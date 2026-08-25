@@ -1,0 +1,1 @@
+ALTER TABLE `access_automation_settings` ADD `auto_enable_teacher_local_edit` integer DEFAULT 1 NOT NULL;

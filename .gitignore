@@ -1,43 +1,34 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies and package-manager state
+**/node_modules/
+**/.pnp
+**/.pnp.*
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/versions
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Build and runtime output
+**/coverage/
+**/.next/
+**/out/
+**/dist/
+**/.wrangler/
+**/.sites-runtime/
+**/outputs/
+**/work/
 
-# testing
-/coverage
+# Local environment and credentials
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
 
-# next.js
-/.next/
-/out/
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
-
-# vercel
-.vercel
-
-# typescript
-next-env.d.ts
-/dist/
-/.wrangler/
-/.sites-runtime/
-/outputs/
-/work/
+# Logs and local editor files
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.pnpm-debug.log*
+**/.DS_Store
+**/.vercel/
+**/next-env.d.ts
