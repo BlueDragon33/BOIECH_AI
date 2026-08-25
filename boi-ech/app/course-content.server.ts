@@ -296,7 +296,7 @@ export async function listContentVersions(database: Database, includePayloadId?:
        FROM course_content_versions
       ORDER BY version_number DESC LIMIT 50`,
   ).all<ContentVersionRow>();
-  return result.results.map((row) => publicVersion(row, row.id === includePayloadId));
+  return result.results.map((row: ContentVersionRow) => publicVersion(row, row.id === includePayloadId));
 }
 
 export async function listEditorContentVersions(
@@ -314,5 +314,5 @@ export async function listEditorContentVersions(
       WHERE created_by = ? AND editor_device_id = ?
       ORDER BY version_number DESC LIMIT 20`,
   ).bind(email, deviceId).all<ContentVersionRow>();
-  return result.results.map((row) => publicVersion(row, row.id === includePayloadId));
+  return result.results.map((row: ContentVersionRow) => publicVersion(row, row.id === includePayloadId));
 }

@@ -72,9 +72,11 @@ export type PublicDeviceState = {
 };
 
 export type AccessAutomationSettings = {
-  deviceApprovalEnabled: boolean;
-  teacherEditEnabled: boolean;
+  enabled: boolean;
   defaultAccessDays: number;
+  defaultDeviceLimit: number;
+  activeAutoFreeDeviceCount: number;
+  remainingAutoFreeDeviceSlots: number;
   updatedBy: string | null;
   updatedAt: string | null;
 };
@@ -139,16 +141,16 @@ export async function getCourseDatabase() {
       `CREATE TABLE IF NOT EXISTS access_automation_settings (
         id TEXT PRIMARY KEY NOT NULL,
         auto_confirm_new_devices INTEGER NOT NULL DEFAULT 1,
-        auto_enable_teacher_local_edit INTEGER NOT NULL DEFAULT 1,
         default_access_days INTEGER NOT NULL DEFAULT 60,
+        default_device_limit INTEGER NOT NULL DEFAULT 20,
         updated_by TEXT,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     ),
     database.prepare(
       `INSERT INTO access_automation_settings
-        (id, auto_confirm_new_devices, auto_enable_teacher_local_edit, default_access_days)
-       VALUES ('global', 1, 1, 60)
+        (id, auto_confirm_new_devices, default_access_days, default_device_limit)
+       VALUES ('global', 1, 60, 20)
        ON CONFLICT(id) DO NOTHING`,
     ),
     database.prepare(
@@ -166,6 +168,16 @@ export async function getCourseDatabase() {
         device_id TEXT NOT NULL,
         expires_at INTEGER NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    ),
+    database.prepare(
+      `CREATE TABLE IF NOT EXISTS device_deletion_tombstones (
+        device_id TEXT PRIMARY KEY NOT NULL,
+        display_code TEXT NOT NULL UNIQUE,
+        reason TEXT NOT NULL DEFAULT 'spam',
+        learner_name TEXT,
+        deleted_by TEXT NOT NULL,
+        deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     ),
     database.prepare(
@@ -286,14 +298,26 @@ const deviceColumns = `device_id, display_code, public_key_jwk, status, label, l
 
 export async function getAccessAutomationSettings(): Promise<AccessAutomationSettings> {
   const database = await getCourseDatabase();
-  const row = await database.prepare(
-    `SELECT auto_confirm_new_devices, auto_enable_teacher_local_edit, default_access_days, updated_by, updated_at
+  const [row, usage] = await Promise.all([
+    database.prepare(
+    `SELECT auto_confirm_new_devices, default_access_days, default_device_limit, updated_by, updated_at
        FROM access_automation_settings WHERE id = 'global'`,
-  ).first<{ auto_confirm_new_devices: number; auto_enable_teacher_local_edit: number; default_access_days: number; updated_by: string | null; updated_at: string | null }>();
+    ).first<{ auto_confirm_new_devices: number; default_access_days: number; default_device_limit: number; updated_by: string | null; updated_at: string | null }>(),
+    database.prepare(
+      `SELECT COUNT(*) AS active_count FROM device_access
+        WHERE status = 'approved' AND access_group = 'free' AND payment_status = 'free_approved'
+          AND auto_confirmed_at IS NOT NULL
+          AND (access_expires_at IS NULL OR datetime(access_expires_at) > CURRENT_TIMESTAMP)`,
+    ).first<{ active_count: number }>(),
+  ]);
+  const defaultDeviceLimit = Math.max(1, Math.min(1_000, Number(row?.default_device_limit) || 20));
+  const activeAutoFreeDeviceCount = Math.max(0, Number(usage?.active_count) || 0);
   return {
-    deviceApprovalEnabled: row?.auto_confirm_new_devices !== 0,
-    teacherEditEnabled: row?.auto_enable_teacher_local_edit !== 0,
+    enabled: row?.auto_confirm_new_devices !== 0,
     defaultAccessDays: Math.max(1, Math.min(365, Number(row?.default_access_days) || 60)),
+    defaultDeviceLimit,
+    activeAutoFreeDeviceCount,
+    remainingAutoFreeDeviceSlots: Math.max(0, defaultDeviceLimit - activeAutoFreeDeviceCount),
     updatedBy: row?.updated_by ?? null,
     updatedAt: row?.updated_at ?? null,
   };
@@ -318,6 +342,17 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
   const serializedKey = canonicalPublicKey(normalizedKey);
   const deviceId = await sha256(serializedKey);
   const database = await getCourseDatabase();
+
+  const removed = await database.prepare(
+    "SELECT display_code FROM device_deletion_tombstones WHERE device_id = ?",
+  ).bind(deviceId).first<{ display_code: string }>();
+  if (removed) {
+    throw new DeviceAccessError(
+      `Thiết bị ${removed.display_code} đã bị Chủ hệ thống loại khỏi danh sách. Hãy liên hệ quản trị nếu cần đăng ký lại.`,
+      403,
+      "DEVICE_REMOVED",
+    );
+  }
 
   const existing = await database.prepare(
     `SELECT ${deviceColumns} FROM device_access WHERE device_id = ?`,
@@ -571,9 +606,10 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
     payment_status: PaymentStatus;
   }>();
   const automation = await getAccessAutomationSettings();
-  const shouldAutoConfirm = automation.deviceApprovalEnabled
+  const shouldAutoConfirm = automation.enabled
     && current?.status !== "blocked"
     && current?.payment_status === "unassigned";
+  let autoConfirmed = false;
   const changed = !current
     || current.learner_name !== learnerName
     || current.learner_family_name !== learnerFamilyName
@@ -593,13 +629,25 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
        WHERE device_id = ?`,
     ).bind(learnerName, learnerFamilyName, learnerGivenName, personRole, personCode, className, phone, personRole, device.deviceId).run();
     if (shouldAutoConfirm) {
-      await database.prepare(
+      const confirmation = await database.prepare(
         `UPDATE device_access SET status = 'approved', access_group = 'free', payment_status = 'free_approved',
                 approved_at = CURRENT_TIMESTAMP, blocked_at = NULL,
-                personal_edit_enabled = CASE WHEN person_role = 'teacher' AND ? = 1 THEN 1 ELSE 0 END,
+                personal_edit_enabled = CASE WHEN person_role = 'teacher' THEN 1 ELSE 0 END,
                 auto_confirmed_at = CURRENT_TIMESTAMP, access_expires_at = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE device_id = ?`,
-      ).bind(automation.teacherEditEnabled ? 1 : 0, accessExpiryAfterDays(automation.defaultAccessDays), device.deviceId).run();
+          WHERE device_id = ? AND status <> 'blocked' AND payment_status IN ('unassigned', 'free_approved')
+            AND (
+              SELECT COUNT(*) FROM device_access
+               WHERE status = 'approved' AND access_group = 'free' AND payment_status = 'free_approved'
+                 AND auto_confirmed_at IS NOT NULL AND device_id <> ?
+                 AND (access_expires_at IS NULL OR datetime(access_expires_at) > CURRENT_TIMESTAMP)
+            ) < ?`,
+      ).bind(
+        accessExpiryAfterDays(automation.defaultAccessDays),
+        device.deviceId,
+        device.deviceId,
+        automation.defaultDeviceLimit,
+      ).run();
+      autoConfirmed = Number(confirmation.meta.changes) === 1;
     }
   } catch (error) {
     if (error instanceof Error && /device_access\.phone|device_access_phone_unique/i.test(error.message)) {
@@ -615,13 +663,14 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
       "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'device_registration_submitted', ?, ?)",
     ).bind(device.deviceCode, device.deviceId, JSON.stringify({ learnerName, learnerFamilyName, learnerGivenName, personRole, personCode, className, phone })).run();
   }
-  if (shouldAutoConfirm) {
+  if (autoConfirmed) {
     await database.prepare(
       "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'learning_device_auto_confirmed', ?, ?)",
-    ).bind("automation", device.deviceId, JSON.stringify({
-      accessDays: automation.defaultAccessDays,
-      personalEditEnabled: personRole === "teacher" && automation.teacherEditEnabled,
-    })).run();
+    ).bind("automation", device.deviceId, JSON.stringify({ accessDays: automation.defaultAccessDays, deviceLimit: automation.defaultDeviceLimit, personalEditEnabled: personRole === "teacher" })).run();
+  } else if (shouldAutoConfirm && changed) {
+    await database.prepare(
+      "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'learning_device_auto_confirmation_deferred', ?, ?)",
+    ).bind("automation", device.deviceId, JSON.stringify({ reason: "device_limit_reached", deviceLimit: automation.defaultDeviceLimit })).run();
   }
   const updated = await database.prepare(`SELECT ${deviceColumns} FROM device_access WHERE device_id = ?`)
     .bind(device.deviceId).first<DeviceAccessRow>();

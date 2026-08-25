@@ -1,0 +1,1 @@
+ALTER TABLE `access_automation_settings` ADD `default_device_limit` integer DEFAULT 20 NOT NULL;

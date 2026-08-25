@@ -567,7 +567,10 @@ test("supports installable offline learning without offline answer submission", 
   assert.match(page, /enqueueOfflineAction/);
   assert.match(page, /existingRequest\.result/);
   assert.match(page, /flushOfflineQueue/);
-  assert.match(page, /navigator\.serviceWorker\.register\("\/sw\.js"\)/);
+  assert.match(page, /navigator\.serviceWorker[\s\S]*register\("\/sw\.js", \{ updateViaCache: "none" \}\)/);
+  assert.match(page, /controllerchange/);
+  assert.match(page, /window\.location\.reload\(\)/);
+  assert.match(serviceWorker, /boi-ech-webapp-v4/);
   assert.match(page, /Bài kiểm tra cần kết nối mạng để chấm điểm an toàn trên máy chủ/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /\/bien-tap-noi-dung/);
@@ -694,7 +697,7 @@ test("registers a unique learner or teacher identity and limits editing to teach
   assert.match(page, /Mã số học viên/);
   assert.match(page, /Số hiệu SQ\/QNCN/);
   assert.match(auth, /PERSON_CODE_ALREADY_REGISTERED/);
-  assert.match(auth, /personal_edit_enabled = CASE WHEN person_role = 'teacher' AND \? = 1 THEN 1 ELSE 0 END/);
+  assert.match(auth, /personal_edit_enabled = CASE WHEN person_role = 'teacher' THEN 1 ELSE 0 END/);
   assert.match(overview, /current\.person_role !== "teacher"/);
   assert.match(migration, /device_access_person_identity_unique/);
 });
@@ -707,4 +710,67 @@ test("personalizes learner-facing copy with the registered given name", async ()
   assert.match(page, /className="learner-chip"/);
   assert.match(page, /hoc_vien: learnerFullName/);
   assert.doesNotMatch(page, /Bạn (?:đạt|đã|có thể|cần)/);
+});
+
+test("lets only the owner permanently remove confirmed spam devices while preserving protected academic records", async () => {
+  const overview = await readFile(new URL("../app/api/control/overview/route.ts", import.meta.url), "utf8");
+  const auth = await readFile(new URL("../app/device-auth.server.ts", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
+
+  assert.match(overview, /action === "delete-spam-device"/);
+  assert.match(overview, /role !== "owner"/);
+  assert.match(overview, /confirmedCode !== current\.display_code/);
+  assert.match(overview, /current\.payment_status === "paid_verified"/);
+  assert.match(overview, /SELECT id FROM course_certificates WHERE device_id = \? LIMIT 1/);
+  for (const table of [
+    "device_challenges",
+    "ai_feedback",
+    "ai_quiz_sessions",
+    "learner_self_assessments",
+    "ai_device_controls",
+    "ai_interactions",
+    "payment_reviews",
+    "course_activity_events",
+    "device_profiles",
+    "device_access",
+  ]) {
+    assert.match(overview, new RegExp(`DELETE FROM ${table}`));
+  }
+  assert.match(overview, /learning_device_deleted/);
+  assert.match(overview, /deletedDeviceId: deviceId/);
+  assert.match(overview, /INSERT INTO device_deletion_tombstones/);
+  assert.match(overview, /action === "restore-deleted-device"/);
+  assert.match(overview, /learning_device_registration_reopened/);
+  assert.match(auth, /SELECT display_code FROM device_deletion_tombstones WHERE device_id = \?/);
+  assert.match(auth, /DEVICE_REMOVED/);
+  assert.match(schema, /deviceDeletionTombstones/);
+});
+
+test("enters the course immediately after an approved profile and hides free-day countdowns until expiry", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(page, /Lưu thông tin & vào học/);
+  assert.match(page, /setHasEnteredLearning\(access\.status === "approved" && access\.registrationComplete && !access\.accessExpired\)/);
+  assert.match(page, /access\.registrationComplete && !access\.accessExpired\) setHasEnteredLearning\(true\)/);
+  assert.doesNotMatch(page, /Quyền miễn phí còn/);
+  assert.doesNotMatch(page, /Miễn phí\$\{deviceAccess\.accessDaysRemaining/);
+  assert.match(page, /Quyền học đã hết hạn/);
+});
+
+test("caps automatic free access with configurable defaults of 60 days and 20 devices", async () => {
+  const auth = await readFile(new URL("../app/device-auth.server.ts", import.meta.url), "utf8");
+  const overview = await readFile(new URL("../app/api/control/overview/route.ts", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../drizzle/0014_kind_jimmy_woo.sql", import.meta.url), "utf8");
+
+  assert.match(schema, /defaultDeviceLimit: integer\("default_device_limit"\)\.notNull\(\)\.default\(20\)/);
+  assert.match(auth, /defaultDeviceLimit: number/);
+  assert.match(auth, /activeAutoFreeDeviceCount/);
+  assert.match(auth, /remainingAutoFreeDeviceSlots/);
+  assert.match(auth, /SELECT COUNT\(\*\) FROM device_access/);
+  assert.match(auth, /automation\.defaultDeviceLimit/);
+  assert.match(auth, /learning_device_auto_confirmation_deferred/);
+  assert.match(overview, /defaultDeviceLimit < 1 \|\| defaultDeviceLimit > 1_000/);
+  assert.match(overview, /default_device_limit = excluded\.default_device_limit/);
+  assert.match(migration, /ADD `default_device_limit` integer DEFAULT 20 NOT NULL/);
 });

@@ -82,7 +82,7 @@ export async function requireControlService(request: Request) {
   return { actor: actor || "system", role };
 }
 
-function corsHeaders(request: Request) {
+function corsHeaders(request: Request): Record<string, string> {
   return request.headers.get("origin") === CONTROL_CENTER_ORIGIN
     ? {
         "access-control-allow-origin": CONTROL_CENTER_ORIGIN,

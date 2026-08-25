@@ -1,4 +1,13 @@
-# vinext-starter
+# BOIECH_AI
+
+Mã nguồn chính thức của hệ thống **Ứng dụng AI trong dạy và học môn Bơi ếch**.
+Hệ thống gồm site bài giảng, API học tập có xác thực thiết bị, AI giải thích có
+nguồn, học offline, chứng chỉ và cầu nối sang Trung tâm quản trị.
+
+> Bản đang chạy dùng Vinext trên Cloudflare Workers, D1 và R2. Không triển khai
+> riêng thư mục giao diện lên Firebase Hosting vì cách đó sẽ làm mất API, dữ liệu
+> tiến độ, duyệt nội dung và ảnh thanh toán. Kế hoạch chuyển nền tảng an toàn nằm
+> tại [`docs/FIREBASE_READINESS.md`](docs/FIREBASE_READINESS.md).
 
 ## Frog AI learning layer
 

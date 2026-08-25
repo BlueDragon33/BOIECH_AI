@@ -89,6 +89,15 @@ type ActivityDay = {
   progressPercent: number;
 };
 
+type DeletedDeviceRow = {
+  device_id: string;
+  display_code: string;
+  reason: "spam" | "duplicate" | "test" | "other";
+  learner_name: string | null;
+  deleted_by: string;
+  deleted_at: string;
+};
+
 function parse<T>(value: string | null, fallback: T): T {
   try { return JSON.parse(value ?? "") as T; } catch { return fallback; }
 }
@@ -219,10 +228,10 @@ async function attachActivity<T extends ReturnType<typeof view>>(devices: T[], d
         day.studyMinutes += Math.max(0, Number(detail.activeSeconds) || 0) / 60;
       }
     }
-    const recentFirstCompletions = completionResult.results.filter((item) => item.device_id === device.deviceId && timeline.has(isoDay(item.created_at)));
+    const recentFirstCompletions = completionResult.results.filter((item: FirstCompletionRow) => item.device_id === device.deviceId && timeline.has(isoDay(item.created_at)));
     let cumulativeSteps = Math.max(0, device.completedSteps - recentFirstCompletions.length);
     for (const date of days) {
-      cumulativeSteps += recentFirstCompletions.filter((item) => isoDay(item.created_at) === date).length;
+      cumulativeSteps += recentFirstCompletions.filter((item: FirstCompletionRow) => isoDay(item.created_at) === date).length;
       const day = timeline.get(date)!;
       day.studyMinutes = Math.round(day.studyMinutes);
       day.progressPercent = Math.round((Math.min(40, cumulativeSteps) / 40) * 100);
@@ -260,7 +269,7 @@ async function auditRows() {
     `SELECT id, actor, action, target, detail_json, created_at
        FROM course_audit_log ORDER BY id DESC LIMIT 200`,
   ).all<{ id: number; actor: string; action: string; target: string; detail_json: string; created_at: string }>();
-  return result.results.map((row) => ({
+  return result.results.map((row: { id: number; actor: string; action: string; target: string; detail_json: string; created_at: string }) => ({
     id: `boi-ech-${row.id}`,
     source: "Bơi ếch",
     actor: row.actor,
@@ -268,6 +277,22 @@ async function auditRows() {
     target: row.target,
     detail: parse<Record<string, unknown>>(row.detail_json, {}),
     createdAt: row.created_at,
+  }));
+}
+
+async function deletedDeviceRows() {
+  const database = await getCourseDatabase();
+  const result = await database.prepare(
+    `SELECT device_id, display_code, reason, learner_name, deleted_by, deleted_at
+       FROM device_deletion_tombstones ORDER BY deleted_at DESC LIMIT 200`,
+  ).all<DeletedDeviceRow>();
+  return result.results.map((row: DeletedDeviceRow) => ({
+    deviceId: row.device_id,
+    deviceCode: row.display_code,
+    reason: row.reason,
+    learnerName: row.learner_name,
+    deletedBy: row.deleted_by,
+    deletedAt: row.deleted_at,
   }));
 }
 
@@ -290,6 +315,7 @@ export async function GET(request: Request) {
     return controlResponse({
       application: { id: "boi-ech", name: "Bơi ếch AI", lessonCount: 8 },
       devices: await rows(requestedCodes, activityDayCount),
+      ...(requestedCodes === undefined && role === "owner" ? { deletedDevices: await deletedDeviceRows() } : {}),
       automation: await getAccessAutomationSettings(),
       auditLog: requestedCodes === undefined && ["publisher", "owner"].includes(role) ? await auditRows() : [],
     }, 200, request);
@@ -308,42 +334,64 @@ export async function POST(request: Request) {
     const action = requestedAction === "approve" ? "grant-free" : requestedAction;
     const database = await getCourseDatabase();
 
-    if (["update-automation", "update-device-automation", "update-edit-automation"].includes(action)) {
-      const currentAutomation = await getAccessAutomationSettings();
-      const deviceApprovalEnabled = action === "update-edit-automation"
-        ? currentAutomation.deviceApprovalEnabled
-        : payload.enabled === true;
-      const teacherEditEnabled = action === "update-device-automation"
-        ? currentAutomation.teacherEditEnabled
-        : payload.enabled === true;
+    if (action === "update-automation") {
+      const enabled = payload.enabled === true;
       const defaultAccessDays = Math.floor(Number(payload.defaultAccessDays));
+      const defaultDeviceLimit = Math.floor(Number(payload.defaultDeviceLimit));
       if (!Number.isFinite(defaultAccessDays) || defaultAccessDays < 1 || defaultAccessDays > 365) {
         return respond({ error: "Thời hạn tự động phải từ 1 đến 365 ngày." }, 400);
+      }
+      if (!Number.isFinite(defaultDeviceLimit) || defaultDeviceLimit < 1 || defaultDeviceLimit > 1_000) {
+        return respond({ error: "Hạn mức tự động phải từ 1 đến 1.000 thiết bị." }, 400);
       }
       await database.batch([
         database.prepare(
           `INSERT INTO access_automation_settings
-            (id, auto_confirm_new_devices, auto_enable_teacher_local_edit, default_access_days, updated_by, updated_at)
+            (id, auto_confirm_new_devices, default_access_days, default_device_limit, updated_by, updated_at)
            VALUES ('global', ?, ?, ?, ?, CURRENT_TIMESTAMP)
            ON CONFLICT(id) DO UPDATE SET auto_confirm_new_devices = excluded.auto_confirm_new_devices,
-             auto_enable_teacher_local_edit = excluded.auto_enable_teacher_local_edit,
-             default_access_days = excluded.default_access_days, updated_by = excluded.updated_by,
+             default_access_days = excluded.default_access_days,
+             default_device_limit = excluded.default_device_limit, updated_by = excluded.updated_by,
              updated_at = CURRENT_TIMESTAMP`,
-        ).bind(deviceApprovalEnabled ? 1 : 0, teacherEditEnabled ? 1 : 0, defaultAccessDays, actor),
+        ).bind(enabled ? 1 : 0, defaultAccessDays, defaultDeviceLimit, actor),
         database.prepare(
           "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'access_automation_updated', 'global', ?)",
-        ).bind(actor, JSON.stringify({ deviceApprovalEnabled, teacherEditEnabled, defaultAccessDays, scope: action, source: "control-center" })),
+        ).bind(actor, JSON.stringify({ enabled, defaultAccessDays, defaultDeviceLimit, source: "control-center" })),
       ]);
       return respond({ automation: await getAccessAutomationSettings() });
     }
 
     const deviceId = typeof payload.deviceId === "string" ? payload.deviceId : "";
     if (!/^[a-f0-9]{64}$/.test(deviceId)) return respond({ error: "Mã thiết bị không hợp lệ." }, 400);
+
+    if (action === "restore-deleted-device") {
+      if (role !== "owner") {
+        return respond({ error: "Chỉ Chủ hệ thống mới được cho phép thiết bị đã xóa đăng ký lại." }, 403);
+      }
+      const deleted = await database.prepare(
+        "SELECT display_code, reason FROM device_deletion_tombstones WHERE device_id = ?",
+      ).bind(deviceId).first<{ display_code: string; reason: string }>();
+      if (!deleted) return respond({ error: "Thiết bị không còn trong danh sách đã xóa." }, 404);
+      const confirmedCode = typeof payload.confirmDeviceCode === "string"
+        ? payload.confirmDeviceCode.trim().toUpperCase()
+        : "";
+      if (confirmedCode !== deleted.display_code) {
+        return respond({ error: `Hãy nhập chính xác mã ${deleted.display_code} để cho phép đăng ký lại.` }, 409);
+      }
+      await database.batch([
+        database.prepare("DELETE FROM device_deletion_tombstones WHERE device_id = ?").bind(deviceId),
+        database.prepare(
+          "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'learning_device_registration_reopened', ?, ?)",
+        ).bind(actor, deviceId, JSON.stringify({ source: "control-center", deviceCode: deleted.display_code, previousReason: deleted.reason })),
+      ]);
+      return respond({ restoredDeviceId: deviceId, deletedDevices: await deletedDeviceRows() });
+    }
+
     const current = await database.prepare(
       `SELECT device_id, display_code, learner_name, learner_family_name, learner_given_name,
               person_role, person_code, class_name, phone, registration_submitted_at,
               access_group, payment_status, payment_proof_key, status,
-              access_expires_at, personal_edit_enabled
+              access_expires_at, personal_edit_enabled, migrated_from_user_key
          FROM device_access WHERE device_id = ?`,
     ).bind(deviceId).first<{
       device_id: string;
@@ -362,8 +410,80 @@ export async function POST(request: Request) {
       status: "pending" | "approved" | "blocked";
       access_expires_at: string | null;
       personal_edit_enabled: number;
+      migrated_from_user_key: string | null;
     }>();
     if (!current) return respond({ error: "Không tìm thấy thiết bị." }, 404);
+
+    if (action === "delete-spam-device") {
+      if (role !== "owner") {
+        return respond({ error: "Chỉ Chủ hệ thống mới được xóa vĩnh viễn thiết bị rác." }, 403);
+      }
+      const confirmedCode = typeof payload.confirmDeviceCode === "string"
+        ? payload.confirmDeviceCode.trim().toUpperCase()
+        : "";
+      if (confirmedCode !== current.display_code) {
+        return respond({ error: `Hãy nhập chính xác mã ${current.display_code} để xác nhận xóa.` }, 409);
+      }
+      if (current.payment_status === "paid_verified") {
+        return respond({ error: "Tài khoản đã xác minh thanh toán được bảo vệ. Hãy khóa thiết bị thay vì xóa." }, 409);
+      }
+      const certificate = await database.prepare(
+        "SELECT id FROM course_certificates WHERE device_id = ? LIMIT 1",
+      ).bind(deviceId).first<{ id: string }>();
+      if (certificate) {
+        return respond({ error: "Thiết bị đã được cấp chứng chỉ nên không thể xóa. Hãy khóa thiết bị để bảo toàn hồ sơ học tập." }, 409);
+      }
+      const allowedReasons = new Set(["spam", "duplicate", "test", "other"]);
+      const requestedReason = typeof payload.deleteReason === "string" ? payload.deleteReason : "spam";
+      const deleteReason = allowedReasons.has(requestedReason) ? requestedReason : "spam";
+      const statements = [
+        database.prepare(
+          `INSERT INTO device_deletion_tombstones
+            (device_id, display_code, reason, learner_name, deleted_by, deleted_at)
+           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(device_id) DO UPDATE SET display_code = excluded.display_code,
+             reason = excluded.reason, learner_name = excluded.learner_name,
+             deleted_by = excluded.deleted_by, deleted_at = CURRENT_TIMESTAMP`,
+        ).bind(deviceId, current.display_code, deleteReason, current.learner_name, actor),
+        database.prepare("DELETE FROM device_challenges WHERE device_id = ?").bind(deviceId),
+        database.prepare(
+          "DELETE FROM ai_feedback WHERE device_id = ? OR interaction_id IN (SELECT id FROM ai_interactions WHERE subject_id = ?)",
+        ).bind(deviceId, deviceId),
+        database.prepare("DELETE FROM ai_quiz_sessions WHERE device_id = ?").bind(deviceId),
+        database.prepare("DELETE FROM learner_self_assessments WHERE device_id = ?").bind(deviceId),
+        database.prepare("DELETE FROM ai_device_controls WHERE device_id = ?").bind(deviceId),
+        database.prepare("DELETE FROM ai_interactions WHERE subject_id = ?").bind(deviceId),
+        database.prepare("DELETE FROM payment_reviews WHERE device_id = ?").bind(deviceId),
+        database.prepare("DELETE FROM course_activity_events WHERE device_id = ?").bind(deviceId),
+        database.prepare("DELETE FROM device_profiles WHERE device_id = ?").bind(deviceId),
+      ];
+      if (current.migrated_from_user_key) {
+        statements.push(database.prepare("DELETE FROM course_profiles WHERE user_key = ?").bind(current.migrated_from_user_key));
+      }
+      statements.push(
+        database.prepare("DELETE FROM device_access WHERE device_id = ?").bind(deviceId),
+        database.prepare(
+          "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'learning_device_deleted', ?, ?)",
+        ).bind(actor, deviceId, JSON.stringify({
+          source: "control-center",
+          deviceCode: current.display_code,
+          learnerName: current.learner_name,
+          previousStatus: current.status,
+          reason: deleteReason,
+        })),
+      );
+      await database.batch(statements);
+      if (current.payment_proof_key) {
+        const bucket = await paymentBucket();
+        if (bucket) await bucket.delete(current.payment_proof_key).catch(() => undefined);
+      }
+      return respond({
+        deletedDeviceId: deviceId,
+        deletedDeviceCode: current.display_code,
+        deletedDevices: await deletedDeviceRows(),
+        devices: [],
+      });
+    }
 
     const registrationComplete = Boolean(current.learner_name?.trim() && current.person_role && current.person_code?.trim() && current.class_name?.trim() && current.phone?.trim() && current.registration_submitted_at);
     if (["grant-free", "require-payment", "verify-payment"].includes(action) && !registrationComplete) {

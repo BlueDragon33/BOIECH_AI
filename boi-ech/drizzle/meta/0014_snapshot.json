@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d5f22c76-d731-449a-bc2b-c5f50c2c154c",
-  "prevId": "ac408581-1be8-47b0-af9d-8a008314267f",
+  "id": "5518fb5c-5a11-4571-9fc5-f826ed05e0e1",
+  "prevId": "d5f22c76-d731-449a-bc2b-c5f50c2c154c",
   "tables": {
     "access_automation_settings": {
       "name": "access_automation_settings",
@@ -29,6 +29,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 60
+        },
+        "default_device_limit": {
+          "name": "default_device_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 20
         },
         "updated_by": {
           "name": "updated_by",

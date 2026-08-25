@@ -752,7 +752,7 @@ function DeviceGate({
           {blocked ? "Thiết bị đã bị khóa" : expired ? "Quyền học đã hết hạn" : needsRegistration ? "Nhập thông tin người học" : readyToLearn ? "Thông tin đã được lưu" : paymentRequested ? "Bước 2 · Thanh toán" : pending ? "Đang chờ phân nhóm" : "Đang xác thực thiết bị"}
         </span>
         <h1>{blocked ? "Website chưa thể mở trên thiết bị này." : expired ? "Tài khoản cần được quản trị viên gia hạn." : needsRegistration ? "Nhập thông tin người học." : readyToLearn ? `Sẵn sàng vào học, ${device?.learnerGivenName ?? "học viên"}.` : proofSubmitted ? "Ảnh chuyển khoản đã gửi." : paymentRequested ? "Tài khoản học tập: 50.000đ." : pending ? "Thông tin đã gửi tới Trung tâm quản trị." : "Đang kiểm tra quyền truy cập…"}</h1>
-        <p>{blocked ? "Liên hệ quản trị viên nếu cần mở lại quyền học." : expired ? `Quyền học hết hạn lúc ${device?.accessExpiresAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(device.accessExpiresAt)) : "—"}. Tiến độ đã lưu được giữ nguyên.` : needsRegistration ? "Thông tin được gắn với mã thiết bị để cá nhân hóa bài học, lưu tiến độ và cấp chứng chỉ hoàn thành." : readyToLearn ? `Quyền miễn phí còn ${device?.accessDaysRemaining ?? 60} ngày. Thời gian và tiến độ học được tự động ghi nhận để đồng bộ với giảng viên.` : proofSubmitted ? "Trung tâm sẽ kiểm tra ảnh. Ngay khi xác minh, tài khoản trên thiết bị này sẽ tự động mở." : paymentRequested ? "Quét mã QR MB, chuyển đúng 50.000đ rồi gửi ảnh chuyển khoản để Trung tâm xác minh." : pending ? "Quản trị viên sẽ chọn tài khoản miễn phí hoặc yêu cầu trả phí. Trang tự kiểm tra kết quả mà không cần nhập lại." : error || "Thiết bị đang ký thử thách bảo mật do máy chủ gửi."}</p>
+        <p>{blocked ? "Liên hệ quản trị viên nếu cần mở lại quyền học." : expired ? `Quyền học hết hạn lúc ${device?.accessExpiresAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(device.accessExpiresAt)) : "—"}. Tiến độ đã lưu được giữ nguyên.` : needsRegistration ? "Thông tin được dùng để cá nhân hóa bài học, lưu tiến độ và cấp chứng chỉ hoàn thành." : readyToLearn ? "Thông tin đã được xác nhận. Thời gian và tiến độ học được tự động ghi nhận để đồng bộ với giảng viên." : proofSubmitted ? "Trung tâm sẽ kiểm tra ảnh. Ngay khi xác minh, tài khoản trên thiết bị này sẽ tự động mở." : paymentRequested ? "Quét mã QR MB, chuyển đúng 50.000đ rồi gửi ảnh chuyển khoản để Trung tâm xác minh." : pending ? "Quản trị viên sẽ chọn tài khoản miễn phí hoặc yêu cầu trả phí. Trang tự kiểm tra kết quả mà không cần nhập lại." : error || "Thiết bị đang ký thử thách bảo mật do máy chủ gửi."}</p>
         {device?.deviceCode ? (
           <div className="device-code-box"><span>Mã thiết bị</span><strong>{device.deviceCode}</strong><button onClick={() => void copyCode()}>{copied ? "Đã sao chép" : "Sao chép mã"}</button></div>
         ) : null}
@@ -765,7 +765,7 @@ function DeviceGate({
             <label><span>{personRole === "teacher" ? "Lớp / đơn vị phụ trách" : "Lớp"}</span><input value={className} onChange={(event) => setClassName(event.target.value)} placeholder={personRole === "teacher" ? "Ví dụ: Đại đội 1" : "Ví dụ: 7A1"} maxLength={50} required /></label>
             <label><span>Số điện thoại</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="Ví dụ: 0912345678" maxLength={14} required /></label>
             <label className="device-code-field"><span>Mã thiết bị</span><input value={device?.deviceCode ?? ""} readOnly /></label>
-            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu…" : "Lưu thông tin người học"}</button>
+            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu và mở bài học…" : "Lưu thông tin & vào học"}</button>
           </form>
         ) : null}
         {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>Vào học <span>→</span></button> : null}
@@ -1037,8 +1037,21 @@ export default function Home() {
       setNetworkOnline(navigator.onLine);
       void refreshPendingSyncCount();
     }, 0);
+    let detachServiceWorkerListener = () => undefined;
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      const hadActiveWorker = Boolean(navigator.serviceWorker.controller);
+      let reloadingForUpdate = false;
+      const onControllerChange = () => {
+        if (!hadActiveWorker || reloadingForUpdate) return;
+        reloadingForUpdate = true;
+        window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+      detachServiceWorkerListener = () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((registration) => registration.update())
+        .catch(() => undefined);
     }
     const onOnline = () => {
       setNetworkOnline(true);
@@ -1053,6 +1066,7 @@ export default function Home() {
     window.addEventListener("offline", onOffline);
     window.addEventListener("beforeinstallprompt", onInstall);
     return () => {
+      detachServiceWorkerListener();
       window.clearTimeout(startupTimer);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
@@ -1278,7 +1292,10 @@ export default function Home() {
       registerDeviceCredential(deviceCredential)
         .then((access) => {
           setDeviceAccess(access);
-          if (access.status === "approved") setDeviceError("");
+          if (access.status === "approved") {
+            if (access.registrationComplete && !access.accessExpired) setHasEnteredLearning(true);
+            setDeviceError("");
+          }
         })
         .catch((error) => setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị."));
     }, 10_000);
@@ -1469,6 +1486,7 @@ export default function Home() {
     try {
       const access = await registerDeviceCredential(deviceCredential);
       setDeviceAccess(access);
+      if (access.status === "approved" && access.registrationComplete && !access.accessExpired) setHasEnteredLearning(true);
       setDeviceError("");
     } catch (error) {
       setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị.");
@@ -1481,7 +1499,7 @@ export default function Home() {
     if (!deviceCredential || !deviceAccess) throw new Error("Thiết bị chưa sẵn sàng để đăng ký.");
     const access = await saveDeviceRegistration(deviceCredential, deviceAccess, fields);
     setDeviceAccess(access);
-    setHasEnteredLearning(false);
+    setHasEnteredLearning(access.status === "approved" && access.registrationComplete && !access.accessExpired);
     setDeviceError("");
   }
 
@@ -1734,7 +1752,7 @@ export default function Home() {
             <button className={`network-state ${networkOnline ? "online" : "offline"}`} onClick={() => void flushOfflineQueue()} title={usingOfflineLesson ? "Nội dung đang được mở từ bộ nhớ thiết bị" : undefined}><i />{networkOnline ? pendingSyncCount > 0 ? `Đồng bộ ${pendingSyncCount} mục` : "Đã kết nối" : `Học offline${pendingSyncCount > 0 ? ` · ${pendingSyncCount} mục chờ` : ""}`}</button>
             <div className="learner-chip" title={`${learnerFullName} · ${deviceAccess.personCode ?? ""}`}><span>{learnerInitial}</span><div><small>{deviceAccess.personRole === "teacher" ? "Giảng viên" : "Học viên"}</small><strong>Chào {learnerGivenName}</strong></div></div>
             <div className="top-status"><span className="status-dot" /> {section === "tong-quan" ? `${completedLessonCount}/8 bài đã đạt` : section === "ai-hoc-tap" ? "AI có nguồn dẫn" : section === "thuc-hanh" ? `Đang luyện Bài ${selectedLesson}` : `Bài ${selectedLesson} đang mở`}</div>
-            <span className={`payment-access-status ${deviceAccess.accessGroup}`}>{deviceAccess.paymentStatus === "paid_verified" ? "Đã trả phí" : deviceAccess.paymentStatus === "free_approved" ? `Miễn phí${deviceAccess.accessDaysRemaining !== null ? ` · ${deviceAccess.accessDaysRemaining} ngày` : ""}` : "Chưa thanh toán"}</span>
+            <span className={`payment-access-status ${deviceAccess.accessGroup}`}>{deviceAccess.paymentStatus === "paid_verified" ? "Đã trả phí" : deviceAccess.paymentStatus === "free_approved" ? "Miễn phí" : "Chưa thanh toán"}</span>
             {deviceAccess.personRole === "teacher" && deviceAccess.personalEditEnabled && officialContent ? <div className="personal-content-actions"><button className="personal-edit-trigger" onClick={() => setLocalStudioOpen(true)}><span>{hasLocalOverride ? "Đang dùng bản riêng" : "Sửa bản riêng"}</span><b>Bài {selectedLesson}</b></button>{hasLocalOverride ? <button className="personal-reset-trigger" onClick={() => void confirmResetPersonalContent()} title="Xóa bản sửa cục bộ và dùng lại nội dung máy chủ"><span>↺</span> Bản máy chủ</button> : null}</div> : null}
             {deviceAccess.personRole === "teacher" ? <a className="editor-request-link" href={`/bien-tap-noi-dung?lesson=${selectedLesson}`}><span>Xin quyền chỉnh sửa</span><b>Bài {selectedLesson}</b></a> : null}
             <button className="appearance-trigger" onClick={() => setAppearanceOpen(true)} aria-expanded={appearanceOpen} aria-controls="appearance-panel"><span aria-hidden="true">Aa</span> Giao diện</button>

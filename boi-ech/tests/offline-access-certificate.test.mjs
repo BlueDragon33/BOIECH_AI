@@ -11,13 +11,11 @@ test("auto-confirms complete new profiles as free and limits local editing to te
   const migration = await read("../drizzle/0011_superb_vector.sql");
 
   assert.match(schema, /autoConfirmNewDevices/);
-  assert.match(schema, /autoEnableTeacherLocalEdit/);
   assert.match(schema, /defaultAccessDays.*default\(60\)/);
   assert.match(auth, /shouldAutoConfirm/);
   assert.match(auth, /status = 'approved', access_group = 'free', payment_status = 'free_approved'/);
-  assert.match(auth, /personal_edit_enabled = CASE WHEN person_role = 'teacher' AND \? = 1 THEN 1 ELSE 0 END/);
-  assert.match(overview, /"update-device-automation"/);
-  assert.match(overview, /"update-edit-automation"/);
+  assert.match(auth, /personal_edit_enabled = CASE WHEN person_role = 'teacher' THEN 1 ELSE 0 END/);
+  assert.match(overview, /action === "update-automation"/);
   assert.match(overview, /action === "renew-access"/);
   assert.match(overview, /action === "toggle-personal-edit"/);
   assert.match(migration, /CREATE TABLE `access_automation_settings`/);

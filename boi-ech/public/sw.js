@@ -1,4 +1,4 @@
-const CACHE_NAME = "boi-ech-webapp-v3";
+const CACHE_NAME = "boi-ech-webapp-v4";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png", "/thanh-toan-mb.jpeg"];
 
 self.addEventListener("install", (event) => {

@@ -50,8 +50,8 @@ export const deviceAccess = sqliteTable("device_access", {
 export const accessAutomationSettings = sqliteTable("access_automation_settings", {
   id: text("id").primaryKey(),
   autoConfirmNewDevices: integer("auto_confirm_new_devices").notNull().default(1),
-  autoEnableTeacherLocalEdit: integer("auto_enable_teacher_local_edit").notNull().default(1),
   defaultAccessDays: integer("default_access_days").notNull().default(60),
+  defaultDeviceLimit: integer("default_device_limit").notNull().default(20),
   updatedBy: text("updated_by"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -74,6 +74,15 @@ export const deviceChallenges = sqliteTable("device_challenges", {
   deviceId: text("device_id").notNull(),
   expiresAt: integer("expires_at").notNull(),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const deviceDeletionTombstones = sqliteTable("device_deletion_tombstones", {
+  deviceId: text("device_id").primaryKey(),
+  displayCode: text("display_code").notNull().unique(),
+  reason: text("reason").notNull().default("spam"),
+  learnerName: text("learner_name"),
+  deletedBy: text("deleted_by").notNull(),
+  deletedAt: text("deleted_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const contentEditorDevices = sqliteTable("content_editor_devices", {
