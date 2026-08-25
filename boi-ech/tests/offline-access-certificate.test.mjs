@@ -56,6 +56,11 @@ test("records active offline study idempotently and syncs it when connectivity r
   assert.match(coach, /AI offline cục bộ/);
   assert.match(coach, /Chỉ tính khi trang đang hiển thị và có tương tác gần đây/);
   assert.match(coach, /Không camera/);
+  assert.match(coach, /offline-coach-bubble/);
+  assert.match(coach, /setPointerCapture/);
+  assert.match(coach, /POSITION_STORAGE_KEY/);
+  assert.match(coach, /keepInsideViewport/);
+  assert.match(coach, /Thu gọn AI thành bong bóng/);
   assert.match(page, /action: "heartbeat"/);
   assert.match(page, /activeSeconds: 60/);
   assert.doesNotMatch(page, /activeSeconds: 300/);
