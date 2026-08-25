@@ -17,12 +17,6 @@ export function OPTIONS(request: Request) {
 
 const DEVICE_PRESENCE_TIMEOUT_MS = 150_000;
 
-type PaymentBucket = { delete(key: string): Promise<void> };
-
-async function paymentBucket() {
-  const workers = await import("cloudflare:workers");
-  return (workers.env as unknown as { BUCKET?: PaymentBucket }).BUCKET;
-}
 
 function normalizedNamePart(value: unknown, maximum: number) {
   const normalized = typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, maximum) : "";
@@ -424,8 +418,7 @@ export async function POST(request: Request) {
                          AND proof_key = ? ORDER BY submitted_at DESC LIMIT 1)`,
         ).bind(actor, note, deviceId, previousProofKey),
       ]);
-      const bucket = await paymentBucket();
-      if (bucket) await bucket.delete(previousProofKey).catch(() => undefined);
+
       auditAction = "learning_device_payment_rejected";
     } else if (action === "toggle-personal-edit") {
       if (!registrationComplete) return respond({ error: "Thiết bị chưa nhập đủ thông tin người học." }, 409);

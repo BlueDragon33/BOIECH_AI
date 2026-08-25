@@ -597,21 +597,25 @@ async function saveDeviceRegistration(
   return data.device;
 }
 
-async function uploadPaymentProof(credential: StoredDeviceCredential, device: DeviceAccessState, file: File) {
+async function confirmPayment(credential: StoredDeviceCredential, device: DeviceAccessState) {
   const proof = await signedDeviceProof(credential, device);
-  const form = new FormData();
-  form.set("deviceId", proof.deviceId);
-  form.set("challenge", proof.challenge);
-  form.set("signature", proof.signature);
-  form.set("proof", file);
-  const response = await fetch("/api/device/payment-proof", { method: "POST", credentials: "same-origin", body: form });
+  const response = await fetch("/api/device/payment-confirmation", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(proof),
+  });
   if (!response.ok) {
     const data = (await response.json()) as DeviceApiResponse;
-    throw new CourseApiError(data.error ?? "Không thể gửi ảnh chuyển khoản.", data.code, data.device);
+    throw new CourseApiError(
+      data.error ?? "Không thể gửi xác nhận thanh toán.",
+      data.code,
+      data.device,
+    );
   }
   return registerDeviceCredential(credential);
 }
-
 function splitLegacyLearnerName(value: string | null | undefined) {
   const parts = value?.trim().split(/\s+/).filter(Boolean) ?? [];
   return {
@@ -633,7 +637,7 @@ function DeviceGate({
   checking,
   onRetry,
   onRegister,
-  onUploadPayment,
+  onConfirmPayment,
   onEnter,
 }: {
   device: DeviceAccessState | null;
@@ -641,7 +645,7 @@ function DeviceGate({
   checking: boolean;
   onRetry: () => void;
   onRegister: (fields: LearnerRegistrationFields) => Promise<void>;
-  onUploadPayment: (file: File) => Promise<void>;
+  onConfirmPayment: () => Promise<void>;
   onEnter: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -650,7 +654,6 @@ function DeviceGate({
   const [learnerGivenName, setLearnerGivenName] = useState(device?.learnerGivenName ?? legacyName.learnerGivenName);
   const [className, setClassName] = useState(device?.className ?? "");
   const [phone, setPhone] = useState(device?.phone ?? "");
-  const [proof, setProof] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState("");
   const pending = device?.status === "pending";
@@ -681,13 +684,11 @@ function DeviceGate({
 
   async function submitPayment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!proof) { setLocalError("Hãy chọn ảnh chuyển khoản trước khi gửi."); return; }
     setSubmitting(true);
     setLocalError("");
     try {
-      await onUploadPayment(proof);
-      setProof(null);
-    } catch (caught) { setLocalError(caught instanceof Error ? caught.message : "Không thể gửi ảnh chuyển khoản."); }
+      await onConfirmPayment();
+    } catch (caught) { setLocalError(caught instanceof Error ? caught.message : "Không thể gửi xác nhận thanh toán."); }
     finally { setSubmitting(false); }
   }
 
@@ -698,8 +699,8 @@ function DeviceGate({
         <span className={`device-gate-status ${blocked ? "blocked" : expired ? "expired" : pending ? "pending" : "checking"}`}>
           {blocked ? "Thiết bị đã bị khóa" : expired ? "Quyền học đã hết hạn" : needsRegistration ? "Nhập thông tin người học" : readyToLearn ? "Thông tin đã được lưu" : paymentRequested ? "Bước 2 · Thanh toán" : pending ? "Đang chờ phân nhóm" : "Đang xác thực thiết bị"}
         </span>
-        <h1>{blocked ? "Website chưa thể mở trên thiết bị này." : expired ? "Tài khoản cần được quản trị viên gia hạn." : needsRegistration ? "Nhập thông tin người học." : readyToLearn ? `Sẵn sàng vào học, ${device?.learnerGivenName ?? "học viên"}.` : proofSubmitted ? "Ảnh chuyển khoản đã gửi." : paymentRequested ? "Tài khoản học tập: 50.000đ." : pending ? "Thông tin đã gửi tới Trung tâm quản trị." : "Đang kiểm tra quyền truy cập…"}</h1>
-        <p>{blocked ? "Liên hệ quản trị viên nếu cần mở lại quyền học." : expired ? `Quyền học hết hạn lúc ${device?.accessExpiresAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(device.accessExpiresAt)) : "—"}. Tiến độ đã lưu được giữ nguyên.` : needsRegistration ? "Thông tin được gắn với mã thiết bị để cá nhân hóa bài học, lưu tiến độ và cấp chứng chỉ hoàn thành." : readyToLearn ? `Quyền miễn phí còn ${device?.accessDaysRemaining ?? 60} ngày. Thời gian và tiến độ học được tự động ghi nhận để đồng bộ với giảng viên.` : proofSubmitted ? "Trung tâm sẽ kiểm tra ảnh. Ngay khi xác minh, tài khoản trên thiết bị này sẽ tự động mở." : paymentRequested ? "Quét mã QR MB, chuyển đúng 50.000đ rồi gửi ảnh chuyển khoản để Trung tâm xác minh." : pending ? "Quản trị viên sẽ chọn tài khoản miễn phí hoặc yêu cầu trả phí. Trang tự kiểm tra kết quả mà không cần nhập lại." : error || "Thiết bị đang ký thử thách bảo mật do máy chủ gửi."}</p>
+        <h1>{blocked ? "Website chưa thể mở trên thiết bị này." : expired ? "Tài khoản cần được quản trị viên gia hạn." : needsRegistration ? "Nhập thông tin người học." : readyToLearn ? `Sẵn sàng vào học, ${device?.learnerGivenName ?? "học viên"}.` : proofSubmitted ? "Đã gửi xác nhận thanh toán." : paymentRequested ? "Tài khoản học tập: 50.000đ." : pending ? "Thông tin đã gửi tới Trung tâm quản trị." : "Đang kiểm tra quyền truy cập…"}</h1>
+        <p>{blocked ? "Liên hệ quản trị viên nếu cần mở lại quyền học." : expired ? `Quyền học hết hạn lúc ${device?.accessExpiresAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(device.accessExpiresAt)) : "—"}. Tiến độ đã lưu được giữ nguyên.` : needsRegistration ? "Thông tin được gắn với mã thiết bị để cá nhân hóa bài học, lưu tiến độ và cấp chứng chỉ hoàn thành." : readyToLearn ? `Quyền miễn phí còn ${device?.accessDaysRemaining ?? 60} ngày. Thời gian và tiến độ học được tự động ghi nhận để đồng bộ với giảng viên.` : proofSubmitted ? "Trung tâm sẽ đối chiếu giao dịch. Ngay khi xác minh, tài khoản trên thiết bị này sẽ tự động mở." : paymentRequested ? "Quét mã QR MB, chuyển đúng 50.000đ và ghi mã thiết bị làm nội dung chuyển khoản. Sau đó bấm Tôi đã chuyển khoản." : pending ? "Quản trị viên sẽ chọn tài khoản miễn phí hoặc yêu cầu trả phí. Trang tự kiểm tra kết quả mà không cần nhập lại." : error || "Thiết bị đang ký thử thách bảo mật do máy chủ gửi."}</p>
         {device?.deviceCode ? (
           <div className="device-code-box"><span>Mã thiết bị</span><strong>{device.deviceCode}</strong><button onClick={() => void copyCode()}>{copied ? "Đã sao chép" : "Sao chép mã"}</button></div>
         ) : null}
@@ -716,12 +717,18 @@ function DeviceGate({
         {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>Vào học <span>→</span></button> : null}
         {paymentRequested ? (
           <form className="device-payment-form" onSubmit={(event) => void submitPayment(event)}>
-            {device?.paymentReviewNote ? <div className="payment-rejection" role="alert"><strong>Ảnh trước chưa được chấp nhận</strong><p>{device.paymentReviewNote}</p><small>Hãy kiểm tra lại thông tin chuyển khoản rồi gửi ảnh mới.</small></div> : null}
+            {device?.paymentReviewNote ? <div className="payment-rejection" role="alert"><strong>Thanh toán trước chưa được chấp nhận</strong><p>{device.paymentReviewNote}</p><small>Hãy kiểm tra lại giao dịch và nội dung chuyển khoản rồi xác nhận lại.</small></div> : null}
             <div className="payment-price"><span>Bảng giá tài khoản</span><strong>50.000đ</strong><small>Thanh toán một lần cho thiết bị này</small></div>
             <img src="/thanh-toan-mb.jpeg" alt="Mã QR chuyển khoản MB cho Nguyễn Đình Nam, số tài khoản 3030103031991" />
             <dl><div><dt>Ngân hàng</dt><dd>MB</dd></div><div><dt>Chủ tài khoản</dt><dd>NGUYEN DINH NAM</dd></div><div><dt>Số tài khoản</dt><dd>3030103031991</dd></div></dl>
-            <label className="payment-file"><span>{proofSubmitted ? "Thay ảnh chuyển khoản (nếu cần)" : "Ảnh chuyển khoản"}</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setProof(event.target.files?.[0] ?? null)} /></label>
-            <button type="submit" disabled={submitting || !proof}>{submitting ? "Đang gửi ảnh…" : proofSubmitted ? "Gửi ảnh thay thế" : "Gửi ảnh chuyển khoản"}</button>
+            <div className="payment-reference">
+              <span>Nội dung chuyển khoản</span>
+              <strong>{device?.deviceCode ?? "—"}</strong>
+              <small>Ghi chính xác mã thiết bị này trong nội dung chuyển khoản để quản trị viên đối chiếu.</small>
+            </div>
+            <button type="submit" disabled={submitting}>
+              {submitting ? "Đang gửi xác nhận…" : proofSubmitted ? "Xác nhận lại thanh toán" : "Tôi đã chuyển khoản"}
+            </button>
           </form>
         ) : null}
         {(localError || error) && !blocked ? <div className="device-gate-error" role="alert">{localError || error}</div> : null}
@@ -1413,9 +1420,11 @@ export default function Home() {
     setDeviceError("");
   }
 
-  async function submitPaymentProof(file: File) {
-    if (!deviceCredential || !deviceAccess) throw new Error("Thiết bị chưa sẵn sàng để gửi ảnh.");
-    const access = await uploadPaymentProof(deviceCredential, deviceAccess, file);
+  async function submitPaymentConfirmation() {
+    if (!deviceCredential || !deviceAccess) {
+      throw new Error("Thiết bị chưa sẵn sàng để xác nhận thanh toán.");
+    }
+    const access = await confirmPayment(deviceCredential, deviceAccess);
     setDeviceAccess(access);
     setDeviceError("");
   }
@@ -1609,7 +1618,7 @@ export default function Home() {
         checking={deviceChecking}
         onRetry={() => void refreshDeviceAccess()}
         onRegister={submitDeviceRegistration}
-        onUploadPayment={submitPaymentProof}
+        onConfirmPayment={submitPaymentConfirmation}
         onEnter={() => setHasEnteredLearning(true)}
       />
     );
