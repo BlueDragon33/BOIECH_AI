@@ -1,0 +1,16 @@
+{
+  "name": "Ứng dụng AI trong dạy và học môn Bơi ếch",
+  "short_name": "Bơi ếch AI",
+  "description": "Ứng dụng Bơi ếch có trợ giảng AI có nguồn dẫn, lộ trình cá nhân hóa, bài luyện thích ứng, tiến độ thiết bị và học offline.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7fbfb",
+  "theme_color": "#0c6f75",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

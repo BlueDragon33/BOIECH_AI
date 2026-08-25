@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `device_access_phone_unique` ON `device_access` (`phone`);

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `course_content_version_number_unique` ON `course_content_versions` (`version_number`);

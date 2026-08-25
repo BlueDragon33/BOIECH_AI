@@ -1,0 +1,2 @@
+CREATE INDEX `course_activity_device_created_idx` ON `course_activity_events` (`device_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `course_content_status_version_idx` ON `course_content_versions` (`status`,`version_number`);
