@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "boi-ech",
+  "main": "./dist/server/entry.js",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist/client"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "boi-ech-db",
+      "database_id": "7816425d-ce8a-4b3c-b303-7697fd4a529c"
+    }
+  ]
+}
