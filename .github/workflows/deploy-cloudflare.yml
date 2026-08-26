@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -31,23 +31,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build application
-        run: npx vinext build
-
-      - name: Verify build output
-        run: |
-          test -d dist/client
-          test -f worker/index.ts
-          test -f wrangler.deploy.jsonc
-
-      - name: Dry run deploy
+      - name: Deploy with vinext Cloudflare adapter
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --dry-run --config wrangler.deploy.jsonc
-
-      - name: Deploy to Cloudflare Workers
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --config wrangler.deploy.jsonc
+        run: npx --yes @vinext/cloudflare@0.0.50 deploy --name boi-ech
