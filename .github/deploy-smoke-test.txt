@@ -1,0 +1,3 @@
+Auto-deploy smoke test.
+Created 2026-08-26.
+This file does not affect the application runtime.
