@@ -1,6 +1,6 @@
 import { DeviceAccessError } from "./device-auth.server";
 
-const CONTROL_CENTER_ORIGIN = "https://quan-ly-hoc-tap.dinhnam3391.chatgpt.site";
+const CONTROL_CENTER_ORIGIN = "https://learning-management.boiech-ai.workers.dev";
 const TOKEN_AUDIENCE = "boi-ech-control";
 const TOKEN_ISSUER = "quan-ly-hoc-tap";
 
@@ -44,7 +44,8 @@ async function signature(secret: string, value: string) {
     false,
     ["sign"],
   );
-  return base64Url(bytes(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
+  const signed = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return base64Url(new Uint8Array(signed));
 }
 
 async function browserTicket(secret: string, supplied: string) {
