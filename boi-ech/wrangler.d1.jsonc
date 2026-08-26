@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "boi-ech",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "boi-ech-db",
+      "database_id": "7816425d-ce8a-4b3c-b303-7697fd4a529c",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}
