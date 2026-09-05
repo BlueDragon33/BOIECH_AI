@@ -1,0 +1,33 @@
+name: Smoke production admin auth
+
+on:
+  push:
+    branches:
+      - staging/child-health-center-integration
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Workers login fallback
+        run: |
+          set -euo pipefail
+          BASE='https://learning-management.boiech-ai.workers.dev'
+          ROOT_HEADERS=$(curl -sS -D - -o /dev/null "$BASE/")
+          echo "$ROOT_HEADERS"
+          echo "$ROOT_HEADERS" | grep -qi '^location: /login'
+          LOGIN_CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/login")
+          echo "login=$LOGIN_CODE"
+          test "$LOGIN_CODE" = '200'
+          STATUS=$(curl -sS "$BASE/api/auth/status")
+          echo "$STATUS"
+          echo "$STATUS" | grep -q '"configured":true'
+          echo "$STATUS" | grep -Eq '"scheme":"(sha256|pbkdf2-sha256)"'
+          CORS=$(curl -sS -D - -o /dev/null -X OPTIONS \
+            -H 'Origin: https://learning-management.boiech-ai.workers.dev' \
+            -H 'Access-Control-Request-Method: GET' \
+            'https://boi-ech.boiech-ai.workers.dev/api/control/health-content')
+          echo "$CORS" | grep -qi 'access-control-allow-origin: https://learning-management.boiech-ai.workers.dev'
