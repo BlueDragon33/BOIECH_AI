@@ -7,8 +7,10 @@ import {
   replaceHealthEditSection,
   validateHealthCourseDocument,
 } from "./health-content.server";
-import { canContentPublish, canContentReview } from "./content-control-course.server";
 import { getCourseDatabase } from "./device-auth.server";
+
+function canReview(role: string) { return ["reviewer", "publisher", "owner"].includes(role); }
+function canPublish(role: string) { return ["publisher", "owner"].includes(role); }
 
 async function audit(actor: string, action: string, target: string, detail: Record<string, unknown> = {}) {
   const database = await getCourseDatabase();
@@ -53,39 +55,39 @@ export async function healthControlAction(actor: string, role: string, payload: 
   const note = typeof payload.note === "string" ? payload.note.trim().slice(0, 1000) : "";
 
   if (action === "approve-edit") {
-    if (!canContentReview(role)) return { status: 403, data: { error: "Không có quyền cấp phép chỉnh sửa." } };
+    if (!canReview(role)) return { status: 403, data: { error: "Không có quyền cấp phép chỉnh sửa." } };
     if (current.status !== "permission_requested") return { status: 409, data: { error: "Yêu cầu này không còn ở trạng thái xin quyền." } };
     await database.prepare(
       `UPDATE health_content_versions SET status = 'draft', permission_note = ?, permission_reviewed_by = ?,
               permission_reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'permission_requested'`,
     ).bind(note || null, actor, versionId).run();
-    await audit(actor, "health_content_edit_permission_approved", versionId, { scope: current.edit_scope, deviceCode: current.editor_device_code, note });
+    await audit(actor, "content_edit_permission_approved", versionId, { scope: current.edit_scope, deviceCode: current.editor_device_code, note });
   } else if (action === "deny-edit") {
-    if (!canContentReview(role)) return { status: 403, data: { error: "Không có quyền từ chối yêu cầu." } };
+    if (!canReview(role)) return { status: 403, data: { error: "Không có quyền từ chối yêu cầu." } };
     if (current.status !== "permission_requested") return { status: 409, data: { error: "Yêu cầu này không còn ở trạng thái xin quyền." } };
     await database.prepare(
       `UPDATE health_content_versions SET status = 'denied', permission_note = ?, permission_reviewed_by = ?,
               permission_reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'permission_requested'`,
     ).bind(note || null, actor, versionId).run();
-    await audit(actor, "health_content_edit_permission_denied", versionId, { scope: current.edit_scope, deviceCode: current.editor_device_code, note });
+    await audit(actor, "content_edit_permission_denied", versionId, { scope: current.edit_scope, deviceCode: current.editor_device_code, note });
   } else if (action === "request-changes") {
-    if (!canContentReview(role)) return { status: 403, data: { error: "Không có quyền yêu cầu sửa lại." } };
+    if (!canReview(role)) return { status: 403, data: { error: "Không có quyền yêu cầu sửa lại." } };
     if (current.status !== "review") return { status: 409, data: { error: "Bản này không ở trạng thái chờ kiểm tra." } };
     await database.prepare(
       `UPDATE health_content_versions SET status = 'changes_requested', permission_note = ?, reviewed_by = ?,
               reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'review'`,
     ).bind(note || "Trung tâm yêu cầu kiểm tra và chỉnh sửa lại nội dung Sức khỏe trẻ.", actor, versionId).run();
-    await audit(actor, "health_content_changes_requested", versionId, { scope: current.edit_scope, note });
+    await audit(actor, "content_changes_requested", versionId, { scope: current.edit_scope, note });
   } else if (action === "cancel") {
-    if (!canContentReview(role)) return { status: 403, data: { error: "Không có quyền hủy bản chỉnh sửa." } };
+    if (!canReview(role)) return { status: 403, data: { error: "Không có quyền hủy bản chỉnh sửa." } };
     if (!["permission_requested", "draft", "changes_requested", "review"].includes(current.status)) return { status: 409, data: { error: "Không thể hủy ở trạng thái hiện tại." } };
     await database.prepare(
       `UPDATE health_content_versions SET status = 'cancelled', permission_note = ?, reviewed_by = ?,
               reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     ).bind(note || null, actor, versionId).run();
-    await audit(actor, "health_content_edit_cancelled", versionId, { scope: current.edit_scope, note });
+    await audit(actor, "content_edit_cancelled", versionId, { scope: current.edit_scope, note });
   } else if (action === "approve-publish") {
-    if (!canContentPublish(role)) return { status: 403, data: { error: "Chỉ người có quyền xuất bản mới được phê duyệt." } };
+    if (!canPublish(role)) return { status: 403, data: { error: "Chỉ người có quyền xuất bản mới được phê duyệt." } };
     if (current.status !== "review") return { status: 409, data: { error: "Nội dung phải được gửi duyệt trước khi xuất bản." } };
     if (current.created_by === actor) return { status: 409, data: { error: "Người tạo bản nháp không được tự phê duyệt phiên bản của mình." } };
     const candidate = parseHealthCourseDocument(current.payload_json);
@@ -109,9 +111,9 @@ export async function healthControlAction(actor: string, role: string, payload: 
     const published = await database.prepare("SELECT status, reviewed_by FROM health_content_versions WHERE id = ?")
       .bind(versionId).first<{ status: string; reviewed_by: string | null }>();
     if (published?.status !== "published" || published.reviewed_by !== actor) return { status: 409, data: { error: "Phiên bản đã thay đổi trong lúc phê duyệt. Hãy tải lại." } };
-    await audit(actor, "health_content_published", versionId, { versionNumber: current.version_number, scope: scope?.value, lessonNumber: scope?.lessonNumber, section: scope?.section, policyVersion: merged?.policyVersion });
+    await audit(actor, "content_published", versionId, { versionNumber: current.version_number, scope: scope?.value, lessonNumber: scope?.lessonNumber, section: scope?.section, policyVersion: merged?.policyVersion });
   } else if (action === "rollback") {
-    if (!canContentPublish(role)) return { status: 403, data: { error: "Chỉ người có quyền xuất bản mới được khôi phục." } };
+    if (!canPublish(role)) return { status: 403, data: { error: "Chỉ người có quyền xuất bản mới được khôi phục." } };
     if (!["archived", "published"].includes(current.status)) return { status: 409, data: { error: "Chỉ phiên bản từng xuất bản mới có thể khôi phục." } };
     const restoredId = crypto.randomUUID();
     await database.batch([
@@ -126,7 +128,7 @@ export async function healthControlAction(actor: string, role: string, payload: 
           WHERE status = 'published' AND id <> ? AND EXISTS (SELECT 1 FROM health_content_versions WHERE id = ? AND status = 'published')`,
       ).bind(restoredId, restoredId),
     ]);
-    await audit(actor, "health_content_rolled_back", restoredId, { sourceVersionId: versionId, sourceVersionNumber: current.version_number });
+    await audit(actor, "content_rolled_back", restoredId, { sourceVersionId: versionId, sourceVersionNumber: current.version_number });
     return { status: 200, data: { versionId: restoredId } };
   } else {
     return { status: 400, data: { error: "Thao tác nội dung Sức khỏe trẻ không hợp lệ." } };
