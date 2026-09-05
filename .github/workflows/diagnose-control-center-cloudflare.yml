@@ -1,0 +1,31 @@
+name: Diagnose control center Cloudflare
+
+on:
+  push:
+    branches:
+      - staging/child-health-center-integration
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Inspect existing control-center resources
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo '=== D1 databases ==='
+          npx -y wrangler@4.92.0 d1 list || true
+          echo '=== learning-management deployments ==='
+          npx -y wrangler@4.92.0 deployments list --name learning-management || true
+          echo '=== learning-management versions ==='
+          npx -y wrangler@4.92.0 versions list --name learning-management || true
+          echo '=== learning-management secret names ==='
+          npx -y wrangler@4.92.0 secret list --name learning-management || true
