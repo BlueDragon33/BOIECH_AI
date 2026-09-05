@@ -105,6 +105,7 @@ export async function POST(request: Request) {
         boiBridge: await issueBoiBrowserBridge(actorDevice.email, actorDevice.role),
         applications: [
           { id: "boi-ech", name: "Bơi ếch AI", status: "online" },
+          { id: "child-health", name: "Sức khỏe trẻ 9 tháng–5 tuổi", status: "online" },
           { id: "bauman-master-ai", name: "Bauman Master AI · Frog AI", status: "online" },
         ],
         auditLog: localAudit,
