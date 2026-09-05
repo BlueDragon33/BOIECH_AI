@@ -135,7 +135,6 @@ export default function HealthEditorWorkspace({ user }: { user: { displayName: s
       finally { if (!cancelled) setBusy(false); }
     })();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function run(body: Record<string, unknown>, success: string) {

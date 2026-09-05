@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   analyzeHealthSymptoms,
@@ -93,30 +93,30 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
   const [episodeEntry, setEpisodeEntry] = useState<HealthEpisodeEntry>({ ...checkerDefault(9), id: "entry", time: new Date().toISOString(), coughSeverity: 0, energy: 3 });
 
   useEffect(() => {
-    const loadedProfile = safeJson<Profile>(localStorage.getItem(store.profile), profile);
-    const ageMonths = Math.max(9, Math.min(60, loadedProfile.ageMonths || 9));
-    const nextProfile = { ...loadedProfile, ageMonths };
-    setProfile(nextProfile);
-    setProgress(safeJson<Record<string, boolean>>(localStorage.getItem(store.progress), {}));
-    setScores(safeJson<Record<string, number>>(localStorage.getItem(store.scores), {}));
-    const storedEpisodes = safeJson<StoredEpisode[]>(localStorage.getItem(store.episodes), []);
-    setEpisodes(storedEpisodes);
-    const first = storedEpisodes.find((item) => item.profileId === nextProfile.id);
-    setActiveEpisodeId(first?.id ?? "");
-    setChecker(checkerDefault(ageMonths));
-    setEpisodeEntry({ ...checkerDefault(ageMonths), id: crypto.randomUUID(), time: new Date().toISOString(), coughSeverity: 0, energy: 3 });
-    setHydrated(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      const fallbackProfile: Profile = { id: "child-1", nickname: "Bé", ageMonths: 9, sex: "boy" };
+      const loadedProfile = safeJson<Profile>(localStorage.getItem(store.profile), fallbackProfile);
+      const ageMonths = Math.max(9, Math.min(60, loadedProfile.ageMonths || 9));
+      const nextProfile = { ...loadedProfile, ageMonths };
+      const storedEpisodes = safeJson<StoredEpisode[]>(localStorage.getItem(store.episodes), []);
+      setProfile(nextProfile);
+      setProgress(safeJson<Record<string, boolean>>(localStorage.getItem(store.progress), {}));
+      setScores(safeJson<Record<string, number>>(localStorage.getItem(store.scores), {}));
+      setEpisodes(storedEpisodes);
+      setActiveEpisodeId(storedEpisodes.find((item) => item.profileId === nextProfile.id)?.id ?? "");
+      setChecker(checkerDefault(ageMonths));
+      setEpisodeEntry({ ...checkerDefault(ageMonths), id: crypto.randomUUID(), time: new Date().toISOString(), coughSeverity: 0, energy: 3 });
+      setHydrated(true);
+    });
+    return () => { cancelled = true; window.cancelAnimationFrame(frame); };
   }, []);
 
   useEffect(() => { if (hydrated) localStorage.setItem(store.profile, JSON.stringify(profile)); }, [profile, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem(store.progress, JSON.stringify(progress)); }, [progress, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem(store.scores, JSON.stringify(scores)); }, [scores, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem(store.episodes, JSON.stringify(episodes)); }, [episodes, hydrated]);
-  useEffect(() => {
-    setChecker((current) => ({ ...current, ageMonths: profile.ageMonths }));
-    setEpisodeEntry((current) => ({ ...current, ageMonths: profile.ageMonths }));
-  }, [profile.ageMonths]);
 
   const lessons = lessonNumbers.map((number) => initialCourse.lessons[number]);
   const currentLesson = initialCourse.lessons[lessonNumber];
@@ -126,6 +126,13 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
     const completeTabs = tabs.filter((item) => item === "Kiểm tra" ? (scores[lesson.number] ?? 0) >= initialCourse.passScore : progress[`${lesson.number}:${item}`]).length;
     return sum + completeTabs / tabs.length;
   }, 0) / Math.max(1, lessons.length) * 100);
+
+  function changeAge(value: number) {
+    const ageMonths = Math.max(9, Math.min(60, value || 9));
+    setProfile((current) => ({ ...current, ageMonths }));
+    setChecker((current) => ({ ...current, ageMonths }));
+    setEpisodeEntry((current) => ({ ...current, ageMonths }));
+  }
 
   function selectLesson(number: string) { setLessonNumber(number); setTab("Học"); setView("lesson"); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function markDone() { if (tab !== "Kiểm tra") setProgress((current) => ({ ...current, [`${lessonNumber}:${tab}`]: true })); }
@@ -157,7 +164,7 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
       <aside className="health-side">
         <section className="health-profile">
           <label>Biệt danh của bé</label><input value={profile.nickname} maxLength={30} onChange={(event) => setProfile({ ...profile, nickname: event.target.value })} />
-          <label>Tuổi (tháng)</label><input type="number" min={9} max={60} value={profile.ageMonths} onChange={(event) => setProfile({ ...profile, ageMonths: Math.max(9, Math.min(60, Number(event.target.value) || 9)) })} />
+          <label>Tuổi (tháng)</label><input type="number" min={9} max={60} value={profile.ageMonths} onChange={(event) => changeAge(Number(event.target.value))} />
           <label>Giới</label><select value={profile.sex} onChange={(event) => setProfile({ ...profile, sex: event.target.value === "girl" ? "girl" : "boy" })}><option value="boy">Bé trai</option><option value="girl">Bé gái</option></select>
           <div className="health-progress"><span style={{ width: `${completion}%` }} /></div><small>Tiến độ giáo trình {completion}%</small>
         </section>
