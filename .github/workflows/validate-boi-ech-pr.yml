@@ -1,0 +1,53 @@
+name: Validate Boi Ech Pull Request
+
+on:
+  pull_request:
+    paths:
+      - "boi-ech/**"
+      - "quan-ly-hoc-tap/**"
+      - ".github/workflows/validate-boi-ech-pr.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-boi-ech-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test-boi-ech:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: boi-ech/package-lock.json
+      - name: Install locked dependencies
+        working-directory: boi-ech
+        run: npm ci
+      - name: Lint
+        working-directory: boi-ech
+        run: npm run lint
+      - name: Build and test
+        working-directory: boi-ech
+        run: npm test
+
+  test-control-center:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: quan-ly-hoc-tap/package-lock.json
+      - name: Install locked dependencies
+        working-directory: quan-ly-hoc-tap
+        run: npm ci
+      - name: Build
+        working-directory: quan-ly-hoc-tap
+        run: npm run build
