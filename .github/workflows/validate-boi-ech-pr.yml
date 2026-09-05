@@ -29,11 +29,28 @@ jobs:
         working-directory: boi-ech
         run: npm ci
       - name: Lint
+        id: lint
+        continue-on-error: true
         working-directory: boi-ech
-        run: npm run lint
+        run: set -o pipefail; npm run lint 2>&1 | tee lint.log
       - name: Build and test
+        id: test
+        continue-on-error: true
         working-directory: boi-ech
-        run: npm test
+        run: set -o pipefail; npm test 2>&1 | tee build-test.log
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boi-ech-validation-logs
+          path: |
+            boi-ech/lint.log
+            boi-ech/build-test.log
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Enforce validation gate
+        if: steps.lint.outcome == 'failure' || steps.test.outcome == 'failure'
+        run: exit 1
 
   test-control-center:
     runs-on: ubuntu-latest
