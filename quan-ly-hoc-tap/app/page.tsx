@@ -1,9 +1,9 @@
 import { requireChatGPTUser } from "./chatgpt-auth";
-import ControlCenter from "./control-center";
+import ApplicationHub from "./application-hub";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const user = await requireChatGPTUser("/");
-  return <ControlCenter user={{ displayName: user.displayName, email: user.email }} />;
+  return <ApplicationHub user={{ displayName: user.displayName, email: user.email }} />;
 }
