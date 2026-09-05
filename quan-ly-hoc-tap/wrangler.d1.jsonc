@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "learning-management",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "learning-management-db",
+      "database_id": "1cf8f6b4-6c23-4479-8751-47703ecac92b",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

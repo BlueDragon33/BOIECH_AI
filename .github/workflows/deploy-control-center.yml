@@ -1,26 +1,25 @@
-name: Deploy Boi Ech Main to Cloudflare
+name: Deploy Learning Management Main to Cloudflare
 
 on:
   push:
     branches:
       - main
     paths:
-      - "boi-ech/**"
-      - ".github/workflows/deploy-cloudflare.yml"
+      - "quan-ly-hoc-tap/**"
+      - ".github/workflows/deploy-control-center.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-boi-ech-main-cloudflare
+  group: deploy-learning-management-main-cloudflare
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,26 +29,26 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: boi-ech/package-lock.json
+          cache-dependency-path: quan-ly-hoc-tap/package-lock.json
 
       - name: Install dependencies
-        working-directory: boi-ech
+        working-directory: quan-ly-hoc-tap
         run: npm ci
 
-      - name: Apply D1 migrations
-        working-directory: boi-ech
+      - name: Apply control-center D1 migrations
+        working-directory: quan-ly-hoc-tap
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler d1 migrations apply boi-ech-db --remote --config wrangler.d1.jsonc
+        run: npx wrangler d1 migrations apply learning-management-db --remote --config wrangler.d1.jsonc
 
-      - name: Build with Cloudflare Vite plugin
-        working-directory: boi-ech
+      - name: Build control center
+        working-directory: quan-ly-hoc-tap
         run: npx vite build
 
-      - name: Deploy to Cloudflare Workers
-        working-directory: boi-ech
+      - name: Deploy learning-management Worker
+        working-directory: quan-ly-hoc-tap
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        run: npx wrangler deploy --name learning-management
