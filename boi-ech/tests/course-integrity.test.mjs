@@ -337,7 +337,7 @@ test("accepts only short-lived signed browser tickets from the exact control-cen
   const overview = await readFile(new URL("../app/api/control/overview/route.ts", import.meta.url), "utf8");
   const content = await readFile(new URL("../app/api/control/content/route.ts", import.meta.url), "utf8");
 
-  assert.match(auth, /CONTROL_CENTER_ORIGIN = "https:\/\/quan-ly-hoc-tap\.dinhnam3391\.chatgpt\.site"/);
+  assert.match(auth, /CONTROL_CENTER_ORIGIN = "https:\/\/learning-management\.boiech-ai\.workers\.dev"/);
   assert.match(auth, /TOKEN_AUDIENCE = "boi-ech-control"/);
   assert.match(auth, /TOKEN_ISSUER = "quan-ly-hoc-tap"/);
   assert.match(auth, /name: "HMAC", hash: "SHA-256"/);
@@ -527,7 +527,9 @@ test("registers unique learner profiles and uses controlled paid or free activat
   assert.match(overview, /activityTimeline/);
   assert.match(page, /thanh-toan-mb\.jpeg/);
   assert.match(page, /50\.000đ/);
-  assert.match(hosting, /"r2": "BUCKET"/);
+  assert.match(hosting, /"d1": "DB"/);
+  assert.doesNotMatch(hosting, /"r2"/);
+  assert.match(proofRoute, /BUCKET\?: PaymentBucket/);
   assert.match(migration, /ADD `class_name` text/);
   assert.match(migration, /ADD `payment_status` text/);
   assert.match(learnerNameMigration, /ADD `learner_family_name` text/);

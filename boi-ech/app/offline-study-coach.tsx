@@ -102,14 +102,17 @@ export default function OfflineStudyCoach({ learnerName, online, pendingSyncCoun
   }
 
   useEffect(() => {
-    let initial = defaultPosition();
-    try {
-      const stored = JSON.parse(window.localStorage.getItem(POSITION_STORAGE_KEY) ?? "null") as unknown;
-      if (validPosition(stored)) initial = stored;
-    } catch {
-      // Dữ liệu vị trí cũ không hợp lệ thì trở về góc mặc định an toàn.
-    }
-    setPosition(keepInsideViewport(initial, BUBBLE_SIZE, BUBBLE_SIZE));
+    const frame = requestAnimationFrame(() => {
+      let initial = defaultPosition();
+      try {
+        const stored = JSON.parse(window.localStorage.getItem(POSITION_STORAGE_KEY) ?? "null") as unknown;
+        if (validPosition(stored)) initial = stored;
+      } catch {
+        // Dữ liệu vị trí cũ không hợp lệ thì trở về góc mặc định an toàn.
+      }
+      setPosition(keepInsideViewport(initial, BUBBLE_SIZE, BUBBLE_SIZE));
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {

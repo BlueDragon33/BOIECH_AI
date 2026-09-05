@@ -8,6 +8,7 @@ import {
   replaceCourseEditSection,
   validateCourseDocument,
 } from "../../../course-content.server";
+import { healthControlAction, healthControlDetail, healthVersionExists } from "../../../content-control-health.server";
 import { deviceErrorResponse, getCourseDatabase } from "../../../device-auth.server";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,18 @@ async function audit(actor: string, action: string, target: string, detail: Reco
   ).bind(actor, action, target, JSON.stringify(detail)).run();
 }
 
+async function combinedVersions(database: Awaited<ReturnType<typeof getCourseDatabase>>) {
+  const [course, health] = await Promise.all([listContentVersions(database), healthControlDetail()]);
+  return [
+    ...course.map((item) => ({ ...item, application: "boi-ech" as const })),
+    ...health.versions,
+  ].sort((left, right) => {
+    const leftTime = Date.parse(left.updated_at ?? left.created_at);
+    const rightTime = Date.parse(right.updated_at ?? right.created_at);
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  }).slice(0, 100);
+}
+
 export async function GET(request: Request) {
   try {
     const { role } = await requireControlService(request);
@@ -38,8 +51,15 @@ export async function GET(request: Request) {
     if (!canReview(role)) return respond({ error: "Không có quyền xem yêu cầu chỉnh sửa." }, 403);
     const database = await getCourseDatabase();
     const versionId = new URL(request.url).searchParams.get("versionId") ?? undefined;
-    const versions = await listContentVersions(database);
+    const versions = await combinedVersions(database);
     if (!versionId) return respond({ versions });
+    if (!/^[0-9a-f-]{36}$/i.test(versionId)) return respond({ error: "Phiên bản nội dung không hợp lệ." }, 400);
+
+    if (await healthVersionExists(versionId)) {
+      const detail = await healthControlDetail(versionId);
+      return respond({ ...detail, versions, application: "child-health" });
+    }
+
     const selected = await database.prepare(
       "SELECT status, payload_json, edit_scope FROM course_content_versions WHERE id = ?",
     ).bind(versionId).first<{ status: string; payload_json: string; edit_scope: string | null }>();
@@ -49,6 +69,7 @@ export async function GET(request: Request) {
     const published = scope ? await publishedCourseDocument(database) : null;
     return respond({
       versions,
+      application: "boi-ech",
       editScope: scope ?? undefined,
       currentSection: published && scope ? courseEditSectionFromDocument(published, scope) : undefined,
       proposedSection: proposal && scope ? courseEditSectionFromDocument(proposal, scope) : undefined,
@@ -68,6 +89,13 @@ export async function POST(request: Request) {
 
     const versionId = typeof payload.versionId === "string" ? payload.versionId : "";
     if (!/^[0-9a-f-]{36}$/i.test(versionId)) return respond({ error: "Phiên bản nội dung không hợp lệ." }, 400);
+
+    if (await healthVersionExists(versionId)) {
+      const result = await healthControlAction(actor, role, payload);
+      if (result.status >= 400) return respond(result.data, result.status);
+      return respond({ ...result.data, versions: await combinedVersions(database), application: "child-health" }, result.status);
+    }
+
     const current = await database.prepare(
       `SELECT id, status, created_by, payload_json, version_number, edit_scope,
               editor_device_id, editor_device_code
@@ -153,7 +181,7 @@ export async function POST(request: Request) {
       });
     } else if (action === "rollback") {
       if (!canPublish(role)) return respond({ error: "Chỉ người có quyền xuất bản mới được khôi phục." }, 403);
-      if (!['archived', 'published'].includes(current.status)) return respond({ error: "Chỉ phiên bản từng xuất bản mới có thể khôi phục." }, 409);
+      if (!["archived", "published"].includes(current.status)) return respond({ error: "Chỉ phiên bản từng xuất bản mới có thể khôi phục." }, 409);
       const restoredId = crypto.randomUUID();
       await database.batch([
         database.prepare(
@@ -172,11 +200,11 @@ export async function POST(request: Request) {
         ).bind(restoredId, restoredId),
       ]);
       await audit(actor, "content_rolled_back", restoredId, { sourceVersionId: versionId, sourceVersionNumber: current.version_number });
-      return respond({ versionId: restoredId, versions: await listContentVersions(database) });
+      return respond({ versionId: restoredId, versions: await combinedVersions(database), application: "boi-ech" });
     } else {
       return respond({ error: "Thao tác nội dung không hợp lệ." }, 400);
     }
-    return respond({ versions: await listContentVersions(database) });
+    return respond({ versions: await combinedVersions(database), application: "boi-ech" });
   } catch (error) {
     return withControlCors(request, deviceErrorResponse(error));
   }
