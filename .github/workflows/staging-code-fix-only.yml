@@ -1,0 +1,67 @@
+name: Staging code fix only
+
+on:
+  push:
+    branches:
+      - staging/child-health-center-integration
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging/child-health-center-integration
+          fetch-depth: 0
+      - name: Patch code and regression assertions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          health = Path('boi-ech/app/suc-khoe-tre/health-client.tsx')
+          text = health.read_text()
+          text = text.replace('import { useEffect, useMemo, useState } from "react";', 'import { useEffect, useState } from "react";')
+          old_mount = '''  useEffect(() => {\n    const loadedProfile = safeJson<Profile>(localStorage.getItem(store.profile), profile);\n    const ageMonths = Math.max(9, Math.min(60, loadedProfile.ageMonths || 9));\n    const nextProfile = { ...loadedProfile, ageMonths };\n    setProfile(nextProfile);\n    setProgress(safeJson<Record<string, boolean>>(localStorage.getItem(store.progress), {}));\n    setScores(safeJson<Record<string, number>>(localStorage.getItem(store.scores), {}));\n    const storedEpisodes = safeJson<StoredEpisode[]>(localStorage.getItem(store.episodes), []);\n    setEpisodes(storedEpisodes);\n    const first = storedEpisodes.find((item) => item.profileId === nextProfile.id);\n    setActiveEpisodeId(first?.id ?? "");\n    setChecker(checkerDefault(ageMonths));\n    setEpisodeEntry({ ...checkerDefault(ageMonths), id: crypto.randomUUID(), time: new Date().toISOString(), coughSeverity: 0, energy: 3 });\n    setHydrated(true);\n  // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, []);'''
+          new_mount = '''  useEffect(() => {\n    let cancelled = false;\n    const frame = window.requestAnimationFrame(() => {\n      if (cancelled) return;\n      const fallbackProfile: Profile = { id: "child-1", nickname: "Bé", ageMonths: 9, sex: "boy" };\n      const loadedProfile = safeJson<Profile>(localStorage.getItem(store.profile), fallbackProfile);\n      const ageMonths = Math.max(9, Math.min(60, loadedProfile.ageMonths || 9));\n      const nextProfile = { ...loadedProfile, ageMonths };\n      const storedEpisodes = safeJson<StoredEpisode[]>(localStorage.getItem(store.episodes), []);\n      setProfile(nextProfile);\n      setProgress(safeJson<Record<string, boolean>>(localStorage.getItem(store.progress), {}));\n      setScores(safeJson<Record<string, number>>(localStorage.getItem(store.scores), {}));\n      setEpisodes(storedEpisodes);\n      setActiveEpisodeId(storedEpisodes.find((item) => item.profileId === nextProfile.id)?.id ?? "");\n      setChecker(checkerDefault(ageMonths));\n      setEpisodeEntry({ ...checkerDefault(ageMonths), id: crypto.randomUUID(), time: new Date().toISOString(), coughSeverity: 0, energy: 3 });\n      setHydrated(true);\n    });\n    return () => { cancelled = true; window.cancelAnimationFrame(frame); };\n  }, []);'''
+          if old_mount not in text: raise SystemExit('health mount block not found')
+          text = text.replace(old_mount, new_mount)
+          old_age_effect = '''  useEffect(() => {\n    setChecker((current) => ({ ...current, ageMonths: profile.ageMonths }));\n    setEpisodeEntry((current) => ({ ...current, ageMonths: profile.ageMonths }));\n  }, [profile.ageMonths]);\n'''
+          if old_age_effect not in text: raise SystemExit('age effect not found')
+          text = text.replace(old_age_effect, '')
+          marker = '  function selectLesson(number: string) { setLessonNumber(number); setTab("Học"); setView("lesson"); window.scrollTo({ top: 0, behavior: "smooth" }); }'
+          helper = '''  function changeAge(value: number) {\n    const ageMonths = Math.max(9, Math.min(60, value || 9));\n    setProfile((current) => ({ ...current, ageMonths }));\n    setChecker((current) => ({ ...current, ageMonths }));\n    setEpisodeEntry((current) => ({ ...current, ageMonths }));\n  }\n\n'''
+          if marker not in text: raise SystemExit('selectLesson marker not found')
+          text = text.replace(marker, helper + marker)
+          old_age_input = 'onChange={(event) => setProfile({ ...profile, ageMonths: Math.max(9, Math.min(60, Number(event.target.value) || 9)) })}'
+          if old_age_input not in text: raise SystemExit('age input handler not found')
+          text = text.replace(old_age_input, 'onChange={(event) => changeAge(Number(event.target.value))}')
+          health.write_text(text)
+
+          workspace = Path('boi-ech/app/bien-tap-suc-khoe-tre/workspace.tsx')
+          text = workspace.read_text()
+          text = text.replace('  // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, []);', '  }, []);', 1)
+          workspace.write_text(text)
+
+          tests = Path('boi-ech/tests/course-integrity.test.mjs')
+          text = tests.read_text()
+          old_origin = r'assert.match(auth, /CONTROL_CENTER_ORIGIN = "https:\/\/quan-ly-hoc-tap\.dinhnam3391\.chatgpt\.site"/);'
+          new_origin = r'assert.match(auth, /CONTROL_CENTER_ORIGIN = "https:\/\/learning-management\.boiech-ai\.workers\.dev"/);'
+          if old_origin not in text: raise SystemExit('old control center assertion not found')
+          text = text.replace(old_origin, new_origin)
+          old_r2 = '  assert.match(hosting, /"r2": "BUCKET"/);'
+          new_r2 = '''  assert.match(hosting, /"d1": "DB"/);\n  assert.doesNotMatch(hosting, /"r2"/);\n  assert.match(proofRoute, /BUCKET\\?: PaymentBucket/);'''
+          if old_r2 not in text: raise SystemExit('old r2 assertion not found')
+          tests.write_text(text.replace(old_r2, new_r2))
+          PY
+      - name: Commit code fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add boi-ech/app/suc-khoe-tre/health-client.tsx boi-ech/app/bien-tap-suc-khoe-tre/workspace.tsx boi-ech/tests/course-integrity.test.mjs
+          git diff --cached --check
+          git commit -m "fix: clear child health code validation"
+          git push origin HEAD:staging/child-health-center-integration
