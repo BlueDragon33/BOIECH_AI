@@ -776,3 +776,17 @@ test("caps automatic free access with configurable defaults of 60 days and 20 de
   assert.match(overview, /default_device_limit = excluded\.default_device_limit/);
   assert.match(migration, /ADD `default_device_limit` integer DEFAULT 20 NOT NULL/);
 });
+
+
+test("keeps child health and Boi Ech administration isolated", async () => {
+  const boiControl = await readFile(new URL("../app/api/control/content/route.ts", import.meta.url), "utf8");
+  const healthControl = await readFile(new URL("../app/api/control/health-content/route.ts", import.meta.url), "utf8");
+  const healthServer = await readFile(new URL("../app/content-control-health.server.ts", import.meta.url), "utf8");
+
+  assert.doesNotMatch(boiControl, /healthControlAction|healthControlDetail|healthVersionExists|combinedVersions/);
+  assert.match(boiControl, /listContentVersions\(database\)/);
+  assert.match(healthControl, /healthControlDetail/);
+  assert.match(healthControl, /healthControlAction/);
+  assert.match(healthControl, /application: "child-health"/);
+  assert.match(healthServer, /health_content_versions/);
+});
