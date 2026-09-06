@@ -1717,13 +1717,13 @@ function Reminders({
   const [time, setTime] = useState("07:00");
   const [repeat, setRepeat] = useState<ReminderRepeat>("daily");
   const [note, setNote] = useState("");
-  const [notificationStatus, setNotificationStatus] = useState<"unsupported" | NotificationPermission>("default");
-  const ownReminders = reminders.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-
-  useEffect(() => {
-    if ("Notification" in window) setNotificationStatus(Notification.permission);
-    else setNotificationStatus("unsupported");
-  }, []);
+  const [notificationStatus, setNotificationStatus] = useState<
+    "unsupported" | NotificationPermission
+  >(() => {
+    if (typeof window === "undefined") return "default";
+    return "Notification" in window ? Notification.permission : "unsupported";
+  });
+  const ownReminders = reminders.slice().sort((a, b) => (a.date + b.time).localeCompare(b.date + b.time));
   useEffect(() => {
     if (notificationStatus !== "granted") return undefined;
     function notifyDue() {
