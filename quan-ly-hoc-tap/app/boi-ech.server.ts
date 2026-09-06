@@ -13,13 +13,15 @@ export class UpstreamError extends Error {
 
 type ApplicationTarget = "boi-ech" | "child-health";
 
+const APPLICATION_BASE_URLS: Record<ApplicationTarget, string> = {
+  "boi-ech": "https://boi-ech.boiech-ai.workers.dev",
+  "child-health": "https://suc-khoe-tre.boiech-ai.workers.dev",
+};
+
 async function configuration(application: ApplicationTarget) {
   const workers = await import("cloudflare:workers");
   const values = workers.env as unknown as Record<string, unknown>;
-  const configuredBoi = typeof values.BOI_ECH_BASE_URL === "string" ? values.BOI_ECH_BASE_URL.replace(/\/$/, "") : "";
-  const baseUrl = application === "child-health"
-    ? "https://suc-khoe-tre.boiech-ai.workers.dev"
-    : configuredBoi;
+  const baseUrl = APPLICATION_BASE_URLS[application];
   const secret = typeof values.CONTROL_SERVICE_SECRET === "string" ? values.CONTROL_SERVICE_SECRET : "";
   if (!/^https:\/\/[a-z0-9.-]+$/i.test(baseUrl) || secret.length < 32) {
     throw new UpstreamError(
