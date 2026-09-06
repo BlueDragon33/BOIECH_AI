@@ -11,13 +11,22 @@ export class UpstreamError extends Error {
   }
 }
 
-async function configuration() {
+type ApplicationTarget = "boi-ech" | "child-health";
+
+async function configuration(application: ApplicationTarget) {
   const workers = await import("cloudflare:workers");
   const values = workers.env as unknown as Record<string, unknown>;
-  const baseUrl = typeof values.BOI_ECH_BASE_URL === "string" ? values.BOI_ECH_BASE_URL.replace(/\/$/, "") : "";
+  const configuredBoi = typeof values.BOI_ECH_BASE_URL === "string" ? values.BOI_ECH_BASE_URL.replace(/\/$/, "") : "";
+  const baseUrl = application === "child-health"
+    ? "https://suc-khoe-tre.boiech-ai.workers.dev"
+    : configuredBoi;
   const secret = typeof values.CONTROL_SERVICE_SECRET === "string" ? values.CONTROL_SERVICE_SECRET : "";
   if (!/^https:\/\/[a-z0-9.-]+$/i.test(baseUrl) || secret.length < 32) {
-    throw new UpstreamError("Kết nối Bơi ếch chưa được cấu hình.", 503, { code: "BOI_ECH_NOT_CONFIGURED" });
+    throw new UpstreamError(
+      application === "child-health" ? "Kết nối Sức khỏe trẻ chưa được cấu hình." : "Kết nối Bơi ếch chưa được cấu hình.",
+      503,
+      { code: application === "child-health" ? "CHILD_HEALTH_NOT_CONFIGURED" : "BOI_ECH_NOT_CONFIGURED" },
+    );
   }
   return { baseUrl, secret };
 }
@@ -40,16 +49,24 @@ async function signature(secret: string, value: string) {
   return base64Url(new Uint8Array(signed));
 }
 
-export async function issueBoiBrowserBridge(actor: string, role: ControlRole) {
-  const { baseUrl, secret } = await configuration();
+async function issueApplicationBrowserBridge(application: ApplicationTarget, actor: string, role: ControlRole) {
+  const { baseUrl, secret } = await configuration(application);
   const expiresAt = Date.now() + 5 * 60 * 1000;
   const payload = base64Url(new TextEncoder().encode(JSON.stringify({
     iss: "quan-ly-hoc-tap",
-    aud: "boi-ech-control",
+    aud: application === "child-health" ? "child-health-control" : "boi-ech-control",
     actor: actor.trim().toLowerCase().slice(0, 160),
     role,
     exp: expiresAt,
   })));
   const signedInput = `v1.${payload}`;
   return { baseUrl, token: `${signedInput}.${await signature(secret, signedInput)}`, expiresAt };
+}
+
+export function issueBoiBrowserBridge(actor: string, role: ControlRole) {
+  return issueApplicationBrowserBridge("boi-ech", actor, role);
+}
+
+export function issueHealthBrowserBridge(actor: string, role: ControlRole) {
+  return issueApplicationBrowserBridge("child-health", actor, role);
 }
