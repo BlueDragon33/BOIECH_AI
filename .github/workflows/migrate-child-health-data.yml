@@ -1,0 +1,34 @@
+name: Migrate Child Health content data
+
+on:
+  push:
+    branches:
+      - staging/child-health-center-integration
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Wrangler
+        run: npm install --global wrangler@4.92.0
+      - name: Copy child-health content versions to dedicated D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          rm -f /tmp/health-export.sql /tmp/health-inserts.sql
+          wrangler d1 export boi-ech-db --remote --output=/tmp/health-export.sql --table=health_content_versions
+          grep -E '^INSERT INTO [`"]?health_content_versions' /tmp/health-export.sql | sed -E 's/^INSERT INTO/INSERT OR IGNORE INTO/' > /tmp/health-inserts.sql || true
+          ROWS=$(grep -c '^INSERT OR IGNORE INTO' /tmp/health-inserts.sql || true)
+          echo "health_content_export_rows=$ROWS"
+          if [ "$ROWS" -gt 0 ]; then
+            wrangler d1 execute suc-khoe-tre-db --remote --file=/tmp/health-inserts.sql
+          fi
+          wrangler d1 execute suc-khoe-tre-db --remote --command='SELECT COUNT(*) AS health_content_versions_count FROM health_content_versions;'
