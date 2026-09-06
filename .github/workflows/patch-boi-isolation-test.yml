@@ -24,9 +24,8 @@ jobs:
           path = Path('boi-ech/tests/course-integrity.test.mjs')
           text = path.read_text()
           start_marker = 'test("keeps child health and Boi Ech administration isolated", async () => {'
-          next_marker = 'test("auto-confirms complete new profiles as free and limits local editing to teachers"'
           start = text.index(start_marker)
-          end = text.index(next_marker, start)
+          end = text.index('\n});', start) + len('\n});')
           replacement = '''test("keeps child health and Boi Ech administration isolated", async () => {
             const boiControl = await readFile(new URL("../app/api/control/content/route.ts", import.meta.url), "utf8");
             const legacyHealth = await readFile(new URL("../app/suc-khoe-tre/page.tsx", import.meta.url), "utf8");
@@ -39,9 +38,7 @@ jobs:
             await assert.rejects(() => stat(new URL("../app/content-control-health.server.ts", import.meta.url)), /ENOENT/);
             assert.match(legacyHealth, /suc-khoe-tre\\.boiech-ai\\.workers\\.dev\\/suc-khoe-tre/);
             assert.match(legacyEditor, /learning-management\\.boiech-ai\\.workers\\.dev\\/apps\\/suc-khoe-tre/);
-          });
-
-          '''
+          });'''
           path.write_text(text[:start] + replacement + text[end:])
           Path('.github/workflows/patch-boi-isolation-test.yml').unlink()
           PY
