@@ -9,3 +9,20 @@
 .install-fab>b{padding-right:15px;font-size:12px;white-space:nowrap}
 .install-fab:hover,.install-fab:focus-visible{width:150px;box-shadow:0 16px 38px rgba(18,55,104,.38);transform:translateY(-2px);outline:none}
 @media(max-width:900px){.install-fab{right:max(10px,env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));width:44px;height:44px}.install-fab:hover,.install-fab:focus-visible{width:44px;transform:none}}
+
+
+.health-button.pressable,.health-lesson-card.pressable{transition:transform .12s ease,box-shadow .12s ease,filter .12s ease;box-shadow:0 3px 0 rgba(20,45,78,.25);cursor:pointer}
+.health-button.pressable:hover,.health-lesson-card.pressable:hover{transform:translateY(-1px)}
+.health-button.pressable:active,.health-lesson-card.pressable:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(20,45,78,.25)}
+.health-button.pressable.is-selected{transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.28),0 1px 0 rgba(20,45,78,.28);filter:saturate(1.12)}
+.health-button:disabled{cursor:not-allowed;opacity:.62}
+.health-nutrition-hero{background:linear-gradient(135deg,#835d16,#b98426)}
+.health-reminder-hero{background:linear-gradient(135deg,#3d2b69,#704bb0)}
+.health-calendar-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.health-reminder-item{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1px solid var(--health-line);border-radius:13px;padding:12px;margin-top:9px;background:#fbfcfe}
+.health-reminder-item h3{margin:0 0 5px}
+.health-reminder-item p{margin:3px 0;color:var(--health-muted)}
+.health-toggle-row{display:flex;flex-wrap:wrap;gap:8px}
+.health-toggle-row label{display:flex;align-items:center;gap:6px;border:1px solid var(--health-line);border-radius:10px;padding:8px 10px;background:#fff}
+.health-permission-note{border:1px solid #ecd59d;background:#fff8e7;color:#73510b;border-radius:11px;padding:10px 12px;margin-top:10px}
+@media(max-width:900px){.health-mobile{grid-template-columns:repeat(7,minmax(0,1fr))}.health-mobile button{font-size:10px;padding:7px 2px}.health-reminder-item{display:block}}
