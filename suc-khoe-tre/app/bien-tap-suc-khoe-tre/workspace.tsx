@@ -35,6 +35,8 @@ type ApiData = { device?: EditorDevice; challenge?: string; versions?: Version[]
 const lessonNames: Record<string, string> = {
   "01": "Hồ sơ sức khỏe & tăng trưởng", "02": "Dinh dưỡng & chống hóc", "03": "Ngủ, vận động & phát triển", "04": "Ho, sổ mũi & đường hô hấp",
   "05": "Sốt & sử dụng thuốc an toàn", "06": "Tiêu hóa, da & vệ sinh", "07": "An toàn & sơ cứu cần nhớ", "08": "Tiêm chủng, khám định kỳ & kế hoạch gia đình",
+  "09": "Tăng trưởng & sức khỏe học đường", "10": "Dinh dưỡng, vận động & răng miệng", "11": "Ngủ, màn hình & sức khỏe tinh thần",
+  "12": "Hô hấp & bệnh học đường", "13": "An toàn, giao thông & sơ cứu", "14": "Khám định kỳ & hồ sơ sức khỏe",
 };
 const sectionOptions: { id: EditSection; label: string; description: string }[] = [
   { id: "content", label: "Nội dung", description: "Kiến thức chính và cảnh báo an toàn." },

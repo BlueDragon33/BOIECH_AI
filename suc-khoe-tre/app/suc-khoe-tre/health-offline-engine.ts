@@ -1,5 +1,6 @@
 export type HealthTriageLevel = 0 | 1 | 2 | 3;
 export type HealthCourseTrend = "same" | "better" | "worse" | "betterThenWorse";
+export type HealthAgeBand = "under5" | "school5to10";
 
 export type HealthSymptomKey =
   | "runny" | "cough" | "phlegm" | "wheeze" | "bark" | "stridor" | "retractions" | "nasalFlaring" | "blue" | "apnea"
@@ -43,7 +44,9 @@ export const HEALTH_SYMPTOMS: { id: HealthSymptomKey; label: string; group: stri
 ];
 
 export type HealthCheckInput = {
-  ageMonths: number;
+  ageBand?: HealthAgeBand;
+  ageMonths?: number;
+  ageYears?: number;
   symptoms: HealthSymptomKey[];
   days: number;
   course: HealthCourseTrend;
@@ -52,6 +55,12 @@ export type HealthCheckInput = {
   spo2?: number;
   intakePercent: number;
   hoursSinceUrine: number;
+};
+
+export type NormalizedHealthAge = {
+  ageBand: HealthAgeBand;
+  ageMonths: number | null;
+  ageYears: number | null;
 };
 
 export type HealthPattern = { name: string; strength: "có thể cân nhắc" | "phù hợp một số dấu hiệu" | "phù hợp khá nhiều dấu hiệu"; reasons: string[] };
@@ -77,10 +86,26 @@ const labels = [
 
 function unique(values: string[]) { return [...new Set(values.filter(Boolean))]; }
 function has(sx: HealthSymptomKey[], key: HealthSymptomKey) { return sx.includes(key); }
-export function healthFastBreathing(ageMonths: number, rate: number) { return ageMonths < 12 ? rate >= 50 : rate >= 40; }
+export function normalizeHealthAge(input: Pick<HealthCheckInput, "ageBand" | "ageMonths" | "ageYears">): NormalizedHealthAge {
+  if (input.ageBand === "school5to10") {
+    return { ageBand: "school5to10", ageMonths: null, ageYears: Math.max(5, Math.min(10, Math.round(input.ageYears || 5))) };
+  }
+  return { ageBand: "under5", ageMonths: Math.max(9, Math.min(60, Math.round(input.ageMonths || 9))), ageYears: null };
+}
+
+export function healthFastBreathing(ageBand: HealthAgeBand | undefined, ageMonths: number, rate: number) {
+  return ageBand === "under5" && (ageMonths < 12 ? rate >= 50 : rate >= 40);
+}
+
+export function healthBreathingThreshold(ageBand: HealthAgeBand | undefined, ageMonths: number) {
+  if (ageBand !== "under5") return null;
+  return ageMonths < 12 ? "≥50 lần/phút" : "≥40 lần/phút";
+}
 
 export function analyzeHealthSymptoms(input: HealthCheckInput): HealthCheckResult {
-  const age = Math.max(9, Math.min(60, Math.round(input.ageMonths || 9)));
+  const normalizedAge = normalizeHealthAge(input);
+  const ageBand = normalizedAge.ageBand;
+  const age = normalizedAge.ageMonths ?? 60;
   const sx = input.symptoms ?? [];
   const rr = Number(input.respiratoryRate || 0);
   const spo2 = Number(input.spo2 || 0);
@@ -88,7 +113,7 @@ export function analyzeHealthSymptoms(input: HealthCheckInput): HealthCheckResul
   const intake = Math.max(0, Math.min(100, Number(input.intakePercent ?? 100)));
   const urine = Math.max(0, Number(input.hoursSinceUrine || 0));
   const respiratory = sx.some((key) => ["runny", "cough", "phlegm", "wheeze", "bark", "stridor", "retractions", "nasalFlaring", "blue", "apnea"].includes(key));
-  const fast = respiratory && rr > 0 && healthFastBreathing(age, rr);
+  const fast = respiratory && rr > 0 && healthFastBreathing(ageBand, age, rr);
   let level: HealthTriageLevel = 0;
   const reasons: string[] = [];
   const actions: string[] = [];
@@ -109,7 +134,7 @@ export function analyzeHealthSymptoms(input: HealthCheckInput): HealthCheckResul
 
   if (respiratory && rr > 70) { level = 3; reasons.push(`Nhịp thở ${rr}/phút rất cao.`); fire("NICE NG9", "RR >70/phút", "Ví dụ của suy hô hấp nặng trong bronchiolitis."); }
   else if (respiratory && rr > 60) { level = Math.max(level, 2) as HealthTriageLevel; reasons.push(`Nhịp thở ${rr}/phút >60/phút.`); fire("NICE NG9", "RR >60/phút", "Cần cân nhắc chuyển đánh giá tại bệnh viện."); }
-  else if (fast) { level = Math.max(level, 1) as HealthTriageLevel; reasons.push(`Thở nhanh theo ngưỡng WHO cho tuổi này (${age < 12 ? "≥50" : "≥40"}/phút).`); fire("WHO IMCI", "Thở nhanh theo tuổi", `Đã nhập ${rr}/phút.`); }
+  else if (fast) { level = Math.max(level, 1) as HealthTriageLevel; reasons.push(`Thở nhanh theo ngưỡng WHO cho nhóm dưới 5 tuổi (${age < 12 ? "≥50" : "≥40"}/phút).`); fire("WHO IMCI", "Thở nhanh theo tuổi", `Đã nhập ${rr}/phút.`); }
 
   if (spo2 > 0 && spo2 < 92) { level = Math.max(level, 2) as HealthTriageLevel; reasons.push(`SpO₂ ${spo2}% thấp.`); fire("NICE NG9", "SpO₂ <92%", "Máy đo gia đình có thể sai số; cần nhìn cả tình trạng trẻ."); }
   if (intake <= 50) { level = Math.max(level, 2) as HealthTriageLevel; reasons.push(`Ăn/uống chỉ khoảng ${intake}% bình thường.`); fire("NICE NG9", "Uống giảm đáng kể", "Khả năng uống là yếu tố chuyển đánh giá y tế."); }
@@ -139,6 +164,8 @@ export function analyzeHealthSymptoms(input: HealthCheckInput): HealthCheckResul
   if (has(sx, "dysuria")) add("Nhiễm trùng đường tiểu — cần xét nghiệm để xác nhận", 5, "Có tiểu đau/khóc khi tiểu.");
   if (has(sx, "mouthSores") && has(sx, "handFootRash")) add("Tay–chân–miệng hoặc bệnh virus có tổn thương miệng-da", 6, "Loét miệng + ban/bóng nước tay chân.");
   if (has(sx, "itchEyes") && has(sx, "runny") && !has(sx, "fever")) add("Viêm mũi dị ứng", 5, "Ngứa mắt/hắt hơi + sổ mũi không sốt.");
+  if (ageBand === "school5to10" && has(sx, "soreThroat") && has(sx, "fever")) add("Đau họng do nhiễm trùng — cần khám nếu sốt/nuốt đau rõ", 4, "Trẻ 5–10 tuổi có sốt kèm đau họng.");
+  if (ageBand === "school5to10" && has(sx, "earPain") && has(sx, "fever")) add("Đau tai kèm sốt — cần được khám", 4, "Trẻ 5–10 tuổi có đau tai và sốt.");
   if (intake <= 75 || urine >= 8 || has(sx, "lessUrine") || has(sx, "vomitAll") || has(sx, "diarrhea")) add("Nguy cơ mất nước", 4, "Lượng uống/tiểu hoặc triệu chứng tiêu hóa gợi ý cần theo dõi mất nước.");
 
   const patterns: HealthPattern[] = [...scores.entries()].filter(([, value]) => value.score >= 3).sort((a, b) => b[1].score - a[1].score).slice(0, 4).map(([name, value]) => ({
@@ -147,7 +174,7 @@ export function analyzeHealthSymptoms(input: HealthCheckInput): HealthCheckResul
     reasons: unique(value.reasons).slice(0, 3),
   }));
 
-  if (respiratory && !rr) missing.push("Đếm nhịp thở đủ 60 giây khi trẻ yên.");
+  if (respiratory && !rr) missing.push(ageBand === "under5" ? "Đếm nhịp thở đủ 60 giây khi trẻ yên." : "Đếm nhịp thở đủ 60 giây khi trẻ yên và quan sát công thở.");
   if (has(sx, "fever") && !temp) missing.push("Đo nhiệt độ bằng nhiệt kế.");
   if ((has(sx, "vomit") || has(sx, "diarrhea") || intake < 90) && urine === 0) missing.push("Theo dõi số giờ từ lần tiểu cuối hoặc số tã ướt.");
 
@@ -167,8 +194,8 @@ export function analyzeHealthSymptoms(input: HealthCheckInput): HealthCheckResul
   }
   avoid.push("Không tự dùng dexamethasone/prednisolone chỉ để cắt ho hoặc 'chống viêm'.");
   avoid.push("Không tự dùng kháng sinh chỉ dựa vào ho, đờm, sốt hoặc màu nước mũi.");
-  if (age < 48) avoid.push("Không tự dùng thuốc ho/cảm OTC cho trẻ dưới 4 tuổi.");
-  if (age < 12) avoid.push("Không dùng mật ong dưới 12 tháng.");
+  if (ageBand === "under5" && age < 48) avoid.push("Không tự dùng thuốc ho/cảm OTC cho trẻ dưới 4 tuổi.");
+  if (ageBand === "under5" && age < 12) avoid.push("Không dùng mật ong dưới 12 tháng.");
   avoid.push("Không xông hơi nóng sát mặt và không nhỏ tinh dầu/dầu gió/nước lá vào mũi.");
 
   const required = missing.length;
