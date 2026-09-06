@@ -1,10 +1,5 @@
-import { requireChatGPTUser } from "../chatgpt-auth";
-import HealthEditorWorkspace from "./workspace";
-import "./editor.css";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function HealthContentEditorPage() {
-  const user = await requireChatGPTUser("/bien-tap-suc-khoe-tre");
-  return <HealthEditorWorkspace user={{ displayName: user.displayName, email: user.email }} />;
+export default function LegacyChildHealthEditorRedirect() {
+  redirect("https://learning-management.boiech-ai.workers.dev/apps/suc-khoe-tre");
 }

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "suc-khoe-tre",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "suc-khoe-tre-db",
+      "database_id": "6bb920e1-c4dc-4f15-96d5-07516490959b",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
-name: Validate Boi Ech Pull Request
+name: Validate Application Pull Request
 
 on:
   pull_request:
     paths:
       - "boi-ech/**"
+      - "suc-khoe-tre/**"
       - "quan-ly-hoc-tap/**"
       - ".github/workflows/validate-boi-ech-pr.yml"
 
@@ -11,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-boi-ech-${{ github.event.pull_request.number }}
+  group: validate-applications-split-v2-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +35,26 @@ jobs:
       - name: Build and test
         working-directory: boi-ech
         run: npm test
+
+  test-child-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: suc-khoe-tre/package-lock.json
+      - name: Install locked dependencies
+        working-directory: suc-khoe-tre
+        run: npm ci
+      - name: Lint
+        working-directory: suc-khoe-tre
+        run: npm run lint
+      - name: Build
+        working-directory: suc-khoe-tre
+        run: npx vite build
 
   test-control-center:
     runs-on: ubuntu-latest

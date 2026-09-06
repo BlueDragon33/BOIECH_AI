@@ -780,13 +780,14 @@ test("caps automatic free access with configurable defaults of 60 days and 20 de
 
 test("keeps child health and Boi Ech administration isolated", async () => {
   const boiControl = await readFile(new URL("../app/api/control/content/route.ts", import.meta.url), "utf8");
-  const healthControl = await readFile(new URL("../app/api/control/health-content/route.ts", import.meta.url), "utf8");
-  const healthServer = await readFile(new URL("../app/content-control-health.server.ts", import.meta.url), "utf8");
+  const legacyHealth = await readFile(new URL("../app/suc-khoe-tre/page.tsx", import.meta.url), "utf8");
+  const legacyEditor = await readFile(new URL("../app/bien-tap-suc-khoe-tre/page.tsx", import.meta.url), "utf8");
 
   assert.doesNotMatch(boiControl, /healthControlAction|healthControlDetail|healthVersionExists|combinedVersions/);
   assert.match(boiControl, /listContentVersions\(database\)/);
-  assert.match(healthControl, /healthControlDetail/);
-  assert.match(healthControl, /healthControlAction/);
-  assert.match(healthControl, /application: "child-health"/);
-  assert.match(healthServer, /health_content_versions/);
+  await assert.rejects(() => stat(new URL("../app/api/control/health-content/route.ts", import.meta.url)), /ENOENT/);
+  await assert.rejects(() => stat(new URL("../app/api/health/course/route.ts", import.meta.url)), /ENOENT/);
+  await assert.rejects(() => stat(new URL("../app/content-control-health.server.ts", import.meta.url)), /ENOENT/);
+  assert.match(legacyHealth, /suc-khoe-tre\.boiech-ai\.workers\.dev\/suc-khoe-tre/);
+  assert.match(legacyEditor, /learning-management\.boiech-ai\.workers\.dev\/apps\/suc-khoe-tre/);
 });

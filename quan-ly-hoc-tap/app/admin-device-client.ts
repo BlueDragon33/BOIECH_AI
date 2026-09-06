@@ -38,10 +38,7 @@ type ApiPayload = Partial<AdminBootstrap> & { device?: AdminAccess; challenge?: 
 
 export class AdminApiError extends Error {
   data: ApiPayload;
-  constructor(message: string, data: ApiPayload) {
-    super(message);
-    this.data = data;
-  }
+  constructor(message: string, data: ApiPayload) { super(message); this.data = data; }
 }
 
 function base64Url(bytes: Uint8Array) {
@@ -53,9 +50,7 @@ function base64Url(bytes: Uint8Array) {
 function openDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open("learning-control-device", 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains("credential")) request.result.createObjectStore("credential");
-    };
+    request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains("credential")) request.result.createObjectStore("credential"); };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -92,13 +87,7 @@ async function credentialForDevice() {
 }
 
 async function jsonApi(path: string, body: Record<string, unknown>) {
-  const response = await fetch(path, {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const response = await fetch(path, { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({ error: "Phản hồi quản trị không hợp lệ." })) as ApiPayload;
   if (!response.ok) throw new AdminApiError(data.error ?? "Không thể kết nối dịch vụ quản trị.", data);
   return data;
@@ -121,9 +110,8 @@ async function proof(credential: Credential, access: AdminAccess) {
 async function secureApi(path: string, credential: Credential, access: AdminAccess, body: Record<string, unknown>) {
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      return await jsonApi(path, { ...body, ...await proof(credential, access) });
-    } catch (error) {
+    try { return await jsonApi(path, { ...body, ...await proof(credential, access) }); }
+    catch (error) {
       lastError = error;
       if (!(error instanceof AdminApiError) || error.data.code !== "DEVICE_PROOF_EXPIRED") throw error;
     }
@@ -131,24 +119,26 @@ async function secureApi(path: string, credential: Credential, access: AdminAcce
   throw lastError;
 }
 
-export async function connectAdminDevice() {
+function currentApplication() {
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/apps/suc-khoe-tre")) return "child-health";
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/apps/bauman-master-ai")) return "bauman-master-ai";
+  return "boi-ech";
+}
+
+export async function connectAdminDevice(application = currentApplication()) {
   const credential = await credentialForDevice();
   const access = await register(credential);
   if (access.status !== "approved") return { access, bootstrap: null as AdminBootstrap | null };
-  const bootstrap = await secureApi("/api/dashboard", credential, access, { action: "bootstrap" }) as AdminBootstrap;
+  const dashboardPath = application === "child-health" ? "/api/dashboard-health" : "/api/dashboard";
+  const bootstrap = await secureApi(dashboardPath, credential, access, { action: "bootstrap", application }) as AdminBootstrap;
   return { access, bootstrap };
 }
 
 export async function upstreamJson<T>(bridge: ApplicationBridge, path: string, init?: { method?: "GET" | "POST"; body?: Record<string, unknown>; query?: string }) {
-  if (!/^https:\/\/[a-z0-9.-]+$/i.test(bridge.baseUrl) || !bridge.token.startsWith("v1.")) {
-    throw new Error("Vé kết nối ứng dụng không hợp lệ.");
-  }
+  if (!/^https:\/\/[a-z0-9.-]+$/i.test(bridge.baseUrl) || !bridge.token.startsWith("v1.")) throw new Error("Vé kết nối ứng dụng không hợp lệ.");
   if (!/^\/api\/control\/[a-z0-9-]+$/i.test(path)) throw new Error("Đường dẫn quản trị ứng dụng không hợp lệ.");
   const response = await fetch(`${bridge.baseUrl}${path}${init?.query ?? ""}`, {
-    method: init?.method ?? "GET",
-    mode: "cors",
-    credentials: "omit",
-    cache: "no-store",
+    method: init?.method ?? "GET", mode: "cors", credentials: "omit", cache: "no-store",
     headers: { authorization: `Bearer ${bridge.token}`, "content-type": "application/json" },
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });
