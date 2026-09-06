@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-applications-${{ github.event.pull_request.number }}
+  group: validate-applications-split-v2-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
