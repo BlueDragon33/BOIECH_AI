@@ -95,7 +95,7 @@ export default function HealthControlCenter({ user }: { user: { displayName: str
     setBusy(true);
     setError("");
     try {
-      const result = await connectAdminDevice();
+      const result = await connectAdminDevice("child-health");
       setAccess(result.access);
       setBootstrap(result.bootstrap);
       if (result.access.status === "approved" && result.bootstrap) await loadVersions(result.bootstrap.boiBridge);
@@ -151,11 +151,14 @@ export default function HealthControlCenter({ user }: { user: { displayName: str
 
   if (!access || access.status !== "approved" || !bootstrap) return <Gate access={access} busy={busy} error={error} retry={() => void initialize()} />;
 
+  const applicationUrl = `${bootstrap.boiBridge.baseUrl}/suc-khoe-tre`;
+  const editorUrl = `${bootstrap.boiBridge.baseUrl}/api/editor/session?ticket=${encodeURIComponent(bootstrap.boiBridge.token)}`;
+
   return <main className={styles.appShell}><div className={styles.appFrame}>
     <Link href="/" className={styles.backLink}>← Trung tâm · chọn ứng dụng</Link>
     <header className={styles.appHeader}>
       <div><span>Ứng dụng độc lập</span><h1>Quản trị Sức khỏe trẻ 9 tháng–5 tuổi</h1><p>Chỉ quản lý nội dung giáo trình và quy trình biên tập của Sức khỏe trẻ. Không hiển thị thiết bị học, tiến độ, thanh toán hay dữ liệu cá nhân của Bơi ếch.</p></div>
-      <div className={styles.headerActions}><a className={styles.secondaryButton} href="https://boi-ech.boiech-ai.workers.dev/suc-khoe-tre" target="_blank" rel="noreferrer">Mở ứng dụng</a><a className={styles.secondaryButton} href="https://boi-ech.boiech-ai.workers.dev/bien-tap-suc-khoe-tre" target="_blank" rel="noreferrer">Mở trình biên tập</a></div>
+      <div className={styles.headerActions}><a className={styles.secondaryButton} href={applicationUrl} target="_blank" rel="noreferrer">Mở ứng dụng</a><a className={styles.secondaryButton} href={editorUrl} target="_blank" rel="noreferrer">Mở trình biên tập</a></div>
     </header>
 
     <div className={styles.boundary}><strong>Ranh giới dữ liệu:</strong> Trung tâm này chỉ nhận phiên bản nội dung cần duyệt. Hồ sơ bé, triệu chứng, nhiệt độ, SpO₂, nhật ký bệnh và kết quả phân tầng nguy cơ không được đưa vào quản trị trung tâm.</div>
