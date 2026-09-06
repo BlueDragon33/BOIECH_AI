@@ -38,6 +38,7 @@ type Tab = "Học" | "Thực hành" | "Phân tích" | "Ôn tập" | "Kiểm tra"
 type Profile = { id: string; nickname: string; ageMonths: number; sex: "boy" | "girl" };
 
 type StoredEpisode = { id: string; profileId: string; name: string; createdAt: string; entries: HealthEpisodeEntry[] };
+type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 
 const tabs: Tab[] = ["Học", "Thực hành", "Phân tích", "Ôn tập", "Kiểm tra"];
 const store = {
@@ -77,6 +78,20 @@ function checkerDefault(ageMonths: number): HealthCheckInput {
   return { ageMonths, symptoms: [], days: 1, course: "same", intakePercent: 100, hoursSinceUrine: 0 };
 }
 
+function InstallAppButton({ install }: { install: () => void }) {
+  return <button className="install-fab" onClick={install} aria-label="Cài ứng dụng Sức khỏe trẻ" title="Cài ứng dụng"><span aria-hidden="true">⇩</span><b>Cài ứng dụng</b></button>;
+}
+
+function exportLocalBackup(profile: Profile, progress: Record<string, boolean>, scores: Record<string, number>, episodes: StoredEpisode[]) {
+  const backup = { version: 1, exportedAt: new Date().toISOString(), profile, progress, scores, episodes };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `suc-khoe-tre-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function HealthClient({ initialCourse }: { initialCourse: Course }) {
   const lessonNumbers = Object.keys(initialCourse.lessons).sort();
   const [view, setView] = useState<View>("home");
@@ -90,6 +105,7 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
   const [checkerResult, setCheckerResult] = useState<HealthCheckResult | null>(null);
   const [episodes, setEpisodes] = useState<StoredEpisode[]>([]);
   const [activeEpisodeId, setActiveEpisodeId] = useState("");
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [episodeEntry, setEpisodeEntry] = useState<HealthEpisodeEntry>({ ...checkerDefault(9), id: "entry", time: new Date().toISOString(), coughSeverity: 0, energy: 3 });
 
   useEffect(() => {
@@ -117,6 +133,28 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
   useEffect(() => { if (hydrated) localStorage.setItem(store.progress, JSON.stringify(progress)); }, [progress, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem(store.scores, JSON.stringify(scores)); }, [scores, hydrated]);
   useEffect(() => { if (hydrated) localStorage.setItem(store.episodes, JSON.stringify(episodes)); }, [episodes, hydrated]);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return undefined;
+    const hadActiveWorker = Boolean(navigator.serviceWorker.controller);
+    let reloadingForUpdate = false;
+    const onControllerChange = () => {
+      if (!hadActiveWorker || reloadingForUpdate) return;
+      reloadingForUpdate = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => undefined);
+    const onInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", onInstall);
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      window.removeEventListener("beforeinstallprompt", onInstall);
+    };
+  }, []);
 
   const lessons = lessonNumbers.map((number) => initialCourse.lessons[number]);
   const currentLesson = initialCourse.lessons[lessonNumber];
@@ -167,6 +205,7 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
           <label>Tuổi (tháng)</label><input type="number" min={9} max={60} value={profile.ageMonths} onChange={(event) => changeAge(Number(event.target.value))} />
           <label>Giới</label><select value={profile.sex} onChange={(event) => setProfile({ ...profile, sex: event.target.value === "girl" ? "girl" : "boy" })}><option value="boy">Bé trai</option><option value="girl">Bé gái</option></select>
           <div className="health-progress"><span style={{ width: `${completion}%` }} /></div><small>Tiến độ giáo trình {completion}%</small>
+          <button className="health-button backup-button" onClick={() => exportLocalBackup(profile, progress, scores, episodes)}>Tải bản sao lưu</button>
         </section>
         <button className="health-button primary" style={{ width: "100%", marginTop: 10 }} onClick={() => setView("checker")}>AI Offline · Kiểm tra triệu chứng</button>
         <button className="health-button" style={{ width: "100%", marginTop: 7 }} onClick={() => setView("doctor")}>Nhật ký bệnh & xu hướng</button>
@@ -184,6 +223,7 @@ export default function HealthClient({ initialCourse }: { initialCourse: Course 
     </div>
 
     <nav className="health-mobile"><button onClick={() => setView("home")}>Tổng quan</button><button onClick={() => setView("checker")}>Triệu chứng</button><button onClick={() => setView("doctor")}>Nhật ký</button><button onClick={() => setView("emergency")}>Cấp cứu</button></nav>
+    {installPrompt ? <InstallAppButton install={() => { void installPrompt.prompt(); void installPrompt.userChoice.finally(() => setInstallPrompt(null)); }} /> : null}
     <footer className="health-footer">Nội dung giáo trình chỉ lấy từ bản đã được Trung tâm quản trị phê duyệt. Hồ sơ, triệu chứng và nhật ký bệnh của gia đình chỉ lưu trong trình duyệt này và không được gửi về Trung tâm. Site hỗ trợ ghi nhớ/phân tầng nguy cơ, không thay thế khám và chẩn đoán.</footer>
   </main>;
 }
