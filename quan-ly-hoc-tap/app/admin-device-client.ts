@@ -131,11 +131,17 @@ async function secureApi(path: string, credential: Credential, access: AdminAcce
   throw lastError;
 }
 
-export async function connectAdminDevice() {
+function currentApplication() {
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/apps/suc-khoe-tre")) return "child-health";
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/apps/bauman-master-ai")) return "bauman-master-ai";
+  return "boi-ech";
+}
+
+export async function connectAdminDevice(application = currentApplication()) {
   const credential = await credentialForDevice();
   const access = await register(credential);
   if (access.status !== "approved") return { access, bootstrap: null as AdminBootstrap | null };
-  const bootstrap = await secureApi("/api/dashboard", credential, access, { action: "bootstrap" }) as AdminBootstrap;
+  const bootstrap = await secureApi("/api/dashboard", credential, access, { action: "bootstrap", application }) as AdminBootstrap;
   return { access, bootstrap };
 }
 
