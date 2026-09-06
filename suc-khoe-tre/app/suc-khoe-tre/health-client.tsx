@@ -42,7 +42,7 @@ type Course = {
   lessons: Record<string, Lesson>;
 };
 type View =
-  "home" | "lesson" | "checker" | "doctor" | "growth" | "care" | "emergency";
+  "home" | "lesson" | "checker" | "doctor" | "growth" | "care" | "nutrition" | "reminders" | "emergency";
 type Tab = "Học" | "Thực hành" | "Phân tích" | "Ôn tập" | "Kiểm tra";
 type Profile = {
   id: string;
@@ -68,6 +68,33 @@ type GrowthRecord = {
   heightCm?: number;
   note: string;
 };
+type NutritionRecord = {
+  id: string;
+  profileId: string;
+  date: string;
+  checks: Record<string, boolean>;
+  waterCups: number;
+  note: string;
+};
+type ReminderKind = "nutrition" | "health";
+type ReminderRepeat = "none" | "daily" | "weekly";
+type ReminderRecord = {
+  id: string;
+  profileId: string;
+  kind: ReminderKind;
+  title: string;
+  date: string;
+  time: string;
+  repeat: ReminderRepeat;
+  note: string;
+};
+type DeviceCapabilities = {
+  googleCalendar?: boolean;
+};
+type CapabilityWindow = Window & {
+  __CHILD_HEALTH_CAPABILITIES__?: DeviceCapabilities;
+};
+
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -82,6 +109,8 @@ const store = {
   episodes: "child-health-episodes-v1",
   growth: "child-health-growth-v1",
   care: "child-health-care-v1",
+  nutrition: "child-health-nutrition-v1",
+  reminders: "child-health-reminders-v1",
 };
 
 function safeJson<T>(value: string | null, fallback: T): T {
@@ -159,9 +188,11 @@ function exportLocalBackup(
   episodes: StoredEpisode[],
   growth: GrowthRecord[],
   care: Record<string, boolean>,
+  nutrition: NutritionRecord[],
+  reminders: ReminderRecord[],
 ) {
   const backup = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     profile,
     progress,
@@ -169,6 +200,8 @@ function exportLocalBackup(
     episodes,
     growth,
     care,
+    nutrition,
+    reminders,
   };
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }),
@@ -221,6 +254,89 @@ function careItems(profile: Profile) {
   ];
 }
 
+
+function nutritionItems(profile: Profile) {
+  if (profile.ageBand === "school5to10") {
+    return [
+      { id: "breakfast", label: "Có bữa sáng phù hợp" },
+      { id: "water", label: "Ưu tiên nước lọc thay vì đồ uống nhiều đường" },
+      { id: "variety", label: "Có rau/quả hoặc thực phẩm đa dạng" },
+      { id: "movement", label: "Có vận động phù hợp trong ngày" },
+      { id: "teeth", label: "Đánh răng buổi sáng và trước khi ngủ" },
+      { id: "no-pressure", label: "Không ép ăn hoặc dùng đồ ăn làm phần thưởng" },
+    ];
+  }
+  const items = [
+    { id: "safe-meal", label: "Bữa ăn phù hợp khả năng nhai và có người lớn quan sát" },
+    { id: "variety", label: "Có thực phẩm đa dạng phù hợp tuổi" },
+    { id: "fluids", label: "Được uống đủ dịch phù hợp tuổi" },
+    { id: "no-pressure", label: "Không ép ăn" },
+    { id: "teeth", label: "Vệ sinh răng miệng phù hợp tuổi" },
+  ];
+  if ((profile.ageMonths ?? 9) < 12) {
+    items.push({ id: "no-honey", label: "Không dùng mật ong khi trẻ chưa đủ 12 tháng" });
+  }
+  return items;
+}
+function localDateInput(value: Date) {
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return value.getFullYear() + "-" + pad(value.getMonth() + 1) + "-" + pad(value.getDate());
+}
+function localTimeInput(value: Date) {
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return pad(value.getHours()) + ":" + pad(value.getMinutes());
+}
+function calendarCompact(value: Date) {
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return value.getFullYear() + pad(value.getMonth() + 1) + pad(value.getDate()) + "T" + pad(value.getHours()) + pad(value.getMinutes()) + pad(value.getSeconds());
+}
+function reminderCalendarParts(reminder: ReminderRecord) {
+  const startDate = new Date(reminder.date + "T" + reminder.time + ":00");
+  const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+  return { start: calendarCompact(startDate), end: calendarCompact(endDate) };
+}
+function escapeCalendarText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
+}
+function reminderCalendarUrl(reminder: ReminderRecord) {
+  const parts = reminderCalendarParts(reminder);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: reminder.title,
+    dates: parts.start + "/" + parts.end,
+    details: (reminder.note || "Nhắc chăm sóc sức khỏe cho trẻ.") + "\n\nSức khỏe trẻ · " + (reminder.kind === "nutrition" ? "Dinh dưỡng" : "Chăm sóc sức khỏe"),
+  });
+  if (reminder.repeat === "daily") params.set("recur", "RRULE:FREQ=DAILY");
+  if (reminder.repeat === "weekly") params.set("recur", "RRULE:FREQ=WEEKLY");
+  return "https://calendar.google.com/calendar/render?" + params.toString();
+}
+function downloadReminderIcs(reminder: ReminderRecord) {
+  const parts = reminderCalendarParts(reminder);
+  const recurrence = reminder.repeat === "daily" ? "RRULE:FREQ=DAILY" : reminder.repeat === "weekly" ? "RRULE:FREQ=WEEKLY" : "";
+  const lines = [
+    "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Sức khỏe trẻ//Nhắc nhở//VI","BEGIN:VEVENT",
+    "UID:" + reminder.id + "@suc-khoe-tre","DTSTAMP:" + calendarCompact(new Date()),
+    "DTSTART:" + parts.start,"DTEND:" + parts.end,
+    "SUMMARY:" + escapeCalendarText(reminder.title),
+    "DESCRIPTION:" + escapeCalendarText(reminder.note || "Nhắc chăm sóc sức khỏe cho trẻ."),
+    recurrence,"END:VEVENT","END:VCALENDAR",
+  ].filter(Boolean).join("\r\n");
+  const url = URL.createObjectURL(new Blob([lines], { type: "text/calendar;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "nhac-suc-khoe-" + reminder.date + ".ics";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+function reminderOccursOnDate(reminder: ReminderRecord, date: string) {
+  if (date < reminder.date) return false;
+  if (reminder.repeat === "none") return date === reminder.date;
+  const start = new Date(reminder.date + "T00:00:00").getTime();
+  const current = new Date(date + "T00:00:00").getTime();
+  const days = Math.round((current - start) / (24 * 60 * 60 * 1000));
+  return reminder.repeat === "daily" || days % 7 === 0;
+}
+
 export default function HealthClient({
   initialCourse,
 }: {
@@ -243,6 +359,9 @@ export default function HealthClient({
   const [activeEpisodeId, setActiveEpisodeId] = useState("");
   const [growthRecords, setGrowthRecords] = useState<GrowthRecord[]>([]);
   const [care, setCare] = useState<Record<string, boolean>>({});
+  const [nutritionRecords, setNutritionRecords] = useState<NutritionRecord[]>([]);
+  const [reminders, setReminders] = useState<ReminderRecord[]>([]);
+  const [capabilities, setCapabilities] = useState<DeviceCapabilities>({});
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(
     null,
   );
@@ -323,6 +442,15 @@ export default function HealthClient({
       setCare(
         safeJson<Record<string, boolean>>(localStorage.getItem(store.care), {}),
       );
+      setNutritionRecords(
+        safeJson<NutritionRecord[]>(localStorage.getItem(store.nutrition), []),
+      );
+      setReminders(
+        safeJson<ReminderRecord[]>(localStorage.getItem(store.reminders), []),
+      );
+      setCapabilities(
+        (window as CapabilityWindow).__CHILD_HEALTH_CAPABILITIES__ ?? {},
+      );
       setActiveEpisodeId(
         storedEpisodes.find((item) => item.profileId === nextProfile.id)?.id ??
           "",
@@ -369,6 +497,14 @@ export default function HealthClient({
   useEffect(() => {
     if (hydrated) localStorage.setItem(store.care, JSON.stringify(care));
   }, [care, hydrated]);
+  useEffect(() => {
+    if (hydrated)
+      localStorage.setItem(store.nutrition, JSON.stringify(nutritionRecords));
+  }, [nutritionRecords, hydrated]);
+  useEffect(() => {
+    if (hydrated)
+      localStorage.setItem(store.reminders, JSON.stringify(reminders));
+  }, [reminders, hydrated]);
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return undefined;
     const hadActiveWorker = Boolean(navigator.serviceWorker.controller);
@@ -498,6 +634,25 @@ export default function HealthClient({
       ...current,
     ]);
   }
+  function addNutritionRecord(
+    record: Omit<NutritionRecord, "id" | "profileId">,
+  ) {
+    setNutritionRecords((current) => [
+      { ...record, id: crypto.randomUUID(), profileId: profile.id },
+      ...current,
+    ]);
+  }
+  function addReminder(record: Omit<ReminderRecord, "id" | "profileId">) {
+    setReminders((current) => [
+      { ...record, id: crypto.randomUUID(), profileId: profile.id },
+      ...current,
+    ]);
+  }
+  function removeReminder(id: string) {
+    setReminders((current) =>
+      current.filter((item) => item.id !== id || item.profileId !== profile.id),
+    );
+  }
 
   return (
     <main className="health-shell">
@@ -591,6 +746,8 @@ export default function HealthClient({
                   episodes,
                   growthRecords,
                   care,
+                  nutritionRecords,
+                  reminders,
                 )
               }
             >
@@ -598,25 +755,58 @@ export default function HealthClient({
             </button>
           </section>
           <button
-            className="health-button primary"
+            className={"health-button primary pressable " +
+              (view === "checker" ? "is-selected" : "")}
             style={{ width: "100%", marginTop: 10 }}
+            aria-pressed={view === "checker"}
             onClick={() => setView("checker")}
           >
             AI Offline · Triệu chứng
           </button>
           <button
-            className="health-button"
+            className={"health-button pressable " +
+              (view === "growth" ? "is-selected" : "")}
             style={{ width: "100%", marginTop: 7 }}
+            aria-pressed={view === "growth"}
             onClick={() => setView("growth")}
           >
             Tăng trưởng & hồ sơ
           </button>
           <button
-            className="health-button"
+            className={"health-button pressable " +
+              (view === "doctor" ? "is-selected" : "")}
             style={{ width: "100%", marginTop: 7 }}
+            aria-pressed={view === "doctor"}
             onClick={() => setView("doctor")}
           >
             Nhật ký bệnh & xu hướng
+          </button>
+          <button
+            className={"health-button pressable " +
+              (view === "care" ? "is-selected" : "")}
+            style={{ width: "100%", marginTop: 7 }}
+            aria-pressed={view === "care"}
+            onClick={() => setView("care")}
+          >
+            Chăm sóc sức khỏe
+          </button>
+          <button
+            className={"health-button pressable " +
+              (view === "nutrition" ? "is-selected" : "")}
+            style={{ width: "100%", marginTop: 7 }}
+            aria-pressed={view === "nutrition"}
+            onClick={() => setView("nutrition")}
+          >
+            Dinh dưỡng
+          </button>
+          <button
+            className={"health-button pressable " +
+              (view === "reminders" ? "is-selected" : "")}
+            style={{ width: "100%", marginTop: 7 }}
+            aria-pressed={view === "reminders"}
+            onClick={() => setView("reminders")}
+          >
+            Nhắc nhở
           </button>
           <div className="health-side-title">
             {lessons.length} bài theo nhóm tuổi
@@ -655,6 +845,8 @@ export default function HealthClient({
               openDoctor={() => setView("doctor")}
               openGrowth={() => setView("growth")}
               openCare={() => setView("care")}
+              openNutrition={() => setView("nutrition")}
+              openReminders={() => setView("reminders")}
             />
           ) : null}
           {view === "lesson" && currentLesson ? (
@@ -724,6 +916,26 @@ export default function HealthClient({
               }
             />
           ) : null}
+          {view === "nutrition" ? (
+            <Nutrition
+              profile={profile}
+              records={nutritionRecords.filter(
+                (item) => item.profileId === profile.id,
+              )}
+              add={addNutritionRecord}
+            />
+          ) : null}
+          {view === "reminders" ? (
+            <Reminders
+              profile={profile}
+              reminders={reminders.filter(
+                (item) => item.profileId === profile.id,
+              )}
+              add={addReminder}
+              remove={removeReminder}
+              googleCalendarEnabled={capabilities.googleCalendar === true}
+            />
+          ) : null}
           {view === "emergency" ? (
             <Emergency
               profile={profile}
@@ -737,6 +949,8 @@ export default function HealthClient({
         <button onClick={() => setView("checker")}>Triệu chứng</button>
         <button onClick={() => setView("growth")}>Hồ sơ</button>
         <button onClick={() => setView("care")}>Chăm sóc</button>
+        <button onClick={() => setView("nutrition")}>Dinh dưỡng</button>
+        <button onClick={() => setView("reminders")}>Nhắc nhở</button>
         <button onClick={() => setView("emergency")}>Cấp cứu</button>
       </nav>
       {installPrompt ? (
@@ -767,6 +981,8 @@ function Home({
   openDoctor,
   openGrowth,
   openCare,
+  openNutrition,
+  openReminders,
 }: {
   course: Course;
   profile: Profile;
@@ -777,6 +993,8 @@ function Home({
   openDoctor: () => void;
   openGrowth: () => void;
   openCare: () => void;
+  openNutrition: () => void;
+  openReminders: () => void;
 }) {
   const memory =
     profile.ageBand === "school5to10"
@@ -819,7 +1037,7 @@ function Home({
       <section className="health-card">
         <h2>Việc cần làm hôm nay</h2>
         <div className="health-grid">
-          <button className="health-lesson-card" onClick={openChecker}>
+          <button className="health-lesson-card pressable" onClick={openChecker}>
             <small>AI OFFLINE</small>
             <h3>Kiểm tra triệu chứng</h3>
             <p>
@@ -827,14 +1045,14 @@ function Home({
               lượng uống.
             </p>
           </button>
-          <button className="health-lesson-card" onClick={openGrowth}>
+          <button className="health-lesson-card pressable" onClick={openGrowth}>
             <small>HỒ SƠ</small>
             <h3>Tăng trưởng & hồ sơ</h3>
             <p>
               Ghi cân nặng, chiều cao, ngày đo và diễn biến để nhìn xu hướng.
             </p>
           </button>
-          <button className="health-lesson-card" onClick={openDoctor}>
+          <button className="health-lesson-card pressable" onClick={openDoctor}>
             <small>NHIỀU NGÀY</small>
             <h3>Nhật ký bệnh</h3>
             <p>
@@ -842,12 +1060,28 @@ function Home({
               xấu hơn.
             </p>
           </button>
-          <button className="health-lesson-card" onClick={openCare}>
+          <button className="health-lesson-card pressable" onClick={openCare}>
             <small>HẰNG NGÀY</small>
             <h3>Checklist chăm sóc</h3>
             <p>
               Đánh dấu các việc về ăn, ngủ, vận động, răng miệng, an toàn và cảm
               xúc.
+            </p>
+          </button>
+          <button className="health-lesson-card pressable" onClick={openNutrition}>
+            <small>ĂN UỐNG</small>
+            <h3>Dinh dưỡng</h3>
+            <p>
+              Checklist bữa ăn, nước, đa dạng thực phẩm và răng miệng theo nhóm
+              tuổi.
+            </p>
+          </button>
+          <button className="health-lesson-card pressable" onClick={openReminders}>
+            <small>NHẮC VIỆC</small>
+            <h3>Lịch chăm sóc</h3>
+            <p>
+              Nhắc dinh dưỡng và chăm sóc sức khỏe, tải lịch hoặc mở Google
+              Calendar khi thiết bị được cấp quyền.
             </p>
           </button>
         </div>
@@ -863,7 +1097,7 @@ function Home({
         <div className="health-grid">
           {lessons.map((lesson) => (
             <button
-              className="health-lesson-card"
+              className="health-lesson-card pressable"
               key={lesson.number}
               onClick={() => selectLesson(lesson.number)}
             >
@@ -1336,6 +1570,293 @@ function Result({ result }: { result: HealthCheckResult }) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+
+function Nutrition({
+  profile,
+  records,
+  add,
+}: {
+  profile: Profile;
+  records: NutritionRecord[];
+  add: (record: Omit<NutritionRecord, "id" | "profileId">) => void;
+}) {
+  const items = nutritionItems(profile);
+  const [date, setDate] = useState(localDateInput(new Date()));
+  const [checks, setChecks] = useState<Record<string, boolean>>({});
+  const [water, setWater] = useState("");
+  const [note, setNote] = useState("");
+  const completed = items.filter((item) => checks[item.id]).length;
+  function save() {
+    if (!completed && !water && !note.trim()) return;
+    add({ date, checks, waterCups: Number(water) || 0, note: note.trim() });
+    setChecks({});
+    setWater("");
+    setNote("");
+  }
+  return (
+    <>
+      <section className="health-doctor health-nutrition-hero">
+        <small>DINH DƯỠNG · {ageLabel(profile)}</small>
+        <h1>Chế độ dinh dưỡng</h1>
+        <p>
+          Ghi nhanh một ngày ăn uống và thói quen hỗ trợ sức khỏe. Đây là nhật
+          ký gia đình, không thay thế tư vấn dinh dưỡng cá nhân.
+        </p>
+      </section>
+      <section className="health-card">
+        <h2>Gợi ý theo mốc tuổi</h2>
+        <ul className="health-list">
+          {profile.ageBand === "school5to10" ? (
+            <>
+              <li>Ưu tiên bữa ăn đa dạng, nước lọc và giờ ăn tương đối đều.</li>
+              <li>Khuyến khích trẻ tự nhận biết đói/no, không ép ăn.</li>
+              <li>Đồ ngọt và đồ uống có đường nên là lựa chọn ít thường xuyên.</li>
+            </>
+          ) : (
+            <>
+              <li>Điều chỉnh độ thô và kích thước thức ăn theo khả năng của trẻ.</li>
+              <li>Luôn có người lớn quan sát khi trẻ ăn, tránh thực phẩm dễ hóc.</li>
+              <li>Trẻ dưới 12 tháng không dùng mật ong.</li>
+            </>
+          )}
+        </ul>
+      </section>
+      <section className="health-card">
+        <div className="health-section-heading">
+          <div>
+            <h2>Ghi hôm nay</h2>
+            <p className="health-muted">Đã đánh dấu {completed}/{items.length} mục</p>
+          </div>
+          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        </div>
+        <div className="health-toggle-row">
+          {items.map((item) => (
+            <label key={item.id}>
+              <input
+                type="checkbox"
+                checked={Boolean(checks[item.id])}
+                onChange={() =>
+                  setChecks((current) => ({ ...current, [item.id]: !current[item.id] }))
+                }
+              />
+              <span>{item.label}</span>
+            </label>
+          ))}
+        </div>
+        <div className="health-fields" style={{ marginTop: 12 }}>
+          <Field label="Nước (cốc, nếu muốn ghi)">
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              value={water}
+              onChange={(event) => setWater(event.target.value)}
+              placeholder="Ví dụ 4"
+            />
+          </Field>
+          <Field label="Ghi chú">
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Ví dụ: ăn ngon, kém ăn, đau răng, hoạt động bình thường…"
+            />
+          </Field>
+        </div>
+        <button
+          className="health-button primary pressable"
+          style={{ marginTop: 10 }}
+          onClick={save}
+          disabled={!completed && !water && !note.trim()}
+        >
+          Lưu nhật ký dinh dưỡng
+        </button>
+      </section>
+      <section className="health-card">
+        <h2>Lịch sử dinh dưỡng · {records.length} ngày</h2>
+        {records.length ? (
+          <div className="health-timeline">
+            {records.slice().sort((a, b) => b.date.localeCompare(a.date)).map((record) => (
+              <article key={record.id}>
+                <strong>
+                  {new Date(record.date + "T00:00:00").toLocaleDateString("vi-VN")}
+                </strong>
+                <p className="health-muted">
+                  {record.waterCups ? record.waterCups + " cốc nước · " : ""}
+                  {items.filter((item) => record.checks[item.id]).map((item) => item.label).join(" · ") || "Chưa đánh dấu mục nào"}
+                  {record.note ? " · " + record.note : ""}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="health-muted">Chưa có nhật ký. Chỉ cần ghi một mục cũng đủ để bắt đầu.</p>
+        )}
+      </section>
+    </>
+  );
+}
+function Reminders({
+  profile,
+  reminders,
+  add,
+  remove,
+  googleCalendarEnabled,
+}: {
+  profile: Profile;
+  reminders: ReminderRecord[];
+  add: (record: Omit<ReminderRecord, "id" | "profileId">) => void;
+  remove: (id: string) => void;
+  googleCalendarEnabled: boolean;
+}) {
+  const [kind, setKind] = useState<ReminderKind>("nutrition");
+  const [title, setTitle] = useState("Nhắc dinh dưỡng");
+  const [date, setDate] = useState(localDateInput(new Date()));
+  const [time, setTime] = useState("07:00");
+  const [repeat, setRepeat] = useState<ReminderRepeat>("daily");
+  const [note, setNote] = useState("");
+  const [notificationStatus, setNotificationStatus] = useState<"unsupported" | NotificationPermission>("default");
+  const ownReminders = reminders.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+  useEffect(() => {
+    if ("Notification" in window) setNotificationStatus(Notification.permission);
+    else setNotificationStatus("unsupported");
+  }, []);
+  useEffect(() => {
+    if (notificationStatus !== "granted") return undefined;
+    function notifyDue() {
+      const now = new Date();
+      const today = localDateInput(now);
+      const currentTime = localTimeInput(now);
+      ownReminders.forEach((reminder) => {
+        if (reminder.time !== currentTime || !reminderOccursOnDate(reminder, today)) return;
+        const key = "child-health-notified:" + reminder.id + ":" + today + ":" + currentTime;
+        if (sessionStorage.getItem(key)) return;
+        new Notification(reminder.title, {
+          body: reminder.note || "Đến giờ chăm sóc sức khỏe cho trẻ.",
+        });
+        sessionStorage.setItem(key, "1");
+      });
+    }
+    notifyDue();
+    const timer = window.setInterval(notifyDue, 60000);
+    return () => window.clearInterval(timer);
+  }, [notificationStatus, ownReminders]);
+  function changeKind(next: ReminderKind) {
+    setKind(next);
+    setTitle(next === "nutrition" ? "Nhắc dinh dưỡng" : "Nhắc chăm sóc sức khỏe");
+  }
+  async function requestNotification() {
+    if (!("Notification" in window)) return;
+    setNotificationStatus(await Notification.requestPermission());
+  }
+  function save() {
+    if (!title.trim() || !date || !time) return;
+    add({ kind, title: title.trim(), date, time, repeat, note: note.trim() });
+    setNote("");
+  }
+  return (
+    <>
+      <section className="health-doctor health-reminder-hero">
+        <small>NHẮC NHỞ · {ageLabel(profile)}</small>
+        <h1>Nhắc dinh dưỡng & chăm sóc sức khỏe</h1>
+        <p>
+          Tạo nhắc việc trong trình duyệt, tải tệp lịch hoặc mở Google Calendar
+          nếu thiết bị đã được Trung tâm quản trị ứng dụng cấp quyền.
+        </p>
+      </section>
+      <section className="health-card">
+        <h2>Tạo nhắc mới</h2>
+        <div className="health-fields">
+          <Field label="Nhóm nhắc">
+            <select value={kind} onChange={(event) => changeKind(event.target.value as ReminderKind)}>
+              <option value="nutrition">Dinh dưỡng</option>
+              <option value="health">Chăm sóc sức khỏe</option>
+            </select>
+          </Field>
+          <Field label="Tiêu đề">
+            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ví dụ: Uống nước, đánh răng, đo nhiệt độ…" />
+          </Field>
+          <Field label="Ngày bắt đầu">
+            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          </Field>
+          <Field label="Giờ">
+            <input type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+          </Field>
+          <Field label="Lặp lại">
+            <select value={repeat} onChange={(event) => setRepeat(event.target.value as ReminderRepeat)}>
+              <option value="none">Không lặp</option>
+              <option value="daily">Mỗi ngày</option>
+              <option value="weekly">Mỗi tuần</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Ghi chú">
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Nội dung sẽ đi kèm thông báo/lịch" />
+        </Field>
+        <div className="health-calendar-actions">
+          <button className="health-button primary pressable" onClick={save}>Thêm nhắc nhở</button>
+          {notificationStatus === "granted" ? (
+            <span className="health-pill">Thông báo đã bật</span>
+          ) : notificationStatus === "unsupported" ? (
+            <span className="health-pill">Trình duyệt không hỗ trợ thông báo</span>
+          ) : (
+            <button className="health-button pressable" onClick={requestNotification}>Bật thông báo trình duyệt</button>
+          )}
+        </div>
+        <div className="health-permission-note">
+          {googleCalendarEnabled
+            ? "Thiết bị đã được cấp quyền Google Calendar từ Trung tâm quản trị ứng dụng."
+            : "Google Calendar đang khóa trên thiết bị này. Bạn vẫn có thể tải .ics; quản trị ứng dụng có thể cấp quyền cho thiết bị được phép."}
+        </div>
+      </section>
+      <section className="health-card">
+        <h2>Nhắc đã tạo · {ownReminders.length}</h2>
+        {ownReminders.length ? (
+          ownReminders.map((reminder) => (
+            <article className="health-reminder-item" key={reminder.id}>
+              <div>
+                <h3>{reminder.title}</h3>
+                <p>
+                  {reminder.kind === "nutrition" ? "Dinh dưỡng" : "Chăm sóc sức khỏe"}{" "}
+                  · {reminder.date} · {reminder.time} ·{" "}
+                  {reminder.repeat === "none" ? "một lần" : reminder.repeat === "daily" ? "mỗi ngày" : "mỗi tuần"}
+                </p>
+                {reminder.note ? <p>{reminder.note}</p> : null}
+              </div>
+              <div className="health-calendar-actions">
+                <button className="health-button pressable" onClick={() => downloadReminderIcs(reminder)}>Tải .ics</button>
+                {googleCalendarEnabled ? (
+                  <a
+                    className="health-button pressable"
+                    href={reminderCalendarUrl(reminder)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Google Calendar
+                  </a>
+                ) : (
+                  <button
+                    className="health-button"
+                    disabled
+                    title="Chỉ thiết bị được Trung tâm quản trị ứng dụng cấp quyền mới dùng Google Calendar"
+                  >
+                    Google Calendar (khóa)
+                  </button>
+                )}
+                <button className="health-button danger pressable" onClick={() => remove(reminder.id)}>Xóa</button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className="health-muted">
+            Chưa có nhắc nhở. Tạo một nhắc cho bữa sáng, uống nước, thuốc đã được kê hoặc lịch chăm sóc.
+          </p>
+        )}
+      </section>
+    </>
   );
 }
 
