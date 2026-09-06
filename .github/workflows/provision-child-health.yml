@@ -24,12 +24,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          LIST=$(wrangler d1 list --json)
-          ID=$(node -e 'const rows=JSON.parse(process.argv[1]); const row=rows.find(x=>x.name==="suc-khoe-tre-db"); if(row) process.stdout.write(row.uuid || row.id || "")' "$LIST")
+          UUID_RE='[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+          LIST=$(wrangler d1 list 2>&1)
+          printf '%s\n' "$LIST"
+          ID=$(printf '%s\n' "$LIST" | grep -i 'suc-khoe-tre-db' | grep -Eo "$UUID_RE" | head -n1 || true)
           if [ -z "$ID" ]; then
-            OUT=$(wrangler d1 create suc-khoe-tre-db --json)
-            echo "$OUT"
-            ID=$(node -e 'const row=JSON.parse(process.argv[1]); process.stdout.write(row.uuid || row.id || row.database_id || "")' "$OUT")
+            OUT=$(wrangler d1 create suc-khoe-tre-db 2>&1)
+            printf '%s\n' "$OUT"
+            ID=$(printf '%s\n' "$OUT" | grep -Eo "$UUID_RE" | head -n1 || true)
           fi
           test -n "$ID"
           echo "CHILD_HEALTH_D1_ID=$ID"
