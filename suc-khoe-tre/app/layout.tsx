@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Sức khỏe trẻ 9 tháng–5 tuổi",
-  description: "Web-app chăm sóc sức khỏe trẻ, công cụ offline và nội dung được kiểm duyệt độc lập.",
+  title: "Sức khỏe trẻ 9 tháng–10 tuổi",
+  description: "Web-app chăm sóc sức khỏe trẻ 9 tháng–10 tuổi, tách mốc tháng và mốc năm, có công cụ offline.",
   applicationName: "Sức khỏe trẻ",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Sức khỏe trẻ", statusBarStyle: "default" },

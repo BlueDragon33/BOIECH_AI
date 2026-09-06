@@ -2,9 +2,9 @@ import type { getCourseDatabase } from "./device-auth.server";
 
 type Database = Awaited<ReturnType<typeof getCourseDatabase>>;
 
-export const HEALTH_DOCUMENT_SCHEMA_VERSION = 1 as const;
-export const HEALTH_POLICY_VERSION = "child-health-clinical-v1" as const;
-export const HEALTH_LESSON_NUMBERS = ["01", "02", "03", "04", "05", "06", "07", "08"] as const;
+export const HEALTH_DOCUMENT_SCHEMA_VERSION = 2 as const;
+export const HEALTH_POLICY_VERSION = "child-health-clinical-v2" as const;
+export const HEALTH_LESSON_NUMBERS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14"] as const;
 export const HEALTH_EDIT_SECTIONS = ["content", "practice", "analysis", "review", "quiz"] as const;
 export type HealthLessonNumber = (typeof HEALTH_LESSON_NUMBERS)[number];
 export type HealthEditSection = (typeof HEALTH_EDIT_SECTIONS)[number];
@@ -15,6 +15,8 @@ export type HealthEditScope = {
   label: string;
   value: string;
 };
+
+export type HealthAgeBand = "under5" | "school5to10";
 
 const sectionLabels: Record<HealthEditSection, string> = {
   content: "Nội dung",
@@ -33,6 +35,7 @@ export type HealthQuestion = {
 
 export type HealthLesson = {
   number: HealthLessonNumber;
+  ageBand: HealthAgeBand;
   title: string;
   summary: string;
   content: { html: string; safety: string[] };
@@ -43,7 +46,7 @@ export type HealthLesson = {
 };
 
 export type HealthCourseDocument = {
-  schemaVersion: 1;
+  schemaVersion: typeof HEALTH_DOCUMENT_SCHEMA_VERSION;
   application: "child-health";
   policyVersion: typeof HEALTH_POLICY_VERSION;
   reviewedOn: string;
@@ -183,19 +186,100 @@ const Q = {
     question("Mục tiêu cuối khóa là gì?", "Chăm sóc an toàn và nhận ra dấu cần khám", "Tự chẩn đoán mọi bệnh", "Tự kê thuốc", "Không cần bác sĩ", "Cha mẹ cần biết giới hạn của tự chăm sóc."),
     question("Thông tin sức khỏe thay đổi theo thời gian cần làm gì?", "Cập nhật", "Giữ nguyên mãi", "Bỏ qua", "Chỉ hỏi bạn bè", "Hướng dẫn và lịch tiêm chủng cần được rà soát định kỳ."),
   ],
+  schoolGrowth: [
+    question("Từ 5–10 tuổi nên ghi tuổi theo cách nào?", "Theo số năm tuổi", "Theo số tháng", "Theo cân nặng", "Theo lớp học", "Nhóm tuổi học đường trong site dùng mốc 5–10 tuổi, không nhập tháng."),
+    question("Theo dõi tăng trưởng nên nhìn gì?", "Xu hướng cân nặng, chiều cao và hoạt động", "Một lần cân", "So với bạn", "Chỉ số giày", "Một điểm đo không thay thế theo dõi xu hướng."),
+    question("Mất kỹ năng đã có cần làm gì?", "Trao đổi với bác sĩ", "Chờ tự hết", "Tự mua thuốc bổ", "Ép luyện tập", "Mất kỹ năng là dấu cần được đánh giá."),
+    question("Dấu hiệu nào cần lưu ý ở tuổi học đường?", "Mệt kéo dài, sụt cân hoặc tăng trưởng chậm rõ", "Một ngày ăn ít", "Đổi kiểu tóc", "Thích một món ăn", "Cần đặt dấu hiệu trong diễn biến và khám phù hợp."),
+    question("Trẻ nên vận động thế nào?", "Đều đặn, phù hợp và an toàn", "Chỉ vận động cuối tuần", "Tập đến kiệt sức", "Không cần vận động", "Vận động hỗ trợ sức khỏe thể chất và tinh thần."),
+    question("Chuẩn tăng trưởng có phải công cụ chẩn đoán duy nhất không?", "Không", "Có", "Luôn đúng tuyệt đối", "Chỉ cần nhìn biểu đồ", "Cần kết hợp khám và bối cảnh của từng trẻ."),
+    question("Khi số đo thay đổi bất thường nên làm gì?", "Ghi lại và trao đổi với nhân viên y tế", "Tự dùng hormone", "Bỏ qua", "Ép ăn", "Không tự điều trị vấn đề tăng trưởng."),
+    question("Giấc ngủ ảnh hưởng điều gì?", "Học tập, tâm trạng và sức khỏe", "Chỉ chiều cao", "Không ảnh hưởng", "Chỉ da", "Ngủ đủ giúp trẻ hoạt động và học tập tốt hơn."),
+    question("Nên so sánh trẻ với ai?", "Với chính xu hướng của trẻ và chuẩn phù hợp", "Với bạn cùng lớp", "Với anh chị", "Với ảnh trên mạng", "Mỗi trẻ có bối cảnh và nhịp phát triển khác nhau."),
+    question("Hồ sơ sức khỏe học đường nên có gì?", "Số đo, bệnh nền, thuốc đang dùng và ghi chú khám", "Chỉ tên trẻ", "Chỉ điểm số", "Không cần lưu", "Hồ sơ giúp trao đổi chính xác hơn khi đi khám."),
+  ],
+  schoolNutrition: [
+    question("Bữa ăn của trẻ 5–10 tuổi nên ưu tiên gì?", "Đa dạng thực phẩm và đủ nhóm chất", "Chỉ thịt", "Chỉ nước ngọt", "Bỏ bữa sáng", "Tính đều đặn và đa dạng quan trọng hơn một món riêng lẻ."),
+    question("Đồ uống nào nên hạn chế?", "Nước ngọt và đồ uống nhiều đường", "Nước lọc", "Sữa phù hợp", "Canh", "Đồ uống nhiều đường làm tăng nguy cơ sâu răng và dư năng lượng."),
+    question("Khi ăn trẻ nên làm gì?", "Ngồi ăn, nhai kỹ và không vừa chạy vừa ăn", "Vừa chạy vừa ăn", "Ăn khi nằm", "Ăn một mình", "An toàn khi ăn vẫn quan trọng ở tuổi học đường."),
+    question("Có nên ép trẻ ăn hết mọi thứ không?", "Không nên ép", "Luôn phải ép", "Chỉ ép rau", "Ép bằng phần thưởng", "Ép ăn có thể làm xấu quan hệ của trẻ với thức ăn."),
+    question("Để phòng hóc nên làm gì?", "Cắt phù hợp, ăn chậm và không vừa ăn vừa chơi", "Ăn thật nhanh", "Ném thức ăn vào miệng", "Ăn khi chạy", "Giám sát và thói quen ăn an toàn vẫn cần thiết."),
+    question("Nước uống hằng ngày nên ưu tiên gì?", "Nước lọc và dịch phù hợp", "Nước tăng lực", "Nước ngọt", "Chỉ nước có màu", "Không dùng nước tăng lực cho trẻ."),
+    question("Dị ứng thực phẩm cần xử trí thế nào?", "Tránh tác nhân đã biết và có kế hoạch với bác sĩ", "Tự thử lại nhiều lần", "Bỏ qua sưng môi", "Cho ăn thêm", "Phản ứng nặng cần xử trí y tế khẩn."),
+    question("Đau bụng tái diễn nên làm gì?", "Ghi thời điểm, thức ăn và trao đổi với bác sĩ", "Tự dùng men/thuốc kéo dài", "Bỏ bữa", "Không cần ghi", "Nhật ký giúp tìm mối liên quan nhưng không thay khám."),
+    question("Thói quen nào bảo vệ răng?", "Đánh răng với kem có fluoride phù hợp và khám răng", "Uống nước ngọt trước ngủ", "Không cần đánh răng", "Dùng kẹo thay đánh răng", "Chăm sóc răng cần đều đặn và theo hướng dẫn nha khoa."),
+    question("Bữa ăn ở trường cần lưu ý gì?", "Vệ sinh, dị ứng và khả năng ăn của trẻ", "Chỉ nhìn hình thức", "Cho trẻ đổi đồ tùy ý", "Không cần báo dị ứng", "Thông tin dị ứng phải được thông báo rõ cho người chăm sóc."),
+  ],
+  schoolSleepMind: [
+    question("Điều gì giúp trẻ 5–10 tuổi ngủ tốt hơn?", "Giờ ngủ đều và giảm màn hình trước ngủ", "Màn hình đến khi ngủ", "Uống nước tăng lực", "Ngủ bù cả tuần", "Nhịp sinh hoạt ổn định hỗ trợ giấc ngủ."),
+    question("Màn hình nên được quản lý thế nào?", "Có giới hạn, nội dung phù hợp và có thời gian không màn hình", "Để trẻ tự dùng cả ngày", "Dùng khi ăn mọi bữa", "Dùng thay ngủ", "Cần cân bằng màn hình với ngủ, vận động và tương tác."),
+    question("Dấu hiệu tâm lý kéo dài cần lưu ý là gì?", "Buồn bã, lo sợ, cáu gắt hoặc rút lui kéo dài", "Một lần cáu", "Thích ở nhà một buổi", "Đổi sở thích", "Diễn biến kéo dài và ảnh hưởng sinh hoạt cần được lắng nghe."),
+    question("Khi trẻ bị bắt nạt nên làm gì?", "Lắng nghe, ghi nhận và phối hợp người lớn đáng tin", "Bảo trẻ chịu đựng", "Đổ lỗi cho trẻ", "Im lặng hoàn toàn", "An toàn thể chất và tinh thần cần được ưu tiên."),
+    question("Cách hỗ trợ trẻ nói về cảm xúc là gì?", "Hỏi mở và lắng nghe không phán xét", "Ngắt lời", "Chê là yếu đuối", "Ép kể ngay", "Không khí an toàn giúp trẻ chia sẻ."),
+    question("Ngủ ngáy to kèm ngừng thở nên làm gì?", "Trao đổi với bác sĩ", "Bỏ qua", "Tự mua thuốc ngủ", "Cho thức khuya", "Rối loạn hô hấp khi ngủ cần được đánh giá."),
+    question("Khi trẻ học sa sút đột ngột nên làm gì?", "Xem cả sức khỏe, giấc ngủ, cảm xúc và môi trường", "Chỉ phạt", "Tự tăng thuốc bổ", "Bỏ qua", "Không nên quy mọi thay đổi cho sự lười biếng."),
+    question("Hoạt động nào bảo vệ sức khỏe tinh thần?", "Vận động, chơi, trò chuyện và thời gian gia đình", "Cô lập", "Chỉ học", "Chỉ dùng màn hình", "Trẻ cần nhịp sống cân bằng."),
+    question("Dấu hiệu nguy hiểm về tự hại cần làm gì?", "Ở bên trẻ và tìm trợ giúp khẩn cấp ngay", "Giữ bí mật tuyệt đối", "Mắng trẻ", "Chờ tự hết", "An toàn tức thời quan trọng hơn việc giữ kín."),
+    question("Lịch sinh hoạt nên được thay đổi ra sao?", "Điều chỉnh từng bước và nhất quán", "Đổi toàn bộ mỗi ngày", "Ép trẻ thức", "Bỏ ngủ trưa tùy ý", "Thói quen bền vững cần điều chỉnh phù hợp."),
+  ],
+  schoolRespiratory: [
+    question("Từ 5–10 tuổi khi đánh giá hô hấp cần ưu tiên gì?", "Công thở, màu môi, mức tỉnh táo và khả năng nói/uống", "Chỉ đếm nhịp thở", "Chỉ nghe tiếng ho", "Chỉ nhìn nhiệt độ", "Ngưỡng IMCI 0–5 tuổi không được áp dụng máy móc cho nhóm này."),
+    question("Khó thở rõ có thể nhận ra qua dấu nào?", "Rút lõm, phập phồng cánh mũi, nói không trọn câu", "Chỉ sổ mũi", "Ăn tốt", "Chơi bình thường", "Công thở và toàn trạng quan trọng."),
+    question("Ho kèm đau ngực hoặc khó thở khi vận động nên làm gì?", "Cho trẻ được đánh giá y tế", "Tự dùng kháng sinh", "Bỏ qua", "Cho chạy thêm", "Cần đặt triệu chứng vào bối cảnh cụ thể."),
+    question("Ho giảm nhưng trẻ mệt và thở gắng sức nghĩa là gì?", "Cần đánh giá lại", "Chắc chắn khỏi", "Cho thêm thuốc ho", "Không cần theo dõi", "Không dùng riêng tiếng ho để kết luận hồi phục."),
+    question("Khò khè tái diễn nên được theo dõi thế nào?", "Ghi yếu tố khởi phát và trao đổi với bác sĩ", "Tự dùng thuốc xịt của người khác", "Bỏ qua", "Dùng tinh dầu", "Thuốc hô hấp cần đúng người, đúng chỉ định."),
+    question("Sốt kèm lừ đừ hoặc khó đánh thức là gì?", "Dấu cần đánh giá khẩn", "Cảm lạnh bình thường", "Chỉ cần ngủ", "Cho nước ngọt", "Giảm tỉnh táo là dấu cảnh báo."),
+    question("Có nên tự dùng kháng sinh khi ho đờm?", "Không", "Có", "Luôn cần", "Dùng còn thừa", "Kháng sinh phải dựa trên đánh giá và chỉ định."),
+    question("Khi trẻ khó thở nên cho ăn thế nào?", "Không ép ăn/uống khi trẻ đang khó thở nặng", "Ép thật nhiều", "Cho ăn khi nằm", "Cho kẹo", "Ưu tiên an toàn đường thở và đánh giá y tế."),
+    question("SpO₂ tại nhà nên được hiểu thế nào?", "Là một dữ liệu phụ, phải nhìn cùng tình trạng trẻ", "Luôn chính xác tuyệt đối", "Thay thế khám", "Không bao giờ có ích", "Máy gia đình có thể sai số và không loại trừ nguy hiểm."),
+    question("Dấu nào cần cấp cứu ngay?", "Tím, ngưng thở, li bì hoặc khó thở rõ", "Hắt hơi", "Ho nhẹ", "Sổ mũi", "Dấu đỏ phải được xử trí khẩn."),
+  ],
+  schoolSafety: [
+    question("Nguy cơ an toàn quan trọng ở tuổi 5–10 là gì?", "Giao thông, nước, điện, ngã và ngộ độc", "Chỉ hóc", "Không còn nguy cơ", "Chỉ ở trường", "Nguy cơ thay đổi theo kỹ năng và môi trường."),
+    question("Trẻ nên làm gì khi qua đường?", "Dừng, quan sát, nghe và qua nơi an toàn có người hướng dẫn", "Chạy nhanh", "Vừa nhìn điện thoại vừa đi", "Đi giữa dòng xe", "Kỹ năng giao thông cần luyện lặp lại."),
+    question("Bơi giỏi có đồng nghĩa an toàn tuyệt đối không?", "Không", "Có", "Chỉ cần biết nổi", "Chỉ cần phao", "Luôn cần giám sát gần nước."),
+    question("Khi nghi ngộ độc nên làm gì?", "Gọi trợ giúp y tế và giữ lại bao bì chất nghi ngờ", "Tự gây nôn", "Cho uống sữa bất kỳ", "Chờ đến hôm sau", "Không tự gây nôn nếu chưa được hướng dẫn."),
+    question("Pin cúc áo nếu nuốt phải cần làm gì?", "Đưa đi cấp cứu ngay", "Chờ đi ngoài", "Cho ăn cơm", "Tự móc họng", "Pin cúc áo có thể gây tổn thương nhanh."),
+    question("Mũ bảo hiểm cần thế nào?", "Đúng cỡ, cài đúng và dùng khi đi xe", "Đội hờ", "Chỉ đội đường xa", "Dùng mũ đồ chơi", "Bảo vệ đầu cần dùng đúng cách."),
+    question("Bỏng mới xảy ra nên làm gì trước?", "Làm mát bằng nước sạch mát và tìm trợ giúp phù hợp", "Bôi kem bất kỳ", "Đắp kem đánh răng", "Chọc vỡ bóng nước", "Không bôi chất dân gian lên bỏng."),
+    question("Trẻ bị đánh vào đầu cần theo dõi gì?", "Nôn lặp lại, lơ mơ, co giật hoặc đau tăng", "Chỉ vết xước", "Cho ngủ không kiểm tra", "Tự dùng thuốc", "Dấu thần kinh sau chấn thương cần đánh giá."),
+    question("Kỹ năng sơ cứu nên học từ đâu?", "Khóa đào tạo và nguồn chính thống", "Video bất kỳ", "Truyền miệng", "Đoán theo kinh nghiệm", "Sơ cứu sai có thể gây hại."),
+    question("Phòng tai nạn có cần rà soát định kỳ không?", "Có", "Không", "Chỉ khi trẻ nhỏ", "Chỉ sau tai nạn", "Kỹ năng mới của trẻ tạo ra nguy cơ mới."),
+  ],
+  schoolPrevention: [
+    question("Trẻ 5–10 tuổi cần hồ sơ phòng bệnh nào?", "Tiêm chủng, răng miệng, mắt và khám định kỳ", "Chỉ cân nặng", "Chỉ điểm số", "Không cần hồ sơ", "Theo dõi sức khỏe học đường gồm nhiều lĩnh vực."),
+    question("Lịch tiêm chủng nên dựa vào đâu?", "Lịch hiện hành và hồ sơ thực tế", "Lịch trên mạng cũ", "Nhớ bằng miệng", "Tự tiêm thêm", "Lịch có thể thay đổi theo nơi sống và tiền sử tiêm."),
+    question("Khám mắt nên chú ý dấu nào?", "Nheo mắt, nhìn gần, đau đầu hoặc nhìn mờ", "Chỉ màu mắt", "Chỉ chiều cao", "Không cần hỏi trẻ", "Dấu hiệu nhìn bất thường nên được kiểm tra."),
+    question("Răng vĩnh viễn cần chăm sóc thế nào?", "Đánh răng đều và khám nha khoa", "Chờ đau mới khám", "Tự nhổ răng", "Chỉ súc nước ngọt", "Phòng bệnh răng miệng quan trọng hơn chờ đau."),
+    question("Trẻ có bệnh nền nên chuẩn bị gì ở trường?", "Kế hoạch chăm sóc đã thống nhất với gia đình và nhà trường", "Giấu hoàn toàn", "Cho bạn tự xử lý", "Tự đổi thuốc", "Thông tin an toàn cần được chia sẻ đúng người."),
+    question("Đau đầu tái diễn nên làm gì?", "Ghi thời điểm, yếu tố liên quan và trao đổi với bác sĩ", "Tự dùng thuốc thường xuyên", "Bỏ qua", "Nhịn ăn", "Nhật ký giúp bác sĩ đánh giá đầy đủ hơn."),
+    question("Tầm soát sức khỏe tinh thần có ý nghĩa gì?", "Phát hiện sớm khó khăn để hỗ trợ", "Dán nhãn trẻ", "Xếp loại trẻ", "Thay thế trò chuyện", "Sàng lọc không phải chẩn đoán."),
+    question("Thuốc của trẻ ở trường cần quản lý ra sao?", "Theo quy định và kế hoạch của bác sĩ/gia đình", "Bạn bè tự cho", "Chia thuốc của người khác", "Để trong cặp không báo ai", "Không dùng thuốc kê cho trẻ khác."),
+    question("Mục tiêu của site ở nhóm 5–10 tuổi là gì?", "Theo dõi, phòng ngừa và nhận ra dấu cần khám", "Tự chẩn đoán", "Tự kê thuốc", "Thay bác sĩ", "Site chỉ hỗ trợ ghi nhớ và chuẩn bị trao đổi y tế."),
+    question("Khi hướng dẫn y tế thay đổi nên làm gì?", "Cập nhật nội dung đã được kiểm duyệt", "Giữ nguyên mãi", "Tin bài cũ", "Tự sửa thuốc", "Nội dung sức khỏe cần được rà soát định kỳ."),
+  ],
 };
 
-function lesson(number: HealthLessonNumber, title: string, summary: string, html: string, safety: string[], steps: string[], analysis: string, points: string[], questions: HealthQuestion[]): HealthLesson {
-  return { number, title, summary, content: { html, safety }, practice: { steps }, analysis: { html: analysis }, review: { points }, quiz: { questions } };
+function lesson(number: HealthLessonNumber, title: string, summary: string, html: string, safety: string[], steps: string[], analysis: string, points: string[], questions: HealthQuestion[], ageBand: HealthAgeBand = "under5"): HealthLesson {
+  return { number, ageBand, title, summary, content: { html, safety }, practice: { steps }, analysis: { html: analysis }, review: { points }, quiz: { questions } };
 }
+
+const schoolLessons: Record<Extract<HealthLessonNumber, "09" | "10" | "11" | "12" | "13" | "14">, HealthLesson> = {
+  "09": lesson("09", "Tăng trưởng & sức khỏe học đường", "Theo dõi trẻ 5–10 tuổi theo năm, nhìn xu hướng phát triển và hồ sơ sức khỏe học đường.", "<h3>Mốc tuổi mới: 5–10 tuổi</h3><p>Từ 5 tuổi trở đi, hồ sơ của site dùng số năm tuổi, không yêu cầu nhập tháng. Cần nhìn cân nặng, chiều cao, vận động, giấc ngủ, học tập và tâm trạng theo thời gian; một lần đo không đủ để kết luận.</p>", ["Sụt cân rõ, mệt kéo dài, mất kỹ năng hoặc tăng trưởng thay đổi nhanh cần được đánh giá.", "Không tự dùng hormone, thuốc bổ hoặc sản phẩm tăng chiều cao."], ["Chọn nhóm 5–10 tuổi và nhập số năm tuổi.", "Ghi cân nặng, chiều cao và ngày đo.", "Ghi diễn biến học tập, ngủ và vận động nếu có thay đổi.", "Mang hồ sơ khi đi khám."], "<p>Trẻ ở tuổi học đường có thể thay đổi do bệnh, dinh dưỡng, giấc ngủ, tâm lý hoặc môi trường. Hãy dùng nhật ký để nhận ra xu hướng và đặt câu hỏi đúng khi khám.</p>", ["Tuổi 5–10 nhập theo năm, không theo tháng.", "Nhìn xu hướng chứ không xếp hạng trẻ.", "Sụt cân hoặc mất kỹ năng cần được đánh giá."], Q.schoolGrowth, "school5to10"),
+  "10": lesson("10", "Dinh dưỡng, vận động & răng miệng", "Tổ chức bữa ăn, vận động và chăm sóc răng cho trẻ trong gia đình và ở trường.", "<h3>Nếp sống là nền tảng</h3><p>Ưu tiên bữa ăn đa dạng, nước lọc, vận động đều đặn và đánh răng đúng cách. Hạn chế nước ngọt, đồ ăn vặt nhiều đường và thói quen vừa ăn vừa chạy/chơi.</p>", ["Không ép ăn hoặc tự bổ sung sản phẩm tăng chiều cao.", "Dị ứng thực phẩm, đau bụng tái diễn hoặc sụt cân cần trao đổi y tế."], ["Ghi món gây khó chịu hoặc phản ứng nếu có.", "Chuẩn bị nước lọc và bữa phụ phù hợp.", "Duy trì vận động hằng ngày.", "Đánh răng và đặt lịch khám răng."], "<p>Ở tuổi 5–10, sức khỏe không chỉ nằm ở cân nặng. Năng lượng khi học và chơi, giấc ngủ, răng miệng và mối quan hệ với thức ăn cũng là dữ liệu quan trọng.</p>", ["Ăn đa dạng, uống nước lọc.", "Không ép ăn và không tự dùng thuốc bổ.", "Theo dõi răng, dị ứng và đau bụng tái diễn."], Q.schoolNutrition, "school5to10"),
+  "11": lesson("11", "Ngủ, màn hình & sức khỏe tinh thần", "Nhận biết thay đổi kéo dài về giấc ngủ, cảm xúc, học tập và các mối quan hệ.", "<h3>Trẻ lớn vẫn cần được bảo vệ</h3><p>Giờ ngủ đều, vận động, trò chuyện và khoảng thời gian không màn hình giúp trẻ phục hồi. Buồn bã, lo sợ, cáu gắt, rút lui hoặc sa sút học tập kéo dài cần được lắng nghe và hỗ trợ.</p>", ["Không dùng thuốc ngủ hoặc thuốc an thần cho trẻ nếu chưa có chỉ định.", "Nếu trẻ nói về tự hại hoặc không an toàn, cần ở bên và tìm trợ giúp khẩn cấp."], ["Hỏi trẻ bằng câu mở và lắng nghe.", "Ghi giờ ngủ, thời gian màn hình và thay đổi cảm xúc.", "Phối hợp gia đình–nhà trường khi cần.", "Tìm hỗ trợ chuyên môn nếu dấu hiệu kéo dài."], "<p>Không nên quy mọi khó khăn của trẻ cho lười biếng hay bướng bỉnh. Hãy xem cả sức khỏe thể chất, giấc ngủ, áp lực học tập, bắt nạt và môi trường gia đình.</p>", ["Lắng nghe không phán xét.", "Ngủ và màn hình ảnh hưởng sức khỏe toàn diện.", "Dấu hiệu kéo dài hoặc tự hại cần hỗ trợ sớm."], Q.schoolSleepMind, "school5to10"),
+  "12": lesson("12", "Hô hấp & bệnh học đường", "Đánh giá khó thở ở trẻ 5–10 tuổi bằng công thở, màu môi, tỉnh táo và khả năng nói/uống.", "<h3>Không áp dụng máy móc ngưỡng dưới 5 tuổi</h3><p>Ở nhóm 5–10 tuổi, site không dùng ngưỡng thở nhanh IMCI của trẻ dưới 5 tuổi để tự kết luận. Khi trẻ khó thở, hãy quan sát rút lõm, phập phồng cánh mũi, tím, khả năng nói thành câu, uống và mức tỉnh táo.</p>", ["Tím, ngưng thở, li bì, khó thở rõ hoặc không nói/uống được là dấu cần cấp cứu.", "Không tự dùng kháng sinh, corticoid hoặc thuốc xịt của người khác."], ["Để trẻ ngồi thoải mái và quan sát công thở.", "Đếm nhịp thở đủ 60 giây khi trẻ yên nếu có thể.", "Ghi sốt, SpO₂ nếu có và diễn biến.", "Đưa đi đánh giá khi dấu hiệu tăng."], "<p>Ho ít hơn không luôn đồng nghĩa với hồi phục. Nếu trẻ mệt hơn, thở gắng sức, uống kém hoặc màu môi bất thường, cần đánh giá lại dù tiếng ho đã giảm.</p>", ["Tuổi 5–10 không dùng ngưỡng IMCI 0–5 tuổi máy móc.", "Công thở và toàn trạng là trọng tâm.", "Dấu đỏ cần cấp cứu."], Q.schoolRespiratory, "school5to10"),
+  "13": lesson("13", "An toàn, giao thông & sơ cứu", "Phòng tai nạn theo kỹ năng mới của trẻ: đường phố, nước, điện, bỏng, ngã và ngộ độc.", "<h3>Nguy cơ thay đổi theo khả năng</h3><p>Trẻ 5–10 tuổi di chuyển độc lập hơn nhưng chưa luôn đánh giá được nguy hiểm. Cần luyện kỹ năng qua đường, quy tắc gần nước, mũ bảo hiểm, không tự dùng thuốc và cách gọi người lớn khi có sự cố.</p>", ["Không để trẻ tự xử trí ngộ độc hoặc chấn thương nặng.", "Không tự gây nôn, bôi chất dân gian lên bỏng hoặc cho thuốc của người khác."], ["Rà soát lối đi và thiết bị trong nhà.", "Luyện quy tắc qua đường và dùng mũ bảo hiểm.", "Dạy trẻ gọi người lớn khi không an toàn.", "Học sơ cứu từ nguồn đào tạo chính thống."], "<p>Phòng tai nạn phải được cập nhật khi trẻ biết leo, chạy, tự đi học, dùng thiết bị hoặc ở gần nước. Bơi biết kỹ thuật vẫn không thay thế giám sát.</p>", ["Biết bơi không đồng nghĩa an toàn tuyệt đối.", "Pin cúc áo và ngộ độc cần cấp cứu.", "Sơ cứu phải đúng kỹ thuật và đúng tình huống."], Q.schoolSafety, "school5to10"),
+  "14": lesson("14", "Khám định kỳ & hồ sơ sức khỏe", "Tổ chức tiêm chủng, khám răng–mắt, bệnh nền và thông tin cần trao đổi với bác sĩ.", "<h3>Biết chuẩn bị cho lần khám</h3><p>Lưu hồ sơ tiêm chủng, thuốc đang dùng, dị ứng, bệnh nền, số đo và các thay đổi ở nhà/trường. Site không đóng cứng lịch vaccine; hãy đối chiếu lịch hiện hành và hồ sơ thật của trẻ.</p>", ["Không tự đổi thuốc đang điều trị hoặc dùng đơn thuốc của trẻ khác.", "Sàng lọc và nhật ký không thay thế chẩn đoán."], ["Chụp/lưu hồ sơ tiêm chủng và lần khám.", "Ghi câu hỏi trước khi đi khám.", "Mang theo danh sách thuốc, dị ứng và diễn biến.", "Cập nhật kế hoạch chăm sóc với nhà trường nếu cần."], "<p>Một hồ sơ ngắn nhưng có ngày tháng, triệu chứng, thuốc và diễn biến sẽ giúp cuộc trao đổi y tế hiệu quả hơn. Khi hướng dẫn thay đổi, nội dung cần được cập nhật qua quy trình biên tập.</p>", ["Tuổi 5–10 theo năm.", "Lưu hồ sơ răng, mắt, vaccine và bệnh nền.", "Dùng site để chuẩn bị trao đổi, không tự kê đơn."], Q.schoolPrevention, "school5to10"),
+};
 
 export function staticHealthCourseDocument(): HealthCourseDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     application: "child-health",
     policyVersion: HEALTH_POLICY_VERSION,
     reviewedOn: "2026-09-05",
-    title: "Giáo trình chăm sóc sức khỏe trẻ 9 tháng – 5 tuổi",
+    title: "Giáo trình chăm sóc sức khỏe trẻ 9 tháng – 10 tuổi",
     passScore: 8,
     lessons: {
       "01": lesson("01", "Hồ sơ sức khỏe & tăng trưởng", "Theo dõi tuổi, giới, cân nặng, chiều cao và phát triển theo xu hướng.", "<h3>Theo dõi theo thời gian</h3><p>Không kết luận tình trạng tăng trưởng chỉ từ một lần cân đo. Dùng chuẩn WHO đúng giới và theo dõi xu hướng cân nặng, chiều dài/chiều cao cùng sự phát triển.</p>", ["Sụt cân rõ, ăn uống giảm kéo dài hoặc mất kỹ năng đã có cần được đánh giá."], ["Ghi tuổi theo tháng.", "Đo cân nặng và chiều cao bằng phương pháp nhất quán.", "Lưu số đo theo ngày.", "Theo dõi cả vận động, ngôn ngữ và tương tác."], "<p>Cân nặng đứng yên ngay sau một đợt bệnh không tự động đồng nghĩa bệnh nặng; cần nhìn quá trình hồi phục và đường tăng trưởng.</p>", ["Theo dõi xu hướng, không chỉ một con số.", "Dùng chuẩn tăng trưởng đúng giới.", "Mất kỹ năng đã có là dấu cần đánh giá."], Q.growth),
@@ -206,6 +290,7 @@ export function staticHealthCourseDocument(): HealthCourseDocument {
       "06": lesson("06", "Tiêu hóa, da & vệ sinh", "Nhận biết mất nước và chăm sóc da/cơ quan sinh dục nhẹ nhàng.", "<h3>Tiêu hóa và vệ sinh</h3><p>Khi nôn hoặc tiêu chảy, theo dõi lượng uống, tiểu và tỉnh táo. Da kích ứng nên tránh sản phẩm thơm và thuốc bôi mạnh không rõ chỉ định.</p>", ["Không cố tuột bao quy đầu bé trai.", "Bé gái nên được dạy lau từ trước ra sau.", "Không tự bôi corticoid mạnh trên diện rộng."], ["Theo dõi số lần tiểu.", "Thay tã khi ướt/bẩn.", "Vệ sinh nhẹ bên ngoài.", "Quan sát dấu mất nước."], "<p>Tiêu chảy kèm li bì, không uống được hoặc tiểu rất ít khác hoàn toàn tiêu chảy khi trẻ vẫn uống và hoạt động tốt.</p>", ["Mất nước là nguy cơ chính khi nôn/tiêu chảy.", "Vệ sinh nhẹ nhàng.", "Không tự dùng thuốc bôi mạnh."], Q.hygiene),
       "07": lesson("07", "An toàn & sơ cứu cần nhớ", "Phòng hóc, đuối nước, bỏng, ngã và ngộ độc.", "<h3>Phòng tai nạn trước</h3><p>Không để trẻ một mình gần nước; khóa thuốc, hóa chất và pin cúc áo; cố định đồ dễ đổ và phòng bỏng.</p>", ["Hóc nặng có thể im lặng.", "Tím và không phát tiếng sau ăn có thể là tắc đường thở nặng.", "Sơ cứu cần học đúng kỹ thuật theo lứa tuổi."], ["Kiểm tra nhà ở ngang tầm trẻ.", "Khóa hóa chất và pin.", "Giám sát liên tục gần nước.", "Học sơ cứu hóc/CPR từ nguồn chính thống."], "<p>Khi trẻ không ho/nói/khóc hiệu quả và tím dần sau ăn, không mất thời gian tìm thuốc; đây là tình huống cấp cứu.</p>", ["Hóc có thể im lặng.", "Nước nông vẫn nguy hiểm.", "Pin cúc áo là dị vật nguy hiểm."], Q.safety),
       "08": lesson("08", "Tiêm chủng, khám định kỳ & kế hoạch gia đình", "Tổ chức chăm sóc phòng bệnh và biết giới hạn của tự chăm sóc.", "<h3>Phòng bệnh có hệ thống</h3><p>Tiêm chủng theo lịch hiện hành tại nơi trẻ sinh sống và hồ sơ vaccine thực tế. Site không đóng cứng lịch vaccine nhiều năm.</p>", ["Giáo trình không thay thế khám, chẩn đoán hoặc kê đơn.", "Bệnh nền có thể làm thay đổi cách đánh giá và điều trị."], ["Lưu hồ sơ tiêm chủng.", "Ghi các lần khám quan trọng.", "Theo dõi răng miệng và phát triển.", "Xem lại checklist an toàn định kỳ."], "<p>Nội dung phụ thuộc vaccine, thuốc kê đơn, bệnh nền hoặc chẩn đoán cần dựa trên hướng dẫn hiện hành và đánh giá cá nhân.</p>", ["Tiêm chủng theo lịch hiện hành.", "Lưu hồ sơ thật của trẻ.", "Biết giới hạn của tự chăm sóc."], Q.prevention),
+      ...schoolLessons,
     },
   };
 }
@@ -232,6 +317,7 @@ export function validateHealthCourseDocument(value: unknown) {
     const lessonValue = lessons[number];
     if (!isRecord(lessonValue)) { errors.push(`Thiếu Bài ${number}.`); continue; }
     if (lessonValue.number !== number) errors.push(`Bài ${number}: mã bài không hợp lệ.`);
+    if (lessonValue.ageBand !== "under5" && lessonValue.ageBand !== "school5to10") errors.push(`Bài ${number}: thiếu nhóm tuổi hợp lệ.`);
     if (!cleanText(lessonValue.title, 180) || !cleanText(lessonValue.summary, 600)) errors.push(`Bài ${number}: thiếu tiêu đề hoặc giới thiệu.`);
     const content = isRecord(lessonValue.content) ? lessonValue.content : null;
     const practice = isRecord(lessonValue.practice) ? lessonValue.practice : null;
