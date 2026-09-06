@@ -1723,7 +1723,7 @@ function Reminders({
     if (typeof window === "undefined") return "default";
     return "Notification" in window ? Notification.permission : "unsupported";
   });
-  const ownReminders = reminders.slice().sort((a, b) => (a.date + b.time).localeCompare(b.date + b.time));
+  const ownReminders = reminders.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   useEffect(() => {
     if (notificationStatus !== "granted") return undefined;
     function notifyDue() {
