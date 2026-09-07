@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trung tâm quản trị học tập",
-  description: "Quản lý thiết bị, tiến độ, nội dung và phiên bản của hệ thống học tập.",
-  applicationName: "Trung tâm quản trị học tập",
+  title: "Trung tâm quản trị ứng dụng",
+  description: "Điều phối ứng dụng, thiết bị quản trị, phân quyền và nhật ký bảo mật của hệ thống.",
+  applicationName: "Trung tâm quản trị ứng dụng",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "Quản trị học tập", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Quản trị ứng dụng", statusBarStyle: "default" },
   other: {
     "codex-preview": "development",
   },

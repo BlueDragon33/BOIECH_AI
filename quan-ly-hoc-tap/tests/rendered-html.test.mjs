@@ -58,5 +58,5 @@ test("renders the authenticated management center and preview metadata", async (
   );
   const html = await response.text();
   assert.match(html, developmentPreviewMeta);
-  assert.match(html, /Trung tâm quản trị học tập/i);
+  assert.match(html, /Trung tâm quản trị ứng dụng/i);
 });

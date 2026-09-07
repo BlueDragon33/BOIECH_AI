@@ -1,0 +1,46 @@
+.boiBoundary :global(.application-list) {
+  display: none !important;
+}
+
+.boiBoundary :global(.control-sidebar nav button:nth-child(n+4)) {
+  display: none !important;
+}
+
+.boiBoundary :global(.control-brand > div:last-child > span),
+.boiBoundary :global(.control-brand > div:last-child > strong),
+.boiBoundary :global(.topbar > div:first-child > span) {
+  font-size: 0 !important;
+}
+
+.boiBoundary :global(.control-brand > div:last-child > span)::after {
+  content: "Ứng dụng độc lập";
+  font-size: 11px;
+}
+
+.boiBoundary :global(.control-brand > div:last-child > strong)::after {
+  content: "Quản trị Bơi ếch";
+  font-size: 16px;
+}
+
+.boiBoundary :global(.topbar > div:first-child > span)::after {
+  content: "Quản trị Bơi ếch";
+  font-size: 12px;
+}
+
+.boiBoundary :global(.control-sidebar nav)::after {
+  content: "Quyền quản trị trung tâm và nhật ký bảo mật được quản lý tại Trung tâm, không nằm trong Bơi ếch.";
+  display: block;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.68);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .boiBoundary :global(.control-sidebar nav)::after {
+    margin-bottom: 6px;
+  }
+}
