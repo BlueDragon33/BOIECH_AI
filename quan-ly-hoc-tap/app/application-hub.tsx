@@ -450,6 +450,9 @@ export default function ApplicationHub({
                   {application.runtime.contractVersion
                     ? <small>Contract v{application.runtime.contractVersion} · {application.runtime.canonicalApplication || "alias legacy"}</small>
                     : null}
+                  {application.runtime.buildRevision
+                    ? <small>Revision {application.runtime.buildRevision.slice(0, 12)} · {application.runtime.buildSource || "Health_Care"}</small>
+                    : <small>Revision production: chưa công bố</small>}
                 </div>
                 : null}
               <div className={styles.appScope}>
