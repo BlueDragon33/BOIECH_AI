@@ -18,6 +18,9 @@ if [[ ! -x "${vinext}" ]]; then
   exit 69
 fi
 
+echo "Checking standalone Child Health boundary..."
+node "${script_dir}/check-boundary.mjs"
+
 echo "Running bounded vinext build..."
 timeout \
   --signal=TERM \
