@@ -4,6 +4,13 @@ const CONTROL_CENTER_ORIGIN = "https://learning-management.boiech-ai.workers.dev
 const TOKEN_AUDIENCE = "child-health-control";
 const TOKEN_ISSUER = "quan-ly-hoc-tap";
 
+export type ControlServiceIdentity = {
+  actor: string;
+  role: string;
+  controlDeviceId: string | null;
+  ticketId: string | null;
+};
+
 async function digest(value: string) { return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))); }
 async function secureEqual(left: string, right: string) {
   const [a, b] = await Promise.all([digest(left), digest(right)]);
@@ -13,7 +20,7 @@ async function secureEqual(left: string, right: string) {
 }
 function base64Url(bytes: Uint8Array) { let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
 function fromBase64Url(value: string) {
-  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length > 2048) throw new DeviceAccessError("Vé quản trị không hợp lệ.", 403, "CONTROL_TICKET_INVALID");
+  if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length > 3072) throw new DeviceAccessError("Vé quản trị không hợp lệ.", 403, "CONTROL_TICKET_INVALID");
   const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
   try { return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)); } catch { throw new DeviceAccessError("Vé quản trị không hợp lệ.", 403, "CONTROL_TICKET_INVALID"); }
 }
@@ -21,7 +28,7 @@ async function signature(secret: string, value: string) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return base64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
 }
-async function browserTicket(secret: string, supplied: string) {
+async function browserTicket(secret: string, supplied: string): Promise<ControlServiceIdentity | null> {
   const [version, encoded, suppliedSignature, extra] = supplied.split(".");
   if (version !== "v1" || !encoded || !suppliedSignature || extra) return null;
   const expected = await signature(secret, `${version}.${encoded}`);
@@ -32,10 +39,13 @@ async function browserTicket(secret: string, supplied: string) {
   const suppliedRole = typeof payload.role === "string" ? payload.role : "viewer";
   const role = ["viewer", "reviewer", "publisher", "owner"].includes(suppliedRole) ? suppliedRole : "viewer";
   const expiresAt = typeof payload.exp === "number" ? payload.exp : 0;
-  if (payload.iss !== TOKEN_ISSUER || payload.aud !== TOKEN_AUDIENCE || !actor.includes("@") || expiresAt <= Date.now() || expiresAt > Date.now() + 10 * 60 * 1000) return null;
-  return { actor, role };
+  const controlDeviceId = typeof payload.controlDeviceId === "string" && /^[a-f0-9]{64}$/.test(payload.controlDeviceId) ? payload.controlDeviceId : null;
+  const ticketId = typeof payload.jti === "string" && /^[A-Za-z0-9_-]{16,100}$/.test(payload.jti) ? payload.jti : null;
+  const app = typeof payload.app === "string" ? payload.app : "child-health";
+  if (payload.iss !== TOKEN_ISSUER || payload.aud !== TOKEN_AUDIENCE || app !== "child-health" || !actor.includes("@") || expiresAt <= Date.now() || expiresAt > Date.now() + 10 * 60 * 1000) return null;
+  return { actor, role, controlDeviceId, ticketId };
 }
-export async function requireControlService(request: Request) {
+export async function requireControlService(request: Request): Promise<ControlServiceIdentity> {
   const workers = await import("cloudflare:workers");
   const configured = (workers.env as unknown as Record<string, unknown>).CONTROL_SERVICE_SECRET;
   const authorization = request.headers.get("authorization") ?? "";
@@ -49,7 +59,8 @@ export async function requireControlService(request: Request) {
   const actor = (request.headers.get("x-control-actor") ?? "system").trim().toLowerCase().slice(0, 160);
   const suppliedRole = (request.headers.get("x-control-role") ?? "viewer").trim().toLowerCase();
   const role = ["viewer", "reviewer", "publisher", "owner"].includes(suppliedRole) ? suppliedRole : "viewer";
-  return { actor: actor || "system", role };
+  const controlDeviceId = (request.headers.get("x-control-device") ?? "").trim().toLowerCase();
+  return { actor: actor || "system", role, controlDeviceId: /^[a-f0-9]{64}$/.test(controlDeviceId) ? controlDeviceId : null, ticketId: null };
 }
 function corsHeaders(request: Request): Record<string, string> {
   return request.headers.get("origin") === CONTROL_CENTER_ORIGIN ? {
