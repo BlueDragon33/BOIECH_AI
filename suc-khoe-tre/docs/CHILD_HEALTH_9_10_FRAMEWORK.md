@@ -1,18 +1,12 @@
-# Sức khỏe Y tế 9–10 tuổi — Framework baseline
+# Sức khỏe Y tế 9–10 tuổi — trạng thái hoàn thiện khung chức năng
 
-## Mục tiêu
+## Kiến trúc đã khóa
 
-Bộ khung này thay cho cách tổ chức sức khỏe tổng quát trước đây. Đối tượng trung tâm là trẻ 9–10 tuổi. Nội dung chính xoay quanh tăng trưởng, dinh dưỡng, vận động, giấc ngủ, vệ sinh, răng miệng, mắt & học tập, sức khỏe học đường, checklist và nhật ký.
-
-## Ranh giới bắt buộc
-
-- `suc-khoe-tre` là Web App độc lập.
-- Không nhúng Site Quản trị vào runtime, router hoặc UI của Sức khỏe Y tế.
-- Không tạo `/admin` trong Sức khỏe Y tế.
-- Site Quản trị chỉ quản lý thiết bị, quyền truy cập, policy, feature permission, phiên, audit và quy trình duyệt nội dung.
-- Hồ sơ sức khỏe cá nhân không mặc định được đưa sang Site Quản trị.
-- Sức khỏe Y tế không dùng runtime/API/database của Bơi ếch.
-- Phương thức quản trị lấy Bơi ếch làm mẫu: Web App độc lập + thiết bị được Trung tâm cấp/khóa/thu hồi quyền từ xa.
+- Web App `suc-khoe-tre` hoạt động độc lập.
+- Thiết bị truy cập bằng khóa riêng, mã `SK-*`, phải được Trung tâm Quản trị cấp quyền.
+- Hồ sơ, số đo, checklist, bữa ăn, vận động, chăm sóc, nhật ký và nhắc việc được lưu local-first trên thiết bị; không mặc định gửi về Trung tâm.
+- Trung tâm chỉ quản lý thiết bị, quyền truy cập, quyền sửa nội dung, quyền Google Calendar, kiểm duyệt và audit.
+- Không dùng runtime/API/database nghiệp vụ của Bơi ếch.
 
 ## Điều hướng cấp 1
 
@@ -22,52 +16,44 @@ Bộ khung này thay cho cách tổ chức sức khỏe tổng quát trước đ
 4. Vận động
 5. Chăm sóc
 6. Nhật ký
-7. Hồ sơ
+7. Hồ sơ & nhắc việc
 
-Không đưa hàng chục module ngang cấp vào menu chính.
+## Chức năng đã có
 
-## A–Z
+- Checklist hằng ngày và tiến độ.
+- Timeline chiều cao, cân nặng, BMI số học không tự phân loại.
+- Checklist nhóm thực phẩm, nước và nhật ký bữa ăn.
+- Nhật ký vận động theo loại và số phút.
+- Giấc ngủ, răng miệng, nghỉ mắt, vệ sinh cá nhân.
+- Nhật ký cảm nhận, triệu chứng và ghi chú diễn biến.
+- Reminder Engine: một lần, hằng ngày, thứ 2–6, hằng tuần.
+- Browser Notification khi Web App đang hoạt động.
+- Tải `.ics`.
+- Google Calendar chỉ mở khi đúng thiết bị có `calendar_enabled=1`.
 
-- **A — App Shell:** desktop sidebar, mobile bottom navigation, trạng thái kết nối/thiết bị.
-- **B — Hôm nay:** checklist, tiến độ, việc tiếp theo, tóm tắt nhanh.
-- **C — Hồ sơ trẻ:** tên, ngày sinh, tuổi, giới tính, số đo và ghi chú cần thiết.
-- **D — Tăng trưởng:** chiều cao, cân nặng, BMI theo tuổi/giới tính, xu hướng.
-- **E — Mốc tăng trưởng:** lưu từng lần đo theo ngày và timeline 9–10 tuổi.
-- **F — Dinh dưỡng:** nhóm thực phẩm, bữa ăn, nước, checklist, nhật ký, nhắc.
-- **G — Nhóm thực phẩm:** đạm, rau, trái cây, sữa/tương đương, ngũ cốc/tinh bột, nước.
-- **H — Checklist dinh dưỡng:** reset theo ngày nhưng giữ lịch sử.
-- **I — Nhật ký dinh dưỡng:** sáng, trưa, phụ, tối; món, nhóm thực phẩm, mức ăn, ghi chú.
-- **J — Nước:** ghi nhanh, lịch sử, mục tiêu cấu hình theo hồ sơ/chính sách.
-- **K — Vận động:** đi bộ, chạy, đạp xe, bơi, bóng đá, nhảy dây, thể dục và hoạt động khác.
-- **L — Checklist vận động:** thói quen vận động, ngoài trời, ngồi lâu và thư giãn.
-- **M — Giấc ngủ:** giờ ngủ, giờ dậy, thời lượng, checklist trước ngủ.
-- **N — Chăm sóc cá nhân:** rửa tay, tắm, thay quần áo, tóc và thói quen vệ sinh.
-- **O — Răng miệng:** đánh răng sáng/tối, đau răng, thay răng, lịch nha khoa.
-- **P — Mắt & học tập:** mỏi mắt, nhìn mờ, đau đầu khi học, màn hình và nghỉ mắt.
-- **Q — Sức khỏe học đường:** mắt, răng, tư thế, cặp sách, vận động, thói quen học tập.
-- **R — Nhật ký sức khỏe:** cảm nhận hôm nay, triệu chứng, nhiệt độ/ghi chú khi cần.
-- **S — Theo dõi triệu chứng:** theo dõi diễn biến, không tự chẩn đoán, không tự kê đơn.
-- **T — Timeline sức khỏe:** tăng trưởng, checklist, triệu chứng, khám và sự kiện quan trọng.
-- **U — Reminder Engine:** một engine chung cho dinh dưỡng, nước, vận động, răng, ngủ, đo và lịch khám.
-- **V — Nhắc lặp:** một lần, hằng ngày, theo ngày trong tuần, hằng tuần, hằng tháng.
-- **W — Notification & Calendar:** browser notification, `.ics`, Google Calendar theo quyền thiết bị.
-- **X — PWA / Offline:** checklist, nhật ký và dữ liệu đã cache; đồng bộ khi có mạng.
-- **Y — Quản lý từ Site Quản trị:** device registry, access, feature permission, policy, session, audit, review.
-- **Z — Kiến trúc phát hành:** runtime riêng, database nghiệp vụ riêng, Control API tối thiểu, test gate trước merge.
+## Quyền Google Calendar
 
-## Những phần không thuộc baseline 9–10 tuổi
+Migration `0002_calendar_permission.sql` thêm `calendar_enabled` vào `site_access_devices`.
 
-Không đưa lên điều hướng chính: thai kỳ, sau sinh, người cao tuổi, bệnh mạn người lớn, calorie tracker giảm cân, gym, thực phẩm bổ sung như module lớn, bệnh viện/bác sĩ như module chính, đường huyết/SpO2/huyết áp mặc định trên dashboard trẻ khỏe mạnh.
+Control API hỗ trợ:
+- `enable-calendar`
+- `disable-calendar`
 
-## Trạng thái triển khai của commit framework
+Khi thiết bị bị khóa, `edit_enabled` và `calendar_enabled` đều bị thu hồi.
 
-Commit framework chỉ tái cấu trúc App Shell và các màn hình cấp 1. Các nút `Thiết kế sâu sau` là chủ ý: chưa triển khai nghiệp vụ sâu, database schema, thuật toán đánh giá tăng trưởng, reminder persistence hoặc Google Calendar trong lượt này.
+## Giới hạn có chủ ý
 
-Khi triển khai sâu phải giữ gate:
+- Browser Notification không được mô tả là nhắc nền khi Web App đã đóng. Khi cần nhắc đáng tin cậy lúc app đóng, dùng `.ics` hoặc Google Calendar.
+- Chưa đồng bộ hồ sơ sức khỏe cá nhân lên server; baseline hiện tại ưu tiên local-first.
+- Chưa thêm percentile tăng trưởng hoặc phân loại BMI trẻ; phần này phải dùng nguồn chuẩn và qua duyệt nội dung riêng.
 
-1. lint;
-2. build;
-3. kiểm thử device access;
-4. kiểm thử responsive;
-5. kiểm thử ranh giới Sức khỏe Y tế ↔ Site Quản trị;
-6. chỉ merge `main` sau khi gate pass.
+## Gate trước merge
+
+1. Sức khỏe Y tế: lint + build.
+2. Bơi ếch: lint + build/test.
+3. Trung tâm Quản trị: build.
+4. Kiểm tra migration D1.
+5. Kiểm tra pending/approved/blocked.
+6. Kiểm tra Calendar khóa/mở đúng quyền thiết bị.
+7. Kiểm tra responsive desktop/phone/tablet.
+8. Chỉ merge `main` khi toàn bộ gate PASS.

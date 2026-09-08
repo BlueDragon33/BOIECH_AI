@@ -1,7 +1,7 @@
 "use client";
 
-import HealthFramework from "./health-framework";
+import HealthFramework, { type HealthDeviceAccess } from "./health-framework";
 
-export default function HealthClient({ initialCourse }: { initialCourse: unknown }) {
-  return <HealthFramework initialCourse={initialCourse} />;
+export default function HealthClient({ initialCourse, device }: { initialCourse: unknown; device: HealthDeviceAccess }) {
+  return <HealthFramework initialCourse={initialCourse} device={device} />;
 }

@@ -15,6 +15,7 @@ type DeviceState = {
   browser: string | null;
   label: string | null;
   editEnabled: boolean;
+  calendarEnabled: boolean;
 };
 type Credential = { version: 1; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type ApiPayload = { device?: DeviceState; challenge?: string; course?: HealthCourseDocument; error?: string; code?: string };
@@ -173,14 +174,14 @@ export default function HealthDeviceGate() {
   }, [credential, device, course]);
 
   if (course && device?.status === "approved") {
-    return <><div className="health-device-strip"><span>{typeLabels[device.deviceType]}</span><strong>{device.deviceCode}</strong><small>{device.browser ?? "Trình duyệt"} · {device.editEnabled ? "Được cấp quyền sửa" : "Chỉ sử dụng"}</small></div><HealthClient initialCourse={course} /></>;
+    return <><div className="health-device-strip"><span>{typeLabels[device.deviceType]}</span><strong>{device.deviceCode}</strong><small>{device.browser ?? "Trình duyệt"} · {device.calendarEnabled ? "Calendar được cấp" : "Calendar khóa"} · {device.editEnabled ? "Được cấp quyền sửa" : "Chỉ sử dụng"}</small></div><HealthClient initialCourse={course} device={{ deviceCode: device.deviceCode, deviceType: device.deviceType, editEnabled: device.editEnabled, calendarEnabled: device.calendarEnabled }} /></>;
   }
 
   return <main className="health-access-shell"><section className="health-access-card">
     <div className="health-access-seal">SK</div>
     <span className="health-access-eyebrow">Sức khỏe Y tế · thiết bị độc lập</span>
     <h1>{device?.status === "blocked" ? "Thiết bị này đã bị khóa." : device?.status === "pending" ? "Thiết bị đang chờ Trung tâm cấp quyền." : "Đang nhận diện thiết bị…"}</h1>
-    <p>{error || "Mỗi thiết bị có khóa riêng. Trung tâm chỉ cấp quyền truy cập và quyền chỉnh sửa; dữ liệu sức khỏe cá nhân vẫn thuộc Web App Sức khỏe Y tế."}</p>
+    <p>{error || "Mỗi thiết bị có khóa riêng. Trung tâm chỉ cấp quyền truy cập và các quyền tính năng; dữ liệu sức khỏe cá nhân vẫn thuộc Web App Sức khỏe Y tế."}</p>
     {device ? <div className="health-access-device"><div><span>Loại thiết bị</span><strong>{typeLabels[device.deviceType]}</strong></div><div><span>Mã thiết bị</span><strong>{device.deviceCode}</strong></div><small>{device.platform || "Không xác định nền tảng"} · {device.browser || "Không xác định trình duyệt"}</small></div> : null}
     <button className="health-access-button" onClick={() => void initialize()} disabled={busy}>{busy ? "Đang kiểm tra…" : "Kiểm tra lại quyền"}</button>
     <small className="health-access-note">Thiết bị chờ duyệt được kiểm tra tự động mỗi 60 giây.</small>
