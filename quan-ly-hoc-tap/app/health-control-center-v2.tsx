@@ -35,6 +35,13 @@ type HealthDevice = {
   deviceCode: string;
   status: "pending" | "approved" | "blocked";
   deviceType: "desktop" | "phone" | "tablet";
+  detectedDeviceType: "desktop" | "phone" | "tablet";
+  deviceTypeOverride: "desktop" | "phone" | "tablet" | null;
+  deviceTypeOverrideBy: string | null;
+  deviceTypeOverrideAt: string | null;
+  environmentChanged: boolean;
+  environmentChangeReason: string | null;
+  autoLabel: string | null;
   platform: string | null;
   osName: string | null;
   browser: string | null;
@@ -121,7 +128,7 @@ type SessionData = { application: "child-health"; sessions: HealthSession[] };
 type PolicyData = { application: "child-health"; policy: HealthPolicy };
 type AuditData = { application: "child-health"; audit: HealthAudit[] };
 type Tab = "overview" | "devices" | "sessions" | "policy" | "audit" | "review" | "versions";
-type DeviceFilter = "all" | "pending" | "approved" | "blocked" | "desktop" | "phone" | "tablet" | "unnamed";
+type DeviceFilter = "all" | "pending" | "approved" | "blocked" | "desktop" | "phone" | "tablet" | "unnamed" | "attention";
 
 const statusLabels: Record<HealthStatus, string> = {
   permission_requested: "Xin quyền",
@@ -158,6 +165,10 @@ const auditLabels: Record<string, string> = {
   site_device_calendar_enabled: "Cấp Google Calendar",
   site_device_calendar_disabled: "Thu Google Calendar",
   site_device_label_updated: "Đổi tên gợi nhớ",
+  site_device_type_overridden: "Điều chỉnh loại thiết bị",
+  site_device_type_override_cleared: "Trả phân loại về tự động",
+  site_device_environment_changed: "Môi trường thiết bị thay đổi",
+  site_device_environment_acknowledged: "Đã kiểm tra thay đổi thiết bị",
   site_session_started: "Tạo phiên truy cập",
   site_session_revoked: "Thu hồi phiên",
   site_device_sessions_revoked: "Thu hồi phiên thiết bị",
@@ -288,6 +299,8 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
     phone: devices.filter((item) => item.deviceType === "phone").length,
     tablet: devices.filter((item) => item.deviceType === "tablet").length,
     lowConfidence: devices.filter((item) => item.classificationConfidence === "low").length,
+    attention: devices.filter((item) => item.environmentChanged || item.classificationConfidence === "low").length,
+    overridden: devices.filter((item) => item.deviceTypeOverride != null).length,
     calendar: devices.filter((item) => item.calendarEnabled).length,
     edit: devices.filter((item) => item.editEnabled).length,
     activeSessions: sessions.filter((item) => item.active).length,
@@ -298,18 +311,22 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
   const visibleDevices = devices.filter((device) => {
     const matchesFilter = deviceFilter === "all" ? true
       : deviceFilter === "unnamed" ? !device.label?.trim()
+      : deviceFilter === "attention" ? device.environmentChanged || device.classificationConfidence === "low"
       : deviceFilter === "desktop" || deviceFilter === "phone" || deviceFilter === "tablet" ? device.deviceType === deviceFilter
       : device.status === deviceFilter;
     if (!matchesFilter) return false;
     if (!query) return true;
     return [
       device.label,
+      device.autoLabel,
       device.deviceCode,
       device.platform,
       device.osName,
       device.browser,
       device.browserVersion,
       device.installationId,
+      device.deviceTypeOverrideBy,
+      device.environmentChangeReason,
       device.timezone,
       deviceTypeLabels[device.deviceType],
       deviceConfidenceLabels[device.classificationConfidence],
@@ -332,11 +349,11 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
     await loadOperations(bridge, access.role);
   }
 
-  async function deviceAction(device: HealthDevice, action: string) {
+  async function deviceAction(device: HealthDevice, action: string, extra: Record<string, unknown> = {}) {
     setBusy(true); setError(""); setNotice("");
     try {
       const bridge = await usableBridge();
-      const body: Record<string, unknown> = { action, deviceId: device.deviceId };
+      const body: Record<string, unknown> = { action, deviceId: device.deviceId, ...extra };
       if (action === "label") body.label = labels[device.deviceId] ?? "";
       const data = await upstreamJson<DeviceData>(bridge, "/api/control/devices", { method: "POST", body });
       applyDevices(data.devices ?? []);
@@ -348,6 +365,9 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
         : action === "disable-edit" ? "Đã thu quyền sửa."
         : action === "enable-calendar" ? "Đã cấp Google Calendar."
         : action === "disable-calendar" ? "Đã thu Google Calendar."
+        : action === "set-device-type" ? "Đã lưu phân loại thủ công. Hệ thống vẫn giữ kết quả tự nhận diện để đối chiếu."
+        : action === "clear-device-type" ? "Đã trả loại thiết bị về kết quả tự động."
+        : action === "ack-environment" ? "Đã xác nhận kiểm tra thay đổi môi trường thiết bị."
         : "Đã lưu tên gợi nhớ.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Không thể cập nhật thiết bị.");
@@ -458,7 +478,7 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
       <article><span>Chờ duyệt</span><strong>{counts.pending}</strong><small>Thiết bị SK mới</small></article>
       <article><span>Đang online</span><strong>{counts.online}</strong><small>{counts.activeSessions} phiên còn tín hiệu</small></article>
       <article><span>Quyền tính năng</span><strong>{counts.edit}/{counts.calendar}</strong><small>Sửa / Calendar</small></article>
-      <article><span>Thiết bị tự phân loại</span><strong>{devices.length}</strong><small>Máy tính {counts.desktop} · Điện thoại {counts.phone} · Tablet {counts.tablet}</small></article>
+      <article><span>Phân loại thiết bị</span><strong>{devices.length}</strong><small>PC {counts.desktop} · Phone {counts.phone} · Tablet {counts.tablet} · Cần xem {counts.attention}</small></article>
     </section>
 
     <nav className={styles.tabs}>{tabs.map((item) => <button type="button" key={item.id} className={tab === item.id ? styles.activeTab : styles.tab} onClick={() => setTab(item.id)}>{item.label}</button>)}</nav>
@@ -476,11 +496,11 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
     </section> : null}
 
     {tab === "devices" ? <section className={styles.panel}>
-      <div className={styles.panelHead}><div><span className={styles.eyebrow}>Thiết bị đầu vào · tự động</span><h2>Nhận diện, phân loại và cấp quyền</h2><p>Health_Care tự nhận diện Máy tính / Điện thoại / Máy tính bảng trước khi thiết bị xuất hiện tại đây. Phân loại chỉ hỗ trợ quản trị; quyền truy cập vẫn phải được cấp riêng.</p></div><strong>{counts.lowConfidence ? `${counts.lowConfidence} thiết bị cần kiểm tra` : "Phân loại ổn định"}</strong></div>
+      <div className={styles.panelHead}><div><span className={styles.eyebrow}>Thiết bị đầu vào · tự động</span><h2>Nhận diện, phân loại và cấp quyền</h2><p>Health_Care tự nhận diện Máy tính / Điện thoại / Máy tính bảng trước khi thiết bị xuất hiện tại đây. Phân loại chỉ hỗ trợ quản trị; quyền truy cập vẫn phải được cấp riêng.</p></div><strong>{counts.attention ? `${counts.attention} thiết bị cần kiểm tra` : `Ổn định · ${counts.overridden} chỉnh thủ công`}</strong></div>
       <div className={styles.searchRow}><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên, mã SK, OS, trình duyệt hoặc Installation ID…" /><span>{visibleDevices.length}/{devices.length}</span></div>
-      <div className={styles.filters}>{([['all','Tất cả'],['pending','Chờ duyệt'],['approved','Được truy cập'],['blocked','Đã khóa'],['unnamed','Chưa đặt tên'],['desktop','Máy tính'],['phone','Điện thoại'],['tablet','Tablet/iPad']] as const).map(([id,label]) => <button type="button" key={id} data-active={deviceFilter === id} onClick={() => setDeviceFilter(id)}>{label}</button>)}</div>
+      <div className={styles.filters}>{([['all','Tất cả'],['pending','Chờ duyệt'],['approved','Được truy cập'],['blocked','Đã khóa'],['unnamed','Chưa đặt tên'],['attention','Cần kiểm tra'],['desktop','Máy tính'],['phone','Điện thoại'],['tablet','Tablet/iPad']] as const).map(([id,label]) => <button type="button" key={id} data-active={deviceFilter === id} onClick={() => setDeviceFilter(id)}>{label}</button>)}</div>
       <div className={styles.deviceList}>{visibleDevices.map((device) => <article className={device.status === "pending" ? styles.pendingDevice : styles.device} key={device.deviceId}>
-        <div className={styles.deviceIdentity}><div><strong>{device.label || device.deviceCode}</strong><span>{deviceTypeLabels[device.deviceType]} · Tự động · {deviceConfidenceLabels[device.classificationConfidence]}</span></div><small>{device.deviceCode} · {device.osName || device.platform || "Hệ điều hành chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}{device.browserVersion ? ` ${device.browserVersion}` : ""}</small><small>{screenLabel(device)} · Cảm ứng {device.touchPoints ?? 0} điểm · PWA {device.pwaMode ? "Có" : "Không"} · Installation {shortInstallation(device.installationId)}</small><small>Cơ sở phân loại: {deviceReasonLabels[device.classificationReason || ""] || device.classificationReason || "Chưa có"}{device.metadataUpdatedAt ? ` · cập nhật ${formatDate(device.metadataUpdatedAt)}` : ""}</small><div className={styles.labelRow}><input value={labels[device.deviceId] ?? ""} maxLength={80} disabled={!canPublish(access.role)} onChange={(event) => setLabels((current) => ({ ...current, [device.deviceId]: event.target.value }))} placeholder="Tên gợi nhớ, ví dụ: Laptop của Nam" /><button type="button" disabled={busy || !canPublish(access.role)} onClick={() => void deviceAction(device, "label")}>Lưu tên</button></div></div>
+        <div className={styles.deviceIdentity}><div><strong>{device.label || device.autoLabel || device.deviceCode}</strong><span>{deviceTypeLabels[device.deviceType]} · {device.deviceTypeOverride ? "Đã chỉnh thủ công" : "Tự động"} · {deviceConfidenceLabels[device.classificationConfidence]}</span></div><small>{device.deviceCode} · {device.osName || device.platform || "Hệ điều hành chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}{device.browserVersion ? ` ${device.browserVersion}` : ""}</small><small>{screenLabel(device)} · Cảm ứng {device.touchPoints ?? 0} điểm · PWA {device.pwaMode ? "Có" : "Không"} · Installation {shortInstallation(device.installationId)}</small><small>Cơ sở phân loại: {deviceReasonLabels[device.classificationReason || ""] || device.classificationReason || "Chưa có"}{device.metadataUpdatedAt ? ` · cập nhật ${formatDate(device.metadataUpdatedAt)}` : ""}</small>{device.deviceTypeOverride ? <small>Đối chiếu tự động: {deviceTypeLabels[device.detectedDeviceType]} · chỉnh bởi {device.deviceTypeOverrideBy || "quản trị"} {device.deviceTypeOverrideAt ? `· ${formatDate(device.deviceTypeOverrideAt)}` : ""}</small> : null}{device.environmentChanged ? <small>⚠ Cần kiểm tra: {device.environmentChangeReason || "Môi trường thiết bị đã thay đổi đáng kể."}</small> : null}<div className={styles.labelRow}><input value={labels[device.deviceId] ?? ""} maxLength={80} disabled={!canPublish(access.role)} onChange={(event) => setLabels((current) => ({ ...current, [device.deviceId]: event.target.value }))} placeholder="Tên gợi nhớ, ví dụ: Laptop của Nam" /><button type="button" disabled={busy || !canPublish(access.role)} onClick={() => void deviceAction(device, "label")}>Lưu tên</button></div><div className={styles.labelRow}><select value={device.deviceTypeOverride ?? ""} disabled={busy || !canPublish(access.role)} onChange={(event) => { const next = event.target.value; void deviceAction(device, next ? "set-device-type" : "clear-device-type", next ? { deviceType: next } : {}); }}><option value="">Theo tự động ({deviceTypeLabels[device.detectedDeviceType]})</option><option value="desktop">Máy tính</option><option value="phone">Điện thoại</option><option value="tablet">Máy tính bảng / iPad</option></select>{device.environmentChanged ? <button type="button" disabled={busy || !canPublish(access.role)} onClick={() => void deviceAction(device, "ack-environment")}>Đã kiểm tra</button> : <span />}</div></div>
         <div className={styles.deviceFacts}><span>Truy cập</span><strong>{deviceStatusLabels[device.status]}</strong><small>{device.active ? "Online" : `Cuối ${formatDate(device.lastSeenAt)}`}</small></div>
         <div className={styles.deviceFacts}><span>Tính năng</span><strong>Sửa: {device.editEnabled ? "Có" : "Không"}</strong><small>Calendar: {device.calendarEnabled ? "Có" : "Khóa"}</small></div>
         <div className={styles.rowActions}>{canPublish(access.role) ? <>{device.status === "pending" ? <button className={styles.primary} type="button" disabled={busy} onClick={() => void deviceAction(device, "approve")}>Cấp truy cập</button> : null}{device.status === "approved" ? <><button type="button" disabled={busy} onClick={() => void deviceAction(device, device.editEnabled ? "disable-edit" : "enable-edit")}>{device.editEnabled ? "Thu quyền sửa" : "Cấp quyền sửa"}</button><button type="button" disabled={busy} onClick={() => void deviceAction(device, device.calendarEnabled ? "disable-calendar" : "enable-calendar")}>{device.calendarEnabled ? "Khóa Calendar" : "Cấp Calendar"}</button><button className={styles.danger} type="button" disabled={busy} onClick={() => void deviceAction(device, "block")}>Khóa</button></> : null}{device.status === "blocked" ? <button type="button" disabled={busy} onClick={() => void deviceAction(device, "unblock")}>Mở khóa</button> : null}</> : <small>Chỉ xem</small>}</div>
