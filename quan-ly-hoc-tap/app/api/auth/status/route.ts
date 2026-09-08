@@ -1,19 +1,19 @@
 import {
   adminPasswordFormatHint,
   adminPasswordScheme,
-  createAdminSession,
+  adminSessionReady,
 } from "../../../admin-session.server";
+import { googleAuthReady } from "../../../google-auth.server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [scheme, format] = await Promise.all([adminPasswordScheme(), adminPasswordFormatHint()]);
-  let sessionReady = false;
-  try {
-    sessionReady = Boolean(await createAdminSession());
-  } catch (error) {
-    console.error("ADMIN_SESSION_DIAGNOSTIC_FAILED", error instanceof Error ? error.message : "unknown");
-  }
+  const [scheme, format, sessionReady, googleConfigured] = await Promise.all([
+    adminPasswordScheme(),
+    adminPasswordFormatHint(),
+    adminSessionReady(),
+    googleAuthReady(),
+  ]);
 
   return Response.json(
     {
@@ -22,6 +22,7 @@ export async function GET() {
       format,
       sessionReady,
       chatgptHeaderAuth: true,
+      googleConfigured,
     },
     { headers: { "cache-control": "no-store, private", "x-content-type-options": "nosniff" } },
   );
