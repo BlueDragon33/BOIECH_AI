@@ -1,7 +1,11 @@
 "use client";
 
 import HealthFramework, { type HealthDeviceAccess } from "./health-framework";
+import HealthFrameworkMap from "./health-framework-map";
 
 export default function HealthClient({ initialCourse, device }: { initialCourse: unknown; device: HealthDeviceAccess }) {
-  return <HealthFramework initialCourse={initialCourse} device={device} />;
+  return <>
+    <HealthFrameworkMap />
+    <HealthFramework initialCourse={initialCourse} device={device} />
+  </>;
 }
