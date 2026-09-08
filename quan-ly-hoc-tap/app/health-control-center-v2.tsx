@@ -36,9 +36,22 @@ type HealthDevice = {
   status: "pending" | "approved" | "blocked";
   deviceType: "desktop" | "phone" | "tablet";
   platform: string | null;
+  osName: string | null;
   browser: string | null;
+  browserVersion: string | null;
+  installationId: string | null;
   screenWidth: number | null;
   screenHeight: number | null;
+  viewportWidth: number | null;
+  viewportHeight: number | null;
+  touchPoints: number;
+  mobileHint: boolean;
+  pwaMode: boolean;
+  language: string | null;
+  timezone: string | null;
+  classificationConfidence: "high" | "medium" | "low";
+  classificationReason: string | null;
+  metadataUpdatedAt: string | null;
   label: string | null;
   editEnabled: boolean;
   calendarEnabled: boolean;
@@ -121,6 +134,18 @@ const statusLabels: Record<HealthStatus, string> = {
   archived: "Lưu trữ",
 };
 const deviceTypeLabels = { desktop: "Máy tính", phone: "Điện thoại", tablet: "Máy tính bảng / iPad" } as const;
+const deviceConfidenceLabels = { high: "Tin cậy cao", medium: "Tin cậy vừa", low: "Cần kiểm tra" } as const;
+const deviceReasonLabels: Record<string, string> = {
+  "ipad-signal": "Tín hiệu iPad/iPadOS",
+  "tablet-user-agent": "Dấu hiệu máy tính bảng",
+  "phone-user-agent": "Dấu hiệu điện thoại",
+  "mobile-hint-large-touch-screen": "Mobile + màn hình cảm ứng lớn",
+  "client-hints-mobile": "Client Hints xác nhận thiết bị di động",
+  "small-touch-screen": "Màn hình cảm ứng nhỏ",
+  "desktop-platform": "Nền tảng máy tính",
+  "large-touch-screen": "Màn hình cảm ứng lớn",
+  "fallback-desktop": "Suy luận dự phòng",
+};
 const deviceStatusLabels = { pending: "Chờ duyệt", approved: "Được truy cập", blocked: "Đã khóa" } as const;
 const sessionStatusLabels = { active: "Đang hoạt động", revoked: "Đã thu hồi", expired: "Hết hạn" } as const;
 const auditLabels: Record<string, string> = {
@@ -151,6 +176,14 @@ function canReview(role: ControlRole) { return ["reviewer", "publisher", "owner"
 function canPublish(role: ControlRole) { return ["publisher", "owner"].includes(role); }
 function canOwn(role: ControlRole) { return role === "owner"; }
 function shortSession(value: string) { return value.length > 18 ? `${value.slice(0, 9)}…${value.slice(-6)}` : value; }
+function shortInstallation(value?: string | null) {
+  if (!value) return "—";
+  return value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
+}
+function screenLabel(device: HealthDevice) {
+  if (!device.screenWidth || !device.screenHeight) return "Màn hình chưa rõ";
+  return `${device.screenWidth}×${device.screenHeight}`;
+}
 
 function Gate({ access, busy, error, retry }: { access: AdminAccess | null; busy: boolean; error: string; retry: () => void }) {
   return <main className={styles.gate}><section className={styles.gateCard}>
@@ -251,6 +284,10 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
     pending: devices.filter((item) => item.status === "pending").length,
     online: devices.filter((item) => item.active).length,
     unnamed: devices.filter((item) => !item.label?.trim()).length,
+    desktop: devices.filter((item) => item.deviceType === "desktop").length,
+    phone: devices.filter((item) => item.deviceType === "phone").length,
+    tablet: devices.filter((item) => item.deviceType === "tablet").length,
+    lowConfidence: devices.filter((item) => item.classificationConfidence === "low").length,
     calendar: devices.filter((item) => item.calendarEnabled).length,
     edit: devices.filter((item) => item.editEnabled).length,
     activeSessions: sessions.filter((item) => item.active).length,
@@ -265,8 +302,18 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
       : device.status === deviceFilter;
     if (!matchesFilter) return false;
     if (!query) return true;
-    return [device.label, device.deviceCode, device.platform, device.browser, deviceTypeLabels[device.deviceType]]
-      .filter(Boolean).join(" ").toLocaleLowerCase("vi").includes(query);
+    return [
+      device.label,
+      device.deviceCode,
+      device.platform,
+      device.osName,
+      device.browser,
+      device.browserVersion,
+      device.installationId,
+      device.timezone,
+      deviceTypeLabels[device.deviceType],
+      deviceConfidenceLabels[device.classificationConfidence],
+    ].filter(Boolean).join(" ").toLocaleLowerCase("vi").includes(query);
   });
 
   const reviewVersions = versions.filter((item) => ["permission_requested", "review", "changes_requested"].includes(item.status));
@@ -411,7 +458,7 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
       <article><span>Chờ duyệt</span><strong>{counts.pending}</strong><small>Thiết bị SK mới</small></article>
       <article><span>Đang online</span><strong>{counts.online}</strong><small>{counts.activeSessions} phiên còn tín hiệu</small></article>
       <article><span>Quyền tính năng</span><strong>{counts.edit}/{counts.calendar}</strong><small>Sửa / Calendar</small></article>
-      <article><span>Chưa đặt tên</span><strong>{counts.unnamed}</strong><small>Cần phân loại</small></article>
+      <article><span>Thiết bị tự phân loại</span><strong>{devices.length}</strong><small>Máy tính {counts.desktop} · Điện thoại {counts.phone} · Tablet {counts.tablet}</small></article>
     </section>
 
     <nav className={styles.tabs}>{tabs.map((item) => <button type="button" key={item.id} className={tab === item.id ? styles.activeTab : styles.tab} onClick={() => setTab(item.id)}>{item.label}</button>)}</nav>
@@ -429,11 +476,11 @@ export default function HealthControlCenterV2({ user }: { user: { displayName: s
     </section> : null}
 
     {tab === "devices" ? <section className={styles.panel}>
-      <div className={styles.panelHead}><div><span className={styles.eyebrow}>Thiết bị đầu vào</span><h2>Nhận diện, phân loại và cấp quyền</h2><p>Quyền truy cập, quyền sửa và Google Calendar là ba lớp riêng.</p></div></div>
-      <div className={styles.searchRow}><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên, mã SK, nền tảng hoặc trình duyệt…" /><span>{visibleDevices.length}/{devices.length}</span></div>
+      <div className={styles.panelHead}><div><span className={styles.eyebrow}>Thiết bị đầu vào · tự động</span><h2>Nhận diện, phân loại và cấp quyền</h2><p>Health_Care tự nhận diện Máy tính / Điện thoại / Máy tính bảng trước khi thiết bị xuất hiện tại đây. Phân loại chỉ hỗ trợ quản trị; quyền truy cập vẫn phải được cấp riêng.</p></div><strong>{counts.lowConfidence ? `${counts.lowConfidence} thiết bị cần kiểm tra` : "Phân loại ổn định"}</strong></div>
+      <div className={styles.searchRow}><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên, mã SK, OS, trình duyệt hoặc Installation ID…" /><span>{visibleDevices.length}/{devices.length}</span></div>
       <div className={styles.filters}>{([['all','Tất cả'],['pending','Chờ duyệt'],['approved','Được truy cập'],['blocked','Đã khóa'],['unnamed','Chưa đặt tên'],['desktop','Máy tính'],['phone','Điện thoại'],['tablet','Tablet/iPad']] as const).map(([id,label]) => <button type="button" key={id} data-active={deviceFilter === id} onClick={() => setDeviceFilter(id)}>{label}</button>)}</div>
       <div className={styles.deviceList}>{visibleDevices.map((device) => <article className={device.status === "pending" ? styles.pendingDevice : styles.device} key={device.deviceId}>
-        <div className={styles.deviceIdentity}><div><strong>{device.label || device.deviceCode}</strong><span>{deviceTypeLabels[device.deviceType]}</span></div><small>{device.deviceCode} · {device.platform || "Nền tảng chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}</small><div className={styles.labelRow}><input value={labels[device.deviceId] ?? ""} maxLength={80} disabled={!canPublish(access.role)} onChange={(event) => setLabels((current) => ({ ...current, [device.deviceId]: event.target.value }))} placeholder="Tên gợi nhớ" /><button type="button" disabled={busy || !canPublish(access.role)} onClick={() => void deviceAction(device, "label")}>Lưu tên</button></div></div>
+        <div className={styles.deviceIdentity}><div><strong>{device.label || device.deviceCode}</strong><span>{deviceTypeLabels[device.deviceType]} · Tự động · {deviceConfidenceLabels[device.classificationConfidence]}</span></div><small>{device.deviceCode} · {device.osName || device.platform || "Hệ điều hành chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}{device.browserVersion ? ` ${device.browserVersion}` : ""}</small><small>{screenLabel(device)} · Cảm ứng {device.touchPoints ?? 0} điểm · PWA {device.pwaMode ? "Có" : "Không"} · Installation {shortInstallation(device.installationId)}</small><small>Cơ sở phân loại: {deviceReasonLabels[device.classificationReason || ""] || device.classificationReason || "Chưa có"}{device.metadataUpdatedAt ? ` · cập nhật ${formatDate(device.metadataUpdatedAt)}` : ""}</small><div className={styles.labelRow}><input value={labels[device.deviceId] ?? ""} maxLength={80} disabled={!canPublish(access.role)} onChange={(event) => setLabels((current) => ({ ...current, [device.deviceId]: event.target.value }))} placeholder="Tên gợi nhớ, ví dụ: Laptop của Nam" /><button type="button" disabled={busy || !canPublish(access.role)} onClick={() => void deviceAction(device, "label")}>Lưu tên</button></div></div>
         <div className={styles.deviceFacts}><span>Truy cập</span><strong>{deviceStatusLabels[device.status]}</strong><small>{device.active ? "Online" : `Cuối ${formatDate(device.lastSeenAt)}`}</small></div>
         <div className={styles.deviceFacts}><span>Tính năng</span><strong>Sửa: {device.editEnabled ? "Có" : "Không"}</strong><small>Calendar: {device.calendarEnabled ? "Có" : "Khóa"}</small></div>
         <div className={styles.rowActions}>{canPublish(access.role) ? <>{device.status === "pending" ? <button className={styles.primary} type="button" disabled={busy} onClick={() => void deviceAction(device, "approve")}>Cấp truy cập</button> : null}{device.status === "approved" ? <><button type="button" disabled={busy} onClick={() => void deviceAction(device, device.editEnabled ? "disable-edit" : "enable-edit")}>{device.editEnabled ? "Thu quyền sửa" : "Cấp quyền sửa"}</button><button type="button" disabled={busy} onClick={() => void deviceAction(device, device.calendarEnabled ? "disable-calendar" : "enable-calendar")}>{device.calendarEnabled ? "Khóa Calendar" : "Cấp Calendar"}</button><button className={styles.danger} type="button" disabled={busy} onClick={() => void deviceAction(device, "block")}>Khóa</button></> : null}{device.status === "blocked" ? <button type="button" disabled={busy} onClick={() => void deviceAction(device, "unblock")}>Mở khóa</button> : null}</> : <small>Chỉ xem</small>}</div>
