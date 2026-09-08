@@ -1,0 +1,32 @@
+name: Patch Health device review UI
+
+on:
+  push:
+    branches:
+      - feature/health-device-review-ui
+    paths:
+      - .health-device-review-ui-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/health-device-review-ui
+          fetch-depth: 0
+      - name: Apply UI patch
+        run: python .github/scripts/patch-health-device-review-ui.py
+      - name: Commit UI patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add quan-ly-hoc-tap/app/health-control-center-v2.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat(admin): add Health device review controls'
+          git push origin HEAD:feature/health-device-review-ui
