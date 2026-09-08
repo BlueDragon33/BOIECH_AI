@@ -49,6 +49,9 @@ jobs:
       - name: Install locked dependencies
         working-directory: suc-khoe-tre
         run: npm ci
+      - name: Validate WHO growth reference
+        working-directory: suc-khoe-tre
+        run: npm run validate:growth
       - name: Lint
         working-directory: suc-khoe-tre
         run: npm run lint
