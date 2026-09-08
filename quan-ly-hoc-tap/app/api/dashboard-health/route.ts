@@ -1,4 +1,4 @@
-import { issueHealthBrowserBridge } from "../../boi-ech.server";
+import { issueHealthBrowserBridge } from "../../application-bridge.server";
 import { controlErrorResponse, verifyControlProof } from "../../control-device.server";
 
 export const dynamic = "force-dynamic";
