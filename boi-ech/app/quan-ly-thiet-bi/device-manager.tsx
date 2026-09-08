@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DeviceType = "desktop" | "phone" | "tablet";
 type Device = {
@@ -24,21 +24,25 @@ export default function DeviceManager() {
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<Filter>("all");
 
-  function apply(data: DeviceResponse) {
+  const apply = useCallback((data: DeviceResponse) => {
     setDevices(data.devices ?? []);
     setLabels(Object.fromEntries((data.devices ?? []).map((device) => [device.deviceId, device.label ?? ""])));
-  }
-  async function read(response: Response) {
+  }, []);
+
+  const read = useCallback(async (response: Response) => {
     const data = await response.json() as DeviceResponse;
     if (!response.ok) throw new Error(data.error ?? "Không thể quản lý thiết bị.");
     apply(data);
-  }
-  async function refresh() {
-    setLoading(true); setNotice("");
+  }, [apply]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setNotice("");
     try { await read(await fetch("/api/admin/devices", { credentials: "same-origin", cache: "no-store" })); }
     catch (error) { setNotice(error instanceof Error ? error.message : "Không thể tải danh sách thiết bị."); }
     finally { setLoading(false); }
-  }
+  }, [read]);
+
   async function act(action: "approve" | "block" | "label", deviceId: string) {
     setNotice("");
     try {
@@ -46,7 +50,11 @@ export default function DeviceManager() {
       setNotice(action === "approve" ? "Đã cấp quyền cho thiết bị." : action === "block" ? "Đã khóa thiết bị." : "Đã lưu tên gợi nhớ.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể cập nhật thiết bị."); }
   }
-  useEffect(() => { void refresh(); }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void refresh(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
 
   const counts = { pending: devices.filter(d => d.status === "pending").length, approved: devices.filter(d => d.status === "approved").length, blocked: devices.filter(d => d.status === "blocked").length };
   const typeCounts = { desktop: devices.filter(d => d.deviceType === "desktop").length, phone: devices.filter(d => d.deviceType === "phone").length, tablet: devices.filter(d => d.deviceType === "tablet").length };
