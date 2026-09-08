@@ -21,9 +21,11 @@ export type ApplicationDescriptor = {
 };
 
 export type ApplicationBridge = {
+  application?: string;
   baseUrl: string;
   token: string;
   expiresAt: number;
+  ticketId?: string;
 };
 
 export type ControlAdminDevice = {
@@ -58,6 +60,8 @@ export type AdminBootstrap = {
   actor: AdminAccess;
   applications: ApplicationDescriptor[];
   boiBridge: ApplicationBridge;
+  applicationBridge?: ApplicationBridge;
+  application?: { id: string; name?: string; shortName?: string; status?: string };
   upstreamError?: string | null;
 };
 
@@ -232,6 +236,10 @@ function currentApplication() {
     return "bauman-master-ai";
   }
   return "boi-ech";
+}
+
+export function bridgeForApplication(bootstrap: AdminBootstrap) {
+  return bootstrap.applicationBridge ?? bootstrap.boiBridge;
 }
 
 export async function connectAdminCenter() {

@@ -17,8 +17,55 @@ type DeviceState = {
   editEnabled: boolean;
   calendarEnabled: boolean;
 };
+type AccessPolicy = {
+  accessEnabled: boolean;
+  pendingPollSeconds: number;
+  heartbeatSeconds: number;
+  sessionTimeoutSeconds: number;
+  sessionTtlMinutes: number;
+  systemNoticeEnabled: boolean;
+  systemNotice: string | null;
+  updatedBy?: string | null;
+  updatedAt?: string;
+};
+type AccessSession = {
+  sessionId: string;
+  deviceId: string;
+  status: "active" | "revoked" | "expired";
+  startedAt?: string;
+  lastSeenAt?: string;
+  expiresAt: number;
+};
 type Credential = { version: 1; privateKey: CryptoKey | null; publicKey: JsonWebKey };
-type ApiPayload = { device?: DeviceState; challenge?: string; course?: HealthCourseDocument; error?: string; code?: string };
+type ApiPayload = {
+  device?: DeviceState;
+  challenge?: string;
+  course?: HealthCourseDocument;
+  policy?: AccessPolicy;
+  session?: AccessSession;
+  error?: string;
+  code?: string;
+};
+
+const DEFAULT_POLICY: AccessPolicy = {
+  accessEnabled: true,
+  pendingPollSeconds: 60,
+  heartbeatSeconds: 60,
+  sessionTimeoutSeconds: 180,
+  sessionTtlMinutes: 720,
+  systemNoticeEnabled: false,
+  systemNotice: null,
+};
+
+const SESSION_STOP_CODES = new Set([
+  "DEVICE_BLOCKED",
+  "DEVICE_PENDING",
+  "APPLICATION_ACCESS_DISABLED",
+  "ACCESS_SESSION_REVOKED",
+  "ACCESS_SESSION_EXPIRED",
+  "ACCESS_SESSION_MISMATCH",
+  "ACCESS_SESSION_INVALID",
+]);
 
 class ApiError extends Error {
   data: ApiPayload;
@@ -29,6 +76,10 @@ function base64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function boundedSeconds(value: number | undefined, fallback: number, minimum: number) {
+  return Number.isFinite(value) ? Math.max(minimum, Math.min(300, Math.round(value ?? fallback))) : fallback;
 }
 
 function openDb() {
@@ -94,7 +145,7 @@ async function api(path: string, body: Record<string, unknown>) {
 async function register(credential: Credential) {
   const data = await api("/api/device", { action: "register", publicKey: credential.publicKey, metadata: deviceMetadata() });
   if (!data.device) throw new ApiError("Máy chủ chưa trả về trạng thái thiết bị.", data);
-  return data.device;
+  return data;
 }
 
 async function proof(credential: Credential, device: DeviceState) {
@@ -111,18 +162,31 @@ export default function HealthDeviceGate() {
   const [credential, setCredential] = useState<Credential | null>(null);
   const [device, setDevice] = useState<DeviceState | null>(null);
   const [course, setCourse] = useState<HealthCourseDocument | null>(null);
+  const [session, setSession] = useState<AccessSession | null>(null);
+  const [policy, setPolicy] = useState<AccessPolicy>(DEFAULT_POLICY);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [gateCode, setGateCode] = useState("");
   const loadingCourse = useRef(false);
+
+  const stopSession = useCallback((message: string, code = "") => {
+    setCourse(null);
+    setSession(null);
+    setGateCode(code);
+    setError(message);
+  }, []);
 
   const loadCourse = useCallback(async (currentCredential: Credential, currentDevice: DeviceState) => {
     if (loadingCourse.current) return;
     loadingCourse.current = true;
     try {
       const data = await api("/api/site/course", await proof(currentCredential, currentDevice));
-      if (!data.course) throw new ApiError("Không tải được nội dung Sức khỏe Y tế.", data);
+      if (!data.course || !data.session) throw new ApiError("Không tạo được phiên truy cập Sức khỏe Y tế.", data);
       setDevice(data.device ?? currentDevice);
       setCourse(data.course);
+      setSession(data.session);
+      if (data.policy) setPolicy(data.policy);
+      setGateCode("");
       setError("");
     } finally { loadingCourse.current = false; }
   }, []);
@@ -130,15 +194,25 @@ export default function HealthDeviceGate() {
   const initialize = useCallback(async () => {
     setBusy(true);
     setError("");
+    setGateCode("");
     try {
       const key = await credentialForDevice();
       setCredential(key);
-      const state = await register(key);
-      setDevice(state);
-      if (state.status === "approved") await loadCourse(key, state);
+      const registration = await register(key);
+      setDevice(registration.device ?? null);
+      if (registration.policy) setPolicy(registration.policy);
+      if (registration.device?.status === "approved") await loadCourse(key, registration.device);
+      else {
+        setCourse(null);
+        setSession(null);
+      }
     } catch (caught) {
       const failure = caught instanceof ApiError ? caught : null;
       if (failure?.data.device) setDevice(failure.data.device);
+      if (failure?.data.policy) setPolicy(failure.data.policy);
+      setCourse(null);
+      setSession(null);
+      setGateCode(failure?.data.code ?? "");
       setError(caught instanceof Error ? caught.message : "Không thể xác thực thiết bị.");
     } finally { setBusy(false); }
   }, [loadCourse]);
@@ -150,40 +224,72 @@ export default function HealthDeviceGate() {
 
   useEffect(() => {
     if (!credential || device?.status !== "pending") return;
+    const seconds = boundedSeconds(policy.pendingPollSeconds, 60, 15);
     const timer = window.setInterval(() => {
-      register(credential).then((state) => {
-        setDevice(state);
-        if (state.status === "approved") void loadCourse(credential, state);
+      register(credential).then((registration) => {
+        if (registration.policy) setPolicy(registration.policy);
+        if (!registration.device) return;
+        setDevice(registration.device);
+        if (registration.device.status === "approved") void loadCourse(credential, registration.device);
       }).catch(() => undefined);
-    }, 60_000);
+    }, seconds * 1000);
     return () => window.clearInterval(timer);
-  }, [credential, device?.status, loadCourse]);
+  }, [credential, device?.status, loadCourse, policy.pendingPollSeconds]);
 
   useEffect(() => {
-    if (!credential || device?.status !== "approved" || !course) return;
+    if (!credential || device?.status !== "approved" || !course || !session) return;
     const currentDevice = device;
+    const currentSessionId = session.sessionId;
+    const seconds = boundedSeconds(policy.heartbeatSeconds, 60, 30);
     const timer = window.setInterval(async () => {
       try {
-        const data = await api("/api/device", { action: "presence", ...await proof(credential, currentDevice) });
+        const data = await api("/api/device", { action: "presence", sessionId: currentSessionId, ...await proof(credential, currentDevice) });
         if (data.device) setDevice(data.device);
+        if (data.session) setSession(data.session);
+        if (data.policy) setPolicy(data.policy);
+        setGateCode("");
+        setError("");
       } catch (caught) {
-        if (caught instanceof ApiError && caught.data.device) setDevice(caught.data.device);
+        if (!(caught instanceof ApiError)) return;
+        if (caught.data.device) setDevice(caught.data.device);
+        if (caught.data.policy) setPolicy(caught.data.policy);
+        const code = caught.data.code ?? "";
+        if (SESSION_STOP_CODES.has(code)) stopSession(caught.message, code);
       }
-    }, 60_000);
+    }, seconds * 1000);
     return () => window.clearInterval(timer);
-  }, [credential, device, course]);
+  }, [credential, device, course, session, policy.heartbeatSeconds, stopSession]);
 
-  if (course && device?.status === "approved") {
-    return <><div className="health-device-strip"><span>{typeLabels[device.deviceType]}</span><strong>{device.deviceCode}</strong><small>{device.browser ?? "Trình duyệt"} · {device.calendarEnabled ? "Calendar được cấp" : "Calendar khóa"} · {device.editEnabled ? "Được cấp quyền sửa" : "Chỉ sử dụng"}</small></div><HealthClient initialCourse={course} device={{ deviceCode: device.deviceCode, deviceType: device.deviceType, editEnabled: device.editEnabled, calendarEnabled: device.calendarEnabled }} /></>;
+  const notice = policy.systemNoticeEnabled && policy.systemNotice ? policy.systemNotice : null;
+
+  if (course && session && device?.status === "approved" && policy.accessEnabled) {
+    return <>
+      <div className="health-device-strip"><span>{typeLabels[device.deviceType]}</span><strong>{device.deviceCode}</strong><small>{device.browser ?? "Trình duyệt"} · {device.calendarEnabled ? "Calendar được cấp" : "Calendar khóa"} · {device.editEnabled ? "Được cấp quyền sửa" : "Chỉ sử dụng"}</small></div>
+      {notice ? <div className="health-policy-notice"><strong>Thông báo hệ thống</strong><span>{notice}</span></div> : null}
+      <HealthClient initialCourse={course} device={{ deviceCode: device.deviceCode, deviceType: device.deviceType, editEnabled: device.editEnabled, calendarEnabled: device.calendarEnabled }} />
+    </>;
   }
+
+  const heading = device?.status === "blocked"
+    ? "Thiết bị này đã bị khóa."
+    : device?.status === "pending"
+      ? "Thiết bị đang chờ Trung tâm cấp quyền."
+      : gateCode === "APPLICATION_ACCESS_DISABLED"
+        ? "Sức khỏe Y tế đang tạm dừng truy cập."
+        : gateCode === "ACCESS_SESSION_REVOKED"
+          ? "Phiên truy cập đã được Trung tâm thu hồi."
+          : gateCode === "ACCESS_SESSION_EXPIRED"
+            ? "Phiên truy cập đã hết hạn."
+            : "Đang kiểm tra quyền truy cập…";
 
   return <main className="health-access-shell"><section className="health-access-card">
     <div className="health-access-seal">SK</div>
     <span className="health-access-eyebrow">Sức khỏe Y tế · thiết bị độc lập</span>
-    <h1>{device?.status === "blocked" ? "Thiết bị này đã bị khóa." : device?.status === "pending" ? "Thiết bị đang chờ Trung tâm cấp quyền." : "Đang nhận diện thiết bị…"}</h1>
-    <p>{error || "Mỗi thiết bị có khóa riêng. Trung tâm chỉ cấp quyền truy cập và các quyền tính năng; dữ liệu sức khỏe cá nhân vẫn thuộc Web App Sức khỏe Y tế."}</p>
+    <h1>{heading}</h1>
+    <p>{error || "Mỗi thiết bị có khóa riêng. Trung tâm chỉ cấp quyền truy cập, phiên và các quyền tính năng; dữ liệu sức khỏe cá nhân vẫn thuộc Web App Sức khỏe Y tế."}</p>
+    {notice ? <div className="health-policy-notice in-gate"><strong>Thông báo hệ thống</strong><span>{notice}</span></div> : null}
     {device ? <div className="health-access-device"><div><span>Loại thiết bị</span><strong>{typeLabels[device.deviceType]}</strong></div><div><span>Mã thiết bị</span><strong>{device.deviceCode}</strong></div><small>{device.platform || "Không xác định nền tảng"} · {device.browser || "Không xác định trình duyệt"}</small></div> : null}
-    <button className="health-access-button" onClick={() => void initialize()} disabled={busy}>{busy ? "Đang kiểm tra…" : "Kiểm tra lại quyền"}</button>
-    <small className="health-access-note">Thiết bị chờ duyệt được kiểm tra tự động mỗi 60 giây.</small>
+    <button className="health-access-button" onClick={() => void initialize()} disabled={busy}>{busy ? "Đang kiểm tra…" : device?.status === "approved" ? "Kiểm tra và tạo phiên mới" : "Kiểm tra lại quyền"}</button>
+    <small className="health-access-note">Thiết bị chờ duyệt được kiểm tra theo chính sách Trung tâm · hiện tại {boundedSeconds(policy.pendingPollSeconds, 60, 15)} giây/lần.</small>
   </section></main>;
 }
