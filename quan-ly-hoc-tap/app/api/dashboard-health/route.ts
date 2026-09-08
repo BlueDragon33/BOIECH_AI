@@ -1,5 +1,6 @@
-import { issueHealthBrowserBridge } from "../../boi-ech.server";
+import { applicationRegistry, getApplicationConfig } from "../../application-registry";
 import { controlErrorResponse, verifyControlProof } from "../../control-device.server";
+import { issueHealthBrowserBridge } from "../../health-bridge.server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,17 +14,18 @@ export async function POST(request: Request) {
     const previewRequest = ["terminal.local", "localhost"].includes(new URL(request.url).hostname);
     const actorDevice = await verifyControlProof(payload, undefined, previewRequest);
     const action = typeof payload.action === "string" ? payload.action : "bootstrap";
-    if (action !== "bootstrap") return json({ error: "Thao tác quản trị Sức khỏe trẻ không hợp lệ.", code: "INVALID_HEALTH_DASHBOARD_ACTION" }, 400);
+    if (action !== "bootstrap") return json({ error: "Thao tác quản trị Sức khỏe Y tế không hợp lệ.", code: "INVALID_HEALTH_DASHBOARD_ACTION" }, 400);
 
+    const application = getApplicationConfig("child-health");
+    const bridge = await issueHealthBrowserBridge(actorDevice.email, actorDevice.role, actorDevice.deviceId);
     return json({
       actor: actorDevice,
+      application,
       upstreamError: null,
-      boiBridge: await issueHealthBrowserBridge(actorDevice.email, actorDevice.role),
-      applications: [
-        { id: "boi-ech", name: "Bơi ếch AI", status: "online" },
-        { id: "child-health", name: "Sức khỏe trẻ 9 tháng–5 tuổi", status: "online" },
-        { id: "bauman-master-ai", name: "Bauman Master AI · Frog AI", status: "online" },
-      ],
+      applicationBridge: bridge,
+      // Giữ khóa cũ trong giai đoạn tương thích; UI Sức khỏe Y tế dùng applicationBridge.
+      boiBridge: bridge,
+      applications: applicationRegistry.map(({ id, name, status }) => ({ id, name, status })),
     });
   } catch (error) {
     return controlErrorResponse(error);
