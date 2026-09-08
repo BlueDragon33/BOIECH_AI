@@ -113,7 +113,20 @@ async function applications() {
   const canonicalReady = health?.canonicalApplication === "suc-khoe-y-te";
   const deviceReviewReady = healthCapabilities.includes("device-review-v1");
   const boundarySafe = health?.boundary?.healthDataInControlPlane !== true;
-  const healthReady = Boolean(health && health.service === "online" && canonicalReady && deviceReviewReady && boundarySafe);
+  const revisionReady = /^[a-f0-9]{40}$/i.test(health?.buildRevision ?? "");
+  const scopedSecretCapability = healthCapabilities.includes("app-scoped-secret-v1");
+  const healthSecretScoped = health?.controlAuth?.secretScope === "health";
+  const bridgeSecretScoped = health?.bridgeSecretScope === "health";
+  const scopedAuthReady = scopedSecretCapability && healthSecretScoped && bridgeSecretScoped;
+  const healthReady = Boolean(
+    health
+      && health.service === "online"
+      && canonicalReady
+      && deviceReviewReady
+      && boundarySafe
+      && revisionReady
+      && scopedAuthReady,
+  );
   const connectionState = !health
     ? "unreachable" as const
     : health.service !== "online"
@@ -131,7 +144,15 @@ async function applications() {
           ? "Backend Health đang chạy contract cũ, chưa công bố canonical id suc-khoe-y-te."
           : !deviceReviewReady
             ? "Backend Health chưa công bố capability device-review-v1."
-            : "Health_Care Control Plane đã sẵn sàng.";
+            : !revisionReady
+              ? "Health_Care production chưa công bố revision triển khai hợp lệ."
+              : !scopedSecretCapability
+                ? "Backend Health chưa hỗ trợ bí mật điều khiển riêng cho Sức khỏe Y tế."
+                : !healthSecretScoped
+                  ? "Worker Health vẫn đang dùng CONTROL_SERVICE_SECRET dùng chung; cần chuyển sang HEALTH_CONTROL_SERVICE_SECRET."
+                  : !bridgeSecretScoped
+                    ? "Trung tâm Quản trị vẫn đang dùng CONTROL_SERVICE_SECRET dùng chung cho Health."
+                    : "Health_Care Control Plane đã sẵn sàng và dùng bí mật điều khiển riêng.";
 
   return applicationRegistry.map(({ id, name, status }) => {
     if (id !== "child-health") return { id, name, status };

@@ -3,6 +3,8 @@ import type { ControlRole } from "./control-device.server";
 const DEFAULT_HEALTH_BASE_URL = "https://suc-khoe-tre.boiech-ai.workers.dev";
 const HEALTH_CANONICAL_APP = "suc-khoe-y-te" as const;
 
+type HealthControlSecretScope = "health" | "legacy-global" | "unconfigured";
+
 export class HealthBridgeError extends Error {
   status: number;
   payload: unknown;
@@ -23,6 +25,10 @@ export type HealthApplicationProbe = {
   buildRevision?: string | null;
   buildSource?: string | null;
   capabilities?: readonly string[];
+  controlAuth?: {
+    secretScope?: HealthControlSecretScope;
+  };
+  bridgeSecretScope?: HealthControlSecretScope;
   boundary?: {
     healthDataInControlPlane?: boolean;
     deviceIdentity?: string;
@@ -42,13 +48,20 @@ function base64Url(bytes: Uint8Array) {
 async function bridgeConfig() {
   const workers = await import("cloudflare:workers");
   const values = workers.env as unknown as Record<string, unknown>;
-  const secret = typeof values.CONTROL_SERVICE_SECRET === "string" ? values.CONTROL_SERVICE_SECRET : "";
+  const healthSecret = typeof values.HEALTH_CONTROL_SERVICE_SECRET === "string" ? values.HEALTH_CONTROL_SERVICE_SECRET : "";
+  const legacySecret = typeof values.CONTROL_SERVICE_SECRET === "string" ? values.CONTROL_SERVICE_SECRET : "";
+  const secret = healthSecret.length >= 32 ? healthSecret : legacySecret.length >= 32 ? legacySecret : "";
+  const secretScope: HealthControlSecretScope = healthSecret.length >= 32
+    ? "health"
+    : legacySecret.length >= 32
+      ? "legacy-global"
+      : "unconfigured";
   const configuredUrl = typeof values.HEALTH_CONTROL_BASE_URL === "string" ? values.HEALTH_CONTROL_BASE_URL.trim() : "";
   const baseUrl = configuredUrl || DEFAULT_HEALTH_BASE_URL;
   if (!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(baseUrl) || secret.length < 32) {
     throw new HealthBridgeError("Kết nối Sức khỏe Y tế chưa được cấu hình.", 503, { code: "HEALTH_CONTROL_NOT_CONFIGURED" });
   }
-  return { secret, baseUrl };
+  return { secret, secretScope, baseUrl };
 }
 
 async function signature(secret: string, value: string) {
@@ -91,7 +104,7 @@ export async function issueHealthBrowserBridge(actor: string, role: ControlRole,
 }
 
 export async function probeHealthApplication(): Promise<HealthApplicationProbe> {
-  const { secret, baseUrl } = await bridgeConfig();
+  const { secret, secretScope, baseUrl } = await bridgeConfig();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2500);
   try {
@@ -115,7 +128,7 @@ export async function probeHealthApplication(): Promise<HealthApplicationProbe> 
     if (data.boundary?.healthDataInControlPlane === true) {
       throw new HealthBridgeError("Control API vi phạm ranh giới dữ liệu sức khỏe cá nhân.", 502, data);
     }
-    return data;
+    return { ...data, bridgeSecretScope: secretScope };
   } finally {
     clearTimeout(timeout);
   }
