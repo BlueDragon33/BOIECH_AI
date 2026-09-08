@@ -10,6 +10,7 @@ export type SiteDeviceState = {
   browser: string | null;
   label: string | null;
   editEnabled: boolean;
+  calendarEnabled: boolean;
 };
 
 type SiteDeviceRow = {
@@ -25,6 +26,7 @@ type SiteDeviceRow = {
   screen_height: number | null;
   label: string | null;
   edit_enabled: number;
+  calendar_enabled: number;
   created_at: string;
   approved_at: string | null;
   blocked_at: string | null;
@@ -123,6 +125,7 @@ function state(row: SiteDeviceRow): SiteDeviceState {
     browser: row.browser,
     label: row.label,
     editEnabled: row.edit_enabled === 1,
+    calendarEnabled: row.calendar_enabled === 1,
   };
 }
 
@@ -130,7 +133,7 @@ async function rowFor(deviceId: string) {
   const database = await getCourseDatabase();
   return database.prepare(
     `SELECT device_id, display_code, public_key_jwk, status, device_type, platform, browser,
-            user_agent, screen_width, screen_height, label, edit_enabled, created_at,
+            user_agent, screen_width, screen_height, label, edit_enabled, calendar_enabled, created_at,
             approved_at, blocked_at, last_seen_at, last_activity_at
        FROM site_access_devices WHERE device_id = ?`,
   ).bind(deviceId).first<SiteDeviceRow>();
@@ -212,7 +215,8 @@ export async function verifySiteDeviceProof(payload: Record<string, unknown>, pr
   await database.prepare(
     "UPDATE site_access_devices SET last_seen_at = CURRENT_TIMESTAMP, last_activity_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
   ).bind(deviceId).run();
-  return state(row);
+  const updated = await rowFor(deviceId);
+  return state(updated ?? row);
 }
 
 export function deviceErrorResponse(error: unknown) {

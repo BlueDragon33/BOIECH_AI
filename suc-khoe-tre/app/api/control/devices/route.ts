@@ -16,6 +16,7 @@ type Row = {
   screen_height: number | null;
   label: string | null;
   edit_enabled: number;
+  calendar_enabled: number;
   created_at: string;
   approved_at: string | null;
   blocked_at: string | null;
@@ -40,6 +41,7 @@ function view(row: Row) {
     screenHeight: row.screen_height,
     label: row.label,
     editEnabled: row.edit_enabled === 1,
+    calendarEnabled: row.calendar_enabled === 1,
     createdAt: row.created_at,
     approvedAt: row.approved_at,
     blockedAt: row.blocked_at,
@@ -54,7 +56,7 @@ async function listDevices() {
   const database = await getCourseDatabase();
   const rows = await database.prepare(
     `SELECT device_id, display_code, status, device_type, platform, browser, screen_width,
-            screen_height, label, edit_enabled, created_at, approved_at, blocked_at,
+            screen_height, label, edit_enabled, calendar_enabled, created_at, approved_at, blocked_at,
             last_seen_at, last_activity_at
        FROM site_access_devices
       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -97,7 +99,7 @@ export async function POST(request: Request) {
         .bind(deviceId).run();
       await audit(actor, "site_device_approved", deviceId, { deviceCode: exists.display_code });
     } else if (action === "block") {
-      await database.prepare("UPDATE site_access_devices SET status = 'blocked', blocked_at = CURRENT_TIMESTAMP, edit_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?")
+      await database.prepare("UPDATE site_access_devices SET status = 'blocked', blocked_at = CURRENT_TIMESTAMP, edit_enabled = 0, calendar_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?")
         .bind(deviceId).run();
       await audit(actor, "site_device_blocked", deviceId, { deviceCode: exists.display_code });
     } else if (action === "unblock") {
@@ -110,6 +112,12 @@ export async function POST(request: Request) {
       await database.prepare("UPDATE site_access_devices SET edit_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?")
         .bind(enabled ? 1 : 0, deviceId).run();
       await audit(actor, enabled ? "site_device_edit_enabled" : "site_device_edit_disabled", deviceId, { deviceCode: exists.display_code });
+    } else if (action === "enable-calendar" || action === "disable-calendar") {
+      if (exists.status !== "approved") throw new DeviceAccessError("Chỉ thiết bị đang được phép truy cập mới có thể cấp quyền Google Calendar.", 409, "DEVICE_ACCESS_REQUIRED");
+      const enabled = action === "enable-calendar";
+      await database.prepare("UPDATE site_access_devices SET calendar_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?")
+        .bind(enabled ? 1 : 0, deviceId).run();
+      await audit(actor, enabled ? "site_device_calendar_enabled" : "site_device_calendar_disabled", deviceId, { deviceCode: exists.display_code });
     } else if (action === "label") {
       const label = typeof payload.label === "string" ? payload.label.trim().slice(0, 80) : "";
       await database.prepare("UPDATE site_access_devices SET label = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?")

@@ -1,6 +1,5 @@
 import HealthDeviceGate from "./device-gate";
-import "./health.css";
-import "./device-access.css";
+import "./health-framework.css";
 
 export const dynamic = "force-dynamic";
 
