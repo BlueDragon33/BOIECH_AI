@@ -11,20 +11,30 @@ type SessionPayload = {
   exp: number;
 };
 
+type PasswordConfig =
+  | { scheme: "sha256"; hash: string; format: string }
+  | { scheme: "pbkdf2-sha256"; iterations: number; salt: string; hash: string; format: string }
+  | { scheme: "unsupported" | "missing"; format: string };
+
 function bytesToBase64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-function base64UrlToBytes(value: string) {
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
+function base64ToBytes(value: string) {
+  if (!/^[A-Za-z0-9+/_=-]+$/.test(value)) return null;
   try {
-    const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+    const normalized = value.replaceAll("-", "+").replaceAll("_", "/").replace(/=+$/g, "");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
     return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
   } catch {
     return null;
   }
+}
+
+function base64UrlToBytes(value: string) {
+  return base64ToBytes(value);
 }
 
 async function envValue(name: string) {
@@ -34,7 +44,7 @@ async function envValue(name: string) {
 }
 
 async function sessionSecret() {
-  const value = await envValue("ADMIN_SESSION_SECRET");
+  const value = (await envValue("ADMIN_SESSION_SECRET")).trim();
   return value.length >= 32 ? value : "";
 }
 
@@ -72,34 +82,93 @@ async function sha256(value: string) {
 function decodeHash(value: string) {
   const hex = hexToBytes(value);
   if (hex) return hex;
-  return base64UrlToBytes(value);
+  return base64ToBytes(value);
+}
+
+function unwrapConfiguredHash(raw: string) {
+  let value = raw.trim();
+  if (/^ADMIN_PASSWORD_HASH=/i.test(value)) value = value.replace(/^ADMIN_PASSWORD_HASH=/i, "").trim();
+  if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+    value = value.slice(1, -1).trim();
+  }
+  return value;
+}
+
+function classifyUnsupported(value: string) {
+  if (!value) return "missing";
+  if (/^\$2[aby]\$/i.test(value)) return "bcrypt";
+  if (/^\$argon2/i.test(value)) return "argon2";
+  if (/^(?:scrypt:|\$scrypt\$)/i.test(value)) return "scrypt";
+  if (/^pbkdf2/i.test(value)) return "pbkdf2-unrecognized";
+  if (/^[a-f0-9]{32}$/i.test(value)) return "md5-unsupported";
+  if (/^[a-f0-9]{40}$/i.test(value)) return "sha1-unsupported";
+  return "unknown";
+}
+
+function parsePasswordConfig(raw: string): PasswordConfig {
+  const configured = unwrapConfiguredHash(raw);
+  if (!configured) return { scheme: "missing", format: "missing" };
+
+  const sha = configured.match(/^(?:(?:sha-?256)\s*[:=]\s*)?([a-f0-9]{64})$/i);
+  if (sha) return { scheme: "sha256", hash: sha[1], format: configured === sha[1] ? "sha256-hex" : "sha256-prefixed" };
+
+  const shaSum = configured.match(/^([a-f0-9]{64})\s+(?:\*?[-A-Za-z0-9._/\\]+)$/i);
+  if (shaSum) return { scheme: "sha256", hash: shaSum[1], format: "sha256sum-output" };
+
+  const canonical = configured.match(/^pbkdf2-sha256:(\d+):([A-Za-z0-9+/_=-]{8,}):([A-Za-z0-9+/_=-]{20,})$/i);
+  if (canonical) {
+    const iterations = Number(canonical[1]);
+    if (Number.isInteger(iterations) && iterations >= 100_000 && iterations <= 2_000_000) {
+      return { scheme: "pbkdf2-sha256", iterations, salt: canonical[2], hash: canonical[3], format: "pbkdf2-colon" };
+    }
+  }
+
+  const passlib = configured.match(/^\$?pbkdf2-sha256\$(\d+)\$([A-Za-z0-9+/_=-]{8,})\$([A-Za-z0-9+/_=-]{20,})$/i);
+  if (passlib) {
+    const iterations = Number(passlib[1]);
+    if (Number.isInteger(iterations) && iterations >= 100_000 && iterations <= 2_000_000) {
+      return { scheme: "pbkdf2-sha256", iterations, salt: passlib[2], hash: passlib[3], format: "pbkdf2-passlib" };
+    }
+  }
+
+  const django = configured.match(/^pbkdf2_sha256\$(\d+)\$([A-Za-z0-9+/_=-]{8,})\$([A-Za-z0-9+/_=-]{20,})$/i);
+  if (django) {
+    const iterations = Number(django[1]);
+    if (Number.isInteger(iterations) && iterations >= 100_000 && iterations <= 2_000_000) {
+      return { scheme: "pbkdf2-sha256", iterations, salt: django[2], hash: django[3], format: "pbkdf2-django" };
+    }
+  }
+
+  return { scheme: "unsupported", format: classifyUnsupported(configured) };
+}
+
+async function passwordConfig() {
+  return parsePasswordConfig(await envValue("ADMIN_PASSWORD_HASH"));
 }
 
 export async function adminPasswordScheme() {
-  const configured = await envValue("ADMIN_PASSWORD_HASH");
-  if (/^(?:sha256:)?[a-f0-9]{64}$/i.test(configured)) return "sha256" as const;
-  if (/^pbkdf2-sha256:\d+:[A-Za-z0-9_-]{8,}:[A-Za-z0-9_-]{20,}$/i.test(configured)) return "pbkdf2-sha256" as const;
-  return configured ? "unsupported" as const : "missing" as const;
+  return (await passwordConfig()).scheme;
+}
+
+export async function adminPasswordFormatHint() {
+  return (await passwordConfig()).format;
 }
 
 export async function verifyAdminPassword(password: string) {
   if (!password || password.length > 256) return false;
-  const configured = await envValue("ADMIN_PASSWORD_HASH");
-  const scheme = await adminPasswordScheme();
+  const configured = await passwordConfig();
 
-  if (scheme === "sha256") {
-    const expected = hexToBytes(configured.replace(/^sha256:/i, ""));
+  if (configured.scheme === "sha256") {
+    const expected = hexToBytes(configured.hash);
     return expected ? constantTimeEqual(await sha256(password), expected) : false;
   }
 
-  if (scheme === "pbkdf2-sha256") {
-    const [, iterationsText, saltText, hashText] = configured.split(":");
-    const iterations = Number(iterationsText);
-    const salt = base64UrlToBytes(saltText);
-    const expected = decodeHash(hashText);
-    if (!Number.isInteger(iterations) || iterations < 100_000 || iterations > 2_000_000 || !salt || !expected || expected.length < 24) return false;
+  if (configured.scheme === "pbkdf2-sha256") {
+    const salt = base64ToBytes(configured.salt);
+    const expected = decodeHash(configured.hash);
+    if (!salt || salt.length < 6 || !expected || expected.length < 24) return false;
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-    const derived = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, key, expected.length * 8));
+    const derived = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: configured.iterations }, key, expected.length * 8));
     return constantTimeEqual(derived, expected);
   }
 
