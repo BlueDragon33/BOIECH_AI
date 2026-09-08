@@ -65,13 +65,41 @@ export type HealthLocalState = {
   updatedAt: string;
 };
 
+export type HealthBackupEnvelope = {
+  format: "suc-khoe-y-te-9-10-backup-v1";
+  exportedAt: string;
+  state: HealthLocalState;
+};
+
 export const STORAGE_KEY = "suc-khoe-y-te:9-10:v1";
+export const BACKUP_FORMAT = "suc-khoe-y-te-9-10-backup-v1" as const;
+
+function cleanString(value: unknown, max: number) {
+  return typeof value === "string" ? value.slice(0, max) : "";
+}
+
+function validDateKey(value: unknown) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
 
 export function todayKey(now = new Date()) {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+export function shiftDateKey(key: string, days: number) {
+  const valid = validDateKey(key);
+  if (!valid) return todayKey();
+  const date = new Date(`${valid}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return todayKey(date);
+}
+
+export function recentDateKeys(count: number, endKey = todayKey()) {
+  const safeCount = Math.max(1, Math.min(31, Math.round(count)));
+  return Array.from({ length: safeCount }, (_, index) => shiftDateKey(endKey, index - safeCount + 1));
 }
 
 export function createDailyRecord(): DailyRecord {
@@ -102,38 +130,119 @@ export function createInitialHealthState(): HealthLocalState {
   };
 }
 
+function safeMeals(value: unknown): MealEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-100).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Partial<MealEntry>;
+    const meal = ["breakfast", "lunch", "snack", "dinner"].includes(String(source.meal)) ? source.meal as MealEntry["meal"] : "snack";
+    const text = cleanString(source.text, 180).trim();
+    if (!text) return [];
+    return [{ id: cleanString(source.id, 120) || uid("meal"), meal, text, createdAt: cleanString(source.createdAt, 40) || new Date(0).toISOString() }];
+  });
+}
+
+function safeActivities(value: unknown): ActivityEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-100).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Partial<ActivityEntry>;
+    const type = cleanString(source.type, 80).trim();
+    const minutes = Math.max(1, Math.min(600, Math.round(Number(source.minutes) || 0)));
+    if (!type || !(minutes > 0)) return [];
+    return [{ id: cleanString(source.id, 120) || uid("activity"), type, minutes, createdAt: cleanString(source.createdAt, 40) || new Date(0).toISOString() }];
+  });
+}
+
 function safeDailyRecord(value: unknown): DailyRecord {
   const fallback = createDailyRecord();
   if (!value || typeof value !== "object") return fallback;
   const source = value as Partial<DailyRecord>;
+  const taskSource = source.tasks && typeof source.tasks === "object" ? source.tasks : {};
   return {
     ...fallback,
-    ...source,
-    tasks: { ...fallback.tasks, ...(source.tasks ?? {}) },
-    foodGroups: Array.isArray(source.foodGroups) ? source.foodGroups.filter((item): item is string => typeof item === "string").slice(0, 20) : [],
-    meals: Array.isArray(source.meals) ? source.meals.slice(-100) : [],
-    activities: Array.isArray(source.activities) ? source.activities.slice(-100) : [],
-    symptoms: Array.isArray(source.symptoms) ? source.symptoms.filter((item): item is string => typeof item === "string").slice(0, 30) : [],
+    tasks: {
+      breakfast: taskSource.breakfast === true,
+      water: taskSource.water === true,
+      movement: taskSource.movement === true,
+      teethMorning: taskSource.teethMorning === true,
+      teethEvening: taskSource.teethEvening === true,
+      sleep: taskSource.sleep === true,
+    },
+    foodGroups: Array.isArray(source.foodGroups) ? source.foodGroups.filter((item): item is string => typeof item === "string").map((item) => item.slice(0, 80)).slice(0, 20) : [],
     waterCups: Math.max(0, Math.min(50, Number(source.waterCups) || 0)),
+    meals: safeMeals(source.meals),
+    activities: safeActivities(source.activities),
+    sleepStart: cleanString(source.sleepStart, 5),
+    sleepEnd: cleanString(source.sleepEnd, 5),
     eyeBreaks: Math.max(0, Math.min(100, Number(source.eyeBreaks) || 0)),
+    hygieneDone: source.hygieneDone === true,
+    feeling: ["good", "normal", "unwell"].includes(String(source.feeling)) ? source.feeling as Feeling : "",
+    symptoms: Array.isArray(source.symptoms) ? source.symptoms.filter((item): item is string => typeof item === "string").map((item) => item.slice(0, 80)).slice(0, 30) : [],
+    journalNote: cleanString(source.journalNote, 1200),
   };
+}
+
+function safeGrowth(value: unknown): GrowthEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-500).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Partial<GrowthEntry>;
+    const date = validDateKey(source.date);
+    const heightCm = Math.round((Number(source.heightCm) || 0) * 10) / 10;
+    const weightKg = Math.round((Number(source.weightKg) || 0) * 10) / 10;
+    if (!date || !(heightCm > 50 && heightCm < 220) || !(weightKg > 10 && weightKg < 200)) return [];
+    return [{ id: cleanString(source.id, 120) || uid("growth"), date, heightCm, weightKg }];
+  });
+}
+
+function safeReminders(value: unknown): Reminder[] {
+  if (!Array.isArray(value)) return [];
+  const repeats = ["once", "daily", "weekdays", "weekly"];
+  const categories = ["nutrition", "water", "activity", "care", "growth", "appointment", "other"];
+  return value.slice(-200).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Partial<Reminder>;
+    const title = cleanString(source.title, 100).trim();
+    const date = validDateKey(source.date);
+    const time = typeof source.time === "string" && /^\d{2}:\d{2}$/.test(source.time) ? source.time : "";
+    if (!title || !date || !time) return [];
+    return [{
+      id: cleanString(source.id, 120) || uid("reminder"),
+      title,
+      category: categories.includes(String(source.category)) ? source.category as Reminder["category"] : "other",
+      date,
+      time,
+      repeat: repeats.includes(String(source.repeat)) ? source.repeat as ReminderRepeat : "once",
+      enabled: source.enabled !== false,
+      lastNotifiedOccurrence: cleanString(source.lastNotifiedOccurrence, 50) || undefined,
+    }];
+  });
 }
 
 export function normalizeHealthState(value: unknown): HealthLocalState {
   const fallback = createInitialHealthState();
   if (!value || typeof value !== "object") return fallback;
   const source = value as Partial<HealthLocalState>;
+  const profileSource = source.profile && typeof source.profile === "object" ? source.profile as Partial<HealthProfile> : {};
   const days: Record<string, DailyRecord> = {};
   if (source.days && typeof source.days === "object") {
-    for (const [key, record] of Object.entries(source.days).slice(-730)) days[key] = safeDailyRecord(record);
+    for (const [key, record] of Object.entries(source.days).slice(-730)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(key)) days[key] = safeDailyRecord(record);
+    }
   }
   return {
     version: 1,
-    profile: { ...fallback.profile, ...(source.profile ?? {}) },
-    growth: Array.isArray(source.growth) ? source.growth.slice(-500) : [],
-    reminders: Array.isArray(source.reminders) ? source.reminders.slice(-200) : [],
+    profile: {
+      name: cleanString(profileSource.name, 80),
+      birthDate: validDateKey(profileSource.birthDate),
+      sex: profileSource.sex === "male" || profileSource.sex === "female" ? profileSource.sex : "",
+      note: cleanString(profileSource.note, 800),
+    },
+    growth: safeGrowth(source.growth),
+    reminders: safeReminders(source.reminders),
     days,
-    updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : fallback.updatedAt,
+    updatedAt: typeof source.updatedAt === "string" ? source.updatedAt.slice(0, 50) : fallback.updatedAt,
   };
 }
 
@@ -154,6 +263,18 @@ export function saveHealthState(state: HealthLocalState) {
   } catch {
     // Giữ ứng dụng hoạt động ngay cả khi trình duyệt chặn localStorage.
   }
+}
+
+export function exportHealthBackup(state: HealthLocalState) {
+  const envelope: HealthBackupEnvelope = { format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), state: normalizeHealthState(state) };
+  return JSON.stringify(envelope, null, 2);
+}
+
+export function parseHealthBackup(value: unknown) {
+  if (!value || typeof value !== "object") throw new Error("Tệp sao lưu không hợp lệ.");
+  const source = value as Partial<HealthBackupEnvelope>;
+  if (source.format !== BACKUP_FORMAT || !source.state) throw new Error("Không đúng định dạng sao lưu Sức khỏe Y tế 9–10 tuổi.");
+  return normalizeHealthState(source.state);
 }
 
 export function currentDay(state: HealthLocalState, key: string) {
