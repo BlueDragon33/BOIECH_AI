@@ -22,6 +22,8 @@ export type ApplicationDescriptor = {
     service?: "online" | "paused" | "unreachable";
     contractVersion?: number;
     canonicalApplication?: string | null;
+    buildRevision?: string | null;
+    buildSource?: string | null;
     capabilities?: readonly string[];
     ready?: boolean;
     connectionState?: "ready" | "legacy" | "paused" | "unreachable";

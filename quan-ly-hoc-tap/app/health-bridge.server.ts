@@ -20,6 +20,8 @@ export type HealthApplicationProbe = {
   applicationAliases?: readonly string[];
   controlProtocol?: "health-control-plane";
   contractVersion: number;
+  buildRevision?: string | null;
+  buildSource?: string | null;
   capabilities?: readonly string[];
   boundary?: {
     healthDataInControlPlane?: boolean;

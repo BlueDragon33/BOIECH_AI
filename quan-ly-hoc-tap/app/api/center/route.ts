@@ -143,6 +143,8 @@ async function applications() {
         service: health.service,
         contractVersion: health.contractVersion,
         canonicalApplication: health.canonicalApplication ?? null,
+        buildRevision: health.buildRevision ?? null,
+        buildSource: health.buildSource ?? null,
         capabilities: healthCapabilities,
         ready: healthReady,
         connectionState,
