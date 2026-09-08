@@ -66,13 +66,21 @@ export type HealthLocalState = {
 };
 
 export type HealthBackupEnvelope = {
-  format: "suc-khoe-y-te-9-10-backup-v1";
+  format: typeof BACKUP_FORMAT;
   exportedAt: string;
   state: HealthLocalState;
 };
 
-export const STORAGE_KEY = "suc-khoe-y-te:9-10:v1";
-export const BACKUP_FORMAT = "suc-khoe-y-te-9-10-backup-v1" as const;
+type LegacyHealthBackupEnvelope = {
+  format: typeof LEGACY_BACKUP_FORMAT;
+  exportedAt?: string;
+  state: HealthLocalState;
+};
+
+export const STORAGE_KEY = "suc-khoe-y-te:9-18:v2";
+export const LEGACY_STORAGE_KEY = "suc-khoe-y-te:9-10:v1";
+export const BACKUP_FORMAT = "suc-khoe-y-te-9-18-backup-v2" as const;
+export const LEGACY_BACKUP_FORMAT = "suc-khoe-y-te-9-10-backup-v1" as const;
 
 function cleanString(value: unknown, max: number) {
   return typeof value === "string" ? value.slice(0, max) : "";
@@ -227,7 +235,7 @@ export function normalizeHealthState(value: unknown): HealthLocalState {
   const profileSource = source.profile && typeof source.profile === "object" ? source.profile as Partial<HealthProfile> : {};
   const days: Record<string, DailyRecord> = {};
   if (source.days && typeof source.days === "object") {
-    for (const [key, record] of Object.entries(source.days).slice(-730)) {
+    for (const [key, record] of Object.entries(source.days).slice(-3650)) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(key)) days[key] = safeDailyRecord(record);
     }
   }
@@ -246,14 +254,28 @@ export function normalizeHealthState(value: unknown): HealthLocalState {
   };
 }
 
+function readStoredState(key: string) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? normalizeHealthState(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadHealthState() {
   if (typeof window === "undefined") return createInitialHealthState();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeHealthState(JSON.parse(raw)) : createInitialHealthState();
-  } catch {
-    return createInitialHealthState();
+  const current = readStoredState(STORAGE_KEY);
+  if (current) return current;
+
+  // One-way, non-destructive migration: copy old 9–10 data to the new 9–18 key.
+  // Keep the legacy key untouched so rollback remains possible.
+  const legacy = readStoredState(LEGACY_STORAGE_KEY);
+  if (legacy) {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...legacy, updatedAt: new Date().toISOString() })); } catch { /* localStorage may be blocked */ }
+    return legacy;
   }
+  return createInitialHealthState();
 }
 
 export function saveHealthState(state: HealthLocalState) {
@@ -272,8 +294,10 @@ export function exportHealthBackup(state: HealthLocalState) {
 
 export function parseHealthBackup(value: unknown) {
   if (!value || typeof value !== "object") throw new Error("Tệp sao lưu không hợp lệ.");
-  const source = value as Partial<HealthBackupEnvelope>;
-  if (source.format !== BACKUP_FORMAT || !source.state) throw new Error("Không đúng định dạng sao lưu Sức khỏe Y tế 9–10 tuổi.");
+  const source = value as Partial<HealthBackupEnvelope & LegacyHealthBackupEnvelope> & { format?: string; state?: unknown };
+  if ((source.format !== BACKUP_FORMAT && source.format !== LEGACY_BACKUP_FORMAT) || !source.state) {
+    throw new Error("Không đúng định dạng sao lưu Sức khỏe Y tế được hỗ trợ.");
+  }
   return normalizeHealthState(source.state);
 }
 
