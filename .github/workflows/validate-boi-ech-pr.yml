@@ -52,6 +52,9 @@ jobs:
       - name: Validate WHO growth reference
         working-directory: suc-khoe-tre
         run: npm run validate:growth
+      - name: Validate 9-18 health framework
+        working-directory: suc-khoe-tre
+        run: npm run validate:framework
       - name: Lint
         working-directory: suc-khoe-tre
         run: npm run lint
