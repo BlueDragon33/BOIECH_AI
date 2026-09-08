@@ -14,6 +14,9 @@ type AdminDeviceRow = {
   device_id: string;
   display_code: string;
   status: "pending" | "approved" | "blocked";
+  device_type: "desktop" | "phone" | "tablet";
+  platform: string | null;
+  browser: string | null;
   label: string | null;
   learner_name: string | null;
   learner_family_name: string | null;
@@ -62,6 +65,9 @@ function summary(row: AdminDeviceRow) {
     deviceId: row.device_id,
     deviceCode: row.display_code,
     status: row.status,
+    deviceType: row.device_type,
+    platform: row.platform,
+    browser: row.browser,
     label: row.label,
     learnerName: row.learner_name,
     learnerFamilyName: row.learner_family_name,
@@ -90,7 +96,7 @@ function summary(row: AdminDeviceRow) {
 async function listDevices() {
   const database = await getCourseDatabase();
   const result = await database.prepare(
-    `SELECT d.device_id, d.display_code, d.status, d.label, d.learner_name,
+    `SELECT d.device_id, d.display_code, d.status, d.device_type, d.platform, d.browser, d.label, d.learner_name,
             d.learner_family_name, d.learner_given_name, d.class_name,
             d.phone, d.registration_submitted_at,
             d.access_expires_at, d.created_at, d.approved_at, d.blocked_at, d.last_seen_at,

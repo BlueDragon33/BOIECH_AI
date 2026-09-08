@@ -5,6 +5,7 @@ import {
   saveDeviceRegistration,
   verifyDeviceIdentityRequest,
 } from "../../device-auth.server";
+import { captureDeviceMetadata } from "../../device-metadata.server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
       const hostname = new URL(request.url).hostname;
       const autoApprove = hostname === "terminal.local" || hostname === "localhost";
       const device = await registerDevice(payload.publicKey, payload.legacyToken, autoApprove);
+      await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     if (action === "challenge") {
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
       const hostname = new URL(request.url).hostname;
       const previewRequest = hostname === "terminal.local" || hostname === "localhost";
       const device = await verifyDeviceIdentityRequest(payload, previewRequest);
+      await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     return Response.json({ error: "Thao tác không được hỗ trợ." }, { status: 400 });
