@@ -1,0 +1,28 @@
+name: Patch Health build revision UI
+
+on:
+  push:
+    branches:
+      - feature/health-build-revision-ui
+    paths:
+      - .health-build-revision-ui-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/health-build-revision-ui
+      - name: Apply Health revision UI patch
+        run: python .github/scripts/patch-health-build-revision-ui.py
+      - name: Commit runtime patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add quan-ly-hoc-tap/app/health-bridge.server.ts quan-ly-hoc-tap/app/api/center/route.ts quan-ly-hoc-tap/app/admin-device-client.ts quan-ly-hoc-tap/app/application-hub.tsx
+          git diff --cached --quiet || git commit -m "feat(admin): show deployed Health revision"
+          git push
