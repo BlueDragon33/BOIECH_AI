@@ -21,7 +21,7 @@ export const applicationRegistry: readonly ApplicationConfig[] = [
     icon: "BE",
     status: "online",
     scope: "Quản trị vận hành riêng của hệ thống học Bơi ếch.",
-    capabilities: ["Thiết bị học & tài khoản", "Tiến độ học", "AI", "Thanh toán & thời hạn", "Duyệt nội dung"],
+    capabilities: ["Thiết bị học & truy cập", "Tiến độ học", "AI", "Thanh toán & thời hạn", "Duyệt nội dung"],
     guardrails: ["Không quản trị Sức khỏe trẻ", "Không quản trị Bauman", "Không cấp quyền thiết bị quản trị trung tâm"],
   },
   {
@@ -31,9 +31,9 @@ export const applicationRegistry: readonly ApplicationConfig[] = [
     href: "/apps/suc-khoe-tre",
     icon: "SK",
     status: "online",
-    scope: "Quản trị nội dung, phiên bản và quyền biên tập của Sức khỏe trẻ.",
-    capabilities: ["Quyền biên tập", "Kiểm duyệt", "Xuất bản", "Rollback", "Nhật ký phiên bản"],
-    guardrails: ["Không nhận hồ sơ sức khỏe cá nhân", "Không dùng API/DB Bơi ếch", "Không quản trị thiết bị học Bơi ếch"],
+    scope: "Quản trị thiết bị truy cập, quyền chỉnh sửa và nội dung của riêng Sức khỏe trẻ.",
+    capabilities: ["Thiết bị & phân loại", "Cấp/khóa truy cập", "Cấp quyền sửa", "Kiểm duyệt & xuất bản", "Rollback"],
+    guardrails: ["Không nhận hồ sơ sức khỏe cá nhân", "Không dùng API/DB Bơi ếch", "Thiết bị Sức khỏe trẻ dùng mã SK riêng"],
   },
   {
     id: "bauman-master-ai",
