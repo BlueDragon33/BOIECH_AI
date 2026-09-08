@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { HEALTH_AGE_STAGES, type HealthAgeStageId } from "./health-age-scope";
-import { HEALTH_DOMAINS, HEALTH_FRAMEWORK_COUNTS, healthDomainsForStage, type HealthPrivacyLevel } from "./health-domain-catalog";
+import { HEALTH_DOMAINS, HEALTH_FRAMEWORK_COUNTS, healthDomainsForStage, type HealthNavArea, type HealthPrivacyLevel } from "./health-domain-catalog";
 import "./health-framework-map.css";
 
 const privacyLabels: Record<HealthPrivacyLevel, string> = {
@@ -10,6 +10,27 @@ const privacyLabels: Record<HealthPrivacyLevel, string> = {
   sensitive: "Nhạy cảm",
   "highly-sensitive": "Rất nhạy cảm",
 };
+
+const navLabels: Record<HealthNavArea, string> = {
+  today: "Hôm nay",
+  growth: "Tăng trưởng",
+  nutrition: "Dinh dưỡng",
+  activity: "Vận động",
+  care: "Chăm sóc",
+  journal: "Nhật ký",
+  profile: "Hồ sơ",
+};
+
+const baselineDomainIds = new Set([
+  "growth-development",
+  "nutrition-hydration",
+  "physical-activity",
+  "sleep-recovery",
+  "oral-skin-hygiene",
+  "eyes-hearing-school",
+  "symptoms-illness-first-aid",
+  "records-appointments-documents",
+]);
 
 export default function HealthFrameworkMap() {
   const [stage, setStage] = useState<HealthAgeStageId | "all">("all");
@@ -39,14 +60,20 @@ export default function HealthFrameworkMap() {
         </article>)}
       </div>
 
+      <div className="hfm-legend"><span><i className="is-baseline" /> Có nền vận hành</span><span><i className="is-framework" /> Đã khóa khung, làm sâu sau</span></div>
+
       <section className="hfm-grid" aria-label="Các miền chức năng Sức khỏe Y tế">
-        {visible.map((domain) => <article className="hfm-card" key={domain.id}>
-          <div className="hfm-card-head"><span>{domain.navArea}</span><b className={`privacy-${domain.privacy}`}>{privacyLabels[domain.privacy]}</b></div>
-          <h3>{domain.title}</h3>
-          <p>{domain.summary}</p>
-          <div className="hfm-capabilities">{domain.capabilities.map((item) => <span key={item}>{item}</span>)}</div>
-          {domain.guardrail ? <small className="hfm-guardrail">{domain.guardrail}</small> : null}
-        </article>)}
+        {visible.map((domain) => {
+          const hasBaseline = baselineDomainIds.has(domain.id);
+          return <article className="hfm-card" key={domain.id}>
+            <div className="hfm-card-head"><span>{navLabels[domain.navArea]}</span><b className={`privacy-${domain.privacy}`}>{privacyLabels[domain.privacy]}</b></div>
+            <div className={hasBaseline ? "hfm-status is-baseline" : "hfm-status is-framework"}>{hasBaseline ? "Có nền" : "Khung sẵn sàng"}</div>
+            <h3>{domain.title}</h3>
+            <p>{domain.summary}</p>
+            <div className="hfm-capabilities">{domain.capabilities.map((item) => <span key={item}>{item}</span>)}</div>
+            {domain.guardrail ? <small className="hfm-guardrail">{domain.guardrail}</small> : null}
+          </article>;
+        })}
       </section>
 
       <div className="hfm-boundary">
