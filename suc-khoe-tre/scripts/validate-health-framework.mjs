@@ -2,15 +2,15 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const catalogPath = path.join(root, "app/suc-khoe-tre/health-domain-catalog.ts");
-const source = fs.readFileSync(catalogPath, "utf8");
-const bodyMatch = source.match(/export const HEALTH_DOMAINS:[\s\S]*?= \[([\s\S]*?)\n\] as const;/);
-if (!bodyMatch) throw new Error("Không đọc được HEALTH_DOMAINS.");
-
-const blocks = [...bodyMatch[1].matchAll(/\n  \{\n([\s\S]*?)\n  \},/g)].map((match) => match[1]);
+const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const fail = (message) => { throw new Error(`Framework validation failed: ${message}`); };
 
-if (blocks.length !== 16) fail(`cần đúng 16 miền chức năng, hiện có ${blocks.length}`);
+const catalogSource = read("app/suc-khoe-tre/health-domain-catalog.ts");
+const bodyMatch = catalogSource.match(/export const HEALTH_DOMAINS:[\s\S]*?= \[([\s\S]*?)\n\] as const;/);
+if (!bodyMatch) throw new Error("Không đọc được HEALTH_DOMAINS.");
+const blocks = [...bodyMatch[1].matchAll(/\n  \{\n([\s\S]*?)\n  \},/g)].map((match) => match[1]);
+
+if (blocks.length !== 22) fail(`cần đúng 22 miền chức năng sau Audit V3, hiện có ${blocks.length}`);
 
 const ids = [];
 const stageCounts = new Map([["foundation", 0], ["preteen", 0], ["early-adolescent", 0], ["late-adolescent", 0]]);
@@ -39,11 +39,48 @@ for (const block of blocks) {
 }
 
 if (new Set(ids).size !== ids.length) fail("id miền chức năng bị trùng");
-for (const [stage, count] of stageCounts) if (count < 8) fail(`${stage}: phạm vi quá mỏng (${count} miền)`);
+for (const [stage, count] of stageCounts) if (count < 10) fail(`${stage}: phạm vi quá mỏng (${count} miền)`);
+
+const requiredV3Domains = [
+  "vital-signs-screening-results",
+  "injury-sports-musculoskeletal",
+  "school-function-learning-neurodevelopment",
+  "chronic-conditions-care-plans",
+  "substance-use-risk-behaviour",
+  "family-social-protective-context",
+];
+for (const id of requiredV3Domains) if (!ids.includes(id)) fail(`thiếu miền V3: ${id}`);
 
 const transition = blocks.find((block) => /id: "transition-adult-care"/.test(block));
 if (!transition || !/stages: \["late-adolescent"\]/.test(transition)) fail("transition-adult-care chỉ được dành cho 16–18 tuổi");
 const reproductive = blocks.find((block) => /id: "relationships-reproductive-health"/.test(block));
 if (!reproductive || /"foundation"/.test(reproductive.match(/stages: \[([^\]]+)\]/)?.[1] ?? "")) fail("sức khỏe sinh sản không được gắn trực tiếp vào stage 9–10 trong catalog chuyên sâu");
 
-console.log(`Health framework PASS: ${blocks.length} domains · 4 stages · privacy/guardrail checks OK.`);
+const trackingSource = read("app/suc-khoe-tre/health-tracking-catalog.ts");
+const trackingBody = trackingSource.match(/export const HEALTH_TRACKING_ITEMS:[\s\S]*?= \[([\s\S]*?)\n\];/)?.[1];
+if (!trackingBody) fail("không đọc được HEALTH_TRACKING_ITEMS");
+const trackingBlocks = [...trackingBody.matchAll(/\n  \{([^\n]+)\},/g)].map((match) => match[1]);
+if (trackingBlocks.length < 25) fail(`tracking catalog quá mỏng (${trackingBlocks.length} items)`);
+if (!/noOverallHealthScore: true/.test(trackingSource)) fail("phải khóa nguyên tắc không dùng overall health score");
+if (!/guidelineDrivenItemsRequireJurisdictionAndVersion: true/.test(trackingSource)) fail("guideline-driven tracking phải jurisdiction/version aware");
+
+const trackedDomainIds = new Set([...trackingSource.matchAll(/domainId: "([^"]+)"/g)].map((match) => match[1]));
+for (const id of requiredV3Domains) if (!trackedDomainIds.has(id)) fail(`${id}: chưa có tracking item`);
+
+const privacySource = read("app/suc-khoe-tre/health-privacy-contracts.ts");
+if (!/deviceApprovalIsNotProfileAuthorization: true/.test(privacySource)) fail("phải tách Device Gate khỏi Profile Authorization");
+if (!/noLegalConsentAgeHardcoded: true/.test(privacySource)) fail("không được hard-code tuổi đồng ý pháp lý");
+if (!/sensitiveNotificationsRedactedByDefault: true/.test(privacySource)) fail("notification nhạy cảm phải redacted mặc định");
+
+const evidenceSource = read("app/suc-khoe-tre/health-evidence.ts");
+for (const evidenceId of ["whoAdolescentHealth", "whoGamaIndicators", "vietnamSchoolHealth", "vietnamExpandedImmunization2026"]) {
+  if (!new RegExp(`${evidenceId}:`).test(evidenceSource)) fail(`Evidence Registry thiếu ${evidenceId}`);
+}
+if (!/jurisdiction\?:/.test(evidenceSource) || !/reviewDueAt\?:/.test(evidenceSource)) fail("Evidence Registry phải có jurisdiction và reviewDueAt");
+
+const contractsSource = read("app/suc-khoe-tre/health-record-contracts.ts");
+for (const contract of ["VitalSignRecord", "ScreeningResultRecord", "ConditionRecord", "CarePlanRecord", "SymptomEpisodeRecord", "InjuryEpisodeRecord", "SchoolFunctionCheckIn", "SubstanceUseCheckIn", "SocialProtectiveContextRecord"]) {
+  if (!new RegExp(`export type ${contract}`).test(contractsSource)) fail(`record contract thiếu ${contract}`);
+}
+
+console.log(`Health framework V3 PASS: ${blocks.length} domains · ${trackingBlocks.length}+ tracking items · 4 stages · privacy/evidence/provenance checks OK.`);
