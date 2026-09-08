@@ -6,6 +6,7 @@ import {
   getCourseDatabase,
   getSiteAccessPolicy,
   revokeSiteSessionsForDevice,
+  type SiteAccessPolicy,
 } from "../../../device-auth.server";
 
 export const dynamic = "force-dynamic";
@@ -33,10 +34,12 @@ type Row = {
 function canView(role: string) { return ["viewer", "reviewer", "publisher", "owner"].includes(role); }
 function canManage(role: string) { return ["publisher", "owner"].includes(role); }
 
-async function view(row: Row) {
-  const policy = await getSiteAccessPolicy();
+function view(row: Row, policy: SiteAccessPolicy) {
   const lastSeen = Date.parse(row.last_seen_at);
-  const active = row.status === "approved" && policy.accessEnabled && Number.isFinite(lastSeen) && Date.now() - lastSeen <= policy.sessionTimeoutSeconds * 1000;
+  const active = row.status === "approved"
+    && policy.accessEnabled
+    && Number.isFinite(lastSeen)
+    && Date.now() - lastSeen <= policy.sessionTimeoutSeconds * 1000;
   return {
     deviceId: row.device_id,
     deviceCode: row.display_code,
@@ -60,7 +63,7 @@ async function view(row: Row) {
 }
 
 async function listDevices() {
-  const database = await getCourseDatabase();
+  const [database, policy] = await Promise.all([getCourseDatabase(), getSiteAccessPolicy()]);
   const rows = await database.prepare(
     `SELECT device_id, display_code, status, device_type, platform, browser, screen_width,
             screen_height, label, edit_enabled, calendar_enabled, created_at, approved_at, blocked_at,
@@ -69,7 +72,7 @@ async function listDevices() {
       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
                last_seen_at DESC LIMIT 300`,
   ).all<Row>();
-  return Promise.all(rows.results.map(view));
+  return rows.results.map((row) => view(row, policy));
 }
 
 export async function GET(request: Request) {
