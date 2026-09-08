@@ -18,6 +18,17 @@ export type ApplicationDescriptor = {
   id: string;
   name: string;
   status: "online" | "warning" | "planned";
+  runtime?: {
+    service?: "online" | "paused" | "unreachable";
+    contractVersion?: number;
+    canonicalApplication?: string | null;
+    capabilities?: readonly string[];
+    ready?: boolean;
+    connectionState?: "ready" | "legacy" | "paused" | "unreachable";
+    message?: string;
+    pendingDevices?: number;
+    activeSessions?: number;
+  };
 };
 
 export type ApplicationBridge = {

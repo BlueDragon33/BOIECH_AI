@@ -135,6 +135,13 @@
 .planned { background: #eceeef; color: #5a6266; }
 .appCard h2 { margin: 17px 0 7px; font-size: 22px; }
 .appCard > p { margin: 0; min-height: 48px; color: #5e6965; line-height: 1.5; }
+.runtimeStatus { margin-top: 12px; padding: 10px 12px; border: 1px solid #d5ddd9; border-radius: 11px; background: #f5f8f7; }
+.runtimeStatus strong, .runtimeStatus small { display: block; }
+.runtimeStatus strong { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.runtimeStatus small { margin-top: 4px; color: #65706c; font-size: 11px; line-height: 1.4; }
+.runtimeStatus[data-state="ready"] { border-color: #b9d8cc; background: #edf7f3; }
+.runtimeStatus[data-state="legacy"], .runtimeStatus[data-state="paused"] { border-color: #e4cc8c; background: #fff8e7; }
+.runtimeStatus[data-state="unreachable"] { border-color: #e2b7ad; background: #fff1ed; }
 .appScope,
 .guardrail { margin-top: 15px; padding: 12px 13px; border-radius: 12px; background: #f2f6f4; }
 .guardrail { background: #f8f3e9; }

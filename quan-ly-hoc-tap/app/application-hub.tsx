@@ -443,6 +443,15 @@ export default function ApplicationHub({
               </div>
               <h2>{application.name}</h2>
               <p>{config.scope}</p>
+              {application.runtime?.message
+                ? <div className={styles.runtimeStatus} data-state={application.runtime.connectionState}>
+                  <strong>Kết nối Health_Care</strong>
+                  <small>{application.runtime.message}</small>
+                  {application.runtime.contractVersion
+                    ? <small>Contract v{application.runtime.contractVersion} · {application.runtime.canonicalApplication || "alias legacy"}</small>
+                    : null}
+                </div>
+                : null}
               <div className={styles.appScope}>
                 <strong>Quản lý tại đây</strong>
                 <ul>{config.capabilities.map((item) => <li key={item}>{item}</li>)}</ul>

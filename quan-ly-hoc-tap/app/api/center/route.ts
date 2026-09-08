@@ -109,20 +109,51 @@ async function localAuditRows() {
 
 async function applications() {
   const health = await probeHealthApplication().catch(() => null);
+  const healthCapabilities = health?.capabilities ?? [];
+  const canonicalReady = health?.canonicalApplication === "suc-khoe-y-te";
+  const deviceReviewReady = healthCapabilities.includes("device-review-v1");
+  const boundarySafe = health?.boundary?.healthDataInControlPlane !== true;
+  const healthReady = Boolean(health && health.service === "online" && canonicalReady && deviceReviewReady && boundarySafe);
+  const connectionState = !health
+    ? "unreachable" as const
+    : health.service !== "online"
+      ? "paused" as const
+      : healthReady
+        ? "ready" as const
+        : "legacy" as const;
+  const healthMessage = !health
+    ? "Không kết nối được Health_Care production."
+    : health.service !== "online"
+      ? "Health_Care đang tạm dừng theo policy."
+      : !boundarySafe
+        ? "Control API báo ranh giới dữ liệu không an toàn."
+        : !canonicalReady
+          ? "Backend Health đang chạy contract cũ, chưa công bố canonical id suc-khoe-y-te."
+          : !deviceReviewReady
+            ? "Backend Health chưa công bố capability device-review-v1."
+            : "Health_Care Control Plane đã sẵn sàng.";
+
   return applicationRegistry.map(({ id, name, status }) => {
     if (id !== "child-health") return { id, name, status };
     return {
       id,
       name,
-      status: health?.service === "online" ? "online" as const : "warning" as const,
+      status: healthReady ? "online" as const : "warning" as const,
       runtime: health ? {
         service: health.service,
         contractVersion: health.contractVersion,
-        serverTime: health.serverTime,
+        canonicalApplication: health.canonicalApplication ?? null,
+        capabilities: healthCapabilities,
+        ready: healthReady,
+        connectionState,
+        message: healthMessage,
         pendingDevices: health.devices.pending,
         activeSessions: health.sessions.active,
       } : {
-        service: "unreachable",
+        service: "unreachable" as const,
+        ready: false,
+        connectionState,
+        message: healthMessage,
       },
     };
   });
