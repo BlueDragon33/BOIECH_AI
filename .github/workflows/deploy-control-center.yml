@@ -56,8 +56,29 @@ jobs:
       - name: Verify production auth configuration
         run: |
           set -euo pipefail
-          sleep 2
-          curl --fail --silent --show-error \
-            --retry 3 --retry-delay 2 \
-            https://learning-management.boiech-ai.workers.dev/api/auth/status
-          echo
+          ORIGIN="https://learning-management.boiech-ai.workers.dev"
+          sleep 5
+
+          STATUS="$(curl --fail --silent --show-error --retry 3 --retry-delay 2 "$ORIGIN/api/auth/status")"
+          echo "$STATUS"
+          node -e '
+            const status = JSON.parse(process.argv[1]);
+            if (!status.configured) throw new Error(`password config is not ready: ${JSON.stringify(status)}`);
+            if (!status.sessionReady) throw new Error(`admin session is not ready: ${JSON.stringify(status)}`);
+          ' "$STATUS"
+
+          LOGIN_CODE="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" "$ORIGIN/login")"
+          test "$LOGIN_CODE" = "200"
+
+          ROOT_CODE="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" "$ORIGIN/")"
+          case "$ROOT_CODE" in
+            302|303|307|308) ;;
+            *) echo "Unexpected anonymous root status: $ROOT_CODE"; exit 1 ;;
+          esac
+
+          WRONG_LOGIN_CODE="$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" \
+            --request POST \
+            --header "content-type: application/x-www-form-urlencoded" \
+            --data-urlencode "password=definitely-wrong-smoke-test-password" \
+            "$ORIGIN/api/auth/login")"
+          test "$WRONG_LOGIN_CODE" = "303"
