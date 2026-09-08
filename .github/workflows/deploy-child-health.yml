@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         working-directory: suc-khoe-tre
         run: npm ci
+      - name: Verify standalone Child Health boundary
+        working-directory: suc-khoe-tre
+        run: npm run validate:boundary
       - name: Apply dedicated D1 migrations
         working-directory: suc-khoe-tre
         env:
@@ -40,7 +43,7 @@ jobs:
         run: npx wrangler d1 migrations apply suc-khoe-tre-db --remote --config wrangler.d1.jsonc
       - name: Build standalone Child Health application
         working-directory: suc-khoe-tre
-        run: npx vite build
+        run: npm run build
       - name: Deploy standalone Child Health Worker
         working-directory: suc-khoe-tre
         env:
