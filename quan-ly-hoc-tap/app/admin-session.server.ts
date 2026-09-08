@@ -43,22 +43,41 @@ async function envValue(name: string) {
   return typeof value === "string" ? value : "";
 }
 
+function normalizeEmail(value: string | null | undefined) {
+  const email = value?.trim().toLowerCase() ?? "";
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : "";
+}
+
+async function ownerEmails() {
+  const value = await envValue("CONTROL_OWNER_EMAILS");
+  return value.split(",").map((item) => normalizeEmail(item)).filter(Boolean);
+}
+
+async function isOwnerEmail(emailValue: string) {
+  const email = normalizeEmail(emailValue);
+  return Boolean(email && (await ownerEmails()).includes(email));
+}
+
 async function sessionSecret() {
   const value = (await envValue("ADMIN_SESSION_SECRET")).trim();
   return value.length >= 32 ? value : "";
 }
 
 async function hmac(value: string) {
-  const secret = await sessionSecret();
-  if (!secret) return null;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
+  try {
+    const secret = await sessionSecret();
+    if (!secret) return null;
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)));
+  } catch {
+    return null;
+  }
 }
 
 function constantTimeEqual(left: Uint8Array, right: Uint8Array) {
@@ -154,60 +173,82 @@ export async function adminPasswordFormatHint() {
   return (await passwordConfig()).format;
 }
 
+export async function adminSessionReady() {
+  return Boolean(await sessionSecret()) && (await ownerEmails()).length > 0;
+}
+
 export async function verifyAdminPassword(password: string) {
   if (!password || password.length > 256) return false;
-  const configured = await passwordConfig();
+  try {
+    const configured = await passwordConfig();
 
-  if (configured.scheme === "sha256") {
-    const expected = hexToBytes(configured.hash);
-    return expected ? constantTimeEqual(await sha256(password), expected) : false;
-  }
+    if (configured.scheme === "sha256") {
+      const expected = hexToBytes(configured.hash);
+      return expected ? constantTimeEqual(await sha256(password), expected) : false;
+    }
 
-  if (configured.scheme === "pbkdf2-sha256") {
-    const salt = base64ToBytes(configured.salt);
-    const expected = decodeHash(configured.hash);
-    if (!salt || salt.length < 6 || !expected || expected.length < 24) return false;
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-    const derived = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: configured.iterations }, key, expected.length * 8));
-    return constantTimeEqual(derived, expected);
+    if (configured.scheme === "pbkdf2-sha256") {
+      const salt = base64ToBytes(configured.salt);
+      const expected = decodeHash(configured.hash);
+      if (!salt || salt.length < 6 || !expected || expected.length < 24) return false;
+      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+      const derived = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: configured.iterations }, key, expected.length * 8));
+      return constantTimeEqual(derived, expected);
+    }
+  } catch {
+    return false;
   }
 
   return false;
 }
 
 async function ownerIdentity(): Promise<ChatGPTUser | null> {
-  const value = await envValue("CONTROL_OWNER_EMAILS");
-  const email = value.split(",").map((item) => item.trim().toLowerCase()).find((item) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(item));
+  const email = (await ownerEmails())[0] ?? "";
   if (!email) return null;
   return { email, displayName: "Chủ hệ thống", fullName: null };
 }
 
-export async function createAdminSession() {
-  const identity = await ownerIdentity();
-  if (!identity) return null;
-  const payload: SessionPayload = { v: 1, email: identity.email, displayName: identity.displayName, exp: Date.now() + SESSION_MAX_AGE_SECONDS * 1000 };
+async function signIdentity(identity: ChatGPTUser) {
+  const payload: SessionPayload = {
+    v: 1,
+    email: identity.email,
+    displayName: identity.displayName,
+    exp: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+  };
   const body = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const signature = await hmac(body);
   if (!signature) return null;
   return `${body}.${bytesToBase64Url(signature)}`;
 }
 
+export async function createAdminSession() {
+  const identity = await ownerIdentity();
+  return identity ? signIdentity(identity) : null;
+}
+
+export async function createAdminSessionForIdentity(emailValue: string, displayNameValue?: string) {
+  const email = normalizeEmail(emailValue);
+  if (!email || !(await isOwnerEmail(email))) return null;
+  const displayName = displayNameValue?.trim().slice(0, 160) || email.split("@")[0] || email;
+  return signIdentity({ email, displayName, fullName: null });
+}
+
 export async function getAdminSessionUser(): Promise<ChatGPTUser | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value ?? "";
-  const [body, signatureText, extra] = token.split(".");
-  if (!body || !signatureText || extra) return null;
-  const expected = await hmac(body);
-  const signature = base64UrlToBytes(signatureText);
-  if (!expected || !signature || !constantTimeEqual(expected, signature)) return null;
-  const bytes = base64UrlToBytes(body);
-  if (!bytes) return null;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE)?.value ?? "";
+    const [body, signatureText, extra] = token.split(".");
+    if (!body || !signatureText || extra) return null;
+    const expected = await hmac(body);
+    const signature = base64UrlToBytes(signatureText);
+    if (!expected || !signature || !constantTimeEqual(expected, signature)) return null;
+    const bytes = base64UrlToBytes(body);
+    if (!bytes) return null;
     const payload = JSON.parse(new TextDecoder().decode(bytes)) as Partial<SessionPayload>;
-    if (payload.v !== 1 || typeof payload.email !== "string" || typeof payload.displayName !== "string" || typeof payload.exp !== "number" || payload.exp <= Date.now()) return null;
-    const owner = await ownerIdentity();
-    if (!owner || owner.email !== payload.email) return null;
-    return { email: payload.email, displayName: payload.displayName, fullName: null };
+    const email = normalizeEmail(payload.email);
+    if (payload.v !== 1 || !email || typeof payload.displayName !== "string" || typeof payload.exp !== "number" || payload.exp <= Date.now()) return null;
+    if (!(await isOwnerEmail(email))) return null;
+    return { email, displayName: payload.displayName, fullName: null };
   } catch {
     return null;
   }
