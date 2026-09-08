@@ -157,6 +157,7 @@ export const HEALTH_DOMAINS: readonly HealthDomain[] = [
     capabilities: ["lịch hẹn", "ghi chú khám", "tài liệu", "xuất lịch .ics", "Google Calendar theo quyền thiết bị"],
     stages: ["foundation", "preteen", "early-adolescent", "late-adolescent"],
     privacy: "highly-sensitive",
+    guardrail: "Tài liệu y tế chỉ được lưu/xuất theo thao tác chủ động của người dùng; không tự tải lên hoặc gửi sang Site Quản trị.",
   },
   {
     id: "transition-adult-care",
