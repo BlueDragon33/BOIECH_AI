@@ -63,7 +63,6 @@ const trackingBlocks = [...trackingBody.matchAll(/\n  \{([^\n]+)\},/g)].map((mat
 if (trackingBlocks.length < 25) fail(`tracking catalog quá mỏng (${trackingBlocks.length} items)`);
 if (!/noOverallHealthScore: true/.test(trackingSource)) fail("phải khóa nguyên tắc không dùng overall health score");
 if (!/guidelineDrivenItemsRequireJurisdictionAndVersion: true/.test(trackingSource)) fail("guideline-driven tracking phải jurisdiction/version aware");
-
 const trackedDomainIds = new Set([...trackingSource.matchAll(/domainId: "([^"]+)"/g)].map((match) => match[1]));
 for (const id of requiredV3Domains) if (!trackedDomainIds.has(id)) fail(`${id}: chưa có tracking item`);
 
@@ -71,6 +70,18 @@ const privacySource = read("app/suc-khoe-tre/health-privacy-contracts.ts");
 if (!/deviceApprovalIsNotProfileAuthorization: true/.test(privacySource)) fail("phải tách Device Gate khỏi Profile Authorization");
 if (!/noLegalConsentAgeHardcoded: true/.test(privacySource)) fail("không được hard-code tuổi đồng ý pháp lý");
 if (!/sensitiveNotificationsRedactedByDefault: true/.test(privacySource)) fail("notification nhạy cảm phải redacted mặc định");
+
+const profileSource = read("app/suc-khoe-tre/health-profile-contracts.ts");
+for (const rule of ["everyHealthRecordRequiresProfileId: true", "noCrossProfileTimelineMixing: true", "noCrossProfileReminderMixing: true", "deviceAccessDoesNotGrantAllProfileVisibility: true"]) {
+  if (!profileSource.includes(rule)) fail(`Profile Registry thiếu rule: ${rule}`);
+}
+
+const attentionSource = read("app/suc-khoe-tre/health-attention-contracts.ts");
+for (const contract of ["HealthDueItem", "HealthDataGap", "HealthTrendSignal", "HealthAttentionItem"]) {
+  if (!new RegExp(`export type ${contract}`).test(attentionSource)) fail(`attention contract thiếu ${contract}`);
+}
+if (!/missingDataIsNotBadHealth: true/.test(attentionSource)) fail("Data Completeness không được đồng nhất với sức khỏe xấu");
+if (!/maxPrimaryItemsOnToday: 5/.test(attentionSource)) fail("Today phải giới hạn attention để tránh alert fatigue");
 
 const evidenceSource = read("app/suc-khoe-tre/health-evidence.ts");
 for (const evidenceId of ["whoAdolescentHealth", "whoGamaIndicators", "vietnamSchoolHealth", "vietnamExpandedImmunization2026"]) {
@@ -83,4 +94,4 @@ for (const contract of ["VitalSignRecord", "ScreeningResultRecord", "ConditionRe
   if (!new RegExp(`export type ${contract}`).test(contractsSource)) fail(`record contract thiếu ${contract}`);
 }
 
-console.log(`Health framework V3 PASS: ${blocks.length} domains · ${trackingBlocks.length}+ tracking items · 4 stages · privacy/evidence/provenance checks OK.`);
+console.log(`Health framework V3 PASS: ${blocks.length} domains · ${trackingBlocks.length}+ tracking items · multi-profile/privacy/attention/evidence checks OK.`);
