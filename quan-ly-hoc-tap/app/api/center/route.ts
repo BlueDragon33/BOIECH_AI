@@ -7,6 +7,7 @@ import {
   verifyControlProof,
   type ControlRole,
 } from "../../control-device.server";
+import { probeHealthApplication } from "../../health-bridge.server";
 
 export const dynamic = "force-dynamic";
 
@@ -106,8 +107,25 @@ async function localAuditRows() {
   });
 }
 
-function applications() {
-  return applicationRegistry.map(({ id, name, status }) => ({ id, name, status }));
+async function applications() {
+  const health = await probeHealthApplication().catch(() => null);
+  return applicationRegistry.map(({ id, name, status }) => {
+    if (id !== "child-health") return { id, name, status };
+    return {
+      id,
+      name,
+      status: health?.service === "online" ? "online" as const : "warning" as const,
+      runtime: health ? {
+        service: health.service,
+        contractVersion: health.contractVersion,
+        serverTime: health.serverTime,
+        pendingDevices: health.devices.pending,
+        activeSessions: health.sessions.active,
+      } : {
+        service: "unreachable",
+      },
+    };
+  });
 }
 
 export async function POST(request: Request) {
@@ -120,7 +138,7 @@ export async function POST(request: Request) {
     if (action === "bootstrap") {
       return json({
         actor: actorDevice,
-        applications: applications(),
+        applications: await applications(),
         controlDevices: actorDevice.role === "owner" ? await controlDevices() : [],
         auditLog: ["publisher", "owner"].includes(actorDevice.role) ? await localAuditRows() : [],
         upstreamError: null,
