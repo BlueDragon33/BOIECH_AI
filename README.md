@@ -1,42 +1,36 @@
 # BOIECH_AI
 
-Repository chung cho các ứng dụng học tập/sức khỏe và Trung tâm quản trị.
+Repository cho **Bơi ếch** và **Trung tâm Quản trị**.
 
-Kiến trúc production tách theo ứng dụng:
+Ứng dụng **Sức khỏe Y tế 9–18 tuổi đã được tách hoàn toàn về repo riêng**:
 
-| Thư mục | Worker / dữ liệu | Chức năng |
+- `BlueDragon33/Health_Care`
+- Worker hiện hành: `suc-khoe-tre`
+- D1 hiện hành: `suc-khoe-tre-db`
+
+`BOIECH_AI` không còn chứa runtime/mã nguồn nghiệp vụ của Sức khỏe Y tế. Trung tâm Quản trị vẫn giữ bridge và giao diện quản trị cần thiết để quản lý Health_Care từ xa qua Control API.
+
+## Kiến trúc
+
+| Thành phần | Worker / dữ liệu | Chức năng |
 | --- | --- | --- |
 | `boi-ech/` | Worker `boi-ech` · D1 `boi-ech-db` | Ứng dụng Bơi ếch, học viên, tiến độ, thanh toán, AI và nội dung Bơi ếch |
-| `suc-khoe-tre/` | Worker `suc-khoe-tre` · D1 `suc-khoe-tre-db` | Ứng dụng Sức khỏe trẻ 9 tháng–5 tuổi, dữ liệu nội dung và quy trình biên tập riêng |
-| `quan-ly-hoc-tap/` | Worker `learning-management` · D1 `learning-management-db` | Trung tâm chọn ứng dụng, xác thực quản trị và điều hướng vào khu quản trị riêng của từng ứng dụng |
+| `quan-ly-hoc-tap/` | Worker `learning-management` · D1 `learning-management-db` | Trung tâm quản trị thiết bị, quyền, policy, phiên, audit và bridge tới các ứng dụng độc lập |
+| `BlueDragon33/Health_Care` | Worker `suc-khoe-tre` · D1 `suc-khoe-tre-db` | Web App Sức khỏe Y tế 9–18 tuổi độc lập; nằm ngoài repo này |
 
-Trung tâm không gộp dữ liệu nghiệp vụ của các ứng dụng. Mỗi ứng dụng có API, cơ sở dữ liệu và vòng đời deploy riêng; Trung tâm chỉ cấp vé quản trị ngắn hạn theo đúng audience của ứng dụng.
+Trung tâm không sở hữu dữ liệu sức khỏe cá nhân. Health_Care có runtime, mã nguồn, CI và vòng đời phát hành riêng; Trung tâm chỉ giao tiếp thông qua Control API rõ ràng.
 
-## Lấy mã nguồn
-
-```bash
-git clone https://github.com/BlueDragon33/boiech_AI.git
-cd boiech_AI
-```
-
-Nếu đã clone trước đó:
+## Lấy mã nguồn BOIECH_AI
 
 ```bash
-git pull origin main
+git clone https://github.com/BlueDragon33/BOIECH_AI.git
+cd BOIECH_AI
 ```
 
 ## Chạy Bơi ếch
 
 ```bash
 cd boi-ech
-npm ci
-npm run dev
-```
-
-## Chạy Sức khỏe trẻ
-
-```bash
-cd suc-khoe-tre
 npm ci
 npm run dev
 ```
@@ -49,4 +43,12 @@ npm ci
 npm run dev
 ```
 
-Yêu cầu Node.js `>=22.13.0`. Không đưa tệp `.env`, token hoặc khóa bí mật lên GitHub; các secret production được quản lý tại Cloudflare/GitHub Actions.
+## Sức khỏe Y tế
+
+Mã nguồn không còn nằm trong repo này. Làm việc tại repo:
+
+```text
+https://github.com/BlueDragon33/Health_Care
+```
+
+Yêu cầu Node.js `>=22.13.0`. Không đưa `.env`, token hoặc khóa bí mật lên GitHub; secret production được quản lý tại Cloudflare/GitHub Actions của từng repo.
