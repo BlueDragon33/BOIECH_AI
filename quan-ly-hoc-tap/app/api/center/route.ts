@@ -1,4 +1,5 @@
 import { applicationRegistry } from "../../application-registry";
+import { probeBaumanApplication } from "../../bauman-bridge.server";
 import {
   ControlAccessError,
   controlErrorResponse,
@@ -108,7 +109,11 @@ async function localAuditRows() {
 }
 
 async function applications() {
-  const health = await probeHealthApplication().catch(() => null);
+  const [health, bauman] = await Promise.all([
+    probeHealthApplication().catch(() => null),
+    probeBaumanApplication().catch(() => null),
+  ]);
+
   const healthCapabilities = health?.capabilities ?? [];
   const canonicalReady = health?.canonicalApplication === "suc-khoe-y-te";
   const deviceReviewReady = healthCapabilities.includes("device-review-v1");
@@ -127,7 +132,7 @@ async function applications() {
       && revisionReady
       && scopedAuthReady,
   );
-  const connectionState = !health
+  const healthConnectionState = !health
     ? "unreachable" as const
     : health.service !== "online"
       ? "paused" as const
@@ -154,31 +159,82 @@ async function applications() {
                     ? "Trung tâm Quản trị vẫn đang dùng CONTROL_SERVICE_SECRET dùng chung cho Health."
                     : "Health_Care Control Plane đã sẵn sàng và dùng bí mật điều khiển riêng.";
 
+  const baumanReadiness = bauman?.readiness ?? {};
+  const baumanReadOnlyReady = baumanReadiness.runtime === "available"
+    && baumanReadiness.subclientInventory === "available"
+    && baumanReadiness.readOnlyControlApi === "available";
+  const baumanDeviceReviewReady = baumanReadiness.deviceRegistry === "available"
+    && baumanReadiness.deviceGateway === "available";
+  const baumanReady = Boolean(bauman && baumanReadOnlyReady && baumanDeviceReviewReady);
+  const baumanCapabilities = [
+    ...(baumanReadOnlyReady ? ["control-read-v1", "subclient-inventory-v1"] : []),
+    ...(baumanDeviceReviewReady ? ["device-review-v1"] : []),
+    ...(baumanReadiness.auditApi === "available" ? ["audit-v1"] : []),
+    ...(baumanReadiness.contentReviewApi === "available" ? ["content-review-v1"] : []),
+  ];
+  const baumanMessage = !bauman
+    ? "Không kết nối được Bauman Control Service production."
+    : !baumanReadOnlyReady
+      ? "Bauman Control Service chưa đủ contract đọc trạng thái/sub-client."
+      : !baumanDeviceReviewReady
+        ? "Bauman đã kết nối, nhưng deviceRegistry/deviceGateway chưa sẵn sàng nên Trung tâm không hiển thị nút Duyệt giả."
+        : "Bauman Control Plane đã sẵn sàng cho kiểm duyệt thiết bị.";
+  const baumanConnectionState = !bauman
+    ? "unreachable" as const
+    : baumanReady
+      ? "ready" as const
+      : "legacy" as const;
+
   return applicationRegistry.map(({ id, name, status }) => {
-    if (id !== "child-health") return { id, name, status };
-    return {
-      id,
-      name,
-      status: healthReady ? "online" as const : "warning" as const,
-      runtime: health ? {
-        service: health.service,
-        contractVersion: health.contractVersion,
-        canonicalApplication: health.canonicalApplication ?? null,
-        buildRevision: health.buildRevision ?? null,
-        buildSource: health.buildSource ?? null,
-        capabilities: healthCapabilities,
-        ready: healthReady,
-        connectionState,
-        message: healthMessage,
-        pendingDevices: health.devices.pending,
-        activeSessions: health.sessions.active,
-      } : {
-        service: "unreachable" as const,
-        ready: false,
-        connectionState,
-        message: healthMessage,
-      },
-    };
+    if (id === "child-health") {
+      return {
+        id,
+        name,
+        status: healthReady ? "online" as const : "warning" as const,
+        runtime: health ? {
+          service: health.service,
+          contractVersion: health.contractVersion,
+          canonicalApplication: health.canonicalApplication ?? null,
+          buildRevision: health.buildRevision ?? null,
+          buildSource: health.buildSource ?? null,
+          capabilities: healthCapabilities,
+          ready: healthReady,
+          connectionState: healthConnectionState,
+          message: healthMessage,
+          pendingDevices: health.devices.pending,
+          activeSessions: health.sessions.active,
+        } : {
+          service: "unreachable" as const,
+          ready: false,
+          connectionState: healthConnectionState,
+          message: healthMessage,
+        },
+      };
+    }
+
+    if (id === "bauman-master-ai") {
+      return {
+        id,
+        name,
+        status: baumanReady ? "online" as const : "warning" as const,
+        runtime: bauman ? {
+          service: "online" as const,
+          capabilities: baumanCapabilities,
+          ready: baumanReady,
+          connectionState: baumanConnectionState,
+          message: baumanMessage,
+          ...(typeof bauman.counts?.pendingDevices === "number" ? { pendingDevices: bauman.counts.pendingDevices } : {}),
+          ...(typeof bauman.counts?.activeSessions === "number" ? { activeSessions: bauman.counts.activeSessions } : {}),
+        } : {
+          service: "unreachable" as const,
+          ready: false,
+          connectionState: baumanConnectionState,
+          message: baumanMessage,
+        },
+      };
+    }
+
+    return { id, name, status };
   });
 }
 
