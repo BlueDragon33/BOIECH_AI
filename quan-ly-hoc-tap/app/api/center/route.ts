@@ -1,5 +1,12 @@
 import { applicationRegistry } from "../../application-registry";
 import {
+  BaumanDeviceError,
+  baumanDeviceCounts,
+  listBaumanAudit,
+  listBaumanDevices,
+  manageBaumanDevice,
+} from "../../bauman-device.server";
+import {
   ControlAccessError,
   controlErrorResponse,
   getControlDatabase,
@@ -36,6 +43,10 @@ function json(data: unknown, status = 200) {
       "x-content-type-options": "nosniff",
     },
   });
+}
+
+function canReview(role: ControlRole) {
+  return ["reviewer", "publisher", "owner"].includes(role);
 }
 
 async function controlDevices() {
@@ -108,7 +119,10 @@ async function localAuditRows() {
 }
 
 async function applications() {
-  const health = await probeHealthApplication().catch(() => null);
+  const [health, bauman] = await Promise.all([
+    probeHealthApplication().catch(() => null),
+    baumanDeviceCounts().catch(() => null),
+  ]);
   const healthCapabilities = health?.capabilities ?? [];
   const canonicalReady = health?.canonicalApplication === "suc-khoe-y-te";
   const deviceReviewReady = healthCapabilities.includes("device-review-v1");
@@ -155,6 +169,27 @@ async function applications() {
                     : "Health_Care Control Plane đã sẵn sàng và dùng bí mật điều khiển riêng.";
 
   return applicationRegistry.map(({ id, name, status }) => {
+    if (id === "bauman-master-ai") {
+      const ready = Boolean(bauman);
+      return {
+        id,
+        name,
+        status: ready ? "online" as const : "warning" as const,
+        runtime: {
+          service: ready ? "online" as const : "unreachable" as const,
+          contractVersion: 1,
+          canonicalApplication: "bauman-master-ai",
+          capabilities: ["device-review-v1", "p256-device-proof-v1", "central-review-sync-v1"],
+          ready,
+          connectionState: ready ? "ready" as const : "unreachable" as const,
+          message: ready
+            ? "Registry thiết bị Bauman đã nối với Trung tâm; quyết định duyệt/khóa được ghi trực tiếp và có audit."
+            : "Registry thiết bị Bauman chưa sẵn sàng trong D1.",
+          pendingDevices: bauman?.pending ?? 0,
+          activeSessions: bauman?.active ?? 0,
+        },
+      };
+    }
     if (id !== "child-health") return { id, name, status };
     return {
       id,
@@ -196,6 +231,44 @@ export async function POST(request: Request) {
         controlDevices: actorDevice.role === "owner" ? await controlDevices() : [],
         auditLog: ["publisher", "owner"].includes(actorDevice.role) ? await localAuditRows() : [],
         upstreamError: null,
+      });
+    }
+
+    if (action === "bauman-bootstrap") {
+      return json({
+        actor: actorDevice,
+        baumanDevices: await listBaumanDevices(),
+        baumanAudit: canReview(actorDevice.role) ? await listBaumanAudit() : [],
+        baumanStats: await baumanDeviceCounts(),
+        applications: await applications(),
+      });
+    }
+
+    if (action === "manage-bauman-device") {
+      if (!canReview(actorDevice.role)) {
+        throw new ControlAccessError(
+          "Vai trò hiện tại không được kiểm duyệt thiết bị Bauman.",
+          403,
+          "BAUMAN_REVIEWER_REQUIRED",
+        );
+      }
+      const operation = typeof payload.operation === "string" ? payload.operation : "";
+      if (!["approve", "block", "reopen", "label"].includes(operation)) {
+        throw new ControlAccessError("Thao tác thiết bị Bauman không hợp lệ.", 400, "INVALID_BAUMAN_OPERATION");
+      }
+      const targetId = typeof payload.targetDeviceId === "string" ? payload.targetDeviceId : "";
+      const label = typeof payload.label === "string" ? payload.label : null;
+      await manageBaumanDevice(
+        actorDevice.email,
+        operation as "approve" | "block" | "reopen" | "label",
+        targetId,
+        label,
+      );
+      return json({
+        baumanDevices: await listBaumanDevices(),
+        baumanAudit: await listBaumanAudit(),
+        baumanStats: await baumanDeviceCounts(),
+        applications: await applications(),
       });
     }
 
@@ -299,6 +372,9 @@ export async function POST(request: Request) {
       "INVALID_CENTER_ACTION",
     );
   } catch (error) {
+    if (error instanceof BaumanDeviceError) {
+      return json({ error: error.message, code: error.code, device: error.device }, error.status);
+    }
     return controlErrorResponse(error);
   }
 }
