@@ -284,7 +284,9 @@ export async function connectAdminDevice(application = currentApplication()) {
   }
   const dashboardPath = application === "child-health"
     ? "/api/dashboard-health"
-    : "/api/dashboard";
+    : application === "bauman-master-ai"
+      ? "/api/dashboard-bauman"
+      : "/api/dashboard";
   const bootstrap = await secureApi(dashboardPath, credential, access, {
     action: "bootstrap",
     application,
