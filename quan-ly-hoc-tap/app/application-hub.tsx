@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { applicationRegistry } from "./application-registry";
+import ClientDeviceCenter from "./client-device-center";
 import {
   centerAdminAction,
   connectAdminCenter,
@@ -65,11 +66,11 @@ const futureClients: readonly ClientEntry[] = [
     name: "Hòa nhập Nga",
     shortName: "Hòa nhập Nga",
     icon: "HN",
-    href: null,
-    status: "planned",
+    href: "/apps/ru-life",
+    status: "online",
     group: "Nga",
     boundary: "Thiết bị HN · OCR thuốc · đối chiếu quy định · audit Nga",
-    scope: "Client độc lập; production hiện tại chưa có adapter Hòa nhập Nga nên Trung tâm không dựng thao tác giả.",
+    scope: "Client độc lập; registry HN thuộc RU_LIFE. Trung tâm chỉ gửi lệnh Control API và đồng bộ lại trạng thái thật.",
   },
   {
     id: "growup-mychildren",
@@ -107,7 +108,7 @@ const viewTitles: Record<CenterView, { eyebrow: string; title: string; descripti
   overview: { eyebrow: "CONTROL PLANE · OPERATIONS", title: "Bảng điều phối quản trị ứng dụng", description: "Kiểm soát tập trung các client độc lập, cảnh báo thiết bị mới và điều phối đúng khu kiểm duyệt của từng ứng dụng." },
   inbox: { eyebrow: "PRIORITY INBOX", title: "Hộp việc ưu tiên", description: "Tập trung các việc đang chờ xử lý từ control-plane và những client production hiện có." },
   applications: { eyebrow: "CLIENT REGISTRY", title: "Ứng dụng đang quản lý", description: "Một hàng cho mỗi client để tìm nhanh khi hệ thống tăng số lượng ứng dụng." },
-  "client-devices": { eyebrow: "CLIENT DEVICE ALERTS", title: "Thiết bị mới theo ứng dụng", description: "Trung tâm chỉ đọc trạng thái mà client chủ động trả về; registry thiết bị vẫn thuộc từng ứng dụng." },
+  "client-devices": { eyebrow: "CLIENT DEVICE ALERTS", title: "Thiết bị mới / thiết bị cần xác minh", description: "Duyệt hoặc loại bỏ trực tiếp khi Control API hỗ trợ; nếu app cần thêm dữ liệu, chuyển vào quản trị app rồi tự đồng bộ trạng thái thật khi quay lại." },
   alerts: { eyebrow: "OPERATIONS ALERTS", title: "Cảnh báo vận hành", description: "Tập trung client mất kết nối, contract chưa hoàn tất và việc cần can thiệp nhanh." },
   devices: { eyebrow: "CONTROL ACCESS", title: "Thiết bị quản trị Trung tâm", description: "Chỉ chứa thiết bị QT của Application Management; không trộn thiết bị người dùng của client." },
   audit: { eyebrow: "SYSTEM AUDIT", title: "Nhật ký hệ thống", description: "Audit quyền và bảo mật control-plane. Audit nghiệp vụ vẫn thuộc khu quản trị riêng của từng client." },
@@ -140,6 +141,7 @@ function connectionState(client: ClientEntry, descriptor?: ApplicationDescriptor
   if (runtime?.service === "paused" || runtime?.connectionState === "paused" || runtime?.connectionState === "legacy") return "warning";
   if (descriptor?.status === "warning") return "warning";
   if (descriptor?.status === "online" || runtime?.service === "online" || runtime?.ready) return "connected";
+  if (!descriptor && client.status === "online") return "connected";
   if (client.status === "planned" || descriptor?.status === "planned") return "pending";
   return "warning";
 }
@@ -183,8 +185,12 @@ function DeviceRow({ device, actor, role, busy, run }: {
     <div><span>Vai trò</span><strong>{roleLabels[device.role]}</strong><small>{device.active ? "Đang trực tuyến" : formatTime(device.lastSeenAt)}</small></div>
     <div className={styles.adminDeviceActions}>{protectedDevice ? <span className={styles.protected}>Owner · được bảo vệ</span> : device.status === "pending" ? <>
       <select value={approvalRole} onChange={(event) => setApprovalRole(event.target.value as "reviewer" | "publisher")} disabled={isBusy || role !== "owner"}><option value="reviewer">Kiểm duyệt viên</option><option value="publisher">Người xuất bản</option></select>
-      <button disabled={isBusy || role !== "owner"} onClick={() => run(device, "approve", approvalRole)}>Cấp quyền</button><button className={styles.dangerButton} disabled={isBusy || role !== "owner"} onClick={() => run(device, "block")}>Từ chối</button>
-    </> : device.memberStatus === "inactive" ? <button className={styles.dangerButton} disabled={isBusy || role !== "owner"} onClick={() => run(device, "delete-member")}>Xóa tài khoản</button> : <><button disabled={isBusy || role !== "owner" || device.status === "blocked"} onClick={() => run(device, "block")}>Khóa máy</button><button className={styles.dangerButton} disabled={isBusy || role !== "owner"} onClick={() => run(device, "deactivate-member")}>Thu hồi</button></>}</div>
+      <button disabled={isBusy || role !== "owner"} onClick={() => run(device, "approve", approvalRole)}>Cấp quyền</button>
+      <button className={styles.dangerButton} disabled={isBusy || role !== "owner"} onClick={() => run(device, "block")}>Từ chối</button>
+    </> : device.memberStatus === "inactive" ? <button className={styles.dangerButton} disabled={isBusy || role !== "owner"} onClick={() => run(device, "delete-member")}>Xóa tài khoản</button> : <>
+      <button disabled={isBusy || role !== "owner" || device.status === "blocked"} onClick={() => run(device, "block")}>Khóa máy</button>
+      <button className={styles.dangerButton} disabled={isBusy || role !== "owner"} onClick={() => run(device, "deactivate-member")}>Thu hồi</button>
+    </>}</div>
   </article>;
 }
 
@@ -313,10 +319,10 @@ export default function ApplicationHub({ user }: { user: { displayName: string; 
       const row = clientRows.find((item) => item.client.id === client.id)!;
       return <article key={client.id} className={styles.clientDeviceRow}>
         <div className={styles.appCell}><b>{client.icon}</b><strong>{client.shortName}</strong></div>
-        <div><strong>{row.pending ?? "—"}</strong><small>{row.pending === null ? "Client chưa trả số liệu" : "Đang chờ client xử lý"}</small></div>
+        <div><strong>{row.pending ?? "—"}</strong><small>{row.pending === null ? "Xem chi tiết để đồng bộ registry" : "Đang chờ client xử lý"}</small></div>
         <div><strong>{row.active ?? "—"}</strong><small>Phiên do client sở hữu</small></div>
         <StatusDot state={row.state} />
-        {client.href ? <Link href={client.href} className={styles.rowAction}>{(row.pending ?? 0) > 0 ? "Duyệt →" : "Mở →"}</Link> : <span className={styles.connectionState} data-state="pending">—</span>}
+        <button className={styles.rowAction} onClick={() => switchView("client-devices")}>Mở thiết bị →</button>
       </article>;
     })}
   </div>;
@@ -328,7 +334,7 @@ export default function ApplicationHub({ user }: { user: { displayName: string; 
         <button data-active={view === "overview"} onClick={() => switchView("overview")}><i>⌂</i><div><strong>Tổng quan</strong><small>Bảng điều phối</small></div></button>
         <button data-active={view === "inbox"} onClick={() => switchView("inbox")}><i>▤</i><div><strong>Hộp việc</strong><small>Ưu tiên xử lý</small></div>{workItems.length ? <b>{workItems.length}</b> : null}</button>
         <button data-active={view === "applications"} onClick={() => switchView("applications")}><i>⊞</i><div><strong>Ứng dụng</strong><small>Tìm & quản trị client</small></div></button>
-        <button data-active={view === "client-devices"} onClick={() => switchView("client-devices")}><i>▯</i><div><strong>Thiết bị mới</strong><small>Theo từng ứng dụng</small></div>{pendingClientDevices ? <b>{pendingClientDevices}</b> : null}</button>
+        <button data-active={view === "client-devices"} onClick={() => switchView("client-devices")}><i>▯</i><div><strong>Thiết bị mới</strong><small>Duyệt / loại bỏ thật</small></div>{pendingClientDevices ? <b>{pendingClientDevices}</b> : null}</button>
         <button data-active={view === "alerts"} onClick={() => switchView("alerts")}><i>△</i><div><strong>Cảnh báo</strong><small>Vận hành client</small></div>{alertClients ? <b>{alertClients}</b> : null}</button>
         <span className={styles.navDivider}>HỆ THỐNG</span>
         {canSeeAdminDevices ? <button data-active={view === "devices"} onClick={() => switchView("devices")}><i>♙</i><div><strong>Thiết bị QT</strong><small>Quyền Trung tâm</small></div>{centralCounts.pending ? <b>{centralCounts.pending}</b> : null}</button> : null}
@@ -361,13 +367,12 @@ export default function ApplicationHub({ user }: { user: { displayName: string; 
             <button onClick={() => switchView("alerts")} data-tone="red"><i>△</i><div><span>Cảnh báo vận hành</span><strong>{alertClients}</strong><small>Client cần kiểm tra</small></div><b>→</b></button>
             <button onClick={() => switchView("inbox")} data-tone="gold"><i>▤</i><div><span>Việc cần xử lý</span><strong>{workItems.length}</strong><small>Không tạo số liệu giả</small></div><b>→</b></button>
           </section>
-
           <section className={styles.dashboardGrid}>
             <div className={styles.panel}><SectionHeader title="Hộp việc ưu tiên" meta={`${workItems.length} việc`} action={<button onClick={() => switchView("inbox")}>Xem tất cả →</button>} />{workTable}</div>
-            <div className={styles.panel}><SectionHeader title="Thiết bị mới theo từng ứng dụng" meta={`${pendingClientDevices} chờ duyệt`} action={<button onClick={() => switchView("client-devices")}>Xem tất cả →</button>} /><div className={styles.panelFilter}><select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}><option value="all">Tất cả ứng dụng</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.shortName}</option>)}</select><span>Registry thuộc từng client</span></div>{deviceSummary}</div>
+            <div className={styles.panel}><SectionHeader title="Thiết bị mới theo từng ứng dụng" meta="Mở để đồng bộ chi tiết" action={<button onClick={() => switchView("client-devices")}>Xử lý thiết bị →</button>} />{deviceSummary}</div>
             <div className={`${styles.panel} ${styles.applicationPanel}`}><SectionHeader title="Ứng dụng đang quản lý" meta="Một hàng / một client" action={<button onClick={() => switchView("applications")}>Quản lý ứng dụng →</button>} />{applicationTable}</div>
-            <div className={styles.panel}><SectionHeader title="Cảnh báo nhanh" meta={alertClients ? `${alertClients} client cần kiểm tra` : "Không có cảnh báo nghiêm trọng"} action={<button onClick={() => switchView("alerts")}>Xem tất cả →</button>} /><div className={styles.alertTiles}>
-              <button onClick={() => switchView("client-devices")} data-tone="amber"><span>▯</span><div><small>Thiết bị mới</small><strong>{pendingClientDevices}</strong><em>Chờ duyệt theo app</em></div></button>
+            <div className={styles.panel}><SectionHeader title="Cảnh báo nhanh" meta={alertClients ? `${alertClients} client cần kiểm tra` : "Không có cảnh báo nghiêm trọng"} /><div className={styles.alertTiles}>
+              <button onClick={() => switchView("client-devices")} data-tone="amber"><span>▯</span><div><small>Thiết bị mới</small><strong>{pendingClientDevices}</strong><em>Duyệt / loại bỏ theo app</em></div></button>
               <button onClick={() => switchView("alerts")} data-tone="red"><span>⌁</span><div><small>Client cảnh báo</small><strong>{alertClients}</strong><em>Paused / unreachable / warning</em></div></button>
               <button onClick={() => switchView(canSeeAdminDevices ? "devices" : "alerts")} data-tone="gold"><span>♙</span><div><small>Thiết bị QT chờ duyệt</small><strong>{centralCounts.pending}</strong><em>Chỉ registry Trung tâm</em></div></button>
               <button onClick={() => switchView("settings")} data-tone="blue"><span>▤</span><div><small>Client chờ backend</small><strong>{clientRows.filter((row) => row.state === "pending").length}</strong><em>Không bật thao tác giả</em></div></button>
@@ -377,7 +382,7 @@ export default function ApplicationHub({ user }: { user: { displayName: string; 
 
         {view === "inbox" ? <section className={styles.panel}><SectionHeader title="Tất cả việc cần chú ý" meta={`${workItems.length} việc`} />{workTable}</section> : null}
         {view === "applications" ? <section className={styles.panel}><SectionHeader title="Danh sách client cấp 1" meta={`${clients.length} ứng dụng`} />{applicationTable}</section> : null}
-        {view === "client-devices" ? <section className={styles.panel}><SectionHeader title="Thiết bị mới theo ứng dụng" meta="Registry vẫn thuộc client" /><div className={styles.panelFilter}><select value={appFilter} onChange={(event) => setAppFilter(event.target.value)}><option value="all">Tất cả ứng dụng</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.shortName}</option>)}</select><span>Không gom registry về QT</span></div>{deviceSummary}</section> : null}
+        {view === "client-devices" ? <section className={styles.panel}><SectionHeader title="Thiết bị mới / thiết bị cần xác minh" meta="Registry vẫn thuộc client" /><ClientDeviceCenter role={role} /></section> : null}
 
         {view === "alerts" ? <section className={styles.alertsLayout}>
           <div className={styles.panel}><SectionHeader title="Cảnh báo cần xử lý" meta={`${workItems.filter((item) => item.state === "high" || item.state === "normal").length} cần chú ý`} />{workTable}</div>
@@ -391,7 +396,7 @@ export default function ApplicationHub({ user }: { user: { displayName: string; 
         {view === "settings" ? <section className={styles.settingsGrid}>
           <div className={styles.panel}><SectionHeader title="Topology bắt buộc" /><div className={styles.topologyFlow}><div><span>LEVEL 0</span><strong>Application Management</strong><small>QT · role · central audit</small></div><b>→</b><div><span>LEVEL 1</span><strong>Client độc lập</strong><small>BE · SK · HN · BM · GU</small></div><b>→</b><div><span>ENDPOINT</span><strong>Thiết bị client</strong><small>Registry thuộc client</small></div></div></div>
           <div className={styles.panel}><SectionHeader title="Contract từng ứng dụng" /><div className={styles.contractList}>{clientRows.map((row) => <article key={row.client.id}><b>{row.client.icon}</b><div><strong>{row.client.shortName}</strong><small>{row.client.boundary}</small></div><span data-contract={row.state === "connected" ? "connected" : "pending"}>{stateLabel(row.state)}</span>{row.client.href ? <Link href={row.client.href}>Quản trị →</Link> : <span />}</article>)}</div></div>
-          <div className={`${styles.panel} ${styles.boundaryPanel}`}><SectionHeader title="Ranh giới nghiệp vụ" /><div className={styles.boundaryCards}><article data-client="health"><strong>Sức khỏe Y tế</strong><p>Chỉ quản trị Health: thiết bị SK, policy, session, kiểm duyệt nội dung y tế và audit ứng dụng. Không dùng registry Bơi ếch hay Hòa nhập Nga.</p></article><article data-client="ru"><strong>Hòa nhập Nga</strong><p>Là client độc lập: thiết bị HN, OCR thuốc, đối chiếu quy định và audit Nga. Production hiện tại chưa có adapter nên Trung tâm không dựng nút thao tác giả.</p></article></div></div>
+          <div className={`${styles.panel} ${styles.boundaryPanel}`}><SectionHeader title="Ranh giới nghiệp vụ" /><div className={styles.boundaryCards}><article data-client="health"><strong>Sức khỏe Y tế</strong><p>Chỉ quản trị Health: thiết bị SK, policy, session, kiểm duyệt nội dung y tế và audit ứng dụng. Không dùng registry Bơi ếch hay Hòa nhập Nga.</p></article><article data-client="ru"><strong>Hòa nhập Nga</strong><p>Registry HN, người dùng và phiên thuộc RU_LIFE. Trung tâm chỉ gửi lệnh Control API; nếu thiếu thông tin người dùng thì chuyển vào quản trị Hòa nhập Nga rồi đồng bộ ngược ra Trung tâm.</p></article></div></div>
         </section> : null}
       </div>
     </section>
