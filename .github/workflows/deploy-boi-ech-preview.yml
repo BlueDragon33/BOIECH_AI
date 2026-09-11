@@ -118,8 +118,28 @@ jobs:
             https://*) ;;
             *) echo '::error::BOI_ECH_PREVIEW_ORIGIN must be HTTPS.'; exit 1 ;;
           esac
+          if [[ "$BOI_ECH_PREVIEW_ORIGIN" == *.chatgpt.site ]]; then
+            echo '::error::BOI_ECH_PREVIEW_ORIGIN must not point to ChatGPT Sites.'
+            exit 1
+          fi
           ROOT_CODE="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 15 "$BOI_ECH_PREVIEW_ORIGIN/")"
           case "$ROOT_CODE" in 200|301|302|303|307|308) ;; *) echo "Unexpected Bơi ếch root status: $ROOT_CODE"; exit 1 ;; esac
+
+          curl --fail --silent --show-error --max-time 15 \
+            -H "Authorization: Bearer $CONTROL_SERVICE_SECRET" \
+            -H "x-control-actor: github-preview-smoke" \
+            -H "x-control-role: owner" \
+            "$BOI_ECH_PREVIEW_ORIGIN/api/control/status" > /tmp/boi-status.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const payload = JSON.parse(fs.readFileSync('/tmp/boi-status.json', 'utf8'));
+          if (payload.application !== 'boi-ech') throw new Error('Bơi ếch preview status application mismatch.');
+          if (payload?.deployment?.channel !== 'cloudflare-preview') throw new Error('Bơi ếch preview deployment channel mismatch.');
+          if (!payload?.deployment?.paymentStorageReady) throw new Error('Bơi ếch preview R2 payment storage is not bound.');
+          if (!payload?.deployment?.revision || payload.deployment.revision === 'unknown') throw new Error('Bơi ếch preview build revision is missing.');
+          console.log('Bơi ếch preview status smoke PASS.');
+          NODE
+
           curl --fail --silent --show-error --max-time 15 \
             -H "Authorization: Bearer $CONTROL_SERVICE_SECRET" \
             -H "x-control-actor: github-preview-smoke" \
@@ -130,7 +150,7 @@ jobs:
           const payload = JSON.parse(fs.readFileSync('/tmp/boi-overview.json', 'utf8'));
           if (payload?.application?.id !== 'boi-ech') throw new Error('Bơi ếch preview control overview mismatch.');
           if (!Array.isArray(payload.devices)) throw new Error('Bơi ếch preview devices registry unavailable.');
-          console.log('Bơi ếch preview control smoke PASS.');
+          console.log('Bơi ếch preview registry smoke PASS.');
           NODE
 
       - name: Deployment boundary summary
