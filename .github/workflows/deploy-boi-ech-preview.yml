@@ -27,7 +27,6 @@ jobs:
       CONTROL_SERVICE_SECRET: ${{ secrets.CONTROL_SERVICE_SECRET }}
       APPLICATION_MANAGEMENT_PREVIEW_ORIGIN: ${{ vars.APPLICATION_MANAGEMENT_PREVIEW_ORIGIN }}
       BOI_ECH_PREVIEW_ORIGIN: ${{ vars.BOI_ECH_PREVIEW_ORIGIN }}
-      CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.cloudflare.preview.jsonc
     steps:
       - name: Require explicit preview confirmation
         shell: bash
@@ -84,6 +83,8 @@ jobs:
 
       - name: Build using Cloudflare preview bindings
         working-directory: boi-ech
+        env:
+          CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.cloudflare.preview.jsonc
         run: npm run build
 
       - name: Verify generated deployment artifact
