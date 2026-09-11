@@ -1,0 +1,62 @@
+name: Boi Ech Cloudflare Preview CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/boi-ech-cloudflare-preview-ci.yml"
+      - ".github/workflows/deploy-boi-ech-preview.yml"
+      - "boi-ech/wrangler.cloudflare.preview.example.jsonc"
+      - "boi-ech/vite.config.ts"
+      - "boi-ech/scripts/prepare-cloudflare-preview.mjs"
+      - "boi-ech/scripts/validate-cloudflare-preview.mjs"
+      - "boi-ech/scripts/validate-cloudflare-build-artifact.mjs"
+      - "boi-ech/app/**"
+      - "boi-ech/worker/**"
+      - "boi-ech/package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  preview-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: boi-ech
+    env:
+      BOI_ECH_PREVIEW_D1_DATABASE_ID: 99999999-9999-4999-8999-999999999999
+      BOI_ECH_PRODUCTION_D1_DATABASE_ID: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+      APPLICATION_MANAGEMENT_PREVIEW_ORIGIN: https://application-management-preview.example.com
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: boi-ech/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Preserve Bơi ếch regressions
+        run: |
+          npm run validate:cloudflare-preview
+          npm run lint
+          npm test
+
+      - name: Materialize isolated preview config
+        run: npm run cloudflare:preview:prepare
+
+      - name: Build with preview bindings
+        env:
+          CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.cloudflare.preview.jsonc
+        run: npm run build
+
+      - name: Verify generated preview D1/R2 artifact
+        run: npm run cloudflare:artifact:check
+
+      - name: Wrangler dry-run generated preview artifact
+        run: npx wrangler deploy --dry-run --outdir .wrangler/preview-dry-run
