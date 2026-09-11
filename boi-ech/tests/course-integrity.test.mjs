@@ -332,12 +332,16 @@ test("records approval history without exposing it to editor-only roles", async 
   assert.match(content, /content_rolled_back/);
 });
 
-test("accepts only short-lived signed browser tickets from the exact control-center origin", async () => {
+test("accepts only short-lived signed browser tickets from the exact configured control-plane origin", async () => {
   const auth = await readFile(new URL("../app/control-auth.server.ts", import.meta.url), "utf8");
   const overview = await readFile(new URL("../app/api/control/overview/route.ts", import.meta.url), "utf8");
   const content = await readFile(new URL("../app/api/control/content/route.ts", import.meta.url), "utf8");
 
-  assert.match(auth, /CONTROL_CENTER_ORIGIN = "https:\/\/learning-management\.boiech-ai\.workers\.dev"/);
+  assert.match(auth, /APPLICATION_MANAGEMENT_ORIGIN/);
+  assert.match(auth, /normalizedControlOrigin/);
+  assert.match(auth, /trustedControlOrigin/);
+  assert.match(auth, /CONTROL_ORIGIN_FORBIDDEN/);
+  assert.doesNotMatch(auth, /CONTROL_CENTER_ORIGIN|learning-management\.boiech-ai\.workers\.dev|\.chatgpt\.site/);
   assert.match(auth, /TOKEN_AUDIENCE = "boi-ech-control"/);
   assert.match(auth, /TOKEN_ISSUER = "quan-ly-hoc-tap"/);
   assert.match(auth, /name: "HMAC", hash: "SHA-256"/);

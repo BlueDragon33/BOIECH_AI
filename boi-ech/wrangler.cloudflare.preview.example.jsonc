@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "boi-ech-preview",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-09-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "images": {
+    "binding": "IMAGES"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "boi-ech-preview-db",
+      "database_id": "__BOI_ECH_PREVIEW_D1_DATABASE_ID__",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "boi-ech-preview-payments"
+    }
+  ],
+  "vars": {
+    "APPLICATION_MANAGEMENT_ORIGIN": "__APPLICATION_MANAGEMENT_PREVIEW_ORIGIN__",
+    "BOI_ECH_DEPLOYMENT_CHANNEL": "cloudflare-preview",
+    "BOI_ECH_BUILD_REVISION": "__BOI_ECH_BUILD_REVISION__",
+    "BOI_ECH_BUILD_SOURCE": "BlueDragon33/BOIECH_AI/boi-ech"
+  }
+}

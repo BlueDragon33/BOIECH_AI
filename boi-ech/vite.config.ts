@@ -3,13 +3,11 @@ import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
-const COURSE_DATABASE_ID = "7816425d-ce8a-4b3c-b303-7697fd4a529c";
-
+const LOCAL_ONLY_DATABASE_ID = "00000000-0000-0000-0000-000000000004";
 const { d1 } = hostingConfig;
-
-// macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const allowLan = process.env.LOCAL_CONTROL_ALLOW_LAN === "true";
+const cloudflareConfigPath = process.env.CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH?.trim();
 
 const localVars = [
   "CONTROL_SERVICE_SECRET",
@@ -30,22 +28,30 @@ const localBindingConfig = {
     ? [
         {
           binding: d1,
-          database_name: "boi-ech-db",
-          database_id: COURSE_DATABASE_ID,
+          database_name: "boi-ech-local",
+          database_id: process.env.BOI_ECH_LOCAL_DATABASE_ID || LOCAL_ONLY_DATABASE_ID,
         },
       ]
     : [],
 };
 
 export default defineConfig(async () => {
-  // Keep Wrangler and Miniflare state project-local. These are non-secret tool
-  // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
 
-  // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
+  const cloudflareOptions = cloudflareConfigPath
+    ? {
+        configPath: cloudflareConfigPath,
+        viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
+        inspectorPort: false as const,
+      }
+    : {
+        config: localBindingConfig,
+        viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
+        inspectorPort: false as const,
+      };
 
   return {
     server: {
@@ -55,14 +61,6 @@ export default defineConfig(async () => {
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
     },
-    plugins: [
-      vinext(),
-      sites(),
-      cloudflare({
-        viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        inspectorPort: false,
-        config: localBindingConfig,
-      }),
-    ],
+    plugins: [vinext(), sites(), cloudflare(cloudflareOptions)],
   };
 });

@@ -5,6 +5,10 @@ on:
     paths:
       - "boi-ech/**"
       - "quan-ly-hoc-tap/**"
+      - "README.md"
+      - ".github/workflows/deploy-cloudflare.yml"
+      - ".github/workflows/deploy-boi-ech-preview.yml"
+      - ".github/workflows/deploy-control-center.yml"
       - ".github/workflows/validate-boi-ech-pr.yml"
 
 permissions:
@@ -28,14 +32,20 @@ jobs:
       - name: Install locked dependencies
         working-directory: boi-ech
         run: npm ci
+      - name: Validate Cloudflare migration boundary
+        working-directory: boi-ech
+        run: npm run validate:cloudflare-preview
       - name: Lint
         working-directory: boi-ech
         run: npm run lint
       - name: Build and test
         working-directory: boi-ech
+        env:
+          CONTROL_SERVICE_SECRET: 0123456789abcdef0123456789abcdef
+          APPLICATION_MANAGEMENT_ORIGIN: https://application-management-preview.example.com
         run: npm test
 
-  test-control-center:
+  test-legacy-control-source:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -45,9 +55,14 @@ jobs:
           node-version: "22.13.0"
           cache: npm
           cache-dependency-path: quan-ly-hoc-tap/package-lock.json
+      - name: Confirm legacy control source cannot deploy from this repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -f .github/workflows/deploy-control-center.yml
       - name: Install locked dependencies
         working-directory: quan-ly-hoc-tap
         run: npm ci
-      - name: Build
+      - name: Build archived source for migration compatibility
         working-directory: quan-ly-hoc-tap
         run: npm run build
