@@ -24,6 +24,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       BOI_ECH_PREVIEW_D1_DATABASE_ID: ${{ secrets.BOI_ECH_PREVIEW_D1_DATABASE_ID }}
+      BOI_ECH_PRODUCTION_D1_DATABASE_ID: ${{ secrets.BOI_ECH_PRODUCTION_D1_DATABASE_ID }}
       CONTROL_SERVICE_SECRET: ${{ secrets.CONTROL_SERVICE_SECRET }}
       APPLICATION_MANAGEMENT_PREVIEW_ORIGIN: ${{ vars.APPLICATION_MANAGEMENT_PREVIEW_ORIGIN }}
       BOI_ECH_PREVIEW_ORIGIN: ${{ vars.BOI_ECH_PREVIEW_ORIGIN }}
@@ -89,17 +90,7 @@ jobs:
 
       - name: Verify generated deployment artifact
         working-directory: boi-ech
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f dist/server/index.js
-          test -f dist/wrangler.json
-          test -f .wrangler/deploy/config.json
-          if grep -R "7816425d-ce8a-4b3c-b303-7697fd4a529c" dist/wrangler.json .wrangler/deploy/config.json; then
-            echo '::error::Preview artifact references Bơi ếch production D1.'
-            exit 1
-          fi
-          grep -q 'boi-ech-preview-payments' dist/wrangler.json
+        run: npm run cloudflare:artifact:check
 
       - name: Deploy Bơi ếch preview Worker
         working-directory: boi-ech
