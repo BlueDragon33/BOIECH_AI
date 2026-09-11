@@ -7,6 +7,7 @@ const exists = (relative) => fs.existsSync(path.resolve(process.cwd(), relative)
 for (const file of [
   "wrangler.cloudflare.preview.example.jsonc",
   "scripts/prepare-cloudflare-preview.mjs",
+  "app/api/control/status/route.ts",
   "../.github/workflows/deploy-boi-ech-preview.yml",
   "../.github/workflows/deploy-cloudflare.yml",
 ]) {
@@ -19,6 +20,7 @@ if (exists("../.github/workflows/deploy-control-center.yml")) {
 const template = read("wrangler.cloudflare.preview.example.jsonc");
 const prepare = read("scripts/prepare-cloudflare-preview.mjs");
 const auth = read("app/control-auth.server.ts");
+const status = read("app/api/control/status/route.ts");
 const vite = read("vite.config.ts");
 const previewWorkflow = read("../.github/workflows/deploy-boi-ech-preview.yml");
 const productionWorkflow = read("../.github/workflows/deploy-cloudflare.yml");
@@ -50,6 +52,9 @@ if (/CONTROL_CENTER_ORIGIN|learning-management\.boiech-ai\.workers\.dev|\.chatgp
 for (const marker of ["APPLICATION_MANAGEMENT_ORIGIN", "trustedControlOrigin", "CONTROL_ORIGIN_FORBIDDEN", "LOCAL_CONTROL_PLANE"]) {
   if (!auth.includes(marker)) throw new Error(`Control Auth thiếu exact-origin guard: ${marker}`);
 }
+for (const marker of ["BOI_ECH_DEPLOYMENT_CHANNEL", "BOI_ECH_BUILD_REVISION", 'application: "boi-ech"', 'paymentStorageReady']) {
+  if (!status.includes(marker)) throw new Error(`Control status thiếu deployment/liveness marker: ${marker}`);
+}
 
 if (!previewWorkflow.includes("workflow_dispatch")) throw new Error("Preview deployment phải manual-only.");
 if (/\n\s*push\s*:/.test(previewWorkflow)) throw new Error("Preview chưa được auto-deploy theo push.");
@@ -63,4 +68,4 @@ if (!productionWorkflow.includes("workflow_dispatch") || !productionWorkflow.inc
 }
 if (/\n\s*push\s*:/.test(productionWorkflow)) throw new Error("Production không được auto-deploy khi push main trong giai đoạn migration.");
 
-console.log("Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, preview isolated D1/R2, exact control origin enforced.");
+console.log("Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, preview isolated D1/R2, exact control origin and deployment status enforced.");
