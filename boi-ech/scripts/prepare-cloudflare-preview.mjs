@@ -14,6 +14,14 @@ function required(name) {
   return value;
 }
 
+function d1Uuid(name) {
+  const value = required(name).toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new Error(`${name} không đúng định dạng UUID D1.`);
+  }
+  return value;
+}
+
 function optionalHttpsOrigin(name) {
   const value = text(name);
   if (!value) return "";
@@ -37,15 +45,12 @@ function buildRevision() {
 
 if (!fs.existsSync(TEMPLATE)) throw new Error(`Thiếu ${TEMPLATE}.`);
 
-const d1Id = required("BOI_ECH_PREVIEW_D1_DATABASE_ID").toLowerCase();
-if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(d1Id)) {
-  throw new Error("BOI_ECH_PREVIEW_D1_DATABASE_ID không đúng định dạng UUID D1.");
-}
+const d1Id = d1Uuid("BOI_ECH_PREVIEW_D1_DATABASE_ID");
 if (d1Id === LOCAL_D1_ID) {
   throw new Error("Preview tuyệt đối không được dùng D1 local của Bơi ếch.");
 }
-const productionD1Id = text("BOI_ECH_PRODUCTION_D1_DATABASE_ID").toLowerCase();
-if (productionD1Id && d1Id === productionD1Id) {
+const productionD1Id = d1Uuid("BOI_ECH_PRODUCTION_D1_DATABASE_ID");
+if (d1Id === productionD1Id) {
   throw new Error("Preview tuyệt đối không được dùng D1 production của Bơi ếch.");
 }
 

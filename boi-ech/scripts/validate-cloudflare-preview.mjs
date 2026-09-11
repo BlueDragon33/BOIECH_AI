@@ -42,8 +42,8 @@ for (const token of [
   if (!template.includes(token)) throw new Error(`Preview template thiếu: ${token}`);
 }
 if (template.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Preview template chứa production D1 ID.");
-if (!prepare.includes("BOI_ECH_PRODUCTION_D1_DATABASE_ID") || !prepare.includes(LOCAL_D1_ID)) {
-  throw new Error("Prepare script chưa chặn D1 local/production bằng Environment guard.");
+if (!prepare.includes('d1Uuid("BOI_ECH_PRODUCTION_D1_DATABASE_ID")') || !prepare.includes(LOCAL_D1_ID)) {
+  throw new Error("Prepare script phải bắt buộc production D1 guard và chặn D1 local.");
 }
 if (prepare.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Prepare script không được hard-code production D1 ID.");
 if (!prepare.includes(".chatgpt.site")) throw new Error("Prepare script phải chặn fallback về ChatGPT Sites.");
@@ -81,4 +81,4 @@ if (!productionWorkflow.includes("workflow_dispatch") || !productionWorkflow.inc
 }
 if (/\n\s*push\s*:/.test(productionWorkflow)) throw new Error("Production không được auto-deploy khi push main trong giai đoạn migration.");
 
-console.log("Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, generated preview D1/R2 artifact verified.");
+console.log("Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, fail-closed production D1 guard, generated preview D1/R2 artifact verified.");
