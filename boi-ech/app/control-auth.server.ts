@@ -1,8 +1,42 @@
 import { DeviceAccessError } from "./device-auth.server";
 
-const CONTROL_CENTER_ORIGIN = "https://learning-management.boiech-ai.workers.dev";
 const TOKEN_AUDIENCE = "boi-ech-control";
 const TOKEN_ISSUER = "quan-ly-hoc-tap";
+
+type ControlConfiguration = {
+  secret: string;
+  origin: string;
+};
+
+function normalizedControlOrigin(value: unknown, allowLocalHttp: boolean) {
+  const raw = typeof value === "string" ? value.trim().replace(/\/$/, "") : "";
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return "";
+    if (url.protocol === "https:") return url.origin;
+    const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]" || url.hostname === "::1";
+    if (allowLocalHttp && url.protocol === "http:" && loopback) return url.origin;
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+async function configuration(): Promise<ControlConfiguration> {
+  const workers = await import("cloudflare:workers");
+  const values = workers.env as unknown as Record<string, unknown>;
+  const secret = typeof values.CONTROL_SERVICE_SECRET === "string" ? values.CONTROL_SERVICE_SECRET : "";
+  const allowLocalHttp = values.LOCAL_CONTROL_PLANE === "true";
+  return {
+    secret,
+    origin: normalizedControlOrigin(values.APPLICATION_MANAGEMENT_ORIGIN, allowLocalHttp),
+  };
+}
+
+function trustedControlOrigin(value: string, configuredOrigin: string) {
+  return Boolean(configuredOrigin) && value.replace(/\/$/, "") === configuredOrigin;
+}
 
 function bytes(value: ArrayBuffer) {
   return new Uint8Array(value);
@@ -65,11 +99,14 @@ async function browserTicket(secret: string, supplied: string) {
 }
 
 export async function requireControlService(request: Request) {
-  const workers = await import("cloudflare:workers");
-  const configured = (workers.env as unknown as Record<string, unknown>).CONTROL_SERVICE_SECRET;
+  const { secret: configured, origin } = await configuration();
+  const requestOrigin = (request.headers.get("origin") ?? "").replace(/\/$/, "");
+  if (requestOrigin && !trustedControlOrigin(requestOrigin, origin)) {
+    throw new DeviceAccessError("Origin không được phép dùng Control API Bơi ếch.", 403, "CONTROL_ORIGIN_FORBIDDEN");
+  }
   const authorization = request.headers.get("authorization") ?? "";
   const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (typeof configured !== "string" || configured.length < 32 || supplied.length < 32) {
+  if (configured.length < 32 || supplied.length < 32) {
     throw new DeviceAccessError("Dịch vụ quản trị không được phép truy cập.", 403, "CONTROL_SERVICE_FORBIDDEN");
   }
   if (!(await secureEqual(configured, supplied))) {
@@ -83,10 +120,12 @@ export async function requireControlService(request: Request) {
   return { actor: actor || "system", role };
 }
 
-function corsHeaders(request: Request): Record<string, string> {
-  return request.headers.get("origin") === CONTROL_CENTER_ORIGIN
+async function corsHeaders(request: Request): Promise<Record<string, string>> {
+  const { origin } = await configuration();
+  const requestOrigin = (request.headers.get("origin") ?? "").replace(/\/$/, "");
+  return trustedControlOrigin(requestOrigin, origin)
     ? {
-        "access-control-allow-origin": CONTROL_CENTER_ORIGIN,
+        "access-control-allow-origin": requestOrigin,
         "access-control-allow-methods": "GET, POST, OPTIONS",
         "access-control-allow-headers": "authorization, content-type",
         "access-control-max-age": "600",
@@ -95,25 +134,27 @@ function corsHeaders(request: Request): Record<string, string> {
     : {};
 }
 
-export function controlResponse(data: unknown, status = 200, request?: Request) {
+export async function controlResponse(data: unknown, status = 200, request?: Request) {
   return Response.json(data, {
     status,
     headers: {
       "cache-control": "no-store, private",
       "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
       "x-content-type-options": "nosniff",
-      ...(request ? corsHeaders(request) : {}),
+      ...(request ? await corsHeaders(request) : {}),
     },
   });
 }
 
-export function controlPreflight(request: Request) {
-  if (request.headers.get("origin") !== CONTROL_CENTER_ORIGIN) return new Response(null, { status: 403 });
-  return new Response(null, { status: 204, headers: corsHeaders(request) });
+export async function controlPreflight(request: Request) {
+  const { origin } = await configuration();
+  const requestOrigin = (request.headers.get("origin") ?? "").replace(/\/$/, "");
+  if (!trustedControlOrigin(requestOrigin, origin)) return new Response(null, { status: 403 });
+  return new Response(null, { status: 204, headers: await corsHeaders(request) });
 }
 
-export function withControlCors(request: Request, response: Response) {
+export async function withControlCors(request: Request, response: Response) {
   const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(corsHeaders(request))) headers.set(key, value);
+  for (const [key, value] of Object.entries(await corsHeaders(request))) headers.set(key, value);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
