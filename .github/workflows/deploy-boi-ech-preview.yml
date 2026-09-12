@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID BOI_ECH_PREVIEW_D1_DATABASE_ID CONTROL_SERVICE_SECRET; do
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID BOI_ECH_PREVIEW_D1_DATABASE_ID BOI_ECH_PRODUCTION_D1_DATABASE_ID CONTROL_SERVICE_SECRET; do
             if [[ -z "${!key:-}" ]]; then
               echo "::error::$key is required in the boi-ech-preview GitHub environment."
               exit 1
