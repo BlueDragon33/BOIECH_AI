@@ -13,6 +13,8 @@ test("video AI keeps original media on the learner device", async () => {
   assert.match(source, /URL\.createObjectURL\(next\)/);
   assert.doesNotMatch(source, /body:\s*(?:file|next|objectUrl)/);
   assert.match(source, /analysis:\s*serverPayload\(analysis\)/);
+  assert.match(source, /Xem đúng khung hình/);
+  assert.match(source, /ctx\.createLinearGradient/);
 });
 
 test("video analysis API rejects binary-looking payload fields", async () => {
