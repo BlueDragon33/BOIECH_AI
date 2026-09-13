@@ -13,6 +13,9 @@ test("video AI keeps original media on the learner device", async () => {
   assert.match(source, /URL\.createObjectURL\(next\)/);
   assert.doesNotMatch(source, /body:\s*(?:file|next|objectUrl)/);
   assert.match(source, /analysis:\s*serverPayload\(analysis\)/);
+  assert.match(source, /const MAX_LOCAL_ANALYSES = 10/);
+  assert.match(source, /const MAX_ERROR_FRAMES = 4/);
+  assert.match(source, /const stored = \{ \.\.\.value, localFrames: \[\] \}/);
   assert.match(source, /Xem đúng khung hình/);
   assert.match(source, /ctx\.createLinearGradient/);
 });
@@ -22,6 +25,8 @@ test("video analysis API rejects binary-looking payload fields", async () => {
   assert.match(source, /hasForbiddenBinaryField/);
   assert.match(source, /video\|frame\|image\|base64\|blob\|dataurl\|objecturl\|thumbnail/i);
   assert.match(source, /MAX_DETAIL_BYTES = 24 \* 1024/);
+  assert.match(source, /MAX_REQUEST_BYTES = 32 \* 1024/);
+  assert.match(source, /request\.body\.getReader\(\)/);
   assert.match(source, /'video_ai_analysis'/);
 });
 
