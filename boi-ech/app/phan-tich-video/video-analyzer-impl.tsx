@@ -388,7 +388,6 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         if (!id || !analysis) continue;
         await syncResult(lesson, analysis);
         await deletePending(id);
-        setResult((current) => current?.id === id ? { ...current, syncState: "synced" } : current);
       }
     } catch { /* giữ hàng đợi để thử lại khi có mạng */ }
   }, [lessonNumber]);
