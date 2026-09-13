@@ -10,6 +10,7 @@ const LESSONS = new Set(["01", "02", "03", "04", "05", "06", "07", "08"]);
 const CAMERA_VIEWS = new Set(["rear", "side"]);
 const SEVERITIES = new Set(["info", "warning", "critical"]);
 const MAX_DETAIL_BYTES = 24 * 1024;
+const MAX_REQUEST_BYTES = 32 * 1024;
 const MAX_ERRORS = 10;
 
 function json(data: unknown, status = 200) {
@@ -49,6 +50,44 @@ function hasForbiddenBinaryField(value: unknown): boolean {
     if (/(?:video|frame|image|base64|blob|dataurl|objecturl|thumbnail)/i.test(key)) return true;
     return hasForbiddenBinaryField(child);
   });
+}
+
+async function readBoundedJson(request: Request) {
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("Kết quả không hợp lệ: máy chủ chỉ nhận JSON.");
+  }
+  const declaredBytes = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_REQUEST_BYTES) {
+    throw new Error("Kết quả vượt giới hạn 32 KB.");
+  }
+  if (!request.body) throw new Error("Kết quả không hợp lệ: yêu cầu rỗng.");
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_REQUEST_BYTES) {
+      await reader.cancel();
+      throw new Error("Kết quả vượt giới hạn 32 KB.");
+    }
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(body)) as Record<string, unknown>;
+  } catch {
+    throw new Error("Kết quả không hợp lệ: JSON bị lỗi.");
+  }
 }
 
 function normalizeError(value: unknown) {
@@ -115,7 +154,7 @@ function normalizeAnalysis(value: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json() as Record<string, unknown>;
+    const payload = await readBoundedJson(request);
     const hostname = new URL(request.url).hostname;
     const previewRequest = hostname === "terminal.local" || hostname === "localhost";
     const device = await verifyDeviceRequest(payload, previewRequest);
@@ -147,7 +186,7 @@ export async function POST(request: Request) {
       return json({ error: error.message, code: error.code, device: error.device }, error.status);
     }
     const message = error instanceof Error ? error.message : "Không thể lưu kết quả phân tích.";
-    const status = /không hợp lệ|vượt giới hạn|thiếu mã/i.test(message) ? 400 : 500;
+    const status = /vượt giới hạn/i.test(message) ? 413 : /không hợp lệ|thiếu mã/i.test(message) ? 400 : 500;
     return json({ error: status === 500 ? "Dịch vụ lưu kết quả đang tạm gián đoạn." : message }, status);
   }
 }
