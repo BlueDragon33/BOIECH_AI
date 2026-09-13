@@ -85,6 +85,8 @@ function jointAngle(a: Point, b: Point, c: Point) {
 }
 function bytesLabel(bytes: number) { return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
 function timeLabel(seconds: number) { return `00:${Math.max(0, seconds).toFixed(1).padStart(4, "0")}`; }
+function uniqueAnalysisId() { return `${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`; }
+function utcNow() { return new Date().toISOString(); }
 
 function openLocalDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -313,6 +315,20 @@ function snapshot(video: HTMLVideoElement, metric: Metric, error: AnalysisError)
     const point = metric.landmarks[index]; if (!point) continue;
     ctx.beginPath(); ctx.arc(point.x * canvas.width, point.y * canvas.height, Math.max(5, canvas.width / 95), 0, Math.PI * 2); ctx.fill();
   }
+  const footerHeight = Math.max(64, Math.round(canvas.height * 0.16));
+  const footerTop = canvas.height - footerHeight;
+  const gradient = ctx.createLinearGradient(0, footerTop, 0, canvas.height);
+  gradient.addColorStop(0, "rgba(4,25,36,.08)");
+  gradient.addColorStop(.3, "rgba(4,25,36,.82)");
+  gradient.addColorStop(1, "rgba(4,25,36,.96)");
+  ctx.fillStyle = gradient; ctx.fillRect(0, footerTop, canvas.width, footerHeight);
+  const padding = Math.max(12, Math.round(canvas.width * .022));
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 ${Math.max(14, Math.round(canvas.width / 34))}px Arial, sans-serif`;
+  ctx.fillText(error.title.slice(0, 48), padding, canvas.height - Math.max(31, footerHeight * .48));
+  ctx.fillStyle = "#aeeef2";
+  ctx.font = `600 ${Math.max(11, Math.round(canvas.width / 48))}px Arial, sans-serif`;
+  ctx.fillText(`${timeLabel(error.timeSec)} · ${error.observed}`.slice(0, 70), padding, canvas.height - Math.max(12, footerHeight * .16));
   return canvas.toDataURL("image/jpeg", 0.68);
 }
 
@@ -455,13 +471,13 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         if (dataUrl) localFrames.push({ timeSec: metric.time, title: error.title, dataUrl });
       }
       const analysis: Analysis = {
-        id: `${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`,
-        engineVersion: ENGINE_VERSION, analyzedAt: new Date().toISOString(), durationSec: video.duration, fileSizeBytes: file.size,
+        id: uniqueAnalysisId(),
+        engineVersion: ENGINE_VERSION, analyzedAt: utcNow(), durationSec: video.duration, fileSizeBytes: file.size,
         width: video.videoWidth, height: video.videoHeight, sampledFrames: sampleCount, detectedFrames: frames.length, cameraView: view,
         score, confidence, categories, errors, localFrames, syncState: navigator.onLine ? "pending" : "local",
       };
       await putStore("analyses", analysis);
-      await putStore("pending", { id: analysis.id, lessonNumber, analysis: serverPayload(analysis), createdAt: new Date().toISOString() });
+      await putStore("pending", { id: analysis.id, lessonNumber, analysis: serverPayload(analysis), createdAt: utcNow() });
       setResult(analysis); setProgress(95);
       if (navigator.onLine) {
         try {
@@ -473,6 +489,17 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       setProgress(100);
     } catch (error) { setStatus(error instanceof Error ? error.message : "Không thể phân tích video."); }
     finally { dispose(); setBusy(false); }
+  }
+
+  async function jumpToError(error: AnalysisError) {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      await seek(video, error.timeSec);
+      video.pause();
+      video.scrollIntoView({ behavior: "smooth", block: "center" });
+      setStatus(`Đang xem khung hình lỗi tại ${timeLabel(error.timeSec)}. Video vẫn nằm trên thiết bị này.`);
+    } catch { setStatus("Không thể mở lại đúng khung hình lỗi."); }
   }
 
   return <div className={styles.shell}>
@@ -508,7 +535,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
     {result ? <section className={styles.report}>
       <header><div><span>03 · Kết quả AI</span><h2>{result.errors.length ? `Phát hiện ${result.errors.length} điểm cần xem lại` : "Chưa thấy lỗi nổi bật trong các tiêu chí v1"}</h2><p>Độ tin cậy {result.confidence}% · {result.detectedFrames}/{result.sampledFrames} khung hình hợp lệ · {result.syncState === "synced" ? "đã đồng bộ" : "đang giữ local/chờ đồng bộ"}.</p></div><strong>{result.score}<small>/100</small></strong></header>
       <div className={styles.scores}><div><span>Chân</span><b>{result.categories.legs}</b></div><div><span>Tay</span><b>{result.categories.arms}</b></div><div><span>Phối hợp</span><b>{result.categories.coordination}</b></div><div><span>Đường thân</span><b>{result.categories.bodyLine}</b></div></div>
-      {result.errors.length ? <div className={styles.errorList}>{result.errors.map((error, index) => <article key={error.code} className={error.severity === "critical" ? styles.critical : ""}><header><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{error.title}</strong><small>{timeLabel(error.timeSec)} · {error.observed}</small></div><b>{error.severity === "critical" ? "Ưu tiên" : "Cần sửa"}</b></header><p>{error.recommendation}</p><footer><span>Mốc tham chiếu</span><strong>{error.expected}</strong></footer></article>)}</div> : null}
+      {result.errors.length ? <div className={styles.errorList}>{result.errors.map((error, index) => <article key={error.code} className={error.severity === "critical" ? styles.critical : ""}><header><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{error.title}</strong><small>{timeLabel(error.timeSec)} · {error.observed}</small></div><b>{error.severity === "critical" ? "Ưu tiên" : "Cần sửa"}</b></header><p>{error.recommendation}</p><footer><div><span>Mốc tham chiếu</span> <strong>{error.expected}</strong></div><button type="button" onClick={() => void jumpToError(error)} style={{ border: "1px solid #c9dedf", borderRadius: 10, padding: "8px 10px", background: "#f4fbfb", color: "#075a64", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Xem đúng khung hình</button></footer></article>)}</div> : null}
       {result.localFrames.length ? <div className={styles.frames}><header><span>Ảnh lỗi lấy từ video local</span><small>Không đồng bộ lên server</small></header><div>{result.localFrames.map((frame) => <figure key={`${frame.timeSec}-${frame.title}`}><img src={frame.dataUrl} alt={`Khung hình lỗi ${frame.title}`} /><figcaption><strong>{frame.title}</strong><span>{timeLabel(frame.timeSec)}</span></figcaption></figure>)}</div></div> : null}
     </section> : null}
   </div>;
