@@ -8,6 +8,8 @@ import styles from "./video-analyzer.module.css";
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 30;
 const SAMPLE_FPS = 5;
+const MAX_LOCAL_ANALYSES = 10;
+const MAX_ERROR_FRAMES = 4;
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VIDEO_DB = "boi-ech-video-ai-v1";
 const ENGINE_VERSION = "breaststroke-local-v1.0";
@@ -67,6 +69,7 @@ type Analysis = {
 };
 type StoredCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type DeviceState = { deviceId: string; status: "pending" | "approved" | "blocked"; registrationComplete: boolean; accessExpired: boolean };
+type VideoMetadata = { durationSec: number; width: number; height: number; valid: boolean };
 
 const CONNECTIONS: [number, number][] = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24],
@@ -105,6 +108,25 @@ async function putStore(storeName: "analyses" | "pending", value: unknown) {
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(storeName, "readwrite");
     tx.objectStore(storeName).put(value);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function putLocalAnalysis(value: Analysis) {
+  const db = await openLocalDb();
+  const stored = { ...value, localFrames: [] };
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction("analyses", "readwrite");
+    const store = tx.objectStore("analyses");
+    store.put(stored);
+    const all = store.getAll();
+    all.onsuccess = () => {
+      const stale = (all.result as Analysis[])
+        .sort((left, right) => Date.parse(right.analyzedAt) - Date.parse(left.analyzedAt))
+        .slice(MAX_LOCAL_ANALYSES);
+      stale.forEach((item) => store.delete(item.id));
+    };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -392,6 +414,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [referenceUrl, setReferenceUrl] = useState("");
   const [referenceOpen, setReferenceOpen] = useState(false);
+  const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const embedId = useMemo(() => youtubeId(referenceUrl), [referenceUrl]);
 
   const flushPending = useCallback(async () => {
@@ -430,12 +453,26 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
   }
 
   function chooseFile(next: File | null) {
-    setResult(null); setProgress(0);
+    setResult(null); setProgress(0); setMetadata(null);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
+    setFile(null); setObjectUrl("");
     if (!next) { setFile(null); setObjectUrl(""); setStatus("Chưa chọn video."); return; }
     if (!next.type.startsWith("video/")) { setStatus("Tệp đã chọn không phải video."); return; }
     if (next.size > MAX_VIDEO_BYTES) { setStatus(`Video ${bytesLabel(next.size)} vượt giới hạn 50 MB.`); return; }
     setFile(next); setObjectUrl(URL.createObjectURL(next)); setStatus(`Đã chọn ${bytesLabel(next.size)}. Hãy kiểm tra góc quay rồi chạy AI.`);
+  }
+
+  function inspectVideo() {
+    const video = videoRef.current;
+    if (!video || !file) return;
+    const durationSec = Number.isFinite(video.duration) ? video.duration : 0;
+    const valid = durationSec > 0 && durationSec <= MAX_VIDEO_SECONDS + 0.05 && video.videoWidth > 0 && video.videoHeight > 0;
+    setMetadata({ durationSec, width: video.videoWidth, height: video.videoHeight, valid });
+    setStatus(valid
+      ? `Video hợp lệ: ${durationSec.toFixed(1)} giây, ${video.videoWidth}×${video.videoHeight}. Có thể chạy AI trên máy này.`
+      : durationSec > MAX_VIDEO_SECONDS + 0.05
+        ? `Video dài ${durationSec.toFixed(1)} giây; hãy chọn đoạn tối đa 30 giây.`
+        : "Không đọc được thông số video. Hãy chọn tệp khác.");
   }
 
   async function analyze() {
@@ -465,7 +502,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       let score = Math.round(categories.legs * .35 + categories.arms * .2 + categories.coordination * .3 + categories.bodyLine * .15);
       if (confidence < 55) score = Math.min(score, 75);
       const localFrames: LocalFrame[] = [];
-      for (const error of errors.slice(0, 4)) {
+      for (const error of errors.slice(0, MAX_ERROR_FRAMES)) {
         const metric = frames[error.frameIndex]; if (!metric) continue;
         await seek(video, metric.time); const dataUrl = snapshot(video, metric, error);
         if (dataUrl) localFrames.push({ timeSec: metric.time, title: error.title, dataUrl });
@@ -476,13 +513,13 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         width: video.videoWidth, height: video.videoHeight, sampledFrames: sampleCount, detectedFrames: frames.length, cameraView: view,
         score, confidence, categories, errors, localFrames, syncState: navigator.onLine ? "pending" : "local",
       };
-      await putStore("analyses", analysis);
+      await putLocalAnalysis(analysis);
       await putStore("pending", { id: analysis.id, lessonNumber, analysis: serverPayload(analysis), createdAt: utcNow() });
       setResult(analysis); setProgress(95);
       if (navigator.onLine) {
         try {
           await syncResult(lessonNumber, serverPayload(analysis)); await deletePending(analysis.id);
-          const synced = { ...analysis, syncState: "synced" as const }; await putStore("analyses", synced); setResult(synced);
+          const synced = { ...analysis, syncState: "synced" as const }; await putLocalAnalysis(synced); setResult(synced);
           setStatus("Phân tích xong. Video gốc không rời thiết bị; máy chủ chỉ nhận kết quả JSON.");
         } catch { setStatus("Phân tích xong. Kết quả đang chờ đồng bộ; video vẫn chỉ nằm trên thiết bị."); }
       } else setStatus("Phân tích xong khi offline. Kết quả sẽ tự đồng bộ khi có mạng.");
@@ -520,14 +557,15 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       <div className={styles.videoPanel}>
         <header><div><span>01 · Video học viên</span><h2>Chọn file hoặc quay trực tiếp</h2></div><b>{file ? bytesLabel(file.size) : "Chưa có file"}</b></header>
         <div className={styles.fileActions}><label><input type="file" accept="video/*" onChange={(event) => chooseFile(event.target.files?.[0] ?? null)} /><span>Chọn video</span></label><label><input type="file" accept="video/*" capture="environment" onChange={(event) => chooseFile(event.target.files?.[0] ?? null)} /><span>Quay bằng camera</span></label></div>
-        {objectUrl ? <video ref={videoRef} className={styles.studentVideo} src={objectUrl} controls preload="metadata" playsInline muted onLoadedMetadata={() => { const video = videoRef.current; if (video && video.duration > MAX_VIDEO_SECONDS + .05) setStatus(`Video dài ${video.duration.toFixed(1)} giây; hãy chọn đoạn tối đa 30 giây.`); }} /> : <div className={styles.emptyVideo}><span>+</span><strong>Video không được upload lên server</strong><small>Trình duyệt đọc file trực tiếp bằng Object URL.</small></div>}
+        {objectUrl ? <video ref={videoRef} className={styles.studentVideo} src={objectUrl} controls preload="metadata" playsInline muted onLoadedMetadata={inspectVideo} onError={() => { setMetadata(null); setStatus("Trình duyệt không đọc được video này. Hãy thử MP4 hoặc WebM."); }} /> : <div className={styles.emptyVideo}><span>+</span><strong>Video không được upload lên server</strong><small>Trình duyệt đọc file trực tiếp bằng Object URL.</small></div>}
+        {file ? <div className={styles.preflight} aria-label="Kiểm tra video trước khi phân tích"><div className={file.size <= MAX_VIDEO_BYTES ? styles.pass : styles.fail}><i>{file.size <= MAX_VIDEO_BYTES ? "✓" : "!"}</i><span>Dung lượng</span><strong>{bytesLabel(file.size)} / 50 MB</strong></div><div className={metadata?.valid ? styles.pass : metadata ? styles.fail : ""}><i>{metadata?.valid ? "✓" : metadata ? "!" : "…"}</i><span>Thời lượng</span><strong>{metadata ? `${metadata.durationSec.toFixed(1)} / 30 giây` : "Đang đọc"}</strong></div><div className={metadata?.valid ? styles.pass : metadata ? styles.fail : ""}><i>{metadata?.valid ? "✓" : metadata ? "!" : "…"}</i><span>Khung hình</span><strong>{metadata ? `${metadata.width}×${metadata.height}` : "Đang đọc"}</strong></div><div className={styles.pass}><i>✓</i><span>Gửi lên máy chủ</span><strong>0 B video</strong></div></div> : null}
       </div>
 
       <div className={styles.controlPanel}>
         <header><span>02 · Thiết lập AI</span><h2>Chọn đúng góc quay</h2></header>
         <div className={styles.viewSwitch}><button type="button" className={view === "rear" ? styles.active : ""} onClick={() => setView("rear")}><strong>Chính diện / phía sau</strong><small>Độ mở gối và đối xứng tay–chân</small></button><button type="button" className={view === "side" ? styles.active : ""} onClick={() => setView("side")}><strong>Ngang bên</strong><small>Đường thân và phối hợp pha</small></button></div>
         <div className={styles.aiCache}><div><i className={ready ? styles.ready : ""} /><span>{ready ? "Bộ AI đã có trên máy" : "Chưa lưu đủ bộ AI offline"}</span></div><button type="button" onClick={() => void downloadOfflineAi()} disabled={busy}>{ready ? "Kiểm tra lại" : "Tải AI offline"}</button></div>
-        <button className={styles.analyzeButton} type="button" disabled={!file || busy} onClick={() => void analyze()}>{busy ? `Đang xử lý ${progress}%` : "Phân tích trên máy này"}</button>
+        <button className={styles.analyzeButton} type="button" disabled={!file || !metadata?.valid || busy} onClick={() => void analyze()}>{busy ? `Đang xử lý ${progress}%` : "Phân tích trên máy này"}</button>
         <div className={styles.progress}><i style={{ width: `${progress}%` }} /></div><p className={styles.status} role="status">{status}</p><small className={styles.disclaimer}>AI v1 là công cụ sàng lọc kỹ thuật từ pose landmarks, không thay thế huấn luyện viên. Ngưỡng sẽ được hiệu chỉnh tiếp bằng video bơi thực tế.</small>
       </div>
     </section>
@@ -536,7 +574,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       <header><div><span>03 · Kết quả AI</span><h2>{result.errors.length ? `Phát hiện ${result.errors.length} điểm cần xem lại` : "Chưa thấy lỗi nổi bật trong các tiêu chí v1"}</h2><p>Độ tin cậy {result.confidence}% · {result.detectedFrames}/{result.sampledFrames} khung hình hợp lệ · {result.syncState === "synced" ? "đã đồng bộ" : "đang giữ local/chờ đồng bộ"}.</p></div><strong>{result.score}<small>/100</small></strong></header>
       <div className={styles.scores}><div><span>Chân</span><b>{result.categories.legs}</b></div><div><span>Tay</span><b>{result.categories.arms}</b></div><div><span>Phối hợp</span><b>{result.categories.coordination}</b></div><div><span>Đường thân</span><b>{result.categories.bodyLine}</b></div></div>
       {result.errors.length ? <div className={styles.errorList}>{result.errors.map((error, index) => <article key={error.code} className={error.severity === "critical" ? styles.critical : ""}><header><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{error.title}</strong><small>{timeLabel(error.timeSec)} · {error.observed}</small></div><b>{error.severity === "critical" ? "Ưu tiên" : "Cần sửa"}</b></header><p>{error.recommendation}</p><footer><div><span>Mốc tham chiếu</span> <strong>{error.expected}</strong></div><button type="button" onClick={() => void jumpToError(error)} style={{ border: "1px solid #c9dedf", borderRadius: 10, padding: "8px 10px", background: "#f4fbfb", color: "#075a64", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Xem đúng khung hình</button></footer></article>)}</div> : null}
-      {result.localFrames.length ? <div className={styles.frames}><header><span>Ảnh lỗi lấy từ video local</span><small>Không đồng bộ lên server</small></header><div>{result.localFrames.map((frame) => <figure key={`${frame.timeSec}-${frame.title}`}><img src={frame.dataUrl} alt={`Khung hình lỗi ${frame.title}`} /><figcaption><strong>{frame.title}</strong><span>{timeLabel(frame.timeSec)}</span></figcaption></figure>)}</div></div> : null}
+      {result.localFrames.length ? <div className={styles.frames}><header><span>Ảnh lỗi lấy từ video local</span><small>Chỉ giữ trong phiên đang mở · không lưu lên máy chủ</small></header><div>{result.localFrames.map((frame) => <figure key={`${frame.timeSec}-${frame.title}`}><img src={frame.dataUrl} alt={`Khung hình lỗi ${frame.title}`} /><figcaption><strong>{frame.title}</strong><span>{timeLabel(frame.timeSec)}</span></figcaption></figure>)}</div></div> : null}
     </section> : null}
   </div>;
 }
