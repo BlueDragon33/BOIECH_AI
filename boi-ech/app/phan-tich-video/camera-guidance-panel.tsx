@@ -18,6 +18,13 @@ type CameraView = "rear" | "side" | "front-oblique";
 type Point = { x: number; y: number; z: number; visibility?: number };
 type PoseResult = { landmarks?: Point[][] };
 type PoseLandmarker = { detectForVideo: (video: HTMLVideoElement, timestampMs: number) => PoseResult; close?: () => void };
+type RetakeMoment = {
+  time: number;
+  severity: number;
+  code: string;
+  label: string;
+  guidance: string;
+};
 type GuidanceReport = {
   ready: boolean;
   status: "good" | "review" | "retry";
@@ -35,14 +42,21 @@ type GuidanceReport = {
   };
   checks: Record<string, boolean>;
   issues: string[];
+  retakeMoments: RetakeMoment[];
+  retakeSummary: string;
 };
 type GuidanceSample = {
+  time: number;
   detected: boolean;
   visibility: number;
   leftVisibility: number;
   rightVisibility: number;
   bodySpan: number;
   edgeSafe: boolean;
+  minX?: number;
+  maxX?: number;
+  minY?: number;
+  maxY?: number;
 };
 
 const avg = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -122,8 +136,8 @@ async function createLandmarker() {
   };
 }
 
-function guidanceSample(points?: Point[]): GuidanceSample {
-  if (!points || points.length < 33) return { detected: false, visibility: 0, leftVisibility: 0, rightVisibility: 0, bodySpan: 0, edgeSafe: false };
+function guidanceSample(points: Point[] | undefined, time: number): GuidanceSample {
+  if (!points || points.length < 33) return { time, detected: false, visibility: 0, leftVisibility: 0, rightVisibility: 0, bodySpan: 0, edgeSafe: false };
   const main = [0, 11, 12, 15, 16, 23, 24, 27, 28];
   const observed = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
   const left = [11, 13, 15, 23, 25, 27];
@@ -132,12 +146,16 @@ function guidanceSample(points?: Point[]): GuidanceSample {
   const visibility = avg(observed.map((index) => points[index]?.visibility ?? 0));
   const leftVisibility = avg(left.map((index) => points[index]?.visibility ?? 0));
   const rightVisibility = avg(right.map((index) => points[index]?.visibility ?? 0));
-  if (visibleMain.length < 5 || visibility < 0.3) return { detected: false, visibility, leftVisibility, rightVisibility, bodySpan: 0, edgeSafe: false };
+  if (visibleMain.length < 5 || visibility < 0.3) return { time, detected: false, visibility, leftVisibility, rightVisibility, bodySpan: 0, edgeSafe: false };
   const xs = visibleMain.map((point) => point.x);
   const ys = visibleMain.map((point) => point.y);
-  const bodySpan = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  const edgeSafe = visibleMain.every((point) => point.x >= 0.02 && point.x <= 0.98 && point.y >= 0.02 && point.y <= 0.98);
-  return { detected: true, visibility, leftVisibility, rightVisibility, bodySpan, edgeSafe };
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const bodySpan = Math.max(maxX - minX, maxY - minY);
+  const edgeSafe = minX >= 0.02 && maxX <= 0.98 && minY >= 0.02 && maxY <= 0.98;
+  return { time, detected: true, visibility, leftVisibility, rightVisibility, bodySpan, edgeSafe, minX, maxX, minY, maxY };
 }
 
 function metricPercent(value: number) {
@@ -190,6 +208,19 @@ export default function CameraGuidancePanel() {
     return () => window.clearTimeout(resetTimer);
   }, [view, hasVideo]);
 
+  async function jumpToGuidanceMoment(time: number) {
+    const video = learnerVideo();
+    if (!video) return;
+    video.pause();
+    try {
+      await seek(video, time);
+      video.scrollIntoView({ behavior: "smooth", block: "center" });
+      setStatus(`Đang xem mốc ${time.toFixed(1)}s cần chỉnh khi quay lại.`);
+    } catch {
+      setStatus("Không thể mở mốc cần xem trên video hiện tại.");
+    }
+  }
+
   async function runGuidance() {
     if (busy) return;
     const video = learnerVideo();
@@ -221,7 +252,7 @@ export default function CameraGuidancePanel() {
         const time = Math.min(video.duration - 0.01, Math.max(0, (video.duration - 0.02) * ratio));
         await seek(video, time);
         const points = pose.landmarker.detectForVideo(video, index * 250 + 1).landmarks?.[0];
-        samples.push(guidanceSample(points));
+        samples.push(guidanceSample(points, time));
         setProgress(Math.round((index + 1) / sampleCount * 100));
         if (index % 3 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
@@ -269,6 +300,16 @@ export default function CameraGuidancePanel() {
           <span style={{ fontSize: 8 }}>Ổn định <b>{metricPercent(report.metrics.stability)}</b></span>
         </div>
         <ul style={{ margin: "7px 0 0", paddingLeft: 15, color: tone, fontSize: 8, lineHeight: 1.45 }}>{report.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+        {report.status !== "good" ? <div data-guided-retake-local-only style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid ${tone}22` }}>
+          <strong style={{ display: "block", color: tone, fontSize: 9 }}>Guided Retake · mốc cần sửa khi quay lại</strong>
+          <p style={{ margin: "3px 0 7px", color: "#607780", fontSize: 8, lineHeight: 1.4 }}>{report.retakeSummary}</p>
+          <div style={{ display: "grid", gap: 6 }}>
+            {report.retakeMoments.map((moment) => <article key={`${moment.code}-${moment.time}`} style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 7, alignItems: "start", borderRadius: 8, background: "rgba(255,255,255,.76)", padding: 7 }}>
+              <button type="button" onClick={() => void jumpToGuidanceMoment(moment.time)} style={{ border: `1px solid ${tone}44`, borderRadius: 8, background: "#fff", color: tone, padding: "6px 7px", fontSize: 8, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" }}>Xem {moment.time.toFixed(1)}s</button>
+              <div><b style={{ display: "block", fontSize: 8, color: tone }}>{moment.label}</b><span style={{ display: "block", marginTop: 2, color: "#536d76", fontSize: 8, lineHeight: 1.4 }}>{moment.guidance}</span></div>
+            </article>)}
+          </div>
+        </div> : null}
       </div> : null}
     </section>
   );
