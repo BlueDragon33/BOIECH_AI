@@ -172,19 +172,22 @@ export default function CameraGuidancePanel() {
         }
       }
     };
-    update();
+    const initialTimer = window.setTimeout(update, 0);
     const observer = new MutationObserver(update);
     observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     return () => {
+      window.clearTimeout(initialTimer);
       observer.disconnect();
-      setPortalHost(null);
       host?.remove();
     };
   }, []);
 
   useEffect(() => {
-    setReport(null);
-    setProgress(0);
+    const resetTimer = window.setTimeout(() => {
+      setReport(null);
+      setProgress(0);
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
   }, [view, hasVideo]);
 
   async function runGuidance() {
