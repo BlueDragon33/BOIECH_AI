@@ -198,7 +198,7 @@ export default function CameraGuidancePanel() {
       return;
     }
     const root = document.querySelector("[data-breaststroke-vision]");
-    const effectiveView = (view || selectedLegacyView(root)) as CameraView | "";
+    const effectiveView = (selectedLegacyView(root) || view) as CameraView | "";
     if (!effectiveView) {
       setStatus("Hãy chọn góc quay ở Thiết lập AI trước khi kiểm tra khung.");
       return;
