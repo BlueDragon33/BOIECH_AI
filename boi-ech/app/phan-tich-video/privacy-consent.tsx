@@ -14,12 +14,15 @@ export default function MediaPipeConsentGate({ children }: Props) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    try {
-      setConsented(window.localStorage.getItem(CONSENT_KEY) === "accepted");
-    } catch {
-      setConsented(false);
-    }
-    setHydrated(true);
+    const timer = window.setTimeout(() => {
+      try {
+        setConsented(window.localStorage.getItem(CONSENT_KEY) === "accepted");
+      } catch {
+        setConsented(false);
+      }
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function accept() {
