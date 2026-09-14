@@ -34,6 +34,28 @@ test("camera guidance reports framing evidence without creating another scoring 
   assert.match(core, /bilateralVisibility/);
 });
 
+test("guided retake keeps local timestamps and lets the learner inspect exact problem moments", () => {
+  assert.match(panel, /guidanceSample\(points, time\)/);
+  assert.match(panel, /data-guided-retake-local-only/);
+  assert.match(panel, /report\.retakeMoments\.map/);
+  assert.match(panel, /jumpToGuidanceMoment\(moment\.time\)/);
+  assert.match(panel, /Xem \{moment\.time\.toFixed\(1\)\}s/);
+  assert.match(core, /retakeMoments/);
+  assert.match(core, /POSE_MISSING/);
+  assert.match(core, /EDGE_CLIP/);
+  assert.match(core, /VIEW_OCCLUSION/);
+  assert.match(core, /CAMERA_INSTABILITY/);
+});
+
+test("guided retake captures only numeric pose framing evidence, never frames or media", () => {
+  assert.match(panel, /minX/);
+  assert.match(panel, /maxX/);
+  assert.match(panel, /minY/);
+  assert.match(panel, /maxY/);
+  assert.doesNotMatch(panel, /toDataURL|drawImage|canvas/i);
+  assert.doesNotMatch(core, /toDataURL|drawImage|canvas|Blob|FileReader/i);
+});
+
 test("camera guidance does not capture images, persist results or call application APIs", () => {
   for (const source of [panel, core]) {
     assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB/i);
