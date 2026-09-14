@@ -20,6 +20,7 @@ test("camera guidance sits immediately before analyze and reuses the existing AI
   assert.match(panel, /createPortal\(content, portalHost\)/);
   assert.match(panel, /selectedLegacyView/);
   assert.match(panel, /setCameraProfile\(inferredView\)/);
+  assert.match(panel, /selectedLegacyView\(root\) \|\| view/);
   assert.match(panel, /useCameraProfile\(\)/);
   assert.doesNotMatch(panel, /SharedCameraProfileControl/);
 });
