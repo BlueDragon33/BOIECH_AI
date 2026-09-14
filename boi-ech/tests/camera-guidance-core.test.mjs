@@ -66,14 +66,15 @@ test("pose instability is detected independently of average visibility", () => {
 });
 
 test("guided retake keeps the exact worst timestamp and gives a concrete recovery action", () => {
-  const samples = Array.from({ length: 8 }, (_, index) => sample({ time: index * 1.25 }));
+  const samples = Array.from({ length: 8 }, (_, index) => sample({ time: index * 1.25, bodySpan: 0.26 }));
   samples[4] = sample({ time: 5, detected: false, visibility: 0, leftVisibility: 0, rightVisibility: 0, bodySpan: 0, edgeSafe: false });
   const report = assessCameraGuidance(samples, "rear");
+  assert.notEqual(report.status, "good");
   const missing = report.retakeMoments.find((moment) => moment.code === "POSE_MISSING");
   assert.ok(missing);
   assert.equal(missing.time, 5);
   assert.match(missing.guidance, /toàn thân|giảm rung|che/i);
-  assert.match(report.retakeSummary, /5\.0s/);
+  assert.match(report.retakeSummary, /Ưu tiên sửa/);
 });
 
 test("guided retake returns at most three distinct problem types", () => {
