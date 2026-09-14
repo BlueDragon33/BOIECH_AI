@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const analyzerUrl = new URL("../app/phan-tich-video/video-analyzer-impl.tsx", import.meta.url);
+const analysisPageUrl = new URL("../app/phan-tich-video/page.tsx", import.meta.url);
+const consentUrl = new URL("../app/phan-tich-video/privacy-consent.tsx", import.meta.url);
 const analysisRouteUrl = new URL("../app/api/video-analysis/route.ts", import.meta.url);
 const overviewRouteUrl = new URL("../app/api/control/overview/route.ts", import.meta.url);
 
@@ -21,6 +23,21 @@ test("video AI keeps original media on the learner device", async () => {
   assert.match(source, /const stored = \{ \.\.\.value, localFrames: \[\] \}/);
   assert.match(source, /Xem đúng khung hình/);
   assert.match(source, /ctx\.createLinearGradient/);
+});
+
+test("MediaPipe cannot start before informed telemetry consent", async () => {
+  const [page, consent] = await Promise.all([
+    readFile(analysisPageUrl, "utf8"),
+    readFile(consentUrl, "utf8"),
+  ]);
+  assert.match(page, /<MediaPipeConsentGate>/);
+  assert.match(page, /<VideoAnalyzer lessonNumber="03" \/>/);
+  assert.match(consent, /boi-ech-mediapipe-metrics-consent-v1/);
+  assert.match(consent, /MediaPipe Tasks có thể gửi số liệu/);
+  assert.match(consent, /Video, ảnh khung hình và pose landmarks/);
+  assert.match(consent, /Đồng ý và mở AI video/);
+  assert.match(consent, /Thu hồi/);
+  assert.match(consent, /removeItem\(CONSENT_KEY\)/);
 });
 
 test("video analysis API rejects binary-looking payload fields", async () => {
