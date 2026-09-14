@@ -10,17 +10,24 @@ test("camera guidance samples a bounded local preflight and restores playback", 
   assert.match(panel, /const sampleCount = 12/);
   assert.match(panel, /capturePlaybackState\(video\)/);
   assert.match(panel, /restorePlaybackState\(video, playbackState, seek\)/);
-  assert.match(panel, /assessCameraGuidance\(samples, view\)/);
+  assert.match(panel, /assessCameraGuidance\(samples, effectiveView\)/);
   assert.match(panel, /data-camera-guidance-local-only/);
   assert.match(composer, /<CameraGuidancePanel \/>/);
 });
 
-test("camera guidance uses the shared camera profile and reports framing evidence", () => {
+test("camera guidance sits immediately before analyze and reuses the existing AI view choice", () => {
+  assert.match(panel, /insertBefore\(host, analyzeButton\)/);
+  assert.match(panel, /createPortal\(content, portalHost\)/);
+  assert.match(panel, /selectedLegacyView/);
+  assert.match(panel, /setCameraProfile\(inferredView\)/);
   assert.match(panel, /useCameraProfile\(\)/);
-  assert.match(panel, /SharedCameraProfileControl/);
-  assert.match(panel, /Cơ thể đủ lớn/);
+  assert.doesNotMatch(panel, /SharedCameraProfileControl/);
+});
+
+test("camera guidance reports framing evidence without creating another scoring path", () => {
+  assert.match(panel, /Đủ lớn/);
   assert.match(panel, /Không sát mép/);
-  assert.match(panel, /Ổn định khung/);
+  assert.match(panel, /Ổn định/);
   assert.match(core, /bodyCoverage/);
   assert.match(core, /edgeSafety/);
   assert.match(core, /bilateralVisibility/);
