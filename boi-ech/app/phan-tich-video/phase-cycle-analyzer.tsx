@@ -4,6 +4,7 @@ import { useState } from "react";
 import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, PHASE_THRESHOLDS, SAMPLE_FPS, summarizeCalibration } from "./phase-cycle-core.mjs";
 import { GROUND_TRUTH_PHASES, summarizeGroundTruth } from "./phase-ground-truth.mjs";
 import ThresholdAdvisorPanel from "./threshold-advisor-panel";
+import { capturePlaybackState, restorePlaybackState } from "./video-playback-state.mjs";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VISION_VERSION = "1.0.1";
@@ -153,14 +154,28 @@ async function createLandmarker() {
 }
 
 function seek(video: HTMLVideoElement, seconds: number) {
+  const target = Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.01));
+  if (Math.abs(video.currentTime - target) < 0.001) return Promise.resolve();
   return new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Không đọc được khung hình để nhận dạng chu kỳ.")), 5000);
-    const done = () => {
+    const cleanup = () => {
       window.clearTimeout(timer);
+      video.removeEventListener("seeked", done);
+    };
+    const done = () => {
+      cleanup();
       resolve();
     };
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Không đọc được khung hình để nhận dạng chu kỳ."));
+    }, 5000);
     video.addEventListener("seeked", done, { once: true });
-    video.currentTime = Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.01));
+    try {
+      video.currentTime = target;
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
   });
 }
 
@@ -247,6 +262,8 @@ export default function PhaseCycleAnalyzer() {
       setStatus("Chưa có video học viên hợp lệ ở phần trên.");
       return;
     }
+    const playbackState = capturePlaybackState(video);
+    video.pause();
     setBusy(true);
     setReport(null);
     setCalibrationFrames([]);
@@ -281,7 +298,12 @@ export default function PhaseCycleAnalyzer() {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Không thể nhận dạng chu kỳ bơi.");
     } finally {
-      dispose();
+      try {
+        dispose();
+      } catch {
+        // Playback restoration should not be skipped because MediaPipe cleanup failed.
+      }
+      await restorePlaybackState(video, playbackState, seek);
       setBusy(false);
     }
   }
