@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { ANALYSIS_VIEW_OPTIONS } from "./phase-view-profile.mjs";
+import { SharedCameraProfileControl, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
 import { assessBilateralSymmetry } from "./phase-bilateral-symmetry.mjs";
 
 type StrokePhase = "pull" | "breath" | "leg-recovery" | "kick" | "glide" | "unclear";
@@ -40,22 +39,21 @@ function statusLabel(status: Assessment["status"]) {
 }
 
 export default function BilateralSymmetryPanel({ frames, cycles, onJump }: { frames: PhaseFrame[]; cycles: Cycle[]; onJump: (time: number) => void }) {
-  const [view, setView] = useState("");
+  const view = useCameraProfile();
   const report = assessBilateralSymmetry(frames, cycles, view) as { ready: boolean; trustedCycles: number; note: string; cycles: Assessment[] };
 
   return (
-    <section data-bilateral-symmetry-local-only style={{ border: "1px solid #d8e4ec", borderRadius: 14, background: "#f8fbff", padding: 13 }}>
+    <section data-bilateral-symmetry-local-only data-shared-camera-profile-consumer style={{ border: "1px solid #d8e4ec", borderRadius: 14, background: "#f8fbff", padding: 13 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
           <strong style={{ fontSize: 13 }}>Đối xứng trái–phải · thử nghiệm</strong>
           <p style={{ margin: "4px 0 0", fontSize: 10, lineHeight: 1.45, color: "#617783" }}>Tách riêng hai bên tay/gối và nhịp đạp. Không thay đổi qualityScore hay điểm chính.</p>
+          <div style={{ marginTop: 5 }}><SharedCameraProfileStatus /></div>
         </div>
-        <select aria-label="Góc quay cho đối xứng trái phải" value={view} onChange={(event) => setView(event.target.value)} style={{ border: "1px solid #c9d9df", borderRadius: 9, padding: "7px 9px", background: "#fff", fontSize: 10 }}>
-          {ANALYSIS_VIEW_OPTIONS.map((item: { value: string; label: string }) => <option key={item.value || "unknown"} value={item.value}>{item.label}</option>)}
-        </select>
+        <SharedCameraProfileControl compact />
       </div>
 
-      {!report.ready ? <p style={{ margin: "9px 0 0", fontSize: 10, color: "#7a6647" }}>Chọn góc quay để đánh giá đối xứng. Góc từ sau là bằng chứng mạnh nhất; góc ngang chỉ tham khảo.</p> : <>
+      {!report.ready ? <p style={{ margin: "9px 0 0", fontSize: 10, color: "#7a6647" }}>Chọn góc quay chung ở trên để đánh giá đối xứng. Góc từ sau là bằng chứng mạnh nhất; góc ngang chỉ tham khảo.</p> : <>
         <div style={{ marginTop: 9, display: "flex", gap: 8, flexWrap: "wrap", fontSize: 9, color: "#5f7380" }}>
           <span>Chu kỳ đủ tin cậy: <b>{report.trustedCycles}/{report.cycles.length}</b></span>
           <span>{report.note}</span>
