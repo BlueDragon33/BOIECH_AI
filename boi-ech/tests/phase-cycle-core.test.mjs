@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { analyzePhaseSequence, classifyPhase } from "../app/phan-tich-video/phase-cycle-core.mjs";
+import { analyzePhaseSequence, classifyPhase, PHASE_THRESHOLDS, summarizeCalibration } from "../app/phan-tich-video/phase-cycle-core.mjs";
 
 function phaseFrames(phases, options = {}) {
   const frames = [];
@@ -63,4 +63,18 @@ test("warns when arm and leg recovery overlap for too long", () => {
   }
   const report = analyzePhaseSequence(frames);
   assert.ok(report.warnings.some((warning) => warning.includes("cùng thu mạnh")));
+});
+
+test("summarizes local calibration metrics without changing phase thresholds", () => {
+  const frames = phaseFrames(["pull", "breath", "leg-recovery", "kick", "glide", "unclear"]);
+  const summary = summarizeCalibration(frames);
+  assert.equal(summary.sampledFrames, 12);
+  assert.equal(summary.phases.pull, 2);
+  assert.equal(summary.phases.unclear, 2);
+  assert.ok(summary.recognizedRatio > 0.8 && summary.recognizedRatio < 0.9);
+  assert.equal(summary.visibilityAvg, 0.92);
+  assert.equal(summary.metrics.armFlexion.max, 62);
+  assert.equal(summary.metrics.kneeFlexion.max, 64);
+  assert.equal(PHASE_THRESHOLDS.pullArmFlexionMin, 48);
+  assert.equal(PHASE_THRESHOLDS.legRecoveryKneeFlexionMin, 42);
 });
