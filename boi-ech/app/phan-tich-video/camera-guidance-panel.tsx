@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { assessCameraGuidance } from "./camera-guidance-core.mjs";
-import { SharedCameraProfileControl, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
+import { setCameraProfile, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
 import { capturePlaybackState, restorePlaybackState } from "./video-playback-state.mjs";
 import styles from "./video-analyzer.module.css";
 
@@ -14,6 +14,7 @@ const WASM_LOADER_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${
 const WASM_BINARY_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/wasm/vision_wasm_internal.wasm`;
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
+type CameraView = "rear" | "side" | "front-oblique";
 type Point = { x: number; y: number; z: number; visibility?: number };
 type PoseResult = { landmarks?: Point[][] };
 type PoseLandmarker = { detectForVideo: (video: HTMLVideoElement, timestampMs: number) => PoseResult; close?: () => void };
@@ -48,6 +49,12 @@ const avg = (values: number[]) => values.length ? values.reduce((sum, value) => 
 
 function learnerVideo() {
   return document.querySelector<HTMLVideoElement>("[data-breaststroke-vision] video[playsinline]");
+}
+
+function selectedLegacyView(root?: ParentNode | null): CameraView | "" {
+  const active = root?.querySelector<HTMLButtonElement>(`.${styles.viewSwitch} button.${styles.active}`);
+  if (!active) return "";
+  return active.textContent?.toLowerCase().includes("ngang") ? "side" : "rear";
 }
 
 function seek(video: HTMLVideoElement, seconds: number) {
@@ -144,7 +151,7 @@ export default function CameraGuidancePanel() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [report, setReport] = useState<GuidanceReport | null>(null);
-  const [status, setStatus] = useState("Chọn hoặc quay video, chọn góc quay chung rồi kiểm tra khung trước khi phân tích.");
+  const [status, setStatus] = useState("Chọn hoặc quay video rồi kiểm tra khung trước khi phân tích.");
 
   useEffect(() => {
     const root = document.querySelector("[data-breaststroke-vision]");
@@ -152,6 +159,8 @@ export default function CameraGuidancePanel() {
     let host: HTMLElement | null = null;
     const update = () => {
       setHasVideo(Boolean(learnerVideo()));
+      const inferredView = selectedLegacyView(root);
+      if (inferredView) setCameraProfile(inferredView);
       if (!host) {
         const analyzeButton = root.querySelector<HTMLButtonElement>(`.${styles.analyzeButton}`);
         if (analyzeButton?.parentElement) {
@@ -165,7 +174,7 @@ export default function CameraGuidancePanel() {
     };
     update();
     const observer = new MutationObserver(update);
-    observer.observe(root, { childList: true, subtree: true });
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     return () => {
       observer.disconnect();
       setPortalHost(null);
@@ -185,10 +194,13 @@ export default function CameraGuidancePanel() {
       setStatus("Chưa có video hợp lệ để kiểm tra khung quay.");
       return;
     }
-    if (!view) {
-      setStatus("Hãy chọn góc quay chung trước khi kiểm tra khung.");
+    const root = document.querySelector("[data-breaststroke-vision]");
+    const effectiveView = (view || selectedLegacyView(root)) as CameraView | "";
+    if (!effectiveView) {
+      setStatus("Hãy chọn góc quay ở Thiết lập AI trước khi kiểm tra khung.");
       return;
     }
+    if (effectiveView !== view) setCameraProfile(effectiveView);
     const playbackState = capturePlaybackState(video);
     video.pause();
     setBusy(true);
@@ -210,7 +222,7 @@ export default function CameraGuidancePanel() {
         setProgress(Math.round((index + 1) / sampleCount * 100));
         if (index % 3 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
-      const next = assessCameraGuidance(samples, view) as GuidanceReport;
+      const next = assessCameraGuidance(samples, effectiveView) as GuidanceReport;
       setReport(next);
       setStatus(next.status === "good"
         ? "Khung quay đạt preflight; có thể chạy phân tích đầy đủ."
@@ -235,10 +247,9 @@ export default function CameraGuidancePanel() {
       <div>
         <span style={{ display: "block", color: "#08727b", fontSize: 9, fontWeight: 900, letterSpacing: ".06em" }}>PRE-FLIGHT CAMERA</span>
         <strong style={{ display: "block", marginTop: 3, fontSize: 12 }}>Kiểm tra khung trước khi phân tích</strong>
-        <p style={{ margin: "4px 0 0", color: "#607780", fontSize: 9, lineHeight: 1.45 }}>Đọc 12 mốc local để phát hiện sớm người bơi quá nhỏ, sát mép, bị che hoặc pose chập chờn. Không lưu frame.</p>
+        <p style={{ margin: "4px 0 0", color: "#607780", fontSize: 9, lineHeight: 1.45 }}>Đọc 12 mốc local để phát hiện sớm người bơi quá nhỏ, sát mép, bị che hoặc pose chập chờn. Không lưu frame. Góc quay tự đồng bộ từ Thiết lập AI phía trên.</p>
         <div style={{ marginTop: 5 }}><SharedCameraProfileStatus /></div>
       </div>
-      <div style={{ marginTop: 8 }}><SharedCameraProfileControl compact /></div>
       <div style={{ marginTop: 8, display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
         <button type="button" onClick={() => void runGuidance()} disabled={busy || !hasVideo} style={{ border: 0, borderRadius: 9, padding: "8px 10px", background: busy || !hasVideo ? "#aababc" : "#08727b", color: "#fff", fontSize: 10, fontWeight: 900, cursor: busy || !hasVideo ? "not-allowed" : "pointer" }}>{busy ? `Đang kiểm tra ${progress}%` : "Kiểm tra khung quay"}</button>
         <span style={{ fontSize: 9, color: hasVideo ? "#57717b" : "#846747" }}>{hasVideo ? "Video local sẵn sàng." : "Chưa có video học viên."}</span>
