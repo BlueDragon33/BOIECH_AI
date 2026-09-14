@@ -146,18 +146,28 @@ export function adviseThresholds(frames, labelsByTime, currentThresholds = PHASE
   }
 
   recommendations.sort((a, b) => b.gain - a.gain || b.support - a.support || a.key.localeCompare(b.key));
+
   const previewThresholds = { ...currentThresholds };
-  for (const recommendation of recommendations) previewThresholds[recommendation.key] = recommendation.suggested;
-  const preview = validThresholds(previewThresholds) ? simulateThresholds(frames, labelsByTime, previewThresholds) : baseline;
+  let preview = baseline;
+  const acceptedRecommendations = [];
+  for (const recommendation of recommendations) {
+    const candidateThresholds = { ...previewThresholds, [recommendation.key]: recommendation.suggested };
+    if (!validThresholds(candidateThresholds)) continue;
+    const candidatePreview = simulateThresholds(frames, labelsByTime, candidateThresholds);
+    if (candidatePreview.accuracy + 1e-9 < preview.accuracy) continue;
+    previewThresholds[recommendation.key] = recommendation.suggested;
+    preview = candidatePreview;
+    acceptedRecommendations.push(recommendation);
+  }
 
   return {
     ready: true,
     minimumAnnotations: 10,
     baseline,
     preview,
-    recommendations,
+    recommendations: acceptedRecommendations,
     previewThresholds,
-    reason: recommendations.length
+    reason: acceptedRecommendations.length
       ? "Đề xuất được tạo bằng mô phỏng Ground Truth trong phiên hiện tại; engine chưa bị thay đổi."
       : "Chưa có thay đổi ngưỡng đơn lẻ nào cải thiện độ khớp ít nhất 2 điểm phần trăm trên Ground Truth hiện tại.",
   };
