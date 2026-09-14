@@ -15,6 +15,9 @@ test("video AI keeps original media on the learner device", async () => {
   assert.match(source, /analysis:\s*serverPayload\(analysis\)/);
   assert.match(source, /const MAX_LOCAL_ANALYSES = 10/);
   assert.match(source, /const MAX_ERROR_FRAMES = 4/);
+  assert.match(source, /function assessCaptureQuality/);
+  assert.match(source, /captureQuality\.level === "retry"/);
+  assert.match(source, /Chưa chấm điểm vì chất lượng nhận diện chưa đủ/);
   assert.match(source, /const stored = \{ \.\.\.value, localFrames: \[\] \}/);
   assert.match(source, /Xem đúng khung hình/);
   assert.match(source, /ctx\.createLinearGradient/);
@@ -27,6 +30,9 @@ test("video analysis API rejects binary-looking payload fields", async () => {
   assert.match(source, /MAX_DETAIL_BYTES = 24 \* 1024/);
   assert.match(source, /MAX_REQUEST_BYTES = 32 \* 1024/);
   assert.match(source, /request\.body\.getReader\(\)/);
+  assert.match(source, /SAFE_FRAME_COUNT_FIELDS/);
+  assert.match(source, /"sampledframes", "detectedframes"/);
+  assert.match(source, /captureQuality:/);
   assert.match(source, /'video_ai_analysis'/);
 });
 
@@ -36,5 +42,6 @@ test("control overview exposes only a media-free assistive analysis summary", as
   assert.match(source, /event_type = 'video_ai_analysis'/);
   assert.match(source, /trust: "client-attested-assistive"/);
   assert.match(source, /mediaStored: false/);
+  assert.match(source, /captureQuality:/);
   assert.doesNotMatch(source, /videoAnalysisSummary[\s\S]*?dataUrl/);
 });
