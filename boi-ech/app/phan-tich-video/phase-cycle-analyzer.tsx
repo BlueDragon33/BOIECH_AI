@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, PHASE_THRESHOLDS, SAMPLE_FPS, summarizeCalibration } from "./phase-cycle-core.mjs";
 import { GROUND_TRUTH_PHASES, summarizeGroundTruth } from "./phase-ground-truth.mjs";
+import ThresholdAdvisorPanel from "./threshold-advisor-panel";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VISION_VERSION = "1.0.1";
@@ -417,6 +418,7 @@ export default function PhaseCycleAnalyzer() {
                   const metric = groundTruth.phaseMetrics[phase];
                   return <div key={phase} style={{ border: "1px solid #e2ecee", borderRadius: 9, padding: 8 }}><span style={{ display: "block", fontSize: 10 }}>{PHASE_LABEL[phase]}</span><b style={{ fontSize: 12 }}>{metric.annotated ? `${Math.round(metric.recall * 100)}%` : "—"}</b><span style={{ marginLeft: 4, fontSize: 9, color: "#71858c" }}>{metric.correct}/{metric.annotated}</span></div>;
                 })}</div> : null}
+                <ThresholdAdvisorPanel frames={calibrationFrames} labelsByTime={groundTruthLabels} />
               </div>
 
               <div style={{ overflowX: "auto", maxHeight: 390, border: "1px solid #dce9ea", borderRadius: 12, background: "#fff" }}>
