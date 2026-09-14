@@ -115,6 +115,9 @@ function videoAnalysisSummary(row: VideoAnalysisRow) {
   const categories = detail.categories && typeof detail.categories === "object" && !Array.isArray(detail.categories)
     ? detail.categories as Record<string, unknown>
     : {};
+  const captureQuality = detail.captureQuality && typeof detail.captureQuality === "object" && !Array.isArray(detail.captureQuality)
+    ? detail.captureQuality as Record<string, unknown>
+    : {};
   const errors = Array.isArray(detail.errors)
     ? detail.errors.slice(0, 10).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
     : [];
@@ -128,6 +131,11 @@ function videoAnalysisSummary(row: VideoAnalysisRow) {
     cameraView: detail.cameraView === "side" ? "side" : "rear",
     score: boundedScore(detail.score),
     confidence: boundedScore(detail.confidence),
+    captureQuality: {
+      level: captureQuality.level === "good" ? "good" : "review",
+      poseCoverage: boundedScore(captureQuality.poseCoverage),
+      averageVisibility: boundedScore(captureQuality.averageVisibility),
+    },
     categories: {
       legs: boundedScore(categories.legs),
       arms: boundedScore(categories.arms),
