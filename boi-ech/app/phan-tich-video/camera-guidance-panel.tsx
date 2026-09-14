@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { assessCameraGuidance } from "./camera-guidance-core.mjs";
 import { SharedCameraProfileControl, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
 import { capturePlaybackState, restorePlaybackState } from "./video-playback-state.mjs";
+import styles from "./video-analyzer.module.css";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VISION_VERSION = "1.0.1";
@@ -33,7 +35,6 @@ type GuidanceReport = {
   checks: Record<string, boolean>;
   issues: string[];
 };
-
 type GuidanceSample = {
   detected: boolean;
   visibility: number;
@@ -138,6 +139,7 @@ function metricPercent(value: number) {
 
 export default function CameraGuidancePanel() {
   const view = useCameraProfile();
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -147,11 +149,28 @@ export default function CameraGuidancePanel() {
   useEffect(() => {
     const root = document.querySelector("[data-breaststroke-vision]");
     if (!root) return;
-    const update = () => setHasVideo(Boolean(learnerVideo()));
+    let host: HTMLElement | null = null;
+    const update = () => {
+      setHasVideo(Boolean(learnerVideo()));
+      if (!host) {
+        const analyzeButton = root.querySelector<HTMLButtonElement>(`.${styles.analyzeButton}`);
+        if (analyzeButton?.parentElement) {
+          host = document.createElement("div");
+          host.dataset.cameraGuidanceHost = "";
+          host.style.margin = "0 0 14px";
+          analyzeButton.parentElement.insertBefore(host, analyzeButton);
+          setPortalHost(host);
+        }
+      }
+    };
     update();
     const observer = new MutationObserver(update);
     observer.observe(root, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      setPortalHost(null);
+      host?.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -183,7 +202,7 @@ export default function CameraGuidancePanel() {
       const sampleCount = 12;
       const samples: GuidanceSample[] = [];
       for (let index = 0; index < sampleCount; index += 1) {
-        const ratio = sampleCount === 1 ? 0 : index / (sampleCount - 1);
+        const ratio = index / (sampleCount - 1);
         const time = Math.min(video.duration - 0.01, Math.max(0, (video.duration - 0.02) * ratio));
         await seek(video, time);
         const points = pose.landmarker.detectForVideo(video, index * 250 + 1).landmarks?.[0];
@@ -207,44 +226,38 @@ export default function CameraGuidancePanel() {
     }
   }
 
+  if (!portalHost) return null;
+
   const tone = report?.status === "good" ? "#2f6b4d" : report?.status === "review" ? "#7b632f" : "#8b4343";
   const background = report?.status === "good" ? "#f2fbf6" : report?.status === "review" ? "#fffaf0" : "#fff6f6";
-
-  return (
-    <section data-camera-guidance-local-only style={{ maxWidth: 1240, margin: "0 auto 22px", padding: "0 28px", fontFamily: "Arial, Helvetica, sans-serif", color: "#163346" }}>
-      <div style={{ border: "1px solid #d7e5e7", borderRadius: 20, background: "#fff", padding: 18, boxShadow: "0 12px 34px rgba(17,66,75,.05)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ maxWidth: 700 }}>
-            <span style={{ display: "block", color: "#08727b", fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>KIỂM TRA KHUNG QUAY TRƯỚC PHÂN TÍCH</span>
-            <h2 style={{ margin: "5px 0 6px", fontSize: 19 }}>Camera Guidance · local-only</h2>
-            <p style={{ margin: 0, color: "#607780", fontSize: 11, lineHeight: 1.5 }}>AI đọc 12 mốc rải đều trong video để cảnh báo sớm pose đứt quãng, người bơi quá nhỏ, tay/chân sát mép hoặc che khuất. Không lưu frame và không gửi dữ liệu lên máy chủ.</p>
-            <div style={{ marginTop: 6 }}><SharedCameraProfileStatus /></div>
-          </div>
-          <SharedCameraProfileControl compact />
-        </div>
-
-        <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button type="button" onClick={() => void runGuidance()} disabled={busy || !hasVideo} style={{ border: 0, borderRadius: 10, padding: "9px 12px", background: busy || !hasVideo ? "#aababc" : "#08727b", color: "#fff", fontSize: 11, fontWeight: 900, cursor: busy || !hasVideo ? "not-allowed" : "pointer" }}>{busy ? `Đang kiểm tra ${progress}%` : "Kiểm tra khung quay"}</button>
-          <span style={{ fontSize: 10, color: hasVideo ? "#57717b" : "#846747" }}>{hasVideo ? "Video local đã sẵn sàng cho preflight." : "Chưa có video học viên."}</span>
-        </div>
-        <div style={{ height: 5, marginTop: 9, borderRadius: 999, background: "#e8f0f1", overflow: "hidden" }}><i style={{ display: "block", height: "100%", width: `${progress}%`, background: "#15919a" }} /></div>
-        <p role="status" style={{ margin: "8px 0 0", fontSize: 10, color: "#566f79" }}>{status}</p>
-
-        {report ? <div style={{ marginTop: 12, border: `1px solid ${tone}33`, borderRadius: 12, background, padding: 11 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <strong style={{ color: tone, fontSize: 12 }}>{report.status === "good" ? "Đạt preflight" : report.status === "review" ? "Nên chỉnh trước khi quay/phân tích" : "Nên quay lại"}</strong>
-            <b style={{ color: tone, fontSize: 13 }}>{report.score}% checklist</b>
-          </div>
-          <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 6 }}>
-            <div style={{ borderRadius: 8, background: "#fff", padding: 8 }}><span style={{ display: "block", fontSize: 8, color: "#71858c" }}>Pose liên tục</span><b style={{ fontSize: 11 }}>{metricPercent(report.metrics.detectionRate)}</b></div>
-            <div style={{ borderRadius: 8, background: "#fff", padding: 8 }}><span style={{ display: "block", fontSize: 8, color: "#71858c" }}>Độ rõ khớp</span><b style={{ fontSize: 11 }}>{metricPercent(report.metrics.visibility)}</b></div>
-            <div style={{ borderRadius: 8, background: "#fff", padding: 8 }}><span style={{ display: "block", fontSize: 8, color: "#71858c" }}>Cơ thể đủ lớn</span><b style={{ fontSize: 11 }}>{metricPercent(report.metrics.bodyCoverage)}</b></div>
-            <div style={{ borderRadius: 8, background: "#fff", padding: 8 }}><span style={{ display: "block", fontSize: 8, color: "#71858c" }}>Không sát mép</span><b style={{ fontSize: 11 }}>{metricPercent(report.metrics.edgeSafety)}</b></div>
-            <div style={{ borderRadius: 8, background: "#fff", padding: 8 }}><span style={{ display: "block", fontSize: 8, color: "#71858c" }}>Ổn định khung</span><b style={{ fontSize: 11 }}>{metricPercent(report.metrics.stability)}</b></div>
-          </div>
-          <ul style={{ margin: "9px 0 0", paddingLeft: 17, color: tone, fontSize: 10, lineHeight: 1.5 }}>{report.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
-        </div> : null}
+  const content = (
+    <section data-camera-guidance-local-only style={{ border: "1px solid #d8e5e7", borderRadius: 14, background: "#f8fbfb", padding: 11, color: "#163346" }}>
+      <div>
+        <span style={{ display: "block", color: "#08727b", fontSize: 9, fontWeight: 900, letterSpacing: ".06em" }}>PRE-FLIGHT CAMERA</span>
+        <strong style={{ display: "block", marginTop: 3, fontSize: 12 }}>Kiểm tra khung trước khi phân tích</strong>
+        <p style={{ margin: "4px 0 0", color: "#607780", fontSize: 9, lineHeight: 1.45 }}>Đọc 12 mốc local để phát hiện sớm người bơi quá nhỏ, sát mép, bị che hoặc pose chập chờn. Không lưu frame.</p>
+        <div style={{ marginTop: 5 }}><SharedCameraProfileStatus /></div>
       </div>
+      <div style={{ marginTop: 8 }}><SharedCameraProfileControl compact /></div>
+      <div style={{ marginTop: 8, display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
+        <button type="button" onClick={() => void runGuidance()} disabled={busy || !hasVideo} style={{ border: 0, borderRadius: 9, padding: "8px 10px", background: busy || !hasVideo ? "#aababc" : "#08727b", color: "#fff", fontSize: 10, fontWeight: 900, cursor: busy || !hasVideo ? "not-allowed" : "pointer" }}>{busy ? `Đang kiểm tra ${progress}%` : "Kiểm tra khung quay"}</button>
+        <span style={{ fontSize: 9, color: hasVideo ? "#57717b" : "#846747" }}>{hasVideo ? "Video local sẵn sàng." : "Chưa có video học viên."}</span>
+      </div>
+      <div style={{ height: 4, marginTop: 7, borderRadius: 999, background: "#e5edef", overflow: "hidden" }}><i style={{ display: "block", height: "100%", width: `${progress}%`, background: "#15919a" }} /></div>
+      <p role="status" style={{ margin: "6px 0 0", fontSize: 9, color: "#566f79", lineHeight: 1.4 }}>{status}</p>
+      {report ? <div style={{ marginTop: 8, border: `1px solid ${tone}33`, borderRadius: 10, background, padding: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 7, flexWrap: "wrap" }}><b style={{ color: tone, fontSize: 10 }}>{report.status === "good" ? "Đạt preflight" : report.status === "review" ? "Nên chỉnh khung" : "Nên quay lại"}</b><b style={{ color: tone, fontSize: 10 }}>{report.score}% checklist</b></div>
+        <div style={{ marginTop: 7, display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 5 }}>
+          <span style={{ fontSize: 8 }}>Pose liên tục <b>{metricPercent(report.metrics.detectionRate)}</b></span>
+          <span style={{ fontSize: 8 }}>Độ rõ <b>{metricPercent(report.metrics.visibility)}</b></span>
+          <span style={{ fontSize: 8 }}>Đủ lớn <b>{metricPercent(report.metrics.bodyCoverage)}</b></span>
+          <span style={{ fontSize: 8 }}>Không sát mép <b>{metricPercent(report.metrics.edgeSafety)}</b></span>
+          <span style={{ fontSize: 8 }}>Ổn định <b>{metricPercent(report.metrics.stability)}</b></span>
+        </div>
+        <ul style={{ margin: "7px 0 0", paddingLeft: 15, color: tone, fontSize: 8, lineHeight: 1.45 }}>{report.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+      </div> : null}
     </section>
   );
+
+  return createPortal(content, portalHost);
 }
