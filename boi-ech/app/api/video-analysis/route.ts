@@ -12,6 +12,8 @@ const SEVERITIES = new Set(["info", "warning", "critical"]);
 const MAX_DETAIL_BYTES = 24 * 1024;
 const MAX_REQUEST_BYTES = 32 * 1024;
 const MAX_ERRORS = 10;
+const SAFE_FRAME_COUNT_FIELDS = new Set(["sampledframes", "detectedframes"]);
+const QUALITY_LEVELS = new Set(["good", "review"]);
 
 function json(data: unknown, status = 200) {
   return Response.json(data, {
@@ -47,6 +49,7 @@ function hasForbiddenBinaryField(value: unknown): boolean {
   const object = record(value);
   if (!object) return false;
   return Object.entries(object).some(([key, child]) => {
+    if (SAFE_FRAME_COUNT_FIELDS.has(key.toLowerCase())) return hasForbiddenBinaryField(child);
     if (/(?:video|frame|image|base64|blob|dataurl|objecturl|thumbnail)/i.test(key)) return true;
     return hasForbiddenBinaryField(child);
   });
@@ -118,6 +121,8 @@ function normalizeAnalysis(value: unknown) {
 
   const cameraViewRaw = text(source.cameraView, 16);
   const categoriesSource = record(source.categories) ?? {};
+  const captureQualitySource = record(source.captureQuality) ?? {};
+  const qualityLevelRaw = text(captureQualitySource.level, 16);
   const errors = Array.isArray(source.errors)
     ? source.errors.slice(0, MAX_ERRORS).map(normalizeError).filter(Boolean)
     : [];
@@ -135,6 +140,11 @@ function normalizeAnalysis(value: unknown) {
     cameraView: CAMERA_VIEWS.has(cameraViewRaw) ? cameraViewRaw : "rear",
     score: integer(source.score, 0, 100, 0),
     confidence: integer(source.confidence, 0, 100, 0),
+    captureQuality: {
+      level: QUALITY_LEVELS.has(qualityLevelRaw) ? qualityLevelRaw : "review",
+      poseCoverage: integer(captureQualitySource.poseCoverage, 0, 100, 0),
+      averageVisibility: integer(captureQualitySource.averageVisibility, 0, 100, 0),
+    },
     categories: {
       legs: integer(categoriesSource.legs, 0, 100, 0),
       arms: integer(categoriesSource.arms, 0, 100, 0),
