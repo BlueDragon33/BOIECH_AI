@@ -14,6 +14,7 @@ type Point = { x: number; y: number; z: number; visibility?: number };
 type PoseResult = { landmarks?: Point[][] };
 type PoseLandmarker = { detectForVideo: (video: HTMLVideoElement, timestampMs: number) => PoseResult; close?: () => void };
 type StrokePhase = "pull" | "breath" | "leg-recovery" | "kick" | "glide" | "unclear";
+type ScoredPhase = Exclude<StrokePhase, "unclear">;
 type PhaseFrame = {
   time: number;
   phase: StrokePhase;
@@ -24,12 +25,31 @@ type PhaseFrame = {
   visibility: number;
 };
 type PhaseSegment = { phase: StrokePhase; start: number; end: number; frames: number };
+type CycleQuality = {
+  index: number;
+  start: number;
+  end: number;
+  duration: number;
+  qualityScore: number;
+  status: "good" | "review" | "weak";
+  weakestPhase: ScoredPhase;
+  weakestPhaseScore: number;
+  phaseScores: Record<ScoredPhase, number>;
+  phaseStarts: Record<ScoredPhase, number>;
+  visibilityAvg: number;
+  recognizedRatio: number;
+  overlapRatio: number;
+  orderPurity: number;
+  issues: string[];
+};
 type CycleReport = {
   confidence: number;
   completeCycles: number;
   orderScore: number;
+  cycleQualityAvg: number;
+  cycles: CycleQuality[];
   sequence: PhaseSegment[];
-  phaseDurations: Record<Exclude<StrokePhase, "unclear">, number>;
+  phaseDurations: Record<ScoredPhase, number>;
   warnings: string[];
 };
 type MetricStats = { min: number; max: number; avg: number };
@@ -42,6 +62,8 @@ type CalibrationSummary = {
   metrics: Record<"armFlexion" | "kneeFlexion" | "wristSpread" | "ankleSpread", MetricStats>;
   phases: Record<StrokePhase, number>;
 };
+
+const SCORED_PHASES: ScoredPhase[] = ["pull", "breath", "leg-recovery", "kick", "glide"];
 
 function avg(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -167,6 +189,12 @@ function metricLabel(stats: MetricStats, digits = 1) {
   return `${stats.min.toFixed(digits)}–${stats.max.toFixed(digits)} · TB ${stats.avg.toFixed(digits)}`;
 }
 
+function qualityLabel(status: CycleQuality["status"]) {
+  if (status === "good") return "Tốt";
+  if (status === "review") return "Cần xem";
+  return "Yếu";
+}
+
 export default function PhaseCycleAnalyzer() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -215,7 +243,7 @@ export default function PhaseCycleAnalyzer() {
       const nextReport = analyzePhaseSequence(frames) as CycleReport;
       setCalibrationFrames(frames);
       setReport(nextReport);
-      setStatus(`Đã nhận dạng ${nextReport.completeCycles} chu kỳ hoàn chỉnh; dữ liệu pha và calibration chỉ tồn tại trên thiết bị.`);
+      setStatus(`Đã nhận dạng ${nextReport.completeCycles} chu kỳ hoàn chỉnh; dữ liệu pha, chất lượng chu kỳ và calibration chỉ tồn tại trên thiết bị.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Không thể nhận dạng chu kỳ bơi.");
     } finally {
@@ -233,12 +261,12 @@ export default function PhaseCycleAnalyzer() {
       <div style={panelStyle}>
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <span style={{ color: "#08727b", fontSize: 12, fontWeight: 900, letterSpacing: ".05em" }}>04 · CHU KỲ ĐỘNG TÁC V2 · THỬ NGHIỆM</span>
-            <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>Nhận dạng 5 pha bơi ếch trên chính video local</h2>
-            <p style={{ margin: 0, maxWidth: 760, color: "#526d78", lineHeight: 1.6, fontSize: 13 }}>Engine này chưa tham gia điểm chính. Nó dùng pose landmarks để kiểm tra thứ tự kéo tay → lấy hơi/trả tay → thu chân → đạp chân → lướt trước khi hợp nhất vào Breaststroke Vision.</p>
+            <span style={{ color: "#08727b", fontSize: 12, fontWeight: 900, letterSpacing: ".05em" }}>04 · CHU KỲ ĐỘNG TÁC V2.1 · THỬ NGHIỆM</span>
+            <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>Nhận dạng 5 pha và chất lượng từng chu kỳ trên video local</h2>
+            <p style={{ margin: 0, maxWidth: 820, color: "#526d78", lineHeight: 1.6, fontSize: 13 }}>Engine này chưa tham gia điểm chính. Điểm từng chu kỳ chỉ là độ tin cậy kỹ thuật theo tín hiệu pose/ngưỡng thử nghiệm để tìm đoạn cần xem lại, chưa phải điểm sinh cơ học đã hiệu chuẩn.</p>
           </div>
           <button type="button" onClick={() => void run()} disabled={busy} style={{ border: 0, borderRadius: 12, padding: "11px 16px", background: busy ? "#a9babc" : "#08727b", color: "#ffffff", fontWeight: 900, cursor: busy ? "wait" : "pointer" }}>
-            {busy ? `Đang nhận dạng ${progress}%` : "Phân tích chu kỳ v2"}
+            {busy ? `Đang nhận dạng ${progress}%` : "Phân tích chu kỳ v2.1"}
           </button>
         </header>
         <div style={{ height: 6, borderRadius: 999, background: "#e8f0f1", overflow: "hidden", marginTop: 16 }}><i style={{ display: "block", height: "100%", width: `${progress}%`, background: "#15919a" }} /></div>
@@ -249,12 +277,13 @@ export default function PhaseCycleAnalyzer() {
             <div style={miniStyle}><span style={{ fontSize: 12, color: "#67808a" }}>Chu kỳ hoàn chỉnh</span><strong style={{ display: "block", marginTop: 5, fontSize: 24 }}>{report.completeCycles}</strong></div>
             <div style={miniStyle}><span style={{ fontSize: 12, color: "#67808a" }}>Đúng thứ tự pha</span><strong style={{ display: "block", marginTop: 5, fontSize: 24 }}>{report.orderScore}%</strong></div>
             <div style={miniStyle}><span style={{ fontSize: 12, color: "#67808a" }}>Độ tin cậy pha</span><strong style={{ display: "block", marginTop: 5, fontSize: 24 }}>{report.confidence}%</strong></div>
+            <div style={miniStyle}><span style={{ fontSize: 12, color: "#67808a" }}>Chất lượng chu kỳ TB</span><strong style={{ display: "block", marginTop: 5, fontSize: 24 }}>{report.cycles.length ? `${report.cycleQualityAvg}%` : "—"}</strong></div>
           </div>
 
           <div style={miniStyle}>
             <strong style={{ fontSize: 13 }}>Thời lượng các pha đã nhận dạng</strong>
             <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 8 }}>
-              {(Object.entries(report.phaseDurations) as [Exclude<StrokePhase, "unclear">, number][]).map(([phase, seconds]) => <div key={phase} style={{ padding: 10, borderRadius: 10, background: "#ffffff" }}><span style={{ display: "block", fontSize: 11, color: "#6a838c" }}>{PHASE_LABEL[phase]}</span><b style={{ fontSize: 16 }}>{durationLabel(seconds)}</b></div>)}
+              {(Object.entries(report.phaseDurations) as [ScoredPhase, number][]).map(([phase, seconds]) => <div key={phase} style={{ padding: 10, borderRadius: 10, background: "#ffffff" }}><span style={{ display: "block", fontSize: 11, color: "#6a838c" }}>{PHASE_LABEL[phase]}</span><b style={{ fontSize: 16 }}>{durationLabel(seconds)}</b></div>)}
             </div>
           </div>
 
@@ -264,6 +293,40 @@ export default function PhaseCycleAnalyzer() {
               {report.sequence.map((segment, index) => <button type="button" onClick={() => jumpToFrame(segment.start)} key={`${segment.phase}-${segment.start}-${index}`} style={{ border: 0, borderRadius: 999, padding: "7px 10px", background: segment.phase === "unclear" ? "#eef1f2" : "#e4f5f4", color: segment.phase === "unclear" ? "#6f7e83" : "#075f68", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>{PHASE_LABEL[segment.phase]} · {segment.start.toFixed(1)}–{segment.end.toFixed(1)}s</button>)}
             </div>
           </div>
+
+          {report.cycles.length ? <div style={{ ...miniStyle, background: "#f7fbff" }} data-cycle-quality-local-only>
+            <div>
+              <strong style={{ fontSize: 14 }}>Chất lượng từng chu kỳ · v2.1</strong>
+              <p style={{ margin: "5px 0 0", color: "#5b737d", fontSize: 12, lineHeight: 1.5 }}>Dùng để khoanh vùng chu kỳ/pha cần xem lại. Không gửi điểm pha hay trace chu kỳ lên máy chủ.</p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10, marginTop: 12 }}>
+              {report.cycles.map((cycle) => <article key={cycle.index} style={{ border: "1px solid #dce8ef", borderRadius: 14, background: "#ffffff", padding: 13 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                  <div>
+                    <strong style={{ fontSize: 15 }}>Chu kỳ {cycle.index}</strong>
+                    <button type="button" onClick={() => jumpToFrame(cycle.start)} style={{ display: "block", marginTop: 4, padding: 0, border: 0, background: "transparent", color: "#47717e", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>{cycle.start.toFixed(1)}–{cycle.end.toFixed(1)}s · {durationLabel(cycle.duration)}</button>
+                  </div>
+                  <div style={{ textAlign: "right" }}><b style={{ display: "block", fontSize: 22 }}>{cycle.qualityScore}%</b><span style={{ fontSize: 11, fontWeight: 800 }}>{qualityLabel(cycle.status)}</span></div>
+                </div>
+
+                <button type="button" onClick={() => jumpToFrame(cycle.phaseStarts[cycle.weakestPhase])} style={{ width: "100%", marginTop: 10, border: "1px solid #ead9b6", borderRadius: 10, background: "#fffaf0", padding: "8px 10px", textAlign: "left", cursor: "pointer", color: "#66543d" }}>
+                  <span style={{ display: "block", fontSize: 10 }}>Pha yếu nhất · bấm để xem</span>
+                  <b>{PHASE_LABEL[cycle.weakestPhase]} · {cycle.weakestPhaseScore}%</b>
+                </button>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 4, marginTop: 9 }}>
+                  {SCORED_PHASES.map((phase) => <button type="button" key={phase} onClick={() => jumpToFrame(cycle.phaseStarts[phase])} title={`Xem pha ${PHASE_LABEL[phase]}`} style={{ border: "1px solid #e1ebef", borderRadius: 8, background: phase === cycle.weakestPhase ? "#fff7e8" : "#f8fbfc", padding: "6px 3px", cursor: "pointer", minWidth: 0 }}><span style={{ display: "block", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{PHASE_LABEL[phase]}</span><b style={{ fontSize: 12 }}>{cycle.phaseScores[phase]}%</b></button>)}
+                </div>
+
+                <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 5, fontSize: 10, color: "#5d737d" }}>
+                  <span>Pose {Math.round(cycle.visibilityAvg * 100)}%</span>
+                  <span>Nhận pha {Math.round(cycle.recognizedRatio * 100)}%</span>
+                  <span>Chồng pha {Math.round(cycle.overlapRatio * 100)}%</span>
+                </div>
+                {cycle.issues.length ? <ul style={{ margin: "8px 0 0", paddingLeft: 17, fontSize: 11, lineHeight: 1.45, color: "#6b5740" }}>{cycle.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul> : <p style={{ margin: "8px 0 0", fontSize: 11, color: "#50726c" }}>Không có cảnh báo chu kỳ theo ngưỡng thử nghiệm hiện tại.</p>}
+              </article>)}
+            </div>
+          </div> : null}
 
           {report.warnings.length ? <div style={{ ...miniStyle, background: "#fffaf1", borderColor: "#f0dfbf" }}><strong style={{ fontSize: 13 }}>Điểm cần kiểm tra thêm</strong><ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "#66543d", lineHeight: 1.6, fontSize: 13 }}>{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
 
