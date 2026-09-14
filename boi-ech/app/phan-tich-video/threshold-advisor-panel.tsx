@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PHASE_LABEL, PHASE_THRESHOLDS } from "./phase-cycle-core.mjs";
+import { analyzePhaseSequence, PHASE_LABEL, PHASE_THRESHOLDS } from "./phase-cycle-core.mjs";
 import { adviseThresholds } from "./phase-threshold-advisor.mjs";
 import { assessCalibrationCoverage, CALIBRATION_COVERAGE_RULES, CALIBRATION_VIEWS } from "./phase-calibration-coverage.mjs";
 
@@ -66,10 +66,11 @@ function checkLabel(key: string) {
   return key;
 }
 
-export default function ThresholdAdvisorPanel({ frames, labelsByTime, completeCycles }: { frames: PhaseFrame[]; labelsByTime: Record<string, ScoredPhase>; completeCycles: number }) {
+export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames: PhaseFrame[]; labelsByTime: Record<string, ScoredPhase> }) {
   const [view, setView] = useState("");
   const advisor = adviseThresholds(frames, labelsByTime, PHASE_THRESHOLDS) as Advisor;
-  const coverage = assessCalibrationCoverage(frames, labelsByTime, { completeCycles, view }) as Coverage;
+  const derivedCycles = Number((analyzePhaseSequence(frames) as { completeCycles?: number }).completeCycles ?? 0);
+  const coverage = assessCalibrationCoverage(frames, labelsByTime, { completeCycles: derivedCycles, view }) as Coverage;
   const gain = Math.round((advisor.preview.accuracy - advisor.baseline.accuracy) * 100);
   const trustedForClip = advisor.ready && coverage.readyForThresholdReview;
 
