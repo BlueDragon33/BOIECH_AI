@@ -5,6 +5,7 @@ import test from "node:test";
 const analyzerUrl = new URL("../app/phan-tich-video/video-analyzer-impl.tsx", import.meta.url);
 const analyzerComposerUrl = new URL("../app/phan-tich-video/video-analyzer.tsx", import.meta.url);
 const phaseAnalyzerUrl = new URL("../app/phan-tich-video/phase-cycle-analyzer.tsx", import.meta.url);
+const phaseCoreUrl = new URL("../app/phan-tich-video/phase-cycle-core.mjs", import.meta.url);
 const analysisPageUrl = new URL("../app/phan-tich-video/page.tsx", import.meta.url);
 const consentUrl = new URL("../app/phan-tich-video/privacy-consent.tsx", import.meta.url);
 const analysisRouteUrl = new URL("../app/api/video-analysis/route.ts", import.meta.url);
@@ -43,22 +44,25 @@ test("MediaPipe cannot start before informed telemetry consent", async () => {
 });
 
 test("experimental v2 recognizes a local five-phase breaststroke cycle without changing v1 scoring", async () => {
-  const [composer, phase] = await Promise.all([
+  const [composer, phase, core] = await Promise.all([
     readFile(analyzerComposerUrl, "utf8"),
     readFile(phaseAnalyzerUrl, "utf8"),
+    readFile(phaseCoreUrl, "utf8"),
   ]);
   assert.match(composer, /data-breaststroke-vision/);
   assert.match(composer, /<VideoAnalyzerImpl lessonNumber=\{lessonNumber\} \/>/);
   assert.match(composer, /<PhaseCycleAnalyzer \/>/);
   assert.match(phase, /type StrokePhase = "pull" \| "breath" \| "leg-recovery" \| "kick" \| "glide" \| "unclear"/);
-  assert.match(phase, /const expected:[\s\S]*\["pull", "breath", "leg-recovery", "kick", "glide"\]/);
+  assert.match(phase, /from "\.\/phase-cycle-core\.mjs"/);
+  assert.match(core, /const EXPECTED_PHASES = \["pull", "breath", "leg-recovery", "kick", "glide"\]/);
   assert.match(phase, /phaseMetrics/);
-  assert.match(phase, /analyzeSequence/);
-  assert.match(phase, /completeCycles/);
-  assert.match(phase, /orderScore/);
+  assert.match(phase, /analyzePhaseSequence/);
+  assert.match(core, /completeCycles/);
+  assert.match(core, /orderScore/);
   assert.match(phase, /Engine này chưa tham gia điểm chính/);
   assert.match(phase, /document\.querySelector<HTMLVideoElement>\("\[data-breaststroke-vision\] video\[playsinline\]"\)/);
   assert.doesNotMatch(phase, /\/api\/video-analysis/);
+  assert.doesNotMatch(core, /\/api\/video-analysis/);
 });
 
 test("video analysis API rejects binary-looking payload fields", async () => {
