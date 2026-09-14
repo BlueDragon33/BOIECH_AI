@@ -4,6 +4,7 @@ import { useState } from "react";
 import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, PHASE_THRESHOLDS, SAMPLE_FPS, summarizeCalibration } from "./phase-cycle-core.mjs";
 import { GROUND_TRUTH_PHASES, summarizeGroundTruth } from "./phase-ground-truth.mjs";
 import ThresholdAdvisorPanel from "./threshold-advisor-panel";
+import BilateralSymmetryPanel from "./bilateral-symmetry-panel";
 import { capturePlaybackState, restorePlaybackState } from "./video-playback-state.mjs";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
@@ -26,6 +27,12 @@ type PhaseFrame = {
   wristSpread: number;
   ankleSpread: number;
   visibility: number;
+  leftArmFlexion: number;
+  rightArmFlexion: number;
+  leftKneeFlexion: number;
+  rightKneeFlexion: number;
+  leftVisibility: number;
+  rightVisibility: number;
 };
 type PhaseSegment = { phase: StrokePhase; start: number; end: number; frames: number };
 type CycleQuality = {
@@ -200,15 +207,35 @@ function phaseMetrics(time: number, points: Point[], previousKneeFlexion: number
   const rightArm = jointAngle(points[12], points[14], points[16]);
   const leftKnee = jointAngle(points[23], points[25], points[27]);
   const rightKnee = jointAngle(points[24], points[26], points[28]);
-  const armFlexion = 180 - (leftArm + rightArm) / 2;
-  const kneeFlexion = 180 - (leftKnee + rightKnee) / 2;
+  const leftArmFlexion = 180 - leftArm;
+  const rightArmFlexion = 180 - rightArm;
+  const leftKneeFlexion = 180 - leftKnee;
+  const rightKneeFlexion = 180 - rightKnee;
+  const armFlexion = (leftArmFlexion + rightArmFlexion) / 2;
+  const kneeFlexion = (leftKneeFlexion + rightKneeFlexion) / 2;
+  const leftVisibility = avg([11, 13, 15, 23, 25, 27].map((index) => points[index]?.visibility ?? 0));
+  const rightVisibility = avg([12, 14, 16, 24, 26, 28].map((index) => points[index]?.visibility ?? 0));
   const shoulderWidth = Math.max(0.025, dist(points[11], points[12]));
   const hipWidth = Math.max(0.025, dist(points[23], points[24]));
   const wristSpread = dist(points[15], points[16]) / shoulderWidth;
   const ankleSpread = dist(points[27], points[28]) / hipWidth;
   const phase = classifyPhase({ armFlexion, kneeFlexion, wristSpread, ankleSpread, previousKneeFlexion }) as StrokePhase;
 
-  return { time, phase, armFlexion, kneeFlexion, wristSpread, ankleSpread, visibility };
+  return {
+    time,
+    phase,
+    armFlexion,
+    kneeFlexion,
+    wristSpread,
+    ankleSpread,
+    visibility,
+    leftArmFlexion,
+    rightArmFlexion,
+    leftKneeFlexion,
+    rightKneeFlexion,
+    leftVisibility,
+    rightVisibility,
+  };
 }
 
 function durationLabel(seconds: number) {
@@ -383,6 +410,8 @@ export default function PhaseCycleAnalyzer() {
               </article>)}
             </div>
           </div> : null}
+
+          {report.cycles.length ? <BilateralSymmetryPanel frames={calibrationFrames} cycles={report.cycles} onJump={jumpToFrame} /> : null}
 
           {report.warnings.length ? <div style={{ ...miniStyle, background: "#fffaf1", borderColor: "#f0dfbf" }}><strong style={{ fontSize: 13 }}>Điểm cần kiểm tra thêm</strong><ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "#66543d", lineHeight: 1.6, fontSize: 13 }}>{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
 
