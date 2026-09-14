@@ -1,3 +1,5 @@
+import { ANALYSIS_VIEW_OPTIONS } from "./phase-view-profile.mjs";
+
 const PHASES = ["pull", "breath", "leg-recovery", "kick", "glide"];
 
 export const CALIBRATION_COVERAGE_RULES = Object.freeze({
@@ -8,12 +10,7 @@ export const CALIBRATION_COVERAGE_RULES = Object.freeze({
   maximumDominantPhaseShare: 0.45,
 });
 
-export const CALIBRATION_VIEWS = Object.freeze([
-  { value: "", label: "Chưa chọn góc quay" },
-  { value: "side", label: "Ngang thân (side)" },
-  { value: "rear", label: "Từ sau (rear)" },
-  { value: "front-oblique", label: "Trước / chéo" },
-]);
+export const CALIBRATION_VIEWS = ANALYSIS_VIEW_OPTIONS;
 
 function keyForTime(time) {
   return Number(time).toFixed(3);
