@@ -9,6 +9,22 @@ export const PHASE_LABEL = {
   unclear: "Chưa rõ",
 };
 
+export const PHASE_THRESHOLDS = Object.freeze({
+  glideArmFlexionMax: 24,
+  glideKneeFlexionMax: 22,
+  glideWristSpreadMax: 1.18,
+  glideAnkleSpreadMax: 1.35,
+  kickVelocityMin: 5,
+  kickKneeFlexionMin: 10,
+  legRecoveryKneeFlexionMin: 42,
+  pullArmFlexionMin: 48,
+  pullWristSpreadMin: 1.12,
+  breathArmFlexionMin: 24,
+  breathArmFlexionMax: 48,
+  overlapArmFlexionMin: 38,
+  overlapKneeFlexionMin: 42,
+});
+
 const EXPECTED_PHASES = ["pull", "breath", "leg-recovery", "kick", "glide"];
 
 function clamp(value, min, max) {
@@ -19,13 +35,24 @@ function avg(values) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
+function metricStats(frames, key) {
+  const values = frames.map((frame) => Number(frame[key])).filter(Number.isFinite);
+  if (!values.length) return { min: 0, max: 0, avg: 0 };
+  return {
+    min: Math.min(...values),
+    max: Math.max(...values),
+    avg: avg(values),
+  };
+}
+
 export function classifyPhase({ armFlexion, kneeFlexion, wristSpread, ankleSpread, previousKneeFlexion = null }) {
   const kickVelocity = previousKneeFlexion === null ? 0 : previousKneeFlexion - kneeFlexion;
-  if (armFlexion < 24 && kneeFlexion < 22 && wristSpread < 1.18 && ankleSpread < 1.35) return "glide";
-  if (kickVelocity > 5 && kneeFlexion >= 10) return "kick";
-  if (kneeFlexion > 42) return "leg-recovery";
-  if (armFlexion > 48 && wristSpread > 1.12) return "pull";
-  if (armFlexion > 24 && armFlexion <= 48 && kneeFlexion < 42) return "breath";
+  const t = PHASE_THRESHOLDS;
+  if (armFlexion < t.glideArmFlexionMax && kneeFlexion < t.glideKneeFlexionMax && wristSpread < t.glideWristSpreadMax && ankleSpread < t.glideAnkleSpreadMax) return "glide";
+  if (kickVelocity > t.kickVelocityMin && kneeFlexion >= t.kickKneeFlexionMin) return "kick";
+  if (kneeFlexion > t.legRecoveryKneeFlexionMin) return "leg-recovery";
+  if (armFlexion > t.pullArmFlexionMin && wristSpread > t.pullWristSpreadMin) return "pull";
+  if (armFlexion > t.breathArmFlexionMin && armFlexion <= t.breathArmFlexionMax && kneeFlexion < t.legRecoveryKneeFlexionMin) return "breath";
   return "unclear";
 }
 
@@ -51,6 +78,29 @@ export function segmentsFor(frames) {
     }
   }
   return segments.filter((segment) => segment.frames >= 2 || segment.phase === "glide");
+}
+
+export function summarizeCalibration(frames) {
+  const safeFrames = Array.isArray(frames) ? frames : [];
+  const recognized = safeFrames.filter((frame) => frame.phase !== "unclear");
+  const overlapFrames = safeFrames.filter((frame) => frame.armFlexion > PHASE_THRESHOLDS.overlapArmFlexionMin && frame.kneeFlexion > PHASE_THRESHOLDS.overlapKneeFlexionMin);
+  const visibilityValues = safeFrames.map((frame) => Number(frame.visibility)).filter(Number.isFinite);
+  const phases = Object.fromEntries(Object.keys(PHASE_LABEL).map((phase) => [phase, safeFrames.filter((frame) => frame.phase === phase).length]));
+
+  return {
+    sampledFrames: safeFrames.length,
+    recognizedRatio: safeFrames.length ? recognized.length / safeFrames.length : 0,
+    overlapRatio: safeFrames.length ? overlapFrames.length / safeFrames.length : 0,
+    visibilityAvg: avg(visibilityValues),
+    visibilityMin: visibilityValues.length ? Math.min(...visibilityValues) : 0,
+    metrics: {
+      armFlexion: metricStats(safeFrames, "armFlexion"),
+      kneeFlexion: metricStats(safeFrames, "kneeFlexion"),
+      wristSpread: metricStats(safeFrames, "wristSpread"),
+      ankleSpread: metricStats(safeFrames, "ankleSpread"),
+    },
+    phases,
+  };
 }
 
 export function analyzePhaseSequence(frames) {
@@ -93,13 +143,12 @@ export function analyzePhaseSequence(frames) {
     if (!phasesSeen.has(phase)) warnings.push(`Chưa nhận dạng ổn định pha “${PHASE_LABEL[phase]}”.`);
   }
 
-  const overlapping = smoothed.filter((frame) => frame.armFlexion > 38 && frame.kneeFlexion > 42).length / Math.max(1, smoothed.length);
-  if (overlapping > 0.18) warnings.push("Tay và chân có dấu hiệu cùng thu mạnh trong một khoảng dài; cần kiểm tra nhịp phối hợp.");
+  const calibration = summarizeCalibration(smoothed);
+  if (calibration.overlapRatio > 0.18) warnings.push("Tay và chân có dấu hiệu cùng thu mạnh trong một khoảng dài; cần kiểm tra nhịp phối hợp.");
   if (completeCycles === 0) warnings.push("Chưa thấy trọn một chu kỳ 5 pha; nên quay đủ ít nhất 2 nhịp bơi liên tiếp.");
   if (phaseDurations.glide > 0 && phaseDurations.glide < phaseDurations.pull * 0.45) warnings.push("Pha lướt khá ngắn so với pha kéo tay; có thể đang vào nhịp mới quá sớm.");
 
-  const recognizedRatio = smoothed.filter((frame) => frame.phase !== "unclear").length / Math.max(1, smoothed.length);
-  const confidence = Math.round(clamp((avg(smoothed.map((frame) => frame.visibility)) * 0.55 + recognizedRatio * 0.45) * 100, 0, 100));
+  const confidence = Math.round(clamp((calibration.visibilityAvg * 0.55 + calibration.recognizedRatio * 0.45) * 100, 0, 100));
   const orderScore = Math.round(clamp(matched / Math.max(EXPECTED_PHASES.length, visible.length) * 100, 0, 100));
 
   return {
