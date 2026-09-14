@@ -30,10 +30,6 @@ const LABELS = Object.freeze({
   breathArmFlexionMax: "Lấy hơi/trả tay · arm flexion tối đa",
 });
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
 function keyForTime(time) {
   return Number(time).toFixed(3);
 }
