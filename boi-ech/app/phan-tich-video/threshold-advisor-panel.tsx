@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { analyzePhaseSequence, PHASE_LABEL, PHASE_THRESHOLDS } from "./phase-cycle-core.mjs";
 import { adviseThresholds } from "./phase-threshold-advisor.mjs";
-import { assessCalibrationCoverage, CALIBRATION_COVERAGE_RULES, CALIBRATION_VIEWS } from "./phase-calibration-coverage.mjs";
+import { assessCalibrationCoverage, CALIBRATION_COVERAGE_RULES } from "./phase-calibration-coverage.mjs";
 import { assessCycleByView, viewProfile } from "./phase-view-profile.mjs";
+import { SharedCameraProfileControl, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
 
 type StrokePhase = "pull" | "breath" | "leg-recovery" | "kick" | "glide" | "unclear";
 type ScoredPhase = Exclude<StrokePhase, "unclear">;
@@ -82,7 +82,7 @@ function checkLabel(key: string) {
 }
 
 export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames: PhaseFrame[]; labelsByTime: Record<string, ScoredPhase> }) {
-  const [view, setView] = useState("");
+  const view = useCameraProfile();
   const advisor = adviseThresholds(frames, labelsByTime, PHASE_THRESHOLDS) as Advisor;
   const phaseReport = analyzePhaseSequence(frames) as { completeCycles?: number; cycles?: CycleQuality[] };
   const derivedCycles = Number(phaseReport.completeCycles ?? 0);
@@ -96,7 +96,7 @@ export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames
   const trustedForClip = advisor.ready && coverage.readyForThresholdReview;
 
   return (
-    <section data-threshold-advisor-local-only data-calibration-coverage-gate data-view-aware-cycle-analysis style={{ marginTop: 10, border: "1px solid #d9e6dd", borderRadius: 11, background: "#f8fcf8", padding: 11 }}>
+    <section data-threshold-advisor-local-only data-calibration-coverage-gate data-view-aware-cycle-analysis data-shared-camera-profile-consumer style={{ marginTop: 10, border: "1px solid #d9e6dd", borderRadius: 11, background: "#f8fcf8", padding: 11 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
           <strong style={{ fontSize: 12 }}>Threshold Advisor · mô phỏng local</strong>
@@ -110,12 +110,11 @@ export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames
       <div style={{ marginTop: 10, border: "1px solid #dfe8ea", borderRadius: 10, background: "#f8fbff", padding: 10 }} data-view-profile-local-only>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 9, alignItems: "center", flexWrap: "wrap" }}>
           <div>
-            <b style={{ display: "block", fontSize: 11 }}>Góc quay dùng để diễn giải chu kỳ</b>
-            <span style={{ display: "block", marginTop: 2, fontSize: 9, color: "#6c7f89" }}>Không đổi qualityScore; chỉ giới hạn pha nào đủ tin cậy để kết luận.</span>
+            <b style={{ display: "block", fontSize: 11 }}>Góc quay chung đang dùng</b>
+            <span style={{ display: "block", marginTop: 2, fontSize: 9, color: "#6c7f89" }}>Cùng profile đang điều khiển Coverage, diễn giải chu kỳ và đối xứng trái–phải.</span>
+            <div style={{ marginTop: 4 }}><SharedCameraProfileStatus /></div>
           </div>
-          <select aria-label="Góc quay clip calibration" value={view} onChange={(event) => setView(event.target.value)} style={{ border: "1px solid #cadbdd", borderRadius: 8, padding: "6px 8px", background: "#fff", fontSize: 10 }}>
-            {CALIBRATION_VIEWS.map((item: { value: string; label: string }) => <option key={item.value || "unknown"} value={item.value}>{item.label}</option>)}
-          </select>
+          {derivedCycles === 0 ? <SharedCameraProfileControl compact /> : null}
         </div>
 
         {selectedProfile ? <div style={{ marginTop: 8 }}>
@@ -139,7 +138,7 @@ export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames
               {assessment.weakestTrustedPhase ? <p style={{ margin: "3px 0 0", fontSize: 9, color: "#5f536f", lineHeight: 1.4 }}>Pha yếu nhất còn đủ tin cậy theo góc: <b>{PHASE_LABEL[assessment.weakestTrustedPhase]}</b>.</p> : null}
             </article>)}
           </div> : <p style={{ margin: "8px 0 0", fontSize: 9, color: "#71838b" }}>Chưa có chu kỳ hoàn chỉnh để diễn giải theo góc quay.</p>}
-        </div> : <p style={{ margin: "8px 0 0", fontSize: 9, color: "#755d37" }}>Chưa chọn góc quay nên hệ thống chưa hạ/khóa kết luận của pha nào.</p>}
+        </div> : <p style={{ margin: "8px 0 0", fontSize: 9, color: "#755d37" }}>Chưa chọn góc quay chung nên hệ thống chưa hạ/khóa kết luận của pha nào.</p>}
       </div>
 
       <div style={{ marginTop: 10, border: "1px solid #e4e9dd", borderRadius: 10, background: "#fff", padding: 10 }}>
