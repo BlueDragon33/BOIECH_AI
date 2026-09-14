@@ -6,6 +6,7 @@ const analyzerUrl = new URL("../app/phan-tich-video/video-analyzer-impl.tsx", im
 const analyzerComposerUrl = new URL("../app/phan-tich-video/video-analyzer.tsx", import.meta.url);
 const phaseAnalyzerUrl = new URL("../app/phan-tich-video/phase-cycle-analyzer.tsx", import.meta.url);
 const phaseCoreUrl = new URL("../app/phan-tich-video/phase-cycle-core.mjs", import.meta.url);
+const groundTruthUrl = new URL("../app/phan-tich-video/phase-ground-truth.mjs", import.meta.url);
 const analysisPageUrl = new URL("../app/phan-tich-video/page.tsx", import.meta.url);
 const consentUrl = new URL("../app/phan-tich-video/privacy-consent.tsx", import.meta.url);
 const analysisRouteUrl = new URL("../app/api/video-analysis/route.ts", import.meta.url);
@@ -43,7 +44,7 @@ test("MediaPipe cannot start before informed telemetry consent", async () => {
   assert.match(consent, /removeItem\(CONSENT_KEY\)/);
 });
 
-test("experimental v2 recognizes a local five-phase breaststroke cycle without changing v1 scoring", async () => {
+test("experimental cycle engine recognizes a local five-phase breaststroke cycle without changing v1 scoring", async () => {
   const [composer, phase, core] = await Promise.all([
     readFile(analyzerComposerUrl, "utf8"),
     readFile(phaseAnalyzerUrl, "utf8"),
@@ -81,7 +82,7 @@ test("phase calibration remains local, bounded and tied to exact video timestamp
   assert.doesNotMatch(core, /localStorage|indexedDB|fetch\(/i);
 });
 
-test("v2.1 reviews each complete cycle locally and links the weakest phase to video", async () => {
+test("cycle quality reviews each complete cycle locally and links the weakest phase to video", async () => {
   const [phase, core] = await Promise.all([
     readFile(phaseAnalyzerUrl, "utf8"),
     readFile(phaseCoreUrl, "utf8"),
@@ -93,11 +94,31 @@ test("v2.1 reviews each complete cycle locally and links the weakest phase to vi
   assert.match(core, /phaseStarts/);
   assert.match(core, /cycleQualityAvg/);
   assert.match(phase, /data-cycle-quality-local-only/);
-  assert.match(phase, /Chất lượng từng chu kỳ · v2\.1/);
+  assert.match(phase, /Chất lượng từng chu kỳ · thử nghiệm/);
   assert.match(phase, /cycle\.phaseStarts\[cycle\.weakestPhase\]/);
   assert.match(phase, /cycle\.phaseScores\[phase\]/);
   assert.match(phase, /chưa phải điểm sinh cơ học đã hiệu chuẩn/);
+  assert.doesNotMatch(phase, /V2\.1|V2\.2/);
   assert.doesNotMatch(core, /fetch\(|localStorage|indexedDB/i);
+});
+
+test("ground truth remains session-only and never overwrites AI phase predictions", async () => {
+  const [phase, groundTruth] = await Promise.all([
+    readFile(phaseAnalyzerUrl, "utf8"),
+    readFile(groundTruthUrl, "utf8"),
+  ]);
+  assert.match(phase, /from "\.\/phase-ground-truth\.mjs"/);
+  assert.match(phase, /data-ground-truth-local-only/);
+  assert.match(phase, /summarizeGroundTruth\(calibrationFrames, groundTruthLabels\)/);
+  assert.match(phase, /setGroundTruthLabels\(\{\}\)/);
+  assert.match(phase, /Nhãn chuẩn/);
+  assert.match(phase, /Nhãn chuẩn không ghi đè kết quả AI/);
+  assert.match(groundTruth, /export function summarizeGroundTruth/);
+  assert.match(groundTruth, /aiPhase: frame\.phase/);
+  assert.match(groundTruth, /truthPhase/);
+  assert.match(groundTruth, /mistakes\.sort/);
+  assert.doesNotMatch(groundTruth, /fetch\(|localStorage|indexedDB|\/api\//i);
+  assert.doesNotMatch(phase, /localStorage|indexedDB/i);
 });
 
 test("video analysis API rejects binary-looking payload fields", async () => {
