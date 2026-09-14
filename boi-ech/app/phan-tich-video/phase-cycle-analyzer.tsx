@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, PHASE_THRESHOLDS, SAMPLE_FPS, summarizeCalibration } from "./phase-cycle-core.mjs";
+import { GROUND_TRUTH_PHASES, summarizeGroundTruth } from "./phase-ground-truth.mjs";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VISION_VERSION = "1.0.1";
@@ -61,6 +62,19 @@ type CalibrationSummary = {
   visibilityMin: number;
   metrics: Record<"armFlexion" | "kneeFlexion" | "wristSpread" | "ankleSpread", MetricStats>;
   phases: Record<StrokePhase, number>;
+};
+type GroundTruthSummary = {
+  annotated: number;
+  matches: number;
+  corrections: number;
+  accuracy: number;
+  mistakes: Array<{ aiPhase: StrokePhase; truthPhase: ScoredPhase; count: number }>;
+  phaseMetrics: Record<ScoredPhase, {
+    annotated: number;
+    correct: number;
+    recall: number;
+    metrics: Record<"armFlexion" | "kneeFlexion" | "wristSpread" | "ankleSpread", MetricStats>;
+  }>;
 };
 
 const SCORED_PHASES: ScoredPhase[] = ["pull", "breath", "leg-recovery", "kick", "glide"];
@@ -195,6 +209,10 @@ function qualityLabel(status: CycleQuality["status"]) {
   return "Yếu";
 }
 
+function truthKey(time: number) {
+  return Number(time).toFixed(3);
+}
+
 export default function PhaseCycleAnalyzer() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -202,10 +220,24 @@ export default function PhaseCycleAnalyzer() {
   const [report, setReport] = useState<CycleReport | null>(null);
   const [calibrationFrames, setCalibrationFrames] = useState<PhaseFrame[]>([]);
   const [showCalibration, setShowCalibration] = useState(false);
+  const [groundTruthLabels, setGroundTruthLabels] = useState<Record<string, ScoredPhase>>({});
 
   const calibration = calibrationFrames.length ? summarizeCalibration(calibrationFrames) as CalibrationSummary : null;
   const calibrationStep = Math.max(1, Math.ceil(calibrationFrames.length / 60));
   const calibrationRows = calibrationFrames.filter((_, index) => index % calibrationStep === 0);
+  const groundTruth = summarizeGroundTruth(calibrationFrames, groundTruthLabels) as GroundTruthSummary;
+
+  function setGroundTruth(time: number, phase: ScoredPhase | "") {
+    const key = truthKey(time);
+    setGroundTruthLabels((current) => {
+      if (!phase) {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      }
+      return { ...current, [key]: phase };
+    });
+  }
 
   async function run() {
     if (busy) return;
@@ -217,6 +249,7 @@ export default function PhaseCycleAnalyzer() {
     setBusy(true);
     setReport(null);
     setCalibrationFrames([]);
+    setGroundTruthLabels({});
     setShowCalibration(false);
     setProgress(0);
     setStatus("Đang nhận dạng chu kỳ kéo tay → lấy hơi → thu chân → đạp → lướt…");
@@ -261,12 +294,12 @@ export default function PhaseCycleAnalyzer() {
       <div style={panelStyle}>
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <span style={{ color: "#08727b", fontSize: 12, fontWeight: 900, letterSpacing: ".05em" }}>04 · CHU KỲ ĐỘNG TÁC V2.1 · THỬ NGHIỆM</span>
+            <span style={{ color: "#08727b", fontSize: 12, fontWeight: 900, letterSpacing: ".05em" }}>04 · PHÂN TÍCH CHU KỲ · THỬ NGHIỆM</span>
             <h2 style={{ margin: "6px 0 8px", fontSize: 23 }}>Nhận dạng 5 pha và chất lượng từng chu kỳ trên video local</h2>
             <p style={{ margin: 0, maxWidth: 820, color: "#526d78", lineHeight: 1.6, fontSize: 13 }}>Engine này chưa tham gia điểm chính. Điểm từng chu kỳ chỉ là độ tin cậy kỹ thuật theo tín hiệu pose/ngưỡng thử nghiệm để tìm đoạn cần xem lại, chưa phải điểm sinh cơ học đã hiệu chuẩn.</p>
           </div>
           <button type="button" onClick={() => void run()} disabled={busy} style={{ border: 0, borderRadius: 12, padding: "11px 16px", background: busy ? "#a9babc" : "#08727b", color: "#ffffff", fontWeight: 900, cursor: busy ? "wait" : "pointer" }}>
-            {busy ? `Đang nhận dạng ${progress}%` : "Phân tích chu kỳ v2.1"}
+            {busy ? `Đang nhận dạng ${progress}%` : "Phân tích chu kỳ"}
           </button>
         </header>
         <div style={{ height: 6, borderRadius: 999, background: "#e8f0f1", overflow: "hidden", marginTop: 16 }}><i style={{ display: "block", height: "100%", width: `${progress}%`, background: "#15919a" }} /></div>
@@ -296,7 +329,7 @@ export default function PhaseCycleAnalyzer() {
 
           {report.cycles.length ? <div style={{ ...miniStyle, background: "#f7fbff" }} data-cycle-quality-local-only>
             <div>
-              <strong style={{ fontSize: 14 }}>Chất lượng từng chu kỳ · v2.1</strong>
+              <strong style={{ fontSize: 14 }}>Chất lượng từng chu kỳ · thử nghiệm</strong>
               <p style={{ margin: "5px 0 0", color: "#5b737d", fontSize: 12, lineHeight: 1.5 }}>Dùng để khoanh vùng chu kỳ/pha cần xem lại. Không gửi điểm pha hay trace chu kỳ lên máy chủ.</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10, marginTop: 12 }}>
@@ -330,7 +363,7 @@ export default function PhaseCycleAnalyzer() {
 
           {report.warnings.length ? <div style={{ ...miniStyle, background: "#fffaf1", borderColor: "#f0dfbf" }}><strong style={{ fontSize: 13 }}>Điểm cần kiểm tra thêm</strong><ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "#66543d", lineHeight: 1.6, fontSize: 13 }}>{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
 
-          {calibration ? <div style={{ ...miniStyle, background: "#f4fafa" }} data-phase-calibration-local-only>
+          {calibration ? <div style={{ ...miniStyle, background: "#f4fafa" }} data-phase-calibration-local-only data-ground-truth-local-only>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <strong style={{ fontSize: 14 }}>Calibration Mode · local-only</strong>
@@ -365,13 +398,34 @@ export default function PhaseCycleAnalyzer() {
                 </div>
               </details>
 
-              <div style={{ overflowX: "auto", maxHeight: 360, border: "1px solid #dce9ea", borderRadius: 12, background: "#fff" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
-                  <thead style={{ position: "sticky", top: 0, background: "#eef7f7", zIndex: 1 }}><tr><th style={cellStyle}>Thời gian</th><th style={cellStyle}>Pha AI</th><th style={cellStyle}>Tay °</th><th style={cellStyle}>Gối °</th><th style={cellStyle}>Wrist spread</th><th style={cellStyle}>Ankle spread</th><th style={cellStyle}>Visibility</th></tr></thead>
-                  <tbody>{calibrationRows.map((frame) => <tr key={`${frame.time}-${frame.phase}`} onClick={() => jumpToFrame(frame.time)} style={{ cursor: "pointer" }} title="Bấm để nhảy video tới mốc này"><td style={cellStyle}>{frame.time.toFixed(1)}s</td><td style={cellStyle}><b>{PHASE_LABEL[frame.phase]}</b></td><td style={cellStyle}>{frame.armFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.kneeFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.wristSpread.toFixed(2)}</td><td style={cellStyle}>{frame.ankleSpread.toFixed(2)}</td><td style={cellStyle}>{Math.round(frame.visibility * 100)}%</td></tr>)}</tbody>
+              <div style={{ border: "1px solid #cfe2e4", borderRadius: 12, background: "#ffffff", padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <strong style={{ fontSize: 13 }}>Ground Truth · đối chiếu người kiểm tra</strong>
+                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "#607780", lineHeight: 1.45 }}>Chọn nhãn chuẩn ở bảng bên dưới. Nhãn chuẩn không ghi đè kết quả AI; nó chỉ tạo thống kê sai lệch để hiệu chỉnh ngưỡng sau này.</p>
+                  </div>
+                  {groundTruth.annotated ? <button type="button" onClick={() => setGroundTruthLabels({})} style={{ border: "1px solid #d5e2e3", borderRadius: 9, background: "#fff", padding: "7px 9px", cursor: "pointer", fontSize: 11, fontWeight: 800 }}>Xóa nhãn chuẩn</button> : null}
+                </div>
+                <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(135px,1fr))", gap: 7 }}>
+                  <div style={{ background: "#f8fbfb", borderRadius: 9, padding: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c" }}>Đã gắn nhãn</span><b>{groundTruth.annotated}</b></div>
+                  <div style={{ background: "#f8fbfb", borderRadius: 9, padding: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c" }}>AI khớp</span><b>{groundTruth.matches}</b></div>
+                  <div style={{ background: "#f8fbfb", borderRadius: 9, padding: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c" }}>Cần sửa</span><b>{groundTruth.corrections}</b></div>
+                  <div style={{ background: "#f8fbfb", borderRadius: 9, padding: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c" }}>Độ khớp</span><b>{groundTruth.annotated ? `${Math.round(groundTruth.accuracy * 100)}%` : "—"}</b></div>
+                </div>
+                {groundTruth.mistakes.length ? <div style={{ marginTop: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c", marginBottom: 5 }}>Nhầm nhiều nhất</span><div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>{groundTruth.mistakes.slice(0, 5).map((mistake) => <span key={`${mistake.aiPhase}-${mistake.truthPhase}`} style={{ borderRadius: 999, padding: "5px 8px", background: "#fff4e8", color: "#72502b", fontSize: 10, fontWeight: 800 }}>AI {PHASE_LABEL[mistake.aiPhase]} → chuẩn {PHASE_LABEL[mistake.truthPhase]} · {mistake.count}</span>)}</div></div> : null}
+                {groundTruth.annotated ? <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 6 }}>{SCORED_PHASES.map((phase) => {
+                  const metric = groundTruth.phaseMetrics[phase];
+                  return <div key={phase} style={{ border: "1px solid #e2ecee", borderRadius: 9, padding: 8 }}><span style={{ display: "block", fontSize: 10 }}>{PHASE_LABEL[phase]}</span><b style={{ fontSize: 12 }}>{metric.annotated ? `${Math.round(metric.recall * 100)}%` : "—"}</b><span style={{ marginLeft: 4, fontSize: 9, color: "#71858c" }}>{metric.correct}/{metric.annotated}</span></div>;
+                })}</div> : null}
+              </div>
+
+              <div style={{ overflowX: "auto", maxHeight: 390, border: "1px solid #dce9ea", borderRadius: 12, background: "#fff" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 920 }}>
+                  <thead style={{ position: "sticky", top: 0, background: "#eef7f7", zIndex: 1 }}><tr><th style={cellStyle}>Thời gian</th><th style={cellStyle}>Pha AI</th><th style={cellStyle}>Nhãn chuẩn</th><th style={cellStyle}>Tay °</th><th style={cellStyle}>Gối °</th><th style={cellStyle}>Wrist spread</th><th style={cellStyle}>Ankle spread</th><th style={cellStyle}>Visibility</th></tr></thead>
+                  <tbody>{calibrationRows.map((frame) => <tr key={`${frame.time}-${frame.phase}`} onClick={() => jumpToFrame(frame.time)} style={{ cursor: "pointer", background: groundTruthLabels[truthKey(frame.time)] && groundTruthLabels[truthKey(frame.time)] !== frame.phase ? "#fffaf2" : undefined }} title="Bấm hàng để nhảy video tới mốc này"><td style={cellStyle}>{frame.time.toFixed(1)}s</td><td style={cellStyle}><b>{PHASE_LABEL[frame.phase]}</b></td><td style={cellStyle}><select aria-label={`Nhãn chuẩn tại ${frame.time.toFixed(1)} giây`} value={groundTruthLabels[truthKey(frame.time)] ?? ""} onClick={(event) => event.stopPropagation()} onChange={(event) => setGroundTruth(frame.time, event.target.value as ScoredPhase | "")} style={{ maxWidth: 150, border: "1px solid #cadbdd", borderRadius: 7, padding: "5px 6px", background: "#fff", fontSize: 11 }}><option value="">Chưa gắn</option>{(GROUND_TRUTH_PHASES as ScoredPhase[]).map((phase) => <option key={phase} value={phase}>{PHASE_LABEL[phase]}</option>)}</select></td><td style={cellStyle}>{frame.armFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.kneeFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.wristSpread.toFixed(2)}</td><td style={cellStyle}>{frame.ankleSpread.toFixed(2)}</td><td style={cellStyle}>{Math.round(frame.visibility * 100)}%</td></tr>)}</tbody>
                 </table>
               </div>
-              <p style={{ margin: 0, fontSize: 11, color: "#6b8189" }}>Bảng chỉ hiển thị tối đa khoảng 60 mốc để giữ giao diện nhẹ. Bấm một dòng để đối chiếu đúng thời điểm trên video.</p>
+              <p style={{ margin: 0, fontSize: 11, color: "#6b8189" }}>Bảng chỉ hiển thị tối đa khoảng 60 mốc để giữ giao diện nhẹ. Ground Truth chỉ tồn tại trong phiên trang và bị xóa khi chạy phân tích lại.</p>
             </div> : null}
           </div> : null}
         </div> : null}
