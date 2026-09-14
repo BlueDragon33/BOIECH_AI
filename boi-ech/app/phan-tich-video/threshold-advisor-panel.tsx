@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { analyzePhaseSequence, PHASE_LABEL, PHASE_THRESHOLDS } from "./phase-cycle-core.mjs";
 import { adviseThresholds } from "./phase-threshold-advisor.mjs";
 import { assessCalibrationCoverage, CALIBRATION_COVERAGE_RULES, CALIBRATION_VIEWS } from "./phase-calibration-coverage.mjs";
@@ -66,13 +65,13 @@ function checkLabel(key: string) {
   return key;
 }
 
-export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames: PhaseFrame[]; labelsByTime: Record<string, ScoredPhase> }) {
-  const [view, setView] = useState("");
+export default function ThresholdAdvisorPanel({ frames, labelsByTime, view }: { frames: PhaseFrame[]; labelsByTime: Record<string, ScoredPhase>; view: string }) {
   const advisor = adviseThresholds(frames, labelsByTime, PHASE_THRESHOLDS) as Advisor;
   const derivedCycles = Number((analyzePhaseSequence(frames) as { completeCycles?: number }).completeCycles ?? 0);
   const coverage = assessCalibrationCoverage(frames, labelsByTime, { completeCycles: derivedCycles, view }) as Coverage;
   const gain = Math.round((advisor.preview.accuracy - advisor.baseline.accuracy) * 100);
   const trustedForClip = advisor.ready && coverage.readyForThresholdReview;
+  const selectedViewLabel = CALIBRATION_VIEWS.find((item: { value: string; label: string }) => item.value === view)?.label ?? "Chưa chọn góc quay";
 
   return (
     <section data-threshold-advisor-local-only data-calibration-coverage-gate style={{ marginTop: 10, border: "1px solid #d9e6dd", borderRadius: 11, background: "#f8fcf8", padding: 11 }}>
@@ -92,9 +91,7 @@ export default function ThresholdAdvisorPanel({ frames, labelsByTime }: { frames
             <b style={{ display: "block", fontSize: 11 }}>Calibration Coverage Gate</b>
             <span style={{ display: "block", marginTop: 2, fontSize: 9, color: "#71847a" }}>Độ phủ hiện tại {coverage.coverageScore}% · chỉ đánh giá phạm vi một clip.</span>
           </div>
-          <select aria-label="Góc quay clip calibration" value={view} onChange={(event) => setView(event.target.value)} style={{ border: "1px solid #cadbdd", borderRadius: 8, padding: "6px 8px", background: "#fff", fontSize: 10 }}>
-            {CALIBRATION_VIEWS.map((item: { value: string; label: string }) => <option key={item.value || "unknown"} value={item.value}>{item.label}</option>)}
-          </select>
+          <span aria-label="Góc quay clip calibration" style={{ border: "1px solid #cadbdd", borderRadius: 8, padding: "6px 8px", background: "#f8fbfb", fontSize: 10 }}>{selectedViewLabel}</span>
         </div>
 
         <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(92px,1fr))", gap: 5 }}>
