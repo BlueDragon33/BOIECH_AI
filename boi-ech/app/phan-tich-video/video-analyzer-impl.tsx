@@ -12,7 +12,7 @@ const MAX_LOCAL_ANALYSES = 10;
 const MAX_ERROR_FRAMES = 4;
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VIDEO_DB = "boi-ech-video-ai-v1";
-const ENGINE_VERSION = "breaststroke-local-v1.0";
+const ENGINE_VERSION = "breaststroke-local-v1.1";
 const VISION_VERSION = "1.0.1";
 const BUNDLE_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/vision_bundle.mjs`;
 const WASM_LOADER_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/wasm/vision_wasm_internal.js`;
@@ -49,6 +49,12 @@ type AnalysisError = {
   highlight: number[];
 };
 type LocalFrame = { timeSec: number; title: string; dataUrl: string };
+type CaptureQuality = {
+  level: "good" | "review" | "retry";
+  poseCoverage: number;
+  averageVisibility: number;
+  guidance: string[];
+};
 type Analysis = {
   id: string;
   engineVersion: string;
@@ -62,6 +68,7 @@ type Analysis = {
   cameraView: View;
   score: number;
   confidence: number;
+  captureQuality: CaptureQuality;
   categories: { legs: number; arms: number; coordination: number; bodyLine: number };
   errors: AnalysisError[];
   localFrames: LocalFrame[];
@@ -90,6 +97,21 @@ function bytesLabel(bytes: number) { return bytes < 1024 * 1024 ? `${Math.round(
 function timeLabel(seconds: number) { return `00:${Math.max(0, seconds).toFixed(1).padStart(4, "0")}`; }
 function uniqueAnalysisId() { return `${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`; }
 function utcNow() { return new Date().toISOString(); }
+
+function assessCaptureQuality(frames: Metric[], sampleCount: number): CaptureQuality {
+  const poseCoverage = Math.round(clamp(frames.length / Math.max(1, sampleCount) * 100));
+  const averageVisibility = Math.round(clamp(avg(frames.map((frame) => frame.visibility)) * 100));
+  const guidance: string[] = [];
+  if (poseCoverage < 75) guidance.push("Giữ toàn bộ đầu, tay và chân trong khung hình suốt đoạn bơi.");
+  if (averageVisibility < 70) guidance.push("Tăng ánh sáng, giảm phản chiếu mặt nước và tránh người khác che khuất.");
+  if (!guidance.length) guidance.push("Khung hình đủ rõ và liên tục để AI đưa ra nhận xét hỗ trợ.");
+  return {
+    level: poseCoverage < 55 || averageVisibility < 55 ? "retry" : poseCoverage < 75 || averageVisibility < 70 ? "review" : "good",
+    poseCoverage,
+    averageVisibility,
+    guidance,
+  };
+}
 
 function openLocalDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -164,6 +186,11 @@ function serverPayload(result: Analysis) {
     cameraView: result.cameraView,
     score: result.score,
     confidence: result.confidence,
+    captureQuality: {
+      level: result.captureQuality.level,
+      poseCoverage: result.captureQuality.poseCoverage,
+      averageVisibility: result.captureQuality.averageVisibility,
+    },
     categories: result.categories,
     errors: result.errors.map((error) => ({
       code: error.code,
@@ -415,6 +442,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
   const [referenceUrl, setReferenceUrl] = useState("");
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
+  const [qualityReport, setQualityReport] = useState<CaptureQuality | null>(null);
   const embedId = useMemo(() => youtubeId(referenceUrl), [referenceUrl]);
 
   const flushPending = useCallback(async () => {
@@ -453,7 +481,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
   }
 
   function chooseFile(next: File | null) {
-    setResult(null); setProgress(0); setMetadata(null);
+    setResult(null); setProgress(0); setMetadata(null); setQualityReport(null);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     setFile(null); setObjectUrl("");
     if (!next) { setFile(null); setObjectUrl(""); setStatus("Chưa chọn video."); return; }
@@ -480,7 +508,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
     if (!video || !file || busy) return;
     if (!Number.isFinite(video.duration) || video.duration <= 0) { setStatus("Không đọc được thời lượng video."); return; }
     if (video.duration > MAX_VIDEO_SECONDS + 0.05) { setStatus(`Video dài ${video.duration.toFixed(1)} giây; giới hạn là 30 giây.`); return; }
-    setBusy(true); setProgress(0); setResult(null); setStatus("Đang khởi tạo AI cục bộ…");
+    setBusy(true); setProgress(0); setResult(null); setQualityReport(null); setStatus("Đang khởi tạo AI cục bộ…");
     let dispose = () => undefined;
     try {
       const pose = await createLandmarker(); dispose = pose.dispose; setReady(true);
@@ -495,12 +523,18 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         setProgress(Math.round((index + 1) / sampleCount * 82));
         if (index % 5 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
-      if (frames.length < Math.max(3, Math.ceil(sampleCount * 0.35))) throw new Error("AI nhìn thấy cơ thể quá ít. Hãy quay toàn thân rõ hơn và đủ sáng.");
+      const captureQuality = assessCaptureQuality(frames, sampleCount);
+      setQualityReport(captureQuality);
+      if (captureQuality.level === "retry") {
+        setProgress(100);
+        setStatus("Chưa chấm điểm vì chất lượng nhận diện chưa đủ. Hãy quay lại theo hướng dẫn bên dưới.");
+        return;
+      }
       const confidence = Math.round(clamp((avg(frames.map((frame) => frame.visibility)) * .55 + frames.length / sampleCount * .45) * 100));
       const errors = detectErrors(frames, view, confidence);
       const categories = scoreCategories(errors);
       let score = Math.round(categories.legs * .35 + categories.arms * .2 + categories.coordination * .3 + categories.bodyLine * .15);
-      if (confidence < 55) score = Math.min(score, 75);
+      if (captureQuality.level === "review") score = Math.min(score, 80);
       const localFrames: LocalFrame[] = [];
       for (const error of errors.slice(0, MAX_ERROR_FRAMES)) {
         const metric = frames[error.frameIndex]; if (!metric) continue;
@@ -511,7 +545,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         id: uniqueAnalysisId(),
         engineVersion: ENGINE_VERSION, analyzedAt: utcNow(), durationSec: video.duration, fileSizeBytes: file.size,
         width: video.videoWidth, height: video.videoHeight, sampledFrames: sampleCount, detectedFrames: frames.length, cameraView: view,
-        score, confidence, categories, errors, localFrames, syncState: navigator.onLine ? "pending" : "local",
+        score, confidence, captureQuality, categories, errors, localFrames, syncState: navigator.onLine ? "pending" : "local",
       };
       await putLocalAnalysis(analysis);
       await putStore("pending", { id: analysis.id, lessonNumber, analysis: serverPayload(analysis), createdAt: utcNow() });
@@ -569,6 +603,12 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         <div className={styles.progress}><i style={{ width: `${progress}%` }} /></div><p className={styles.status} role="status">{status}</p><small className={styles.disclaimer}>AI v1 là công cụ sàng lọc kỹ thuật từ pose landmarks, không thay thế huấn luyện viên. Ngưỡng sẽ được hiệu chỉnh tiếp bằng video bơi thực tế.</small>
       </div>
     </section>
+
+    {qualityReport ? <section className={`${styles.qualityPanel} ${qualityReport.level === "retry" ? styles.qualityRetry : qualityReport.level === "review" ? styles.qualityReview : styles.qualityGood}`}>
+      <header><div><span>Kiểm soát chất lượng</span><h2>{qualityReport.level === "good" ? "Video đủ chất lượng để nhận xét" : qualityReport.level === "review" ? "Có thể nhận xét, cần đọc thận trọng" : "Cần quay lại trước khi chấm điểm"}</h2></div><b>{qualityReport.level === "good" ? "Đạt" : qualityReport.level === "review" ? "Xem lại" : "Chưa đạt"}</b></header>
+      <div className={styles.qualityMetrics}><div><span>AI thấy rõ tư thế</span><strong>{qualityReport.poseCoverage}%</strong></div><div><span>Độ rõ điểm khớp</span><strong>{qualityReport.averageVisibility}%</strong></div></div>
+      <ul>{qualityReport.guidance.map((item) => <li key={item}>{item}</li>)}</ul>
+    </section> : null}
 
     {result ? <section className={styles.report}>
       <header><div><span>03 · Kết quả AI</span><h2>{result.errors.length ? `Phát hiện ${result.errors.length} điểm cần xem lại` : "Chưa thấy lỗi nổi bật trong các tiêu chí v1"}</h2><p>Độ tin cậy {result.confidence}% · {result.detectedFrames}/{result.sampledFrames} khung hình hợp lệ · {result.syncState === "synced" ? "đã đồng bộ" : "đang giữ local/chờ đồng bộ"}.</p></div><strong>{result.score}<small>/100</small></strong></header>
