@@ -81,6 +81,25 @@ test("phase calibration remains local, bounded and tied to exact video timestamp
   assert.doesNotMatch(core, /localStorage|indexedDB|fetch\(/i);
 });
 
+test("v2.1 reviews each complete cycle locally and links the weakest phase to video", async () => {
+  const [phase, core] = await Promise.all([
+    readFile(phaseAnalyzerUrl, "utf8"),
+    readFile(phaseCoreUrl, "utf8"),
+  ]);
+  assert.match(core, /function buildCycleQuality/);
+  assert.match(core, /qualityScore/);
+  assert.match(core, /weakestPhase/);
+  assert.match(core, /phaseScores/);
+  assert.match(core, /phaseStarts/);
+  assert.match(core, /cycleQualityAvg/);
+  assert.match(phase, /data-cycle-quality-local-only/);
+  assert.match(phase, /Chất lượng từng chu kỳ · v2\.1/);
+  assert.match(phase, /cycle\.phaseStarts\[cycle\.weakestPhase\]/);
+  assert.match(phase, /cycle\.phaseScores\[phase\]/);
+  assert.match(phase, /chưa phải điểm sinh cơ học đã hiệu chuẩn/);
+  assert.doesNotMatch(core, /fetch\(|localStorage|indexedDB/i);
+});
+
 test("video analysis API rejects binary-looking payload fields", async () => {
   const source = await readFile(analysisRouteUrl, "utf8");
   assert.match(source, /hasForbiddenBinaryField/);
