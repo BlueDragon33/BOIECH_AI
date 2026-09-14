@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, SAMPLE_FPS } from "./phase-cycle-core.mjs";
 
-const SAMPLE_FPS = 5;
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VISION_VERSION = "1.0.1";
 const BUNDLE_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/vision_bundle.mjs`;
@@ -33,19 +33,6 @@ type CycleReport = {
   warnings: string[];
 };
 
-const PHASE_LABEL: Record<StrokePhase, string> = {
-  pull: "Kéo tay",
-  breath: "Lấy hơi / trả tay",
-  "leg-recovery": "Thu chân",
-  kick: "Đạp chân",
-  glide: "Lướt",
-  unclear: "Chưa rõ",
-};
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
 function avg(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
@@ -61,7 +48,7 @@ function jointAngle(a: Point, b: Point, c: Point) {
   const cby = c.y - b.y;
   const denominator = Math.hypot(abx, aby) * Math.hypot(cbx, cby);
   if (denominator < 1e-6) return 180;
-  const cosine = clamp((abx * cbx + aby * cby) / denominator, -1, 1);
+  const cosine = Math.min(1, Math.max(-1, (abx * cbx + aby * cby) / denominator));
   return Math.acos(cosine) * 180 / Math.PI;
 }
 
@@ -146,96 +133,9 @@ function phaseMetrics(time: number, points: Point[], previousKneeFlexion: number
   const hipWidth = Math.max(0.025, dist(points[23], points[24]));
   const wristSpread = dist(points[15], points[16]) / shoulderWidth;
   const ankleSpread = dist(points[27], points[28]) / hipWidth;
-  const kickVelocity = previousKneeFlexion === null ? 0 : previousKneeFlexion - kneeFlexion;
-
-  let phase: StrokePhase = "unclear";
-  if (armFlexion < 24 && kneeFlexion < 22 && wristSpread < 1.18 && ankleSpread < 1.35) {
-    phase = "glide";
-  } else if (kickVelocity > 5 && kneeFlexion >= 10) {
-    phase = "kick";
-  } else if (kneeFlexion > 42) {
-    phase = "leg-recovery";
-  } else if (armFlexion > 48 && wristSpread > 1.12) {
-    phase = "pull";
-  } else if (armFlexion > 24 && armFlexion <= 48 && kneeFlexion < 42) {
-    phase = "breath";
-  }
+  const phase = classifyPhase({ armFlexion, kneeFlexion, wristSpread, ankleSpread, previousKneeFlexion }) as StrokePhase;
 
   return { time, phase, armFlexion, kneeFlexion, wristSpread, ankleSpread, visibility };
-}
-
-function smoothPhases(frames: PhaseFrame[]) {
-  return frames.map((frame, index) => {
-    if (frame.phase !== "unclear") return frame;
-    const before = frames[index - 1]?.phase;
-    const after = frames[index + 1]?.phase;
-    if (before && before === after && before !== "unclear") return { ...frame, phase: before };
-    return frame;
-  });
-}
-
-function segmentsFor(frames: PhaseFrame[]) {
-  const segments: PhaseSegment[] = [];
-  for (const frame of frames) {
-    const current = segments.at(-1);
-    if (!current || current.phase !== frame.phase) {
-      segments.push({ phase: frame.phase, start: frame.time, end: frame.time, frames: 1 });
-    } else {
-      current.end = frame.time;
-      current.frames += 1;
-    }
-  }
-  return segments.filter((segment) => segment.frames >= 2 || segment.phase === "glide");
-}
-
-function analyzeSequence(frames: PhaseFrame[]): CycleReport {
-  const smoothed = smoothPhases(frames);
-  const sequence = segmentsFor(smoothed);
-  const expected: Exclude<StrokePhase, "unclear">[] = ["pull", "breath", "leg-recovery", "kick", "glide"];
-  const visible = sequence.filter((segment) => segment.phase !== "unclear");
-  let expectedIndex = 0;
-  let matched = 0;
-  let completeCycles = 0;
-  for (const segment of visible) {
-    if (segment.phase === expected[expectedIndex]) {
-      matched += 1;
-      expectedIndex += 1;
-      if (expectedIndex === expected.length) {
-        completeCycles += 1;
-        expectedIndex = 0;
-      }
-    } else if (segment.phase === "pull") {
-      expectedIndex = 1;
-      matched += 1;
-    }
-  }
-
-  const phaseDurations = {
-    pull: 0,
-    breath: 0,
-    "leg-recovery": 0,
-    kick: 0,
-    glide: 0,
-  };
-  for (const segment of visible) {
-    if (segment.phase === "unclear") continue;
-    phaseDurations[segment.phase] += Math.max(1 / SAMPLE_FPS, segment.end - segment.start + 1 / SAMPLE_FPS);
-  }
-
-  const warnings: string[] = [];
-  const phasesSeen = new Set(visible.map((segment) => segment.phase));
-  for (const phase of expected) {
-    if (!phasesSeen.has(phase)) warnings.push(`Chưa nhận dạng ổn định pha “${PHASE_LABEL[phase]}”.`);
-  }
-  const overlapping = smoothed.filter((frame) => frame.armFlexion > 38 && frame.kneeFlexion > 42).length / Math.max(1, smoothed.length);
-  if (overlapping > 0.18) warnings.push("Tay và chân có dấu hiệu cùng thu mạnh trong một khoảng dài; cần kiểm tra nhịp phối hợp.");
-  if (completeCycles === 0) warnings.push("Chưa thấy trọn một chu kỳ 5 pha; nên quay đủ ít nhất 2 nhịp bơi liên tiếp.");
-  if (phaseDurations.glide > 0 && phaseDurations.glide < phaseDurations.pull * 0.45) warnings.push("Pha lướt khá ngắn so với pha kéo tay; có thể đang vào nhịp mới quá sớm.");
-
-  const recognizedRatio = smoothed.filter((frame) => frame.phase !== "unclear").length / Math.max(1, smoothed.length);
-  const confidence = Math.round(clamp((avg(smoothed.map((frame) => frame.visibility)) * 0.55 + recognizedRatio * 0.45) * 100, 0, 100));
-  const orderScore = Math.round(clamp(matched / Math.max(expected.length, visible.length) * 100, 0, 100));
-  return { confidence, completeCycles, orderScore, sequence, phaseDurations, warnings };
 }
 
 function durationLabel(seconds: number) {
@@ -279,7 +179,7 @@ export default function PhaseCycleAnalyzer() {
         if (index % 5 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
       if (frames.length < Math.max(5, sampleCount * 0.45)) throw new Error("Không thấy đủ tư thế để nhận dạng chu kỳ. Hãy quay rõ toàn thân hơn.");
-      const nextReport = analyzeSequence(frames);
+      const nextReport = analyzePhaseSequence(frames) as CycleReport;
       setReport(nextReport);
       setStatus(`Đã nhận dạng ${nextReport.completeCycles} chu kỳ hoàn chỉnh; dữ liệu pha chỉ tồn tại trên thiết bị.`);
     } catch (error) {
