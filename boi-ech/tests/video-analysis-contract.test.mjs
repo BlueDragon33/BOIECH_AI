@@ -61,8 +61,24 @@ test("experimental v2 recognizes a local five-phase breaststroke cycle without c
   assert.match(core, /orderScore/);
   assert.match(phase, /Engine này chưa tham gia điểm chính/);
   assert.match(phase, /document\.querySelector<HTMLVideoElement>\("\[data-breaststroke-vision\] video\[playsinline\]"\)/);
-  assert.doesNotMatch(phase, /\/api\/video-analysis/);
+  assert.doesNotMatch(phase, /fetch\([\s\S]{0,160}\/api\/video-analysis/);
   assert.doesNotMatch(core, /\/api\/video-analysis/);
+});
+
+test("phase calibration remains local, bounded and tied to exact video timestamps", async () => {
+  const [phase, core] = await Promise.all([
+    readFile(phaseAnalyzerUrl, "utf8"),
+    readFile(phaseCoreUrl, "utf8"),
+  ]);
+  assert.match(phase, /data-phase-calibration-local-only/);
+  assert.match(phase, /summarizeCalibration/);
+  assert.match(phase, /Math\.ceil\(calibrationFrames\.length \/ 60\)/);
+  assert.match(phase, /jumpToFrame\(frame\.time\)/);
+  assert.match(phase, /setCalibrationFrames\(frames\)/);
+  assert.match(core, /export const PHASE_THRESHOLDS/);
+  assert.match(core, /export function summarizeCalibration/);
+  assert.doesNotMatch(phase, /localStorage|indexedDB/i);
+  assert.doesNotMatch(core, /localStorage|indexedDB|fetch\(/i);
 });
 
 test("video analysis API rejects binary-looking payload fields", async () => {
