@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import MediaPipeConsentGate from "./privacy-consent";
 
 const VideoAnalyzer = dynamic(() => import("./video-analyzer"), {
   ssr: false,
@@ -22,7 +23,9 @@ export default function LocalVideoAnalysisPage() {
           ← Quay lại Bơi ếch AI
         </Link>
       </div>
-      <VideoAnalyzer lessonNumber="03" />
+      <MediaPipeConsentGate>
+        <VideoAnalyzer lessonNumber="03" />
+      </MediaPipeConsentGate>
     </main>
   );
 }
