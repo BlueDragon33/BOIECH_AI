@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, SAMPLE_FPS } from "./phase-cycle-core.mjs";
+import { analyzePhaseSequence, classifyPhase, PHASE_LABEL, PHASE_THRESHOLDS, SAMPLE_FPS, summarizeCalibration } from "./phase-cycle-core.mjs";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VISION_VERSION = "1.0.1";
@@ -31,6 +31,16 @@ type CycleReport = {
   sequence: PhaseSegment[];
   phaseDurations: Record<Exclude<StrokePhase, "unclear">, number>;
   warnings: string[];
+};
+type MetricStats = { min: number; max: number; avg: number };
+type CalibrationSummary = {
+  sampledFrames: number;
+  recognizedRatio: number;
+  overlapRatio: number;
+  visibilityAvg: number;
+  visibilityMin: number;
+  metrics: Record<"armFlexion" | "kneeFlexion" | "wristSpread" | "ankleSpread", MetricStats>;
+  phases: Record<StrokePhase, number>;
 };
 
 function avg(values: number[]) {
@@ -117,6 +127,17 @@ function seek(video: HTMLVideoElement, seconds: number) {
   });
 }
 
+function learnerVideo() {
+  return document.querySelector<HTMLVideoElement>("[data-breaststroke-vision] video[playsinline]");
+}
+
+function jumpToFrame(time: number) {
+  const video = learnerVideo();
+  if (!video) return;
+  video.currentTime = Math.min(Math.max(0, time), Math.max(0, video.duration - 0.01));
+  video.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function phaseMetrics(time: number, points: Point[], previousKneeFlexion: number | null): PhaseFrame | null {
   if (points.length < 33) return null;
   const observed = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
@@ -142,21 +163,33 @@ function durationLabel(seconds: number) {
   return `${seconds.toFixed(1)}s`;
 }
 
+function metricLabel(stats: MetricStats, digits = 1) {
+  return `${stats.min.toFixed(digits)}–${stats.max.toFixed(digits)} · TB ${stats.avg.toFixed(digits)}`;
+}
+
 export default function PhaseCycleAnalyzer() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("Dùng chính video học viên đã chọn ở phần trên.");
   const [report, setReport] = useState<CycleReport | null>(null);
+  const [calibrationFrames, setCalibrationFrames] = useState<PhaseFrame[]>([]);
+  const [showCalibration, setShowCalibration] = useState(false);
+
+  const calibration = calibrationFrames.length ? summarizeCalibration(calibrationFrames) as CalibrationSummary : null;
+  const calibrationStep = Math.max(1, Math.ceil(calibrationFrames.length / 60));
+  const calibrationRows = calibrationFrames.filter((_, index) => index % calibrationStep === 0);
 
   async function run() {
     if (busy) return;
-    const video = document.querySelector<HTMLVideoElement>("[data-breaststroke-vision] video[playsinline]");
+    const video = learnerVideo();
     if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
       setStatus("Chưa có video học viên hợp lệ ở phần trên.");
       return;
     }
     setBusy(true);
     setReport(null);
+    setCalibrationFrames([]);
+    setShowCalibration(false);
     setProgress(0);
     setStatus("Đang nhận dạng chu kỳ kéo tay → lấy hơi → thu chân → đạp → lướt…");
     let dispose = () => undefined;
@@ -180,8 +213,9 @@ export default function PhaseCycleAnalyzer() {
       }
       if (frames.length < Math.max(5, sampleCount * 0.45)) throw new Error("Không thấy đủ tư thế để nhận dạng chu kỳ. Hãy quay rõ toàn thân hơn.");
       const nextReport = analyzePhaseSequence(frames) as CycleReport;
+      setCalibrationFrames(frames);
       setReport(nextReport);
-      setStatus(`Đã nhận dạng ${nextReport.completeCycles} chu kỳ hoàn chỉnh; dữ liệu pha chỉ tồn tại trên thiết bị.`);
+      setStatus(`Đã nhận dạng ${nextReport.completeCycles} chu kỳ hoàn chỉnh; dữ liệu pha và calibration chỉ tồn tại trên thiết bị.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Không thể nhận dạng chu kỳ bơi.");
     } finally {
@@ -192,6 +226,7 @@ export default function PhaseCycleAnalyzer() {
 
   const panelStyle = { border: "1px solid #d7e7e8", borderRadius: 20, background: "#ffffff", padding: 22 } as const;
   const miniStyle = { border: "1px solid #e0ebec", borderRadius: 14, padding: 14, background: "#f8fbfb" } as const;
+  const cellStyle = { padding: "8px 10px", borderBottom: "1px solid #e8eff0", whiteSpace: "nowrap", fontSize: 12 } as const;
 
   return (
     <section style={{ maxWidth: 1240, margin: "18px auto 0", padding: "0 28px 28px", fontFamily: "Arial, Helvetica, sans-serif", color: "#163346" }}>
@@ -226,11 +261,56 @@ export default function PhaseCycleAnalyzer() {
           <div style={miniStyle}>
             <strong style={{ fontSize: 13 }}>Timeline pha</strong>
             <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {report.sequence.map((segment, index) => <span key={`${segment.phase}-${segment.start}-${index}`} style={{ borderRadius: 999, padding: "7px 10px", background: segment.phase === "unclear" ? "#eef1f2" : "#e4f5f4", color: segment.phase === "unclear" ? "#6f7e83" : "#075f68", fontSize: 12, fontWeight: 800 }}>{PHASE_LABEL[segment.phase]} · {segment.start.toFixed(1)}–{segment.end.toFixed(1)}s</span>)}
+              {report.sequence.map((segment, index) => <button type="button" onClick={() => jumpToFrame(segment.start)} key={`${segment.phase}-${segment.start}-${index}`} style={{ border: 0, borderRadius: 999, padding: "7px 10px", background: segment.phase === "unclear" ? "#eef1f2" : "#e4f5f4", color: segment.phase === "unclear" ? "#6f7e83" : "#075f68", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>{PHASE_LABEL[segment.phase]} · {segment.start.toFixed(1)}–{segment.end.toFixed(1)}s</button>)}
             </div>
           </div>
 
           {report.warnings.length ? <div style={{ ...miniStyle, background: "#fffaf1", borderColor: "#f0dfbf" }}><strong style={{ fontSize: 13 }}>Điểm cần kiểm tra thêm</strong><ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "#66543d", lineHeight: 1.6, fontSize: 13 }}>{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
+
+          {calibration ? <div style={{ ...miniStyle, background: "#f4fafa" }} data-phase-calibration-local-only>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <strong style={{ fontSize: 14 }}>Calibration Mode · local-only</strong>
+                <p style={{ margin: "5px 0 0", color: "#5b737d", fontSize: 12, lineHeight: 1.5 }}>Dữ liệu này dùng để hiệu chỉnh ngưỡng nhận pha trên video thực tế; không gửi lên `/api/video-analysis` và không lưu vào lịch sử phân tích.</p>
+              </div>
+              <button type="button" onClick={() => setShowCalibration((value) => !value)} style={{ border: "1px solid #9fc7c9", borderRadius: 10, background: "#ffffff", color: "#075f68", padding: "9px 12px", fontWeight: 800, cursor: "pointer" }}>{showCalibration ? "Ẩn calibration" : "Hiện calibration"}</button>
+            </div>
+
+            {showCalibration ? <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><span style={{ display: "block", fontSize: 11, color: "#67808a" }}>Khung pose hợp lệ</span><b>{calibration.sampledFrames}</b></div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><span style={{ display: "block", fontSize: 11, color: "#67808a" }}>Nhận được pha</span><b>{Math.round(calibration.recognizedRatio * 100)}%</b></div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><span style={{ display: "block", fontSize: 11, color: "#67808a" }}>Visibility TB / thấp nhất</span><b>{Math.round(calibration.visibilityAvg * 100)}% / {Math.round(calibration.visibilityMin * 100)}%</b></div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><span style={{ display: "block", fontSize: 11, color: "#67808a" }}>Tỷ lệ chồng tay–chân</span><b>{Math.round(calibration.overlapRatio * 100)}%</b></div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 8 }}>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><b style={{ fontSize: 12 }}>Arm flexion</b><span style={{ display: "block", marginTop: 3, fontSize: 12 }}>{metricLabel(calibration.metrics.armFlexion)}</span></div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><b style={{ fontSize: 12 }}>Knee flexion</b><span style={{ display: "block", marginTop: 3, fontSize: 12 }}>{metricLabel(calibration.metrics.kneeFlexion)}</span></div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><b style={{ fontSize: 12 }}>Wrist spread</b><span style={{ display: "block", marginTop: 3, fontSize: 12 }}>{metricLabel(calibration.metrics.wristSpread, 2)}</span></div>
+                <div style={{ background: "#fff", borderRadius: 10, padding: 10 }}><b style={{ fontSize: 12 }}>Ankle spread</b><span style={{ display: "block", marginTop: 3, fontSize: 12 }}>{metricLabel(calibration.metrics.ankleSpread, 2)}</span></div>
+              </div>
+
+              <details>
+                <summary style={{ cursor: "pointer", fontWeight: 800, fontSize: 12 }}>Ngưỡng engine hiện tại</summary>
+                <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 7, fontSize: 12 }}>
+                  <span>Lướt: tay &lt; {PHASE_THRESHOLDS.glideArmFlexionMax}°, gối &lt; {PHASE_THRESHOLDS.glideKneeFlexionMax}°</span>
+                  <span>Kéo tay: tay &gt; {PHASE_THRESHOLDS.pullArmFlexionMin}°, wrist spread &gt; {PHASE_THRESHOLDS.pullWristSpreadMin}</span>
+                  <span>Thu chân: gối &gt; {PHASE_THRESHOLDS.legRecoveryKneeFlexionMin}°</span>
+                  <span>Đạp: giảm knee flexion &gt; {PHASE_THRESHOLDS.kickVelocityMin}° / mẫu</span>
+                  <span>Chồng pha: tay &gt; {PHASE_THRESHOLDS.overlapArmFlexionMin}° và gối &gt; {PHASE_THRESHOLDS.overlapKneeFlexionMin}°</span>
+                </div>
+              </details>
+
+              <div style={{ overflowX: "auto", maxHeight: 360, border: "1px solid #dce9ea", borderRadius: 12, background: "#fff" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+                  <thead style={{ position: "sticky", top: 0, background: "#eef7f7", zIndex: 1 }}><tr><th style={cellStyle}>Thời gian</th><th style={cellStyle}>Pha AI</th><th style={cellStyle}>Tay °</th><th style={cellStyle}>Gối °</th><th style={cellStyle}>Wrist spread</th><th style={cellStyle}>Ankle spread</th><th style={cellStyle}>Visibility</th></tr></thead>
+                  <tbody>{calibrationRows.map((frame) => <tr key={`${frame.time}-${frame.phase}`} onClick={() => jumpToFrame(frame.time)} style={{ cursor: "pointer" }} title="Bấm để nhảy video tới mốc này"><td style={cellStyle}>{frame.time.toFixed(1)}s</td><td style={cellStyle}><b>{PHASE_LABEL[frame.phase]}</b></td><td style={cellStyle}>{frame.armFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.kneeFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.wristSpread.toFixed(2)}</td><td style={cellStyle}>{frame.ankleSpread.toFixed(2)}</td><td style={cellStyle}>{Math.round(frame.visibility * 100)}%</td></tr>)}</tbody>
+                </table>
+              </div>
+              <p style={{ margin: 0, fontSize: 11, color: "#6b8189" }}>Bảng chỉ hiển thị tối đa khoảng 60 mốc để giữ giao diện nhẹ. Bấm một dòng để đối chiếu đúng thời điểm trên video.</p>
+            </div> : null}
+          </div> : null}
         </div> : null}
       </div>
     </section>
