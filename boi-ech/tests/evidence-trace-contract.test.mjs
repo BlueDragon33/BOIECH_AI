@@ -32,7 +32,8 @@ test("traceability exposes exact local timestamps and can jump back to learner v
 
 test("traceability reads unified trust and explicit quality gates without becoming a gate itself", () => {
   assert.match(panel, /dataset\.unifiedTrustLevel/);
-  assert.match(panel, /Capture Quality/);
+  assert.match(panel, /captureQuality/);
+  assert.match(core, /Capture Quality/);
   assert.match(panel, /data-view-quality-gate/);
   assert.doesNotMatch(panel, /dataset\.unifiedTrustLevel\s*=/);
   assert.doesNotMatch(core, /allowStrongConclusions\s*=/);
