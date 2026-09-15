@@ -23,7 +23,7 @@ it works without an external model key or per-token fee.
 - learner feedback, teacher review, version logs, usage/cost metrics and exports
 - global and per-device AI disable controls in the central administration site
 - content-draft suggestions only inside an approved editor scope; human review and publish remain mandatory
-- no computer vision, camera, learner image or video processing
+- local-first computer vision trial at `/phan-tich-video`: learner video is processed in the browser, never uploaded, and the server accepts only a bounded JSON analysis summary
 
 ## Time-limited access, offline learning and certificates
 
