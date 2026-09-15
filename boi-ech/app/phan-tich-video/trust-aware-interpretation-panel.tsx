@@ -54,7 +54,8 @@ function applyCycleLanguage(root: HTMLElement, level: TrustLevel) {
   const panel = root.querySelector<HTMLElement>("[data-cycle-quality-local-only]");
   if (!panel) return;
   panel.querySelectorAll<HTMLElement>("span").forEach((node) => {
-    const original = originalText(node);
+    const visible = node.textContent ?? "";
+    const original = node.dataset.trustOriginalText ?? visible;
     if (["Tốt", "Cần xem", "Yếu"].includes(original)) {
       applyText(node, (value) => interpretCycleStatus(value, level));
       return;
@@ -67,7 +68,8 @@ function applyBilateralLanguage(root: HTMLElement, level: TrustLevel) {
   const panel = root.querySelector<HTMLElement>("[data-bilateral-symmetry-local-only]");
   if (!panel) return;
   panel.querySelectorAll<HTMLElement>("article strong").forEach((node) => {
-    const original = originalText(node);
+    const visible = node.textContent ?? "";
+    const original = node.dataset.trustOriginalText ?? visible;
     if (["Cân bằng", "Cần xem", "Lệch rõ", "Chưa đủ tin cậy"].includes(original)) {
       applyText(node, (value) => interpretBilateralStatus(value, level));
     }
@@ -89,23 +91,26 @@ function ensureAdvisorGuard(panel: HTMLElement, level: TrustLevel) {
     else panel.insertBefore(guard, panel.firstChild);
   }
   const reference = level === "reference";
-  guard.style.cssText = `margin:0 0 9px;padding:7px 9px;border:1px solid ${reference ? "#d49b85" : "#dcc58b"};border-radius:9px;background:${reference ? "#fff5f0" : "#fffaf0"};color:${reference ? "#7a432f" : "#735f2d"};font:700 9px/1.4 Arial,Helvetica,sans-serif`;
-  guard.textContent = reference
+  const nextText = reference
     ? "Trust-Aware Gate: Threshold Advisor chỉ được xem như mô phỏng tham khảo; không trình bày đề xuất như ngưỡng đủ điều kiện xem xét."
     : "Trust-Aware Gate: mô phỏng vẫn hiển thị, nhưng ngôn ngữ hiệu chỉnh được hạ xuống mức thận trọng cho tới khi trust chung đạt cao.";
+  guard.style.cssText = `margin:0 0 9px;padding:7px 9px;border:1px solid ${reference ? "#d49b85" : "#dcc58b"};border-radius:9px;background:${reference ? "#fff5f0" : "#fffaf0"};color:${reference ? "#7a432f" : "#735f2d"};font:700 9px/1.4 Arial,Helvetica,sans-serif`;
+  if (guard.textContent !== nextText) guard.textContent = nextText;
 }
 
 function applyAdvisorLanguage(root: HTMLElement, level: TrustLevel) {
   const panel = root.querySelector<HTMLElement>("[data-threshold-advisor-local-only]");
   if (!panel) return;
   panel.querySelectorAll<HTMLElement>("span").forEach((node) => {
-    const original = originalText(node);
+    const visible = node.textContent ?? "";
+    const original = node.dataset.trustOriginalText ?? visible;
     if (original === "Coverage đạt cho clip" || original === "Coverage chưa đạt") {
       applyText(node, (value) => interpretAdvisorBadge(value, level));
     }
   });
   panel.querySelectorAll<HTMLElement>("b").forEach((node) => {
-    const original = originalText(node);
+    const visible = node.textContent ?? "";
+    const original = node.dataset.trustOriginalText ?? visible;
     if (original.startsWith("Đủ coverage + chất lượng góc cho clip:") || original.startsWith("Chưa đủ điều kiện hiệu chỉnh:")) {
       applyText(node, (value) => interpretAdvisorGateLabel(value, level));
     }
@@ -116,7 +121,7 @@ function applyAdvisorLanguage(root: HTMLElement, level: TrustLevel) {
 function restoreInterpretations(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>("[data-trust-original-text]").forEach((node) => {
     const original = node.dataset.trustOriginalText;
-    if (original !== undefined) node.textContent = original;
+    if (original !== undefined && node.textContent !== original) node.textContent = original;
     delete node.dataset.trustOriginalText;
     delete node.dataset.trustAppliedText;
   });
