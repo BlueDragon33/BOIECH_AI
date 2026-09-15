@@ -40,13 +40,14 @@ function captureStatus(root: ParentNode): CaptureStatus {
 }
 
 function viewQualityStatus(root: ParentNode): ViewQualityStatus {
-  const nodes = Array.from(root.querySelectorAll("[data-view-quality-gate], [data-view-quality-gate-consumer]"));
-  if (!nodes.length) return "unknown";
-  const text = nodes.map((node) => normalizedText(node)).join(" ");
-  if (text.includes("không đủ")) return "poor";
-  if (text.includes("cần kiểm tra")) return "review";
-  if (text.includes("đủ tín hiệu")) return "strong";
-  if (text.includes("chưa chọn góc")) return "unselected";
+  const labels = Array.from(root.querySelectorAll<HTMLElement>("[data-view-quality-gate] strong, [data-view-quality-gate-consumer] b"))
+    .map((node) => normalizedText(node))
+    .filter((text) => text.includes("view quality gate") || /^(đủ tín hiệu|cần kiểm tra|không đủ|chưa chọn góc)/.test(text));
+  if (!labels.length) return "unknown";
+  if (labels.some((text) => text.includes("không đủ"))) return "poor";
+  if (labels.some((text) => text.includes("cần kiểm tra"))) return "review";
+  if (labels.some((text) => text.includes("đủ tín hiệu"))) return "strong";
+  if (labels.some((text) => text.includes("chưa chọn góc"))) return "unselected";
   return "unknown";
 }
 
