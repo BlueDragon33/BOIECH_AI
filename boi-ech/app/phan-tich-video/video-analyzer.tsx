@@ -3,6 +3,7 @@
 import CameraGuidancePanel from "./camera-guidance-panel";
 import PhaseCycleAnalyzer from "./phase-cycle-analyzer";
 import PreflightEnforcementPanel from "./preflight-enforcement-panel";
+import TrustAwareInterpretationPanel from "./trust-aware-interpretation-panel";
 import UnifiedTrustPanel from "./unified-trust-panel";
 import VideoAnalyzerImpl from "./video-analyzer-impl";
 
@@ -13,6 +14,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       <CameraGuidancePanel />
       <PreflightEnforcementPanel />
       <UnifiedTrustPanel />
+      <TrustAwareInterpretationPanel />
       <PhaseCycleAnalyzer />
     </div>
   );
