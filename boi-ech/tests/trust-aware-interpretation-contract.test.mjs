@@ -10,7 +10,7 @@ const core = fs.readFileSync(new URL("../app/phan-tich-video/trust-aware-interpr
 test("trust-aware interpretation is wired after unified trust at the analysis root", () => {
   assert.match(root, /<UnifiedTrustPanel\s*\/>[\s\S]*<TrustAwareInterpretationPanel\s*\/>/);
   assert.match(unified, /root\.dataset\.unifiedTrustLevel = trust\.level/);
-  assert.match(panel, /data-unified-trust-level/);
+  assert.match(panel, /root\.dataset\.unifiedTrustLevel/);
 });
 
 test("interpretation gate covers v1, cycle, bilateral and threshold advisor surfaces", () => {
