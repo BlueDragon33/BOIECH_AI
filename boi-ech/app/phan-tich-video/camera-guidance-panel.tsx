@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { assessCameraGuidance } from "./camera-guidance-core.mjs";
+import { compareRetakeGuidance } from "./camera-retake-comparison.mjs";
 import { setCameraProfile, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
 import { capturePlaybackState, restorePlaybackState } from "./video-playback-state.mjs";
 import styles from "./video-analyzer.module.css";
@@ -58,11 +59,35 @@ type GuidanceSample = {
   minY?: number;
   maxY?: number;
 };
+type RetakeComparison = {
+  outcome: "ready" | "improved" | "regressed" | "stable";
+  readyNow: boolean;
+  scoreBefore: number;
+  scoreAfter: number;
+  scoreDelta: number;
+  summary: string;
+  resolvedChecks: Array<{ key: string; label: string }>;
+  regressedChecks: Array<{ key: string; label: string }>;
+  remainingChecks: Array<{ key: string; label: string }>;
+  metricSummary: Array<{
+    key: string;
+    label: string;
+    direction: "improved" | "regressed" | "stable";
+    beforePercent: number;
+    afterPercent: number;
+    deltaPercentPoints: number;
+  }>;
+};
+type GuidanceRun = { source: string; view: CameraView; report: GuidanceReport };
 
 const avg = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
 function learnerVideo() {
   return document.querySelector<HTMLVideoElement>("[data-breaststroke-vision] video[playsinline]");
+}
+
+function videoSource(video?: HTMLVideoElement | null) {
+  return video?.currentSrc || video?.src || "";
 }
 
 function selectedLegacyView(root?: ParentNode | null): CameraView | "" {
@@ -162,21 +187,30 @@ function metricPercent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
+function signedPoints(value: number) {
+  return `${value > 0 ? "+" : ""}${value}đ`;
+}
+
 export default function CameraGuidancePanel() {
   const view = useCameraProfile();
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [hasVideo, setHasVideo] = useState(false);
+  const [currentVideoSource, setCurrentVideoSource] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [report, setReport] = useState<GuidanceReport | null>(null);
+  const [comparison, setComparison] = useState<RetakeComparison | null>(null);
   const [status, setStatus] = useState("Chọn hoặc quay video rồi kiểm tra khung trước khi phân tích.");
+  const runHistoryRef = useRef<GuidanceRun[]>([]);
 
   useEffect(() => {
     const root = document.querySelector("[data-breaststroke-vision]");
     if (!root) return;
     let host: HTMLElement | null = null;
     const update = () => {
-      setHasVideo(Boolean(learnerVideo()));
+      const video = learnerVideo();
+      setHasVideo(Boolean(video));
+      setCurrentVideoSource(videoSource(video));
       const inferredView = selectedLegacyView(root);
       if (inferredView) setCameraProfile(inferredView);
       if (!host) {
@@ -192,7 +226,7 @@ export default function CameraGuidancePanel() {
     };
     const initialTimer = window.setTimeout(update, 0);
     const observer = new MutationObserver(update);
-    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "src"] });
     return () => {
       window.clearTimeout(initialTimer);
       observer.disconnect();
@@ -203,10 +237,11 @@ export default function CameraGuidancePanel() {
   useEffect(() => {
     const resetTimer = window.setTimeout(() => {
       setReport(null);
+      setComparison(null);
       setProgress(0);
     }, 0);
     return () => window.clearTimeout(resetTimer);
-  }, [view, hasVideo]);
+  }, [view, hasVideo, currentVideoSource]);
 
   async function jumpToGuidanceMoment(time: number) {
     const video = learnerVideo();
@@ -235,10 +270,12 @@ export default function CameraGuidancePanel() {
       return;
     }
     if (effectiveView !== view) setCameraProfile(effectiveView);
+    const source = videoSource(video);
     const playbackState = capturePlaybackState(video);
     video.pause();
     setBusy(true);
     setReport(null);
+    setComparison(null);
     setProgress(0);
     setStatus("Đang kiểm tra nhanh khung quay trên thiết bị…");
     let dispose = () => undefined;
@@ -257,7 +294,13 @@ export default function CameraGuidancePanel() {
         if (index % 3 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
       const next = assessCameraGuidance(samples, effectiveView) as GuidanceReport;
+      const history = runHistoryRef.current;
+      const previous = [...history].reverse().find((run) => run.source !== source && run.view === effectiveView);
+      const nextComparison = previous ? compareRetakeGuidance(previous.report, next) as RetakeComparison : null;
+      const withoutCurrentSource = history.filter((run) => run.source !== source);
+      runHistoryRef.current = [...withoutCurrentSource, { source, view: effectiveView, report: next }].slice(-4);
       setReport(next);
+      setComparison(nextComparison);
       setStatus(next.status === "good"
         ? "Khung quay đạt preflight; có thể chạy phân tích đầy đủ."
         : next.status === "review"
@@ -276,6 +319,7 @@ export default function CameraGuidancePanel() {
 
   const tone = report?.status === "good" ? "#2f6b4d" : report?.status === "review" ? "#7b632f" : "#8b4343";
   const background = report?.status === "good" ? "#f2fbf6" : report?.status === "review" ? "#fffaf0" : "#fff6f6";
+  const comparisonTone = comparison?.outcome === "ready" || comparison?.outcome === "improved" ? "#2f6b4d" : comparison?.outcome === "regressed" ? "#8b4343" : "#63737a";
   const content = (
     <section data-camera-guidance-local-only style={{ border: "1px solid #d8e5e7", borderRadius: 14, background: "#f8fbfb", padding: 11, color: "#163346" }}>
       <div>
@@ -299,6 +343,19 @@ export default function CameraGuidancePanel() {
           <span style={{ fontSize: 8 }}>Không sát mép <b>{metricPercent(report.metrics.edgeSafety)}</b></span>
           <span style={{ fontSize: 8 }}>Ổn định <b>{metricPercent(report.metrics.stability)}</b></span>
         </div>
+        {comparison ? <div data-retake-comparison-local-only style={{ marginTop: 8, border: `1px solid ${comparisonTone}33`, borderRadius: 9, background: "rgba(255,255,255,.72)", padding: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 7, flexWrap: "wrap" }}>
+            <strong style={{ color: comparisonTone, fontSize: 9 }}>Retake Comparison · so với clip trước</strong>
+            <b style={{ color: comparisonTone, fontSize: 9 }}>{comparison.scoreBefore}% → {comparison.scoreAfter}% ({signedPoints(comparison.scoreDelta)})</b>
+          </div>
+          <p style={{ margin: "4px 0 0", color: comparisonTone, fontSize: 8, lineHeight: 1.4 }}>{comparison.summary}</p>
+          <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 4 }}>
+            {comparison.metricSummary.map((metric) => <span key={metric.key} style={{ fontSize: 8, color: metric.direction === "improved" ? "#2f6b4d" : metric.direction === "regressed" ? "#8b4343" : "#65777e" }}>{metric.label}: <b>{metric.beforePercent}% → {metric.afterPercent}%</b> {metric.direction !== "stable" ? `(${signedPoints(metric.deltaPercentPoints)})` : ""}</span>)}
+          </div>
+          {comparison.resolvedChecks.length ? <p style={{ margin: "6px 0 0", fontSize: 8, color: "#2f6b4d" }}><b>Đã khắc phục:</b> {comparison.resolvedChecks.map((item) => item.label).join(", ")}.</p> : null}
+          {comparison.regressedChecks.length ? <p style={{ margin: "4px 0 0", fontSize: 8, color: "#8b4343" }}><b>Mới kém đi:</b> {comparison.regressedChecks.map((item) => item.label).join(", ")}.</p> : null}
+          {comparison.remainingChecks.length ? <p style={{ margin: "4px 0 0", fontSize: 8, color: "#7b632f" }}><b>Còn cần sửa:</b> {comparison.remainingChecks.map((item) => item.label).join(", ")}.</p> : <p style={{ margin: "4px 0 0", fontSize: 8, color: "#2f6b4d" }}><b>Clip mới đã đủ điều kiện preflight.</b></p>}
+        </div> : null}
         <ul style={{ margin: "7px 0 0", paddingLeft: 15, color: tone, fontSize: 8, lineHeight: 1.45 }}>{report.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
         {report.status !== "good" ? <div data-guided-retake-local-only style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid ${tone}22` }}>
           <strong style={{ display: "block", color: tone, fontSize: 9 }}>Guided Retake · mốc cần sửa khi quay lại</strong>
