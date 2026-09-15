@@ -1,6 +1,7 @@
 "use client";
 
 import CameraGuidancePanel from "./camera-guidance-panel";
+import CrossModuleConsistencyPanel from "./cross-module-consistency-panel";
 import EvidenceTracePanel from "./evidence-trace-panel";
 import PhaseCycleAnalyzer from "./phase-cycle-analyzer";
 import PreflightEnforcementPanel from "./preflight-enforcement-panel";
@@ -18,6 +19,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       <TrustAwareInterpretationPanel />
       <PhaseCycleAnalyzer />
       <EvidenceTracePanel />
+      <CrossModuleConsistencyPanel />
     </div>
   );
 }
