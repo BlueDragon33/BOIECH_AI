@@ -120,6 +120,7 @@ export default function UnifiedTrustPanel() {
         cameraProfileSelected: Boolean(cameraProfile),
         overrideActive: overrideActive(root),
       }) as TrustReport;
+      root.dataset.unifiedTrustLevel = trust.level;
       trustTargets(root).forEach((target) => ensureBadge(target, trust));
     };
 
@@ -134,6 +135,7 @@ export default function UnifiedTrustPanel() {
     return () => {
       if (scheduled) window.clearTimeout(scheduled);
       observer.disconnect();
+      delete root.dataset.unifiedTrustLevel;
       removeBadges(root);
     };
   }, [cameraProfile]);
