@@ -22,11 +22,12 @@ function normalizedText(node?: Element | null) {
 }
 
 function preflightStatus(root: ParentNode): PreflightStatus {
-  const text = normalizedText(root.querySelector("[data-camera-guidance-local-only]"));
-  if (!text) return "unknown";
-  if (text.includes("nên quay lại")) return "retry";
-  if (text.includes("nên chỉnh khung")) return "review";
-  if (text.includes("đạt preflight")) return "good";
+  const guidance = root.querySelector<HTMLElement>("[data-camera-guidance-local-only]");
+  if (!guidance) return "unknown";
+  const labels = Array.from(guidance.querySelectorAll("b")).map((node) => normalizedText(node));
+  if (labels.includes("nên quay lại")) return "retry";
+  if (labels.includes("nên chỉnh khung")) return "review";
+  if (labels.includes("đạt preflight")) return "good";
   return "unknown";
 }
 
