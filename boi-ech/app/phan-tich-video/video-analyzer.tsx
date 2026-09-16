@@ -1,6 +1,7 @@
 "use client";
 
 import CameraGuidancePanel from "./camera-guidance-panel";
+import ConsensusAwareCoachingPanel from "./consensus-aware-coaching-panel";
 import CrossModuleConsistencyPanel from "./cross-module-consistency-panel";
 import EvidenceTracePanel from "./evidence-trace-panel";
 import PhaseCycleAnalyzer from "./phase-cycle-analyzer";
@@ -20,6 +21,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       <PhaseCycleAnalyzer />
       <EvidenceTracePanel />
       <CrossModuleConsistencyPanel />
+      <ConsensusAwareCoachingPanel />
     </div>
   );
 }
