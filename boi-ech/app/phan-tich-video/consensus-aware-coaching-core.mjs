@@ -58,7 +58,12 @@ function normalizeDomain(item) {
 }
 
 function classify(domain, status, trustLevel) {
-  const meta = DOMAIN_META[domain];
+  if (!DOMAIN_META[domain]) {
+    return {
+      bucket: COACHING_BUCKET.WAIT,
+      reason: "Chưa đủ dữ liệu độc lập để đưa ra hướng tập cho nhóm này.",
+    };
+  }
   if (status === STATUS.CORROBORATED) {
     if (trustLevel === COACHING_TRUST.HIGH || trustLevel === COACHING_TRUST.CAUTION) {
       return {
