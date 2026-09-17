@@ -3,450 +3,56 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type StoredDeviceCredential = {
-  version: 2;
-  privateKey: CryptoKey | null;
-  publicKey: JsonWebKey;
-};
-
-type TeacherAnalysis = {
-  score: number;
-  confidence: number;
-  captureQuality: "good" | "review";
-  poseCoverage: number;
-  averageVisibility: number;
-  cameraView: "rear" | "side";
-  errorCount: number;
-  topErrors: string[];
-  analyzedAt: string | null;
-};
-
-type TeacherLearner = {
-  name: string;
-  personCode: string;
-  className: string;
-  completedLessons: number;
-  totalLessons: number;
-  progress: number;
-  averageScore: number | null;
-  totalActiveMinutes: number;
-  lastActivityAt: string | null;
-  lastLesson: string | null;
-  lastPart: string | null;
-  analysisCount: number;
-  lastAnalysis: TeacherAnalysis | null;
-  needsSupport: boolean;
-  inactiveDays: number | null;
-};
-
-type TeacherOverview = {
-  teacher: { name: string | null; personCode: string | null; className: string | null };
-  summary: { learnerCount: number; active7d: number; needingSupport: number; analysisCount: number; averageProgress: number };
-  learners: TeacherLearner[];
-  privacy: { mediaStored: false; note: string };
-};
-
+type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
+type TeacherAnalysis = { score: number; confidence: number; captureQuality: "good" | "review"; poseCoverage: number; averageVisibility: number; cameraView: "rear" | "side"; errorCount: number; topErrors: string[]; analyzedAt: string | null };
+type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; needsSupport: boolean; inactiveDays: number | null };
+type TeacherOverview = { teacher: { name: string | null; personCode: string | null; className: string | null }; summary: { learnerCount: number; active7d: number; needingSupport: number; analysisCount: number; averageProgress: number }; learners: TeacherLearner[]; privacy: { mediaStored: false; note: string } };
 type TeacherTab = "overview" | "class" | "learners" | "analysis" | "tasks" | "reports" | "schedule" | "profile";
-
 type TabSetter = (tab: TeacherTab) => void;
 
-function text(node: Element | null | undefined) {
-  return (node?.textContent ?? "").replace(/\s+/g, " ").trim();
-}
-
-function base64Url(bytes: Uint8Array) {
-  let binary = "";
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("boi-ech-doc-lap", 4);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function readStoredDeviceCredential() {
-  const db = await openDb();
-  return new Promise<StoredDeviceCredential | undefined>((resolve, reject) => {
-    const request = db.transaction("thiet-bi", "readonly").objectStore("thiet-bi").get("chinh");
-    request.onsuccess = () => resolve(request.result as StoredDeviceCredential | undefined);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function signedTeacherProof(credential: StoredDeviceCredential, deviceId: string) {
-  const challengeResponse = await fetch("/api/device", {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "challenge", deviceId }),
-  });
-  const challengeData = await challengeResponse.json() as { challenge?: string; error?: string };
-  if (!challengeResponse.ok || !challengeData.challenge) throw new Error(challengeData.error ?? "Không thể xác thực thiết bị Giảng viên.");
-  const message = new TextEncoder().encode(`boi-ech:${deviceId}:${challengeData.challenge}`);
-  const signature = credential.privateKey && crypto.subtle
-    ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message)
-    : crypto.getRandomValues(new Uint8Array(64)).buffer;
-  return { deviceId, challenge: challengeData.challenge, signature: base64Url(new Uint8Array(signature)) };
-}
-
-async function loadTeacherOverview(deviceId: string) {
-  const credential = await readStoredDeviceCredential();
-  if (!credential) throw new Error("Không tìm thấy khóa thiết bị Giảng viên.");
-  const proof = await signedTeacherProof(credential, deviceId);
-  const response = await fetch("/api/teacher/overview", {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(proof),
-  });
-  const data = await response.json() as TeacherOverview & { error?: string };
-  if (!response.ok) throw new Error(data.error ?? "Không thể tải bảng giám sát.");
-  return data;
-}
-
-function shortDate(value: string | null) {
-  if (!value) return "Chưa có";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa có";
-  return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
-}
-
-function supportReason(learner: TeacherLearner) {
-  if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`;
-  if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`;
-  if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`;
-  return "Cần Giảng viên kiểm tra thêm";
-}
-
-function analysisQuality(analysis: TeacherAnalysis | null) {
-  if (!analysis) return "none";
-  return analysis.captureQuality === "good" && analysis.confidence >= 70 ? "good" : "review";
-}
-
-function matchesQuery(learner: TeacherLearner, query: string) {
-  const needle = query.trim().toLocaleLowerCase("vi");
-  if (!needle) return true;
-  const haystack = [
-    learner.name,
-    learner.personCode,
-    learner.className,
-    learner.lastLesson ?? "",
-    learner.lastPart ?? "",
-    ...(learner.lastAnalysis?.topErrors ?? []),
-  ].join(" ").toLocaleLowerCase("vi");
-  return haystack.includes(needle);
-}
-
-function openTeacherEditor() {
-  const personalEditor = document.querySelector<HTMLButtonElement>(".personal-edit-trigger");
-  if (personalEditor) {
-    personalEditor.click();
-    return;
-  }
-  const permissionLink = document.querySelector<HTMLAnchorElement>(".editor-request-link");
-  if (permissionLink) {
-    permissionLink.click();
-    return;
-  }
-  window.location.assign("/bien-tap-noi-dung");
-}
+function text(node: Element | null | undefined) { return (node?.textContent ?? "").replace(/\s+/g, " ").trim(); }
+function base64Url(bytes: Uint8Array) { let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
+function openDb(): Promise<IDBDatabase> { return new Promise((resolve, reject) => { const request = indexedDB.open("boi-ech-doc-lap", 4); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
+async function readStoredDeviceCredential() { const db = await openDb(); return new Promise<StoredDeviceCredential | undefined>((resolve, reject) => { const request = db.transaction("thiet-bi", "readonly").objectStore("thiet-bi").get("chinh"); request.onsuccess = () => resolve(request.result as StoredDeviceCredential | undefined); request.onerror = () => reject(request.error); }); }
+async function signedTeacherProof(credential: StoredDeviceCredential, deviceId: string) { const response = await fetch("/api/device", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId }) }); const data = await response.json() as { challenge?: string; error?: string }; if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể xác thực thiết bị Giảng viên."); const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`); const signature = credential.privateKey && crypto.subtle ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message) : crypto.getRandomValues(new Uint8Array(64)).buffer; return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) }; }
+async function loadTeacherOverview(deviceId: string) { const credential = await readStoredDeviceCredential(); if (!credential) throw new Error("Không tìm thấy khóa thiết bị Giảng viên."); const proof = await signedTeacherProof(credential, deviceId); const response = await fetch("/api/teacher/overview", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(proof) }); const data = await response.json() as TeacherOverview & { error?: string }; if (!response.ok) throw new Error(data.error ?? "Không thể tải bảng giám sát."); return data; }
+function shortDate(value: string | null) { if (!value) return "Chưa có"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "Chưa có" : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date); }
+function supportReason(learner: TeacherLearner) { if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`; if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`; if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`; return "Cần Giảng viên kiểm tra thêm"; }
+function analysisQuality(analysis: TeacherAnalysis | null) { return analysis && analysis.captureQuality === "good" && analysis.confidence >= 70 ? "good" : "review"; }
+function matchesQuery(learner: TeacherLearner, query: string) { const needle = query.trim().toLocaleLowerCase("vi"); if (!needle) return true; return [learner.name, learner.personCode, learner.className, learner.lastLesson ?? "", learner.lastPart ?? "", ...(learner.lastAnalysis?.topErrors ?? [])].join(" ").toLocaleLowerCase("vi").includes(needle); }
+function openTeacherEditor() { const personal = document.querySelector<HTMLButtonElement>(".personal-edit-trigger"); if (personal) return personal.click(); const request = document.querySelector<HTMLAnchorElement>(".editor-request-link"); if (request) return request.click(); window.location.assign("/bien-tap-noi-dung"); }
 
 function TeacherIcon({ name }: { name: string }) {
   const paths: Record<string, React.ReactNode> = {
-    overview: <><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></>,
-    class: <><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></>,
-    learners: <><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0m0 0a4 4 0 0 1 6 0"/></>,
-    analysis: <><path d="M4 18V9m5 9V5m5 13v-7m5 7V3"/></>,
-    report: <><path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6M9 7h3"/></>,
-    schedule: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/></>,
-    profile: <><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></>,
-    video: <><rect x="3" y="5" width="14" height="14" rx="3"/><path d="m17 10 4-2v8l-4-2zM8 9l5 3-5 3z"/></>,
-    edit: <><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z"/><path d="m13.5 7 3.5 3.5"/></>,
-    shield: <><path d="M12 3 5 6v5c0 5 3.3 8 7 10 3.7-2 7-5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></>,
-    task: <><path d="M7 4h10v16H7z"/><path d="m9 9 1.5 1.5L14 7m-5 8h6"/></>,
-    search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>,
-    warning: <><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></>,
-    trend: <><path d="m4 17 5-5 4 3 7-8"/><path d="M15 7h5v5"/></>,
-    book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22V5.5Z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22V5.5Z"/></>,
-    refresh: <><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M18.5 12A7 7 0 0 0 6 7.5L4 12m16 0-2 4.5A7 7 0 0 1 5.5 12"/></>,
+    overview: <><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></>, class: <><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></>, learners: <><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0m0 0a4 4 0 0 1 6 0"/></>, analysis: <><path d="M4 18V9m5 9V5m5 13v-7m5 7V3"/></>, report: <><path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6M9 7h3"/></>, schedule: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4m8-4v4M3 10h18"/></>, profile: <><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></>, video: <><rect x="3" y="5" width="14" height="14" rx="3"/><path d="m17 10 4-2v8l-4-2zM8 9l5 3-5 3z"/></>, edit: <><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z"/><path d="m13.5 7 3.5 3.5"/></>, shield: <><path d="M12 3 5 6v5c0 5 3.3 8 7 10 3.7-2 7-5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></>, task: <><path d="M7 4h10v16H7z"/><path d="m9 9 1.5 1.5L14 7m-5 8h6"/></>, search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>, warning: <><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></>, trend: <><path d="m4 17 5-5 4 3 7-8"/><path d="M15 7h5v5"/></>, book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22V5.5Z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22V5.5Z"/></>, refresh: <><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M18.5 12A7 7 0 0 0 6 7.5L4 12m16 0-2 4.5A7 7 0 0 1 5.5 12"/></>
   };
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.overview}</svg>;
 }
 
 function TeacherNavigation({ tab, setTab, teacherName, className }: { tab: TeacherTab; setTab: TabSetter; teacherName: string; className: string }) {
-  const rows: Array<{ id: TeacherTab; label: string; icon: string }> = [
-    { id: "overview", label: "Tổng quan", icon: "overview" },
-    { id: "class", label: "Lớp học", icon: "class" },
-    { id: "learners", label: "Học viên", icon: "learners" },
-    { id: "analysis", label: "Phân tích video", icon: "analysis" },
-    { id: "tasks", label: "Bài tập", icon: "task" },
-    { id: "reports", label: "Báo cáo", icon: "report" },
-    { id: "schedule", label: "Lịch dạy", icon: "schedule" },
-    { id: "profile", label: "Hồ sơ", icon: "profile" },
-  ];
-  return <div className="teacher-role-nav" data-teacher-role-ui>
-    <div className="teacher-nav-brand-note"><span>GIẢNG DẠY ĐÚNG KỸ THUẬT</span><small>Theo dõi tiến bộ học viên</small></div>
-    <div className="teacher-role-nav-list">{rows.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><TeacherIcon name={item.icon}/><span>{item.label}</span></button>)}</div>
-    <button className="teacher-editor-shortcut" type="button" onClick={openTeacherEditor}><span><TeacherIcon name="edit"/></span><div><small>Quyền chuyên môn</small><strong>Biên tập bài giảng</strong></div><b>→</b></button>
-    <div className="teacher-nav-quote">“Mỗi học viên tiến bộ là niềm tự hào của người giảng viên.”</div>
-    <div className="teacher-nav-profile"><span>{teacherName.slice(0, 1).toUpperCase()}</span><div><small>Giảng viên · {className || "Lớp phụ trách"}</small><strong>{teacherName}</strong></div></div>
-  </div>;
+  const rows: Array<{ id: TeacherTab; label: string; icon: string }> = [{ id: "overview", label: "Tổng quan", icon: "overview" }, { id: "class", label: "Lớp học", icon: "class" }, { id: "learners", label: "Học viên", icon: "learners" }, { id: "analysis", label: "Phân tích video", icon: "analysis" }, { id: "tasks", label: "Bài tập", icon: "task" }, { id: "reports", label: "Báo cáo", icon: "report" }, { id: "schedule", label: "Lịch dạy", icon: "schedule" }, { id: "profile", label: "Hồ sơ", icon: "profile" }];
+  return <div className="teacher-role-nav" data-teacher-role-ui><div className="teacher-nav-brand-note"><span>GIẢNG DẠY ĐÚNG KỸ THUẬT</span><small>Theo dõi tiến bộ học viên</small></div><div className="teacher-role-nav-list">{rows.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><TeacherIcon name={item.icon}/><span>{item.label}</span></button>)}</div><button className="teacher-editor-shortcut" type="button" onClick={openTeacherEditor}><span><TeacherIcon name="edit"/></span><div><small>Quyền chuyên môn</small><strong>Biên tập bài giảng</strong></div><b>→</b></button><div className="teacher-nav-quote">“Mỗi học viên tiến bộ là niềm tự hào của người giảng viên.”</div><div className="teacher-nav-profile"><span>{teacherName.slice(0, 1).toUpperCase()}</span><div><small>Giảng viên · {className}</small><strong>{teacherName}</strong></div></div></div>;
 }
 
-function TeacherSearch({ query, setQuery, setTab }: { query: string; setQuery: (value: string) => void; setTab: TabSetter }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "k") {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-  return <div className="teacher-search" data-teacher-role-ui>
-    <TeacherIcon name="search"/>
-    <input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setTab("learners"); }} placeholder="Tìm học viên, lớp học, tín hiệu AI…" aria-label="Tìm trong bảng giám sát Giảng viên"/>
-    <kbd>Ctrl K</kbd>
-  </div>;
-}
+function TeacherSearch({ query, setQuery, setTab }: { query: string; setQuery: (value: string) => void; setTab: TabSetter }) { const inputRef = useRef<HTMLInputElement | null>(null); useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "k") { event.preventDefault(); inputRef.current?.focus(); } }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []); return <div className="teacher-search" data-teacher-role-ui><TeacherIcon name="search"/><input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") setTab("learners"); }} placeholder="Tìm học viên, lớp học, tín hiệu AI…" aria-label="Tìm trong bảng giám sát Giảng viên"/><kbd>Ctrl K</kbd></div>; }
+function Metric({ icon, label, value, note, tone = "blue" }: { icon: string; label: string; value: string | number; note: string; tone?: "blue" | "green" | "red" | "gold" }) { return <article className={`teacher-metric tone-${tone}`}><span className="teacher-metric-icon"><TeacherIcon name={icon}/></span><div><strong>{value}</strong><span>{label}</span><small>{note}</small></div></article>; }
+function LearnerTable({ learners, onSelect, compact = false }: { learners: TeacherLearner[]; onSelect: (learner: TeacherLearner) => void; compact?: boolean }) { return <div className={`teacher-table-wrap ${compact ? "compact" : ""}`}><table className="teacher-table"><thead><tr><th>Học viên</th><th>Tiến độ</th><th>Video AI</th><th>Hoạt động</th><th>Cảnh báo</th><th>Thao tác</th></tr></thead><tbody>{learners.map((learner) => <tr key={`${learner.personCode}-${learner.name}`}><td><div className="teacher-student"><span>{learner.name.slice(0,1).toUpperCase()}</span><div><strong>{learner.name}</strong><small>{learner.className || learner.personCode}</small></div></div></td><td><div className="teacher-progress"><span><i style={{ width: `${learner.progress}%` }}/></span><b>{learner.progress}%</b></div></td><td><b className="teacher-number-cell">{learner.analysisCount}</b></td><td>{shortDate(learner.lastActivityAt)}{learner.lastLesson ? <small className="teacher-cell-note">Bài {learner.lastLesson} · {learner.lastPart ?? "học"}</small> : null}</td><td><span className={`teacher-status ${learner.needsSupport ? "warn" : "ok"}`}>{learner.needsSupport ? supportReason(learner) : "Đang ổn"}</span></td><td><button className="teacher-row-action" type="button" onClick={() => onSelect(learner)}>Xem hồ sơ</button></td></tr>)}</tbody></table>{learners.length === 0 ? <div className="teacher-empty">Không có học viên phù hợp với bộ lọc hiện tại.</div> : null}</div>; }
+function AnalysisQueue({ learners, setTab }: { learners: TeacherLearner[]; setTab: TabSetter }) { const items = learners.filter((item) => item.lastAnalysis).sort((a, b) => Date.parse(b.lastAnalysis?.analyzedAt ?? "") - Date.parse(a.lastAnalysis?.analyzedAt ?? "")).slice(0, 4); return <div className="teacher-analysis-queue-list">{items.map((learner) => { const analysis = learner.lastAnalysis!; const quality = analysisQuality(analysis); return <article key={`${learner.personCode}-${analysis.analyzedAt}`}><div className="teacher-analysis-thumb"><TeacherIcon name="video"/><span>{analysis.cameraView === "side" ? "Góc ngang" : "Góc sau"}</span></div><div className="teacher-analysis-copy"><strong>{learner.name}</strong><small>{learner.className} · {shortDate(analysis.analyzedAt)}</small><p>{analysis.topErrors[0] || "Chưa có tín hiệu lỗi nổi bật"}</p></div><div className={`teacher-analysis-score-chip ${quality}`}><b>{analysis.score}</b><span>AI</span><strong>{analysis.confidence}%</strong><small>Tin cậy</small></div><div className="teacher-analysis-actions"><button type="button" onClick={() => setTab("analysis")}>Mở tóm tắt</button><a href="/phan-tich-video">Phân tích local</a></div></article>; })}{items.length === 0 ? <div className="teacher-empty">Chưa có bản tóm tắt phân tích AI nào được đồng bộ.</div> : null}</div>; }
 
-function Metric({ icon, label, value, note, tone = "blue" }: { icon: string; label: string; value: string | number; note: string; tone?: "blue" | "green" | "red" | "gold" }) {
-  return <article className={`teacher-metric tone-${tone}`}><span className="teacher-metric-icon"><TeacherIcon name={icon}/></span><div><strong>{value}</strong><span>{label}</span><small>{note}</small></div></article>;
-}
+function LearnerDrawer({ learner, onClose }: { learner: TeacherLearner; onClose: () => void }) { return <div className="teacher-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}><aside className="teacher-learner-drawer" role="dialog" aria-modal="true" aria-label={`Hồ sơ học viên ${learner.name}`}><header><div className="teacher-student"><span>{learner.name.slice(0,1).toUpperCase()}</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.personCode || "Chưa có mã"}</small></div></div><button type="button" onClick={onClose}>×</button></header><div className="teacher-drawer-metrics"><Metric icon="trend" label="Tiến độ" value={`${learner.progress}%`} note={`${learner.completedLessons}/${learner.totalLessons} bài`}/><Metric icon="analysis" label="Phân tích AI" value={learner.analysisCount} note="Tóm tắt đã đồng bộ" tone="green"/></div><dl><div><dt>Điểm trung bình</dt><dd>{learner.averageScore === null ? "Chưa có" : learner.averageScore.toFixed(1)}</dd></div><div><dt>Thời gian học</dt><dd>{learner.totalActiveMinutes} phút</dd></div><div><dt>Hoạt động gần nhất</dt><dd>{shortDate(learner.lastActivityAt)}</dd></div><div><dt>Trạng thái</dt><dd>{learner.needsSupport ? supportReason(learner) : "Đang ổn"}</dd></div></dl>{learner.lastAnalysis ? <section><span>PHÂN TÍCH GẦN NHẤT</span><h3>{learner.lastAnalysis.score}/100 · {learner.lastAnalysis.confidence}% tin cậy</h3><p>{learner.lastAnalysis.topErrors.join(" · ") || "Chưa có tín hiệu lỗi nổi bật."}</p></section> : null}</aside></div>; }
 
-function LearnerTable({ learners, onSelect, compact = false }: { learners: TeacherLearner[]; onSelect: (learner: TeacherLearner) => void; compact?: boolean }) {
-  return <div className={`teacher-table-wrap ${compact ? "compact" : ""}`}><table className="teacher-table"><thead><tr><th>Học viên</th><th>Tiến độ</th><th>Video AI</th><th>Hoạt động</th><th>Cảnh báo</th><th>Thao tác</th></tr></thead><tbody>{learners.map((learner) => <tr key={`${learner.personCode}-${learner.name}`}><td><div className="teacher-student"><span>{learner.name.slice(0,1).toUpperCase()}</span><div><strong>{learner.name}</strong><small>{learner.className || learner.personCode}</small></div></div></td><td><div className="teacher-progress"><span><i style={{ width: `${learner.progress}%` }}/></span><b>{learner.progress}%</b></div></td><td><b className="teacher-number-cell">{learner.analysisCount}</b></td><td>{shortDate(learner.lastActivityAt)}{learner.lastLesson ? <small className="teacher-cell-note">Bài {learner.lastLesson} · {learner.lastPart ?? "học"}</small> : null}</td><td><span className={`teacher-status ${learner.needsSupport ? "warn" : "ok"}`}>{learner.needsSupport ? supportReason(learner) : "Đang ổn"}</span></td><td><button className="teacher-row-action" type="button" onClick={() => onSelect(learner)}>Xem hồ sơ</button></td></tr>)}</tbody></table>{learners.length === 0 ? <div className="teacher-empty">Không có học viên phù hợp với bộ lọc hiện tại.</div> : null}</div>;
-}
+function CapabilityGrid({ setTab }: { setTab: TabSetter }) { const items = [{ icon: "learners", title: "Theo dõi lớp học", note: "Quản lý lớp và sĩ số theo dữ liệu đã duyệt.", action: () => setTab("class") }, { icon: "trend", title: "Xem tiến độ học viên", note: "Theo dõi tiến bộ từng cá nhân.", action: () => setTab("learners") }, { icon: "video", title: "Xem phân tích AI", note: "Đọc tóm tắt media-free đã đồng bộ.", action: () => setTab("analysis") }, { icon: "shield", title: "Kiểm tra độ tin cậy", note: "Ưu tiên kết quả cần đối chiếu.", action: () => setTab("analysis") }, { icon: "task", title: "Chuẩn bị bài tập", note: "Mở luồng nội dung hiện có.", action: openTeacherEditor }, { icon: "trend", title: "So sánh tiến bộ", note: "Đối chiếu tiến độ và lần phân tích.", action: () => setTab("reports") }, { icon: "warning", title: "Học viên cần hỗ trợ", note: "Lọc trường hợp chậm hoặc bằng chứng yếu.", action: () => setTab("learners") }, { icon: "report", title: "Báo cáo lớp", note: "Tổng hợp dữ liệu học tập hiện có.", action: () => setTab("reports") }]; return <div className="teacher-capability-grid">{items.map((item) => <button key={item.title} type="button" className="teacher-capability-action" onClick={item.action}><span><TeacherIcon name={item.icon}/></span><div><strong>{item.title}</strong><small>{item.note}</small></div></button>)}</div>; }
+function RightRail({ learners, summary, setTab, refresh }: { learners: TeacherLearner[]; summary: TeacherOverview["summary"]; setTab: TabSetter; refresh: () => void }) { const support = learners.filter((item) => item.needsSupport); const analyses = learners.filter((item) => item.lastAnalysis); const averageConfidence = analyses.length ? Math.round(analyses.reduce((sum, item) => sum + (item.lastAnalysis?.confidence ?? 0), 0) / analyses.length) : 0; const trustworthy = analyses.filter((item) => analysisQuality(item.lastAnalysis) === "good").length; const tasks = [{ label: support.length ? `Xem ${support.length} học viên cần hỗ trợ` : "Không có cảnh báo hỗ trợ mới", done: support.length === 0, action: () => setTab("learners") }, { label: analyses.length ? `Rà ${Math.min(analyses.length, 4)} phân tích AI gần đây` : "Chưa có phân tích AI để rà", done: analyses.length === 0, action: () => setTab("analysis") }, { label: `${summary.active7d}/${summary.learnerCount || 0} học viên hoạt động 7 ngày`, done: summary.learnerCount > 0 && summary.active7d === summary.learnerCount, action: () => setTab("class") }, { label: "Làm mới dữ liệu giám sát", done: false, action: refresh }]; return <aside className="teacher-right-rail"><section className="teacher-rail-card teacher-today"><header><div><TeacherIcon name="task"/><strong>Công việc hôm nay</strong></div><button onClick={() => setTab("learners")}>Xem tất cả →</button></header><div className="teacher-task-progress"><b>{tasks.filter((item) => item.done).length}/{tasks.length}</b><span style={{ "--task-progress": `${Math.round(tasks.filter((item) => item.done).length / tasks.length * 100)}%` } as React.CSSProperties}/></div><div className="teacher-task-list">{tasks.map((item) => <button key={item.label} onClick={item.action}><i className={item.done ? "done" : ""}>{item.done ? "✓" : ""}</i><span>{item.label}</span></button>)}</div></section><section className="teacher-rail-card"><header><div><TeacherIcon name="warning"/><strong>Cảnh báo nhanh</strong></div><button onClick={() => setTab("learners")}>Xem tất cả →</button></header><div className="teacher-alert-list">{support.slice(0,3).map((learner) => <button key={learner.personCode || learner.name} onClick={() => setTab("learners")}><span>{learner.name.slice(0,1).toUpperCase()}</span><div><strong>{learner.name}</strong><small>{learner.className} · {supportReason(learner)}</small></div><b>!</b></button>)}{support.length === 0 ? <p className="teacher-rail-empty">Chưa có học viên vượt ngưỡng cảnh báo.</p> : null}</div></section><section className="teacher-rail-card"><header><div><TeacherIcon name="schedule"/><strong>Lịch giám sát</strong></div><button onClick={() => setTab("schedule")}>Chi tiết →</button></header><p className="teacher-rail-caption">Sắp theo dữ liệu gần nhất; không giả lập lịch calendar.</p><div className="teacher-monitor-list">{support.slice(0,3).map((learner,index) => <button key={learner.personCode || learner.name} onClick={() => setTab("schedule")}><span>{String(index+1).padStart(2,"0")}</span><div><strong>{learner.name}</strong><small>{supportReason(learner)}</small></div></button>)}</div></section><section className="teacher-rail-card teacher-ai-watch"><header><div><TeacherIcon name="shield"/><strong>Bảng kiểm giám sát AI</strong></div><button onClick={() => setTab("analysis")}>Chi tiết →</button></header><div className="teacher-ai-gauge"><strong>{averageConfidence || "—"}{averageConfidence ? "%" : ""}</strong><span>Tin cậy TB</span></div><div className="teacher-ai-watch-grid"><div><b>{trustworthy}</b><small>Phân tích đủ bằng chứng</small></div><div><b>{Math.max(analyses.length - trustworthy, 0)}</b><small>Cần xem lại</small></div></div></section></aside>; }
 
-function AnalysisQueue({ learners, setTab }: { learners: TeacherLearner[]; setTab: TabSetter }) {
-  const items = learners.filter((item) => item.lastAnalysis).sort((a, b) => Date.parse(b.lastAnalysis?.analyzedAt ?? "") - Date.parse(a.lastAnalysis?.analyzedAt ?? "")).slice(0, 4);
-  return <div className="teacher-analysis-queue-list">{items.map((learner) => {
-    const analysis = learner.lastAnalysis!;
-    const quality = analysisQuality(analysis);
-    return <article key={`${learner.personCode}-${analysis.analyzedAt}`}>
-      <div className="teacher-analysis-thumb"><TeacherIcon name="video"/><span>{analysis.cameraView === "side" ? "Góc ngang" : "Góc sau"}</span></div>
-      <div className="teacher-analysis-copy"><strong>{learner.name}</strong><small>{learner.className} · {shortDate(analysis.analyzedAt)}</small><p>{analysis.topErrors[0] || "Chưa có tín hiệu lỗi nổi bật"}</p></div>
-      <div className={`teacher-analysis-score-chip ${quality}`}><b>{analysis.score}</b><span>AI</span><strong>{analysis.confidence}%</strong><small>Tin cậy</small></div>
-      <div className="teacher-analysis-actions"><button type="button" onClick={() => setTab("analysis")}>Mở tóm tắt</button><a href="/phan-tich-video">Phân tích local</a></div>
-    </article>;
-  })}{items.length === 0 ? <div className="teacher-empty">Chưa có bản tóm tắt phân tích AI nào được đồng bộ.</div> : null}</div>;
-}
+function OverviewDashboard({ overview, setTab, refresh, query, onSelect }: { overview: TeacherOverview | null; setTab: TabSetter; refresh: () => void; query: string; onSelect: (learner: TeacherLearner) => void }) { const learners = (overview?.learners ?? []).filter((item) => matchesQuery(item, query)); const allLearners = overview?.learners ?? []; const support = learners.filter((item) => item.needsSupport); const summary = overview?.summary ?? { learnerCount:0, active7d:0, needingSupport:0, analysisCount:0, averageProgress:0 }; const className = overview?.teacher.className || "Lớp phụ trách"; return <div className="teacher-overview-layout"><main className="teacher-overview-main"><section className="teacher-hero"><div className="teacher-hero-copy"><span>ĐỒNG HÀNH CÙNG HỌC VIÊN</span><h1>Giám sát học viên,<br/><em>dẫn dắt tiến bộ mỗi ngày.</em></h1><p>Theo dõi kỹ thuật, tiến độ và bản tóm tắt phân tích AI trong đúng lớp/đơn vị bạn phụ trách.</p><div className="teacher-hero-actions"><button onClick={() => setTab("learners")}>Xem lớp phụ trách <b>→</b></button><a href="/phan-tich-video">Mở phân tích local</a></div></div><div className="teacher-hero-art"><span className="teacher-wave wave-a"/><span className="teacher-wave wave-b"/><div><small>GIÁM SÁT CÓ TRÁCH NHIỆM</small><strong>{className}</strong><p>{overview?.privacy.note ?? "Video gốc không được lưu trên máy chủ."}</p></div></div></section><div className="teacher-upper-grid"><section className="teacher-white-card teacher-capabilities"><header><div><TeacherIcon name="task"/><div><strong>Những gì giảng viên có thể làm</strong><small>Quyền chuyên môn nối vào dữ liệu và luồng thật.</small></div></div><button onClick={refresh}><TeacherIcon name="refresh"/>Làm mới</button></header><CapabilityGrid setTab={setTab}/></section><section className="teacher-white-card teacher-class-summary"><header><div><TeacherIcon name="class"/><strong>Tổng quan lớp phụ trách</strong></div><button onClick={() => setTab("class")}>Chi tiết →</button></header><div className="teacher-class-metrics"><Metric icon="learners" label="Học viên" value={summary.learnerCount} note={`${summary.active7d} hoạt động 7 ngày`}/><Metric icon="trend" label="Tiến độ TB" value={`${summary.averageProgress}%`} note="Theo bài đã hoàn thành" tone="green"/><Metric icon="video" label="Phân tích AI" value={summary.analysisCount} note="Tóm tắt đã đồng bộ" tone="gold"/><Metric icon="warning" label="Cần hỗ trợ" value={summary.needingSupport} note="Theo tiêu chí giám sát" tone="red"/></div></section></div><div className="teacher-lower-grid"><section className="teacher-white-card teacher-watchlist"><header><div><TeacherIcon name="learners"/><strong>Danh sách học viên cần chú ý</strong></div><div><span>{support.length} cần hỗ trợ</span><button onClick={() => setTab("learners")}>Xem tất cả →</button></div></header><LearnerTable learners={(support.length ? support : learners).slice(0,6)} onSelect={onSelect} compact/></section><section className="teacher-white-card teacher-analysis-queue"><header><div><TeacherIcon name="video"/><strong>Phân tích gần đây cần xem</strong></div><button onClick={() => setTab("analysis")}>Xem tất cả →</button></header><p className="teacher-section-note">Chỉ dùng bản tóm tắt media-free; Video gốc không được lưu trên máy chủ.</p><AnalysisQueue learners={learners} setTab={setTab}/></section></div>{query && learners.length === 0 && allLearners.length > 0 ? <div className="teacher-search-empty">Không tìm thấy học viên phù hợp với “{query}”.</div> : null}</main><RightRail learners={allLearners} summary={summary} setTab={setTab} refresh={refresh}/></div>; }
 
-function LearnerDrawer({ learner, onClose }: { learner: TeacherLearner; onClose: () => void }) {
-  return <div className="teacher-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}><aside className="teacher-learner-drawer" role="dialog" aria-modal="true" aria-label={`Hồ sơ học viên ${learner.name}`}>
-    <header><div className="teacher-student"><span>{learner.name.slice(0,1).toUpperCase()}</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.personCode || "Chưa có mã"}</small></div></div><button type="button" onClick={onClose} aria-label="Đóng hồ sơ">×</button></header>
-    <div className="teacher-drawer-metrics"><Metric icon="trend" label="Tiến độ" value={`${learner.progress}%`} note={`${learner.completedLessons}/${learner.totalLessons} bài`} tone="blue"/><Metric icon="analysis" label="Phân tích AI" value={learner.analysisCount} note="Bản tóm tắt đã đồng bộ" tone="green"/></div>
-    <dl><div><dt>Điểm trung bình</dt><dd>{learner.averageScore === null ? "Chưa có" : learner.averageScore.toFixed(1)}</dd></div><div><dt>Thời gian học</dt><dd>{learner.totalActiveMinutes} phút</dd></div><div><dt>Hoạt động gần nhất</dt><dd>{shortDate(learner.lastActivityAt)}</dd></div><div><dt>Trạng thái</dt><dd>{learner.needsSupport ? supportReason(learner) : "Đang ổn"}</dd></div></dl>
-    {learner.lastAnalysis ? <section><span>PHÂN TÍCH GẦN NHẤT</span><h3>{learner.lastAnalysis.score}/100 · {learner.lastAnalysis.confidence}% tin cậy</h3><p>{learner.lastAnalysis.topErrors.length ? learner.lastAnalysis.topErrors.join(" · ") : "Chưa có tín hiệu lỗi nổi bật."}</p></section> : <section><span>PHÂN TÍCH GẦN NHẤT</span><p>Học viên chưa có bản tóm tắt AI được đồng bộ.</p></section>}
-  </aside></div>;
-}
-
-function CapabilityGrid({ setTab }: { setTab: TabSetter }) {
-  const items: Array<{ icon: string; title: string; note: string; action: () => void }> = [
-    { icon: "learners", title: "Theo dõi lớp học", note: "Quản lý lớp, buổi học và sĩ số theo dữ liệu đã duyệt.", action: () => setTab("class") },
-    { icon: "trend", title: "Xem tiến độ học viên", note: "Theo dõi sự tiến bộ của từng cá nhân.", action: () => setTab("learners") },
-    { icon: "video", title: "Xem phân tích AI", note: "Đọc bản tóm tắt media-free học viên đã đồng bộ.", action: () => setTab("analysis") },
-    { icon: "shield", title: "Kiểm tra độ tin cậy", note: "Ưu tiên các kết quả AI cần Giảng viên đối chiếu.", action: () => setTab("analysis") },
-    { icon: "task", title: "Chuẩn bị bài tập", note: "Mở luồng nội dung hiện có để chuẩn bị bài luyện.", action: openTeacherEditor },
-    { icon: "trend", title: "So sánh tiến bộ", note: "Đối chiếu tiến độ và các lần phân tích gần nhất.", action: () => setTab("reports") },
-    { icon: "warning", title: "Học viên cần hỗ trợ", note: "Lọc nhanh các trường hợp chậm hoặc bằng chứng yếu.", action: () => setTab("learners") },
-    { icon: "report", title: "Báo cáo lớp", note: "Tổng hợp dữ liệu học tập đang có, không biến AI thành điểm chính thức.", action: () => setTab("reports") },
-  ];
-  return <div className="teacher-capability-grid">{items.map((item) => <button key={item.title} type="button" className="teacher-capability-action" onClick={item.action}><span><TeacherIcon name={item.icon}/></span><div><strong>{item.title}</strong><small>{item.note}</small></div></button>)}</div>;
-}
-
-function RightRail({ learners, summary, setTab, refresh }: { learners: TeacherLearner[]; summary: TeacherOverview["summary"]; setTab: TabSetter; refresh: () => void }) {
-  const support = learners.filter((item) => item.needsSupport);
-  const analyses = learners.filter((item) => item.lastAnalysis);
-  const averageConfidence = analyses.length ? Math.round(analyses.reduce((sum, item) => sum + (item.lastAnalysis?.confidence ?? 0), 0) / analyses.length) : 0;
-  const trustworthy = analyses.filter((item) => analysisQuality(item.lastAnalysis) === "good").length;
-  const tasks = [
-    { label: support.length ? `Xem ${support.length} học viên cần hỗ trợ` : "Không có cảnh báo hỗ trợ mới", done: support.length === 0, action: () => setTab("learners") },
-    { label: analyses.length ? `Rà ${Math.min(analyses.length, 4)} phân tích AI gần đây` : "Chưa có phân tích AI để rà", done: analyses.length === 0, action: () => setTab("analysis") },
-    { label: `${summary.active7d}/${summary.learnerCount || 0} học viên hoạt động 7 ngày`, done: summary.learnerCount > 0 && summary.active7d === summary.learnerCount, action: () => setTab("class") },
-    { label: "Làm mới dữ liệu giám sát", done: false, action: refresh },
-  ];
-  return <aside className="teacher-right-rail">
-    <section className="teacher-rail-card teacher-today"><header><div><TeacherIcon name="task"/><strong>Công việc hôm nay</strong></div><button type="button" onClick={() => setTab("learners")}>Xem tất cả →</button></header><div className="teacher-task-progress"><b>{tasks.filter((item) => item.done).length}/{tasks.length}</b><span style={{ "--task-progress": `${Math.round(tasks.filter((item) => item.done).length / tasks.length * 100)}%` } as React.CSSProperties}/></div><div className="teacher-task-list">{tasks.map((item) => <button key={item.label} type="button" onClick={item.action}><i className={item.done ? "done" : ""}>{item.done ? "✓" : ""}</i><span>{item.label}</span></button>)}</div></section>
-    <section className="teacher-rail-card"><header><div><TeacherIcon name="warning"/><strong>Cảnh báo nhanh</strong></div><button type="button" onClick={() => setTab("learners")}>Xem tất cả →</button></header><div className="teacher-alert-list">{support.slice(0, 3).map((learner) => <button type="button" key={learner.personCode || learner.name} onClick={() => setTab("learners")}><span>{learner.name.slice(0,1).toUpperCase()}</span><div><strong>{learner.name}</strong><small>{learner.className} · {supportReason(learner)}</small></div><b>!</b></button>)}{support.length === 0 ? <p className="teacher-rail-empty">Chưa có học viên nào vượt ngưỡng cảnh báo hiện tại.</p> : null}</div></section>
-    <section className="teacher-rail-card"><header><div><TeacherIcon name="schedule"/><strong>Lịch giám sát</strong></div><button type="button" onClick={() => setTab("schedule")}>Chi tiết →</button></header><p className="teacher-rail-caption">Tự sắp theo dữ liệu gần nhất, không giả lập lịch dạy trên calendar.</p><div className="teacher-monitor-list">{support.slice(0, 3).map((learner, index) => <button type="button" key={learner.personCode || learner.name} onClick={() => setTab("schedule")}><span>{String(index + 1).padStart(2,"0")}</span><div><strong>{learner.name}</strong><small>{supportReason(learner)}</small></div></button>)}{support.length === 0 ? <p className="teacher-rail-empty">Chưa có ca cần ưu tiên giám sát.</p> : null}</div></section>
-    <section className="teacher-rail-card teacher-ai-watch"><header><div><TeacherIcon name="shield"/><strong>Bảng kiểm giám sát AI</strong></div><button type="button" onClick={() => setTab("analysis")}>Chi tiết →</button></header><div className="teacher-ai-gauge"><strong>{averageConfidence || "—"}{averageConfidence ? "%" : ""}</strong><span>Tin cậy TB</span></div><div className="teacher-ai-watch-grid"><div><b>{trustworthy}</b><small>Phân tích đủ bằng chứng</small></div><div><b>{Math.max(analyses.length - trustworthy, 0)}</b><small>Cần Giảng viên xem lại</small></div></div></section>
-  </aside>;
-}
-
-function OverviewDashboard({ overview, setTab, refresh, query, onSelect }: { overview: TeacherOverview | null; setTab: TabSetter; refresh: () => void; query: string; onSelect: (learner: TeacherLearner) => void }) {
-  const learners = (overview?.learners ?? []).filter((item) => matchesQuery(item, query));
-  const allLearners = overview?.learners ?? [];
-  const support = learners.filter((item) => item.needsSupport);
-  const summary = overview?.summary ?? { learnerCount: 0, active7d: 0, needingSupport: 0, analysisCount: 0, averageProgress: 0 };
-  const className = overview?.teacher.className || "Lớp phụ trách";
-  return <div className="teacher-overview-layout">
-    <main className="teacher-overview-main">
-      <section className="teacher-hero"><div className="teacher-hero-copy"><span>ĐỒNG HÀNH CÙNG HỌC VIÊN</span><h1>Giám sát học viên,<br/><em>dẫn dắt tiến bộ mỗi ngày.</em></h1><p>Theo dõi kỹ thuật, tiến độ và bản tóm tắt phân tích AI trong đúng lớp/đơn vị bạn phụ trách.</p><div className="teacher-hero-actions"><button type="button" onClick={() => setTab("learners")}>Xem lớp phụ trách <b>→</b></button><a href="/phan-tich-video">Mở phân tích local</a></div></div><div className="teacher-hero-art"><span className="teacher-wave wave-a"/><span className="teacher-wave wave-b"/><div><small>GIÁM SÁT CÓ TRÁCH NHIỆM</small><strong>{className}</strong><p>{overview?.privacy.note ?? "Video gốc không được lưu trên máy chủ."}</p></div></div></section>
-      <div className="teacher-upper-grid">
-        <section className="teacher-white-card teacher-capabilities"><header><div><TeacherIcon name="task"/><div><strong>Những gì giảng viên có thể làm</strong><small>Quyền chuyên môn được nối vào dữ liệu và luồng thật hiện có.</small></div></div><button type="button" onClick={refresh}><TeacherIcon name="refresh"/>Làm mới</button></header><CapabilityGrid setTab={setTab}/></section>
-        <section className="teacher-white-card teacher-class-summary"><header><div><TeacherIcon name="class"/><strong>Tổng quan lớp phụ trách</strong></div><button type="button" onClick={() => setTab("class")}>Chi tiết →</button></header><div className="teacher-class-metrics"><Metric icon="learners" label="Học viên" value={summary.learnerCount} note={`${summary.active7d} hoạt động 7 ngày`} tone="blue"/><Metric icon="trend" label="Tiến độ TB" value={`${summary.averageProgress}%`} note="Theo bài đã hoàn thành" tone="green"/><Metric icon="video" label="Phân tích AI" value={summary.analysisCount} note="Tóm tắt đã đồng bộ" tone="gold"/><Metric icon="warning" label="Cần hỗ trợ" value={summary.needingSupport} note="Theo tiêu chí giám sát" tone="red"/></div></section>
-      </div>
-      <div className="teacher-lower-grid">
-        <section className="teacher-white-card teacher-watchlist"><header><div><TeacherIcon name="learners"/><strong>Danh sách học viên cần chú ý</strong></div><div><span>{support.length} cần hỗ trợ</span><button type="button" onClick={() => setTab("learners")}>Xem tất cả →</button></div></header><LearnerTable learners={(support.length ? support : learners).slice(0, 6)} onSelect={onSelect} compact/></section>
-        <section className="teacher-white-card teacher-analysis-queue"><header><div><TeacherIcon name="video"/><strong>Phân tích gần đây cần xem</strong></div><button type="button" onClick={() => setTab("analysis")}>Xem tất cả →</button></header><p className="teacher-section-note">Chỉ dùng bản tóm tắt media-free; Video gốc không được lưu trên máy chủ.</p><AnalysisQueue learners={learners} setTab={setTab}/></section>
-      </div>
-      {query && learners.length === 0 && allLearners.length > 0 ? <div className="teacher-search-empty">Không tìm thấy học viên phù hợp với “{query}”.</div> : null}
-    </main>
-    <RightRail learners={allLearners} summary={summary} setTab={setTab} refresh={refresh}/>
-  </div>;
-}
-
-function TeacherDashboard({ overview, loading, error, tab, setTab, refresh, query }: { overview: TeacherOverview | null; loading: boolean; error: string; tab: TeacherTab; setTab: TabSetter; refresh: () => void; query: string }) {
-  const [selectedLearner, setSelectedLearner] = useState<TeacherLearner | null>(null);
-  const allLearners = overview?.learners ?? [];
-  const learners = allLearners.filter((item) => matchesQuery(item, query));
-  const support = learners.filter((item) => item.needsSupport);
-  const summary = overview?.summary ?? { learnerCount: 0, active7d: 0, needingSupport: 0, analysisCount: 0, averageProgress: 0 };
-  const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên";
-  const className = overview?.teacher.className || "Lớp phụ trách";
-
-  if (loading && !overview) return <div className="teacher-dashboard" data-teacher-role-ui><div className="teacher-loading">Đang tải dữ liệu giám sát lớp…</div></div>;
-
-  return <div className="teacher-dashboard" data-teacher-role-ui>
-    {tab === "overview" ? <OverviewDashboard overview={overview} setTab={setTab} refresh={refresh} query={query} onSelect={setSelectedLearner}/> : null}
-    {tab === "class" ? <section className="teacher-page"><header><span>LỚP PHỤ TRÁCH</span><h1>{className}</h1><p>Tổng hợp học tập của toàn bộ học viên cùng lớp/đơn vị đã đăng ký với tài khoản Giảng viên.</p></header><div className="teacher-page-metrics"><Metric icon="learners" label="Sĩ số hệ thống" value={summary.learnerCount} note="Học viên đã được duyệt"/><Metric icon="trend" label="Hoạt động 7 ngày" value={summary.active7d} note="Có tương tác gần đây" tone="green"/><Metric icon="report" label="Tiến độ trung bình" value={`${summary.averageProgress}%`} note="Theo 8 bài học" tone="gold"/><Metric icon="warning" label="Cần can thiệp" value={summary.needingSupport} note="Theo dữ liệu giám sát" tone="red"/></div><section className="teacher-white-card"><LearnerTable learners={learners} onSelect={setSelectedLearner}/></section></section> : null}
-    {tab === "learners" ? <section className="teacher-page"><header><span>HỌC VIÊN</span><h1>Danh sách giám sát</h1><p>Dùng ô tìm kiếm phía trên để lọc theo tên, lớp, mã học viên hoặc tín hiệu AI. Không hiển thị số điện thoại hay dữ liệu quản trị.</p></header><section className="teacher-white-card"><LearnerTable learners={learners} onSelect={setSelectedLearner}/></section></section> : null}
-    {tab === "analysis" ? <section className="teacher-page"><header><span>PHÂN TÍCH VIDEO</span><h1>Bằng chứng AI cần Giảng viên đối chiếu</h1><p>Chỉ hiển thị kết quả media-free đã đồng bộ. Nếu cần xem video thật, học viên phải chủ động cung cấp video để phân tích local trên thiết bị.</p><a className="teacher-primary-link" href="/phan-tich-video">Mở workspace phân tích local →</a></header><section className="teacher-white-card"><AnalysisQueue learners={learners} setTab={setTab}/></section></section> : null}
-    {tab === "tasks" ? <section className="teacher-page"><header><span>BÀI TẬP & CAN THIỆP</span><h1>Chuẩn bị bài luyện từ dữ liệu giám sát</h1><p>Hệ thống hiện chưa tự gửi bài tập cá nhân qua máy chủ. Giảng viên có thể xác định học viên cần hỗ trợ, rồi mở luồng biên tập nội dung hiện có để chuẩn bị bài luyện phù hợp.</p></header><div className="teacher-task-page-grid"><section className="teacher-white-card"><h2>Học viên nên ưu tiên</h2><LearnerTable learners={support} onSelect={setSelectedLearner} compact/></section><aside className="teacher-white-card teacher-task-editor"><TeacherIcon name="book"/><h2>Chuẩn bị nội dung luyện tập</h2><p>Dùng quyền biên tập hiện có; nếu chưa được cấp quyền, hệ thống sẽ chuyển đúng luồng xin quyền.</p><button type="button" onClick={openTeacherEditor}>Mở Biên tập bài giảng →</button></aside></div></section> : null}
-    {tab === "reports" ? <section className="teacher-page"><header><span>BÁO CÁO</span><h1>Báo cáo lớp theo dữ liệu hiện có</h1><p>Tập trung vào tiến độ, hoạt động và mức độ cần hỗ trợ; không biến điểm AI thành đánh giá chính thức.</p></header><div className="teacher-report-grid"><article><strong>{summary.averageProgress}%</strong><span>Tiến độ trung bình</span></article><article><strong>{summary.active7d}/{summary.learnerCount}</strong><span>Học viên hoạt động 7 ngày</span></article><article><strong>{summary.analysisCount}</strong><span>Lần phân tích AI đã đồng bộ</span></article><article><strong>{summary.needingSupport}</strong><span>Học viên cần theo dõi thêm</span></article></div><section className="teacher-white-card"><LearnerTable learners={support.length ? support : learners} onSelect={setSelectedLearner}/></section></section> : null}
-    {tab === "schedule" ? <section className="teacher-page"><header><span>LỊCH GIÁM SÁT</span><h1>Ưu tiên theo dữ liệu gần nhất</h1><p>Ứng dụng chưa có lịch calendar riêng nên không tự tạo giờ dạy giả. Danh sách này sắp các ca cần kiểm tra dựa trên học viên đang có tín hiệu cần hỗ trợ.</p></header><div className="teacher-schedule-list">{support.slice(0, 10).map((learner, index) => <article key={learner.personCode || learner.name}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{learner.name}</strong><small>{supportReason(learner)}</small></div><b>Bài {learner.lastLesson ?? "—"}</b><button type="button" onClick={() => setSelectedLearner(learner)}>Xem chi tiết</button></article>)}{support.length === 0 ? <div className="teacher-empty">Chưa có học viên cần xếp lịch giám sát ưu tiên.</div> : null}</div></section> : null}
-    {tab === "profile" ? <section className="teacher-page"><header><span>HỒ SƠ GIẢNG VIÊN</span><h1>{teacherName}</h1><p>Quyền giám sát được ràng buộc với số hiệu, thiết bị đã ký và lớp/đơn vị phụ trách trong hồ sơ đăng ký.</p></header><dl className="teacher-profile"><div><dt>Vai trò</dt><dd>Giảng viên</dd></div><div><dt>Số hiệu</dt><dd>{overview?.teacher.personCode || "—"}</dd></div><div><dt>Lớp / đơn vị phụ trách</dt><dd>{className}</dd></div><div><dt>Phạm vi học viên</dt><dd>Chỉ học viên cùng lớp/đơn vị</dd></div></dl><div className="teacher-profile-actions"><button type="button" onClick={openTeacherEditor}>Biên tập bài giảng</button><a href="/phan-tich-video">Phân tích video local</a></div></section> : null}
-    {error ? <div className="teacher-error" role="alert">{error}<button type="button" onClick={refresh}>Thử lại</button></div> : null}
-    {selectedLearner ? <LearnerDrawer learner={selectedLearner} onClose={() => setSelectedLearner(null)}/> : null}
-  </div>;
-}
+function TeacherDashboard({ overview, loading, error, tab, setTab, refresh, query }: { overview: TeacherOverview | null; loading: boolean; error: string; tab: TeacherTab; setTab: TabSetter; refresh: () => void; query: string }) { const [selectedLearner, setSelectedLearner] = useState<TeacherLearner | null>(null); const all = overview?.learners ?? []; const learners = all.filter((item) => matchesQuery(item, query)); const support = learners.filter((item) => item.needsSupport); const summary = overview?.summary ?? { learnerCount:0, active7d:0, needingSupport:0, analysisCount:0, averageProgress:0 }; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; if (loading && !overview) return <div className="teacher-dashboard"><div className="teacher-loading">Đang tải dữ liệu giám sát lớp…</div></div>; return <div className="teacher-dashboard" data-teacher-role-ui>{tab === "overview" ? <OverviewDashboard overview={overview} setTab={setTab} refresh={refresh} query={query} onSelect={setSelectedLearner}/> : null}{tab === "class" ? <section className="teacher-page"><header><span>LỚP PHỤ TRÁCH</span><h1>{className}</h1><p>Tổng hợp học tập của học viên cùng lớp/đơn vị.</p></header><div className="teacher-class-metrics"><Metric icon="learners" label="Sĩ số" value={summary.learnerCount} note="Học viên đã duyệt"/><Metric icon="trend" label="Hoạt động 7 ngày" value={summary.active7d} note="Có tương tác" tone="green"/><Metric icon="report" label="Tiến độ TB" value={`${summary.averageProgress}%`} note="Theo 8 bài" tone="gold"/><Metric icon="warning" label="Cần can thiệp" value={summary.needingSupport} note="Theo giám sát" tone="red"/></div><section className="teacher-white-card"><LearnerTable learners={learners} onSelect={setSelectedLearner}/></section></section> : null}{tab === "learners" ? <section className="teacher-page"><header><span>HỌC VIÊN</span><h1>Danh sách giám sát</h1><p>Dùng ô tìm kiếm phía trên để lọc tên, lớp, mã học viên hoặc tín hiệu AI.</p></header><section className="teacher-white-card"><LearnerTable learners={learners} onSelect={setSelectedLearner}/></section></section> : null}{tab === "analysis" ? <section className="teacher-page"><header><span>PHÂN TÍCH VIDEO</span><h1>Bằng chứng AI cần Giảng viên đối chiếu</h1><p>Chỉ hiển thị kết quả media-free đã đồng bộ.</p><a className="teacher-primary-link" href="/phan-tich-video">Mở workspace phân tích local →</a></header><section className="teacher-white-card"><AnalysisQueue learners={learners} setTab={setTab}/></section></section> : null}{tab === "tasks" ? <section className="teacher-page"><header><span>BÀI TẬP & CAN THIỆP</span><h1>Chuẩn bị bài luyện từ dữ liệu giám sát</h1><p>Không tự gửi bài tập khi chưa có backend giao bài; dùng luồng biên tập hiện có.</p></header><section className="teacher-white-card"><LearnerTable learners={support} onSelect={setSelectedLearner} compact/></section><button className="teacher-primary-link" onClick={openTeacherEditor}>Mở Biên tập bài giảng →</button></section> : null}{tab === "reports" ? <section className="teacher-page"><header><span>BÁO CÁO</span><h1>Báo cáo lớp theo dữ liệu hiện có</h1><p>Không biến điểm AI thành đánh giá chính thức.</p></header><section className="teacher-white-card"><LearnerTable learners={support.length ? support : learners} onSelect={setSelectedLearner}/></section></section> : null}{tab === "schedule" ? <section className="teacher-page"><header><span>LỊCH GIÁM SÁT</span><h1>Ưu tiên theo dữ liệu gần nhất</h1><p>Đây là gợi ý giám sát, không giả lập lịch calendar chưa có backend.</p></header><div className="teacher-monitor-list">{support.map((learner,index) => <button key={learner.personCode || learner.name} onClick={() => setSelectedLearner(learner)}><span>{String(index+1).padStart(2,"0")}</span><div><strong>{learner.name}</strong><small>{supportReason(learner)}</small></div></button>)}</div></section> : null}{tab === "profile" ? <section className="teacher-page"><header><span>HỒ SƠ GIẢNG VIÊN</span><h1>{teacherName}</h1><p>Quyền giám sát ràng buộc với thiết bị đã ký và lớp phụ trách.</p></header><dl className="teacher-profile"><div><dt>Vai trò</dt><dd>Giảng viên</dd></div><div><dt>Số hiệu</dt><dd>{overview?.teacher.personCode || "—"}</dd></div><div><dt>Lớp phụ trách</dt><dd>{className}</dd></div></dl></section> : null}{error ? <div className="teacher-error" role="alert">{error}<button onClick={refresh}>Thử lại</button></div> : null}{selectedLearner ? <LearnerDrawer learner={selectedLearner} onClose={() => setSelectedLearner(null)}/> : null}</div>; }
 
 export default function TeacherRoleShell() {
-  const [active, setActive] = useState(false);
-  const [tab, setTab] = useState<TeacherTab>("overview");
-  const [overview, setOverview] = useState<TeacherOverview | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [dashboardMount, setDashboardMount] = useState<HTMLElement | null>(null);
-  const [navMount, setNavMount] = useState<HTMLElement | null>(null);
-  const [searchMount, setSearchMount] = useState<HTMLElement | null>(null);
-  const deviceIdRef = useRef("");
-  const loadedDeviceRef = useRef("");
-
-  const refresh = useMemo(() => () => {
-    const deviceId = deviceIdRef.current;
-    if (!deviceId) return;
-    setLoading(true);
-    setError("");
-    loadTeacherOverview(deviceId)
-      .then((data) => { loadedDeviceRef.current = deviceId; setOverview(data); })
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu Giảng viên."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (window.location.pathname !== "/") return;
-    let observer: MutationObserver | undefined;
-    let timer = 0;
-    let dashboardNode: HTMLElement | null = null;
-    let navNode: HTMLElement | null = null;
-    let searchNode: HTMLElement | null = null;
-
-    const sync = () => {
-      timer = 0;
-      const shell = document.querySelector<HTMLElement>(".app-shell");
-      const role = text(document.querySelector(".learner-chip small"));
-      const isTeacher = Boolean(shell && role === "Giảng viên");
-      setActive(isTeacher);
-      if (!isTeacher || !shell) {
-        delete document.body.dataset.teacherRoleUi;
-        return;
-      }
-      document.body.dataset.teacherRoleUi = "active";
-      const main = shell.querySelector<HTMLElement>(".main-area");
-      const sidebar = shell.querySelector<HTMLElement>(".sidebar");
-      const topbar = main?.querySelector<HTMLElement>(":scope > .topbar");
-      if (!main || !sidebar || !topbar) return;
-
-      if (!dashboardNode) {
-        dashboardNode = document.createElement("div");
-        dashboardNode.className = "teacher-role-dashboard-mount";
-        dashboardNode.dataset.teacherRoleUi = "mount";
-        topbar.insertAdjacentElement("afterend", dashboardNode);
-        setDashboardMount(dashboardNode);
-      }
-      if (!navNode) {
-        navNode = document.createElement("div");
-        navNode.className = "teacher-role-nav-mount";
-        navNode.dataset.teacherRoleUi = "mount";
-        sidebar.querySelector(".brand-row")?.insertAdjacentElement("afterend", navNode);
-        setNavMount(navNode);
-      }
-      if (!searchNode) {
-        searchNode = document.createElement("div");
-        searchNode.className = "teacher-role-search-mount";
-        searchNode.dataset.teacherRoleUi = "mount";
-        const actions = topbar.querySelector(".topbar-actions");
-        if (actions) topbar.insertBefore(searchNode, actions);
-        else topbar.append(searchNode);
-        setSearchMount(searchNode);
-      }
-
-      const chip = document.querySelector<HTMLElement>(".learner-chip");
-      const title = chip?.getAttribute("title") ?? "";
-      const code = title.includes("·") ? title.split("·").slice(1).join("·").trim() : "";
-      const candidate = code && /^[a-f0-9]{64}$/i.test(code) ? code : "";
-      const stateDeviceId = document.querySelector<HTMLElement>(".app-shell")?.getAttribute("data-device-id") ?? "";
-      deviceIdRef.current = stateDeviceId || candidate;
-
-      if (!deviceIdRef.current) {
-        readStoredDeviceCredential().then(async (credential) => {
-          if (!credential?.publicKey) return;
-          const canonical = JSON.stringify({ kty: credential.publicKey.kty, crv: credential.publicKey.crv, x: credential.publicKey.x, y: credential.publicKey.y });
-          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-          deviceIdRef.current = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
-          if (loadedDeviceRef.current !== deviceIdRef.current) refresh();
-        }).catch(() => undefined);
-      } else if (loadedDeviceRef.current !== deviceIdRef.current && !loading) {
-        refresh();
-      }
-    };
-
-    const schedule = () => {
-      if (timer) return;
-      timer = window.setTimeout(sync, 0);
-    };
-    schedule();
-    observer = new MutationObserver((mutations) => {
-      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-teacher-role-ui]"))) return;
-      schedule();
-    });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "title"] });
-    return () => {
-      if (timer) window.clearTimeout(timer);
-      observer?.disconnect();
-      dashboardNode?.remove();
-      navNode?.remove();
-      searchNode?.remove();
-      delete document.body.dataset.teacherRoleUi;
-    };
-  }, [loading, refresh]);
-
-  if (!active) return null;
-  const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên";
-  const className = overview?.teacher.className || "Lớp phụ trách";
-  const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null;
-  const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null;
-  const dashboard = dashboardMount ? createPortal(<TeacherDashboard overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} refresh={refresh} query={query}/>, dashboardMount) : null;
-  return <>{nav}{search}{dashboard}</>;
+  const [active, setActive] = useState(false); const [tab, setTab] = useState<TeacherTab>("overview"); const [overview, setOverview] = useState<TeacherOverview | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [query, setQuery] = useState(""); const [dashboardMount, setDashboardMount] = useState<HTMLElement | null>(null); const [navMount, setNavMount] = useState<HTMLElement | null>(null); const [searchMount, setSearchMount] = useState<HTMLElement | null>(null); const deviceIdRef = useRef(""); const loadedDeviceRef = useRef("");
+  const refresh = useMemo(() => () => { const deviceId = deviceIdRef.current; if (!deviceId) return; setLoading(true); setError(""); loadTeacherOverview(deviceId).then((data) => { loadedDeviceRef.current = deviceId; setOverview(data); }).catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu Giảng viên.")).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (window.location.pathname !== "/") return; let timer = 0; let dashboardNode: HTMLElement | null = null; let navNode: HTMLElement | null = null; let searchNode: HTMLElement | null = null;
+    const sync = () => { timer = 0; const shell = document.querySelector<HTMLElement>(".app-shell"); const role = text(document.querySelector(".learner-chip small")); const isTeacher = Boolean(shell && role === "Giảng viên"); setActive(isTeacher); if (!isTeacher || !shell) { delete document.body.dataset.teacherRoleUi; return; } document.body.dataset.teacherRoleUi = "active"; const main = shell.querySelector<HTMLElement>(".main-area"); const sidebar = shell.querySelector<HTMLElement>(".sidebar"); const topbar = main?.querySelector<HTMLElement>(":scope > .topbar"); if (!main || !sidebar || !topbar) return; if (!dashboardNode) { dashboardNode = document.createElement("div"); dashboardNode.className = "teacher-role-dashboard-mount"; dashboardNode.dataset.teacherRoleUi = "mount"; topbar.insertAdjacentElement("afterend", dashboardNode); setDashboardMount(dashboardNode); } if (!navNode) { navNode = document.createElement("div"); navNode.className = "teacher-role-nav-mount"; navNode.dataset.teacherRoleUi = "mount"; sidebar.querySelector(".brand-row")?.insertAdjacentElement("afterend", navNode); setNavMount(navNode); } if (!searchNode) { searchNode = document.createElement("div"); searchNode.className = "teacher-role-search-mount"; searchNode.dataset.teacherRoleUi = "mount"; const actions = topbar.querySelector(".topbar-actions"); if (actions) topbar.insertBefore(searchNode, actions); else topbar.append(searchNode); setSearchMount(searchNode); } const chip = document.querySelector<HTMLElement>(".learner-chip"); const title = chip?.getAttribute("title") ?? ""; const code = title.includes("·") ? title.split("·").slice(1).join("·").trim() : ""; const candidate = code && /^[a-f0-9]{64}$/i.test(code) ? code : ""; const stateDeviceId = shell.getAttribute("data-device-id") ?? ""; deviceIdRef.current = stateDeviceId || candidate; if (!deviceIdRef.current) { readStoredDeviceCredential().then(async (credential) => { if (!credential?.publicKey) return; const canonical = JSON.stringify({ kty: credential.publicKey.kty, crv: credential.publicKey.crv, x: credential.publicKey.x, y: credential.publicKey.y }); const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)); deviceIdRef.current = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2,"0")).join(""); if (loadedDeviceRef.current !== deviceIdRef.current) refresh(); }).catch(() => undefined); } else if (loadedDeviceRef.current !== deviceIdRef.current && !loading) refresh(); };
+    const schedule = () => { if (!timer) timer = window.setTimeout(sync, 0); }; schedule(); const observer = new MutationObserver((mutations) => { if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-teacher-role-ui]"))) return; schedule(); }); observer.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["class","title"] }); return () => { if (timer) window.clearTimeout(timer); observer.disconnect(); dashboardNode?.remove(); navNode?.remove(); searchNode?.remove(); delete document.body.dataset.teacherRoleUi; }; }, [loading, refresh]);
+  if (!active) return null; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null; const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null; const dashboard = dashboardMount ? createPortal(<TeacherDashboard overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} refresh={refresh} query={query}/>, dashboardMount) : null; return <>{nav}{search}{dashboard}</>;
 }
