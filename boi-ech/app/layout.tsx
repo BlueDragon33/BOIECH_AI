@@ -6,6 +6,7 @@ import "./teacher-role-shell.css";
 import "./role-typography.css";
 import "./teacher-action-bridge.css";
 import "./multi-account-switcher.css";
+import "./teacher-dashboard-reference.css";
 import StudentRoleShell from "./student-role-shell";
 import TeacherRoleShell from "./teacher-role-shell";
 import TeacherActionBridge from "./teacher-action-bridge";
