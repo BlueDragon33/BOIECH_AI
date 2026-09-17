@@ -247,7 +247,7 @@ function roleLabel(role: AccountMeta["role"]) {
 
 export default function MultiAccountSwitcher() {
   const [accounts, setAccounts] = useState<AccountVaultRecord[]>([]);
-  const [chooserOpen, setChooserOpen] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(SESSION_KEY) === "logged-out");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [topbarMount, setTopbarMount] = useState<HTMLElement | null>(null);
@@ -265,8 +265,6 @@ export default function MultiAccountSwitcher() {
 
   useEffect(() => {
     if (window.location.pathname !== "/") return;
-    const loggedOut = window.localStorage.getItem(SESSION_KEY) === "logged-out";
-    setChooserOpen(loggedOut);
     let timer = 0;
     const sync = () => {
       window.clearTimeout(timer);
