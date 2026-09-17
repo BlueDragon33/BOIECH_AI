@@ -20,6 +20,49 @@
 .multi-account-floating { position: fixed; z-index: 980; top: 16px; right: 16px; }
 .multi-account-floating .multi-account-trigger { color: #0a5364; border-color: #c9e3e8; background: rgba(255,255,255,.96); box-shadow: 0 10px 28px rgba(9,65,82,.11); }
 
+/* Khi đã vào giao diện Học viên/Giảng viên, nút tài khoản phải luôn nhìn thấy.
+   Không phụ thuộc chiều rộng topbar hoặc số lượng action hiện có. */
+body[data-student-role-ui="active"] .multi-account-trigger,
+body[data-teacher-role-ui="active"] .multi-account-trigger {
+  position: fixed;
+  z-index: 1550;
+  right: 18px;
+  bottom: 18px;
+  min-height: 44px;
+  padding: 0 15px;
+  border: 1px solid rgba(102, 225, 222, .46);
+  border-radius: 14px;
+  color: #efffff;
+  background: linear-gradient(135deg, rgba(6, 48, 75, .98), rgba(8, 93, 113, .98));
+  box-shadow: 0 16px 38px rgba(3, 36, 58, .25), inset 0 1px 0 rgba(255,255,255,.08);
+  font-size: 11px;
+}
+body[data-student-role-ui="active"] .multi-account-trigger:hover,
+body[data-teacher-role-ui="active"] .multi-account-trigger:hover {
+  border-color: rgba(116, 239, 232, .8);
+  background: linear-gradient(135deg, rgba(5, 57, 86, .99), rgba(9, 114, 128, .99));
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px rgba(3, 36, 58, .3), inset 0 1px 0 rgba(255,255,255,.1);
+}
+body[data-student-role-ui="active"] .multi-account-trigger span,
+body[data-teacher-role-ui="active"] .multi-account-trigger span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  color: #072f43;
+  background: linear-gradient(135deg, #94f2e8, #68d7ef);
+  font-size: 17px;
+  font-weight: 900;
+}
+body[data-student-role-ui="active"] .multi-account-trigger b,
+body[data-teacher-role-ui="active"] .multi-account-trigger b {
+  display: inline !important;
+  font-size: 11px;
+  letter-spacing: .01em;
+}
+
 .multi-account-overlay {
   position: fixed;
   z-index: 3000;
@@ -96,6 +139,17 @@
 @media (max-width: 760px) {
   .multi-account-trigger b { display: none; }
   .multi-account-trigger { width: 34px; padding: 0; justify-content: center; }
+  body[data-student-role-ui="active"] .multi-account-trigger,
+  body[data-teacher-role-ui="active"] .multi-account-trigger {
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    min-width: 46px;
+    min-height: 46px;
+    padding: 0 12px;
+  }
+  body[data-student-role-ui="active"] .multi-account-trigger b,
+  body[data-teacher-role-ui="active"] .multi-account-trigger b { display: inline !important; }
   .multi-account-dialog { padding: 20px 16px; border-radius: 20px; }
   .multi-account-dialog h2 { font-size: 24px; }
   .multi-account-list > button { grid-template-columns: 40px minmax(0,1fr); }
