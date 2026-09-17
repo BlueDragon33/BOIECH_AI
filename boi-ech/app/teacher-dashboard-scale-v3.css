@@ -1,0 +1,191 @@
+/* Teacher dashboard Scale V3 — typography and density calibrated against 1672x941 reference. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+  --td3-xs: 10px;
+  --td3-sm: 11px;
+  --td3-md: 12px;
+  --td3-ui: 13px;
+  --td3-nav: 14px;
+  --td3-panel: 16px;
+}
+
+/* Reference proportions: ~218 sidebar / fluid center / ~380 supervision rail. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .sidebar { width: 218px; }
+.teacher-overview-layout { grid-template-columns: minmax(0, 1fr) 382px; gap: 10px; }
+.teacher-overview-main,
+.teacher-right-rail { gap: 10px; }
+.teacher-dashboard { padding: 10px 12px 0; }
+
+/* Brand + navigation: no miniature menu text. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand strong { font-size: 24px; }
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand small { font-size: 11px; line-height: 1.48; }
+.teacher-nav-brand-note span { font-size: 10px; }
+.teacher-nav-brand-note small { font-size: 10px; }
+.teacher-role-nav-list button { min-height: 47px; padding-inline: 12px; }
+.teacher-role-nav-list button span { font-size: var(--td3-nav); font-weight: 720; }
+.teacher-role-nav-list button svg { width: 20px; height: 20px; }
+.teacher-editor-shortcut { min-height: 54px; padding: 9px 10px; }
+.teacher-editor-shortcut small { font-size: 10px; }
+.teacher-editor-shortcut strong { font-size: 12px; }
+.teacher-nav-quote { font-size: 11px; line-height: 1.55; }
+.teacher-nav-profile small { font-size: 10px; }
+.teacher-nav-profile strong { font-size: 12px; }
+
+/* Topbar. */
+.teacher-role-search-mount { max-width: 720px; }
+.teacher-search { min-height: 43px; }
+.teacher-search input { font-size: 13px; }
+.teacher-search kbd { font-size: 10px; }
+.teacher-mode-badge { min-height: 38px; font-size: 12px; }
+.teacher-mode-badge::before { font-size: 14px; }
+.teacher-alert-shortcut { width: 38px; height: 38px; }
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip { min-width: 205px; min-height: 46px; }
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip small { font-size: 10px; }
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip strong { font-size: 13px; }
+
+/* Hero: retain screenshot proportions but improve legibility. */
+.teacher-hero { min-height: 252px; }
+.teacher-hero-copy { padding: 25px 31px 29px; }
+.teacher-hero-copy > span { font-size: 11px; }
+.teacher-hero h1 { max-width: 660px; font-size: clamp(35px, 3.25vw, 52px); line-height: 1.02; }
+.teacher-hero p { max-width: 700px; font-size: 13px; line-height: 1.52; }
+.teacher-hero-actions button,
+.teacher-hero-actions a { min-height: 39px; font-size: 12px; padding-inline: 16px; }
+.teacher-hero-value-stack { font-size: 9px; gap: 5px; }
+.teacher-hero-art small { font-size: 10px; }
+.teacher-hero-art strong { font-size: 18px; }
+.teacher-hero-art p { font-size: 10px; }
+
+/* Panel hierarchy. */
+.teacher-white-card,
+.teacher-rail-card { border-radius: 12px; }
+.teacher-white-card > header { min-height: 45px; padding: 9px 12px; }
+.teacher-white-card > header svg { width: 20px; height: 20px; }
+.teacher-white-card > header strong { font-size: var(--td3-panel); }
+.teacher-white-card > header small { font-size: 10px; line-height: 1.35; }
+.teacher-white-card > header button { font-size: 10px; }
+.teacher-upper-grid { grid-template-columns: minmax(0, 1.52fr) minmax(330px, .72fr); gap: 10px; }
+.teacher-lower-grid { grid-template-columns: minmax(0, 1.52fr) minmax(370px, .98fr); gap: 10px; }
+
+/* Capability cards. */
+.teacher-capability-grid { gap: 8px; padding: 10px; }
+.teacher-capability-action { min-height: 86px; padding: 11px; grid-template-columns: 36px 1fr; gap: 9px; }
+.teacher-capability-action > span { width: 36px; height: 36px; }
+.teacher-capability-action svg { width: 20px; height: 20px; }
+.teacher-capability-action strong { font-size: 11px; line-height: 1.28; }
+.teacher-capability-action small { margin-top: 4px; font-size: 9.5px; line-height: 1.38; }
+
+/* Class overview cards. */
+.teacher-class-metrics { gap: 8px; padding: 10px; }
+.teacher-metric { min-height: 82px; grid-template-columns: 40px 1fr; gap: 9px; padding: 10px; }
+.teacher-metric-icon { width: 40px; height: 40px; }
+.teacher-metric-icon svg { width: 22px; height: 22px; }
+.teacher-metric > div > strong { font-size: 22px; }
+.teacher-metric > div > span { font-size: 10px; line-height: 1.25; }
+.teacher-metric > div > small { font-size: 9px; }
+
+/* Learner filters and table. */
+.teacher-watch-toolbar { min-height: 44px; padding: 8px 10px; }
+.teacher-watch-filters { gap: 6px; }
+.teacher-watch-filters button { min-height: 30px; padding-inline: 11px; font-size: 10px; }
+.teacher-watch-tools > span { font-size: 10px; }
+.teacher-watch-tools select { min-height: 31px; max-width: 145px; font-size: 10px; padding-inline: 7px; }
+.teacher-blueprint-filter-empty { font-size: 11px; }
+.teacher-section-note { font-size: 10px; line-height: 1.4; }
+.teacher-table { min-width: 760px; }
+.teacher-table th { padding: 9px 9px; font-size: 10px; }
+.teacher-table td { padding: 9px 9px; font-size: 10.5px; line-height: 1.35; }
+.teacher-student > span { width: 32px; height: 32px; font-size: 11px; }
+.teacher-student strong { font-size: 11px; }
+.teacher-student small,
+.teacher-cell-note { font-size: 9px; }
+.teacher-progress b,
+.teacher-number-cell { font-size: 10px; }
+.teacher-status { font-size: 9.5px; line-height: 1.25; }
+.teacher-row-action { min-height: 30px; padding-inline: 10px; font-size: 10px; }
+
+/* Review queue. */
+.teacher-analysis-queue-list article { min-height: 88px; }
+.teacher-analysis-thumb { min-height: 70px; }
+.teacher-analysis-thumb span { font-size: 9px; }
+.teacher-review-state { font-size: 8px; }
+.teacher-analysis-copy strong { font-size: 11px; }
+.teacher-analysis-copy small { font-size: 9px; }
+.teacher-analysis-copy p { font-size: 9.5px; line-height: 1.35; }
+.teacher-analysis-score-chip b { font-size: 17px; }
+.teacher-analysis-score-chip span,
+.teacher-analysis-score-chip small { font-size: 8px; }
+.teacher-analysis-score-chip strong { font-size: 13px; }
+.teacher-analysis-actions button,
+.teacher-analysis-actions a { min-height: 30px; font-size: 9.5px; }
+.teacher-local-note-marker { font-size: 8px; }
+
+/* Supervision rail — this is a major information area, not tiny metadata. */
+.teacher-rail-card > header { min-height: 44px; padding: 9px 11px; }
+.teacher-rail-card > header strong { font-size: 14px; }
+.teacher-rail-card > header button { font-size: 10px; }
+.teacher-task-progress { padding: 9px 11px; }
+.teacher-task-progress b { width: 58px; height: 58px; font-size: 14px; }
+.teacher-task-list { padding: 6px 11px 11px; }
+.teacher-task-list button { min-height: 34px; grid-template-columns: 21px 1fr; gap: 8px; }
+.teacher-task-list i { width: 18px; height: 18px; font-size: 10px; }
+.teacher-task-list span { font-size: 10.5px; }
+.teacher-alert-list { padding: 6px 10px 10px; }
+.teacher-alert-list button { min-height: 52px; grid-template-columns: 34px 1fr 20px; gap: 9px; }
+.teacher-alert-list button > span { width: 33px; height: 33px; font-size: 11px; }
+.teacher-alert-list strong,
+.teacher-monitor-list strong { font-size: 11px; }
+.teacher-alert-list small,
+.teacher-monitor-list small { font-size: 9px; line-height: 1.3; }
+.teacher-rail-caption { font-size: 9px; line-height: 1.4; }
+.teacher-monitor-list { padding: 6px 10px 10px; }
+.teacher-monitor-list button { min-height: 47px; grid-template-columns: 38px 1fr; gap: 9px; }
+.teacher-monitor-list button > span { font-size: 13px; }
+.teacher-rail-empty { font-size: 10px; }
+.teacher-ai-gauge { width: 86px; height: 86px; margin: 12px; }
+.teacher-ai-gauge strong { font-size: 18px; }
+.teacher-ai-gauge span { font-size: 8px; }
+.teacher-ai-watch-grid { left: 108px; }
+.teacher-ai-watch-grid b { font-size: 14px; }
+.teacher-ai-watch-grid small { font-size: 8.5px; line-height: 1.35; }
+
+/* Dialogs and secondary pages. */
+.teacher-page > header h1 { font-size: 30px; }
+.teacher-page > header p { font-size: 12px; }
+.teacher-primary-link { font-size: 12px; }
+.teacher-note-dialog header small { font-size: 10px; }
+.teacher-note-dialog header strong { font-size: 16px; }
+.teacher-note-dialog > p { font-size: 11px; }
+.teacher-note-dialog textarea { font-size: 12px; }
+.teacher-note-dialog footer span { font-size: 10px; }
+.teacher-dashboard-footer { font-size: 10px; }
+
+/* Desktop reference width: preserve three-column structure longer. */
+@media (min-width: 1440px) {
+  .teacher-overview-layout { grid-template-columns: minmax(0, 1fr) 390px; }
+  .teacher-hero { min-height: 258px; }
+}
+
+@media (max-width: 1320px) {
+  .teacher-overview-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+  .teacher-capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-upper-grid,
+  .teacher-lower-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1080px) {
+  .teacher-overview-layout { grid-template-columns: 1fr; }
+  .teacher-right-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-hero { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .teacher-right-rail { grid-template-columns: 1fr; }
+  .teacher-capability-grid { grid-template-columns: 1fr 1fr; }
+  .teacher-hero h1 { font-size: 34px; }
+  .teacher-white-card > header strong { font-size: 15px; }
+}
+
+@media (max-width: 520px) {
+  .teacher-capability-grid,
+  .teacher-class-metrics { grid-template-columns: 1fr; }
+}
