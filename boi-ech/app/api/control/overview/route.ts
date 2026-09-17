@@ -74,6 +74,14 @@ type ActivityRow = {
   created_at: string;
 };
 
+type VideoAnalysisRow = {
+  device_id: string;
+  detail_json: string;
+  created_at: string;
+  analysis_count: number;
+  average_score: number | null;
+};
+
 type FirstCompletionRow = {
   device_id: string;
   lesson_number: string | null;
@@ -100,6 +108,54 @@ type DeletedDeviceRow = {
 
 function parse<T>(value: string | null, fallback: T): T {
   try { return JSON.parse(value ?? "") as T; } catch { return fallback; }
+}
+
+function videoAnalysisSummary(row: VideoAnalysisRow) {
+  const detail = parse<Record<string, unknown>>(row.detail_json, {});
+  const categories = detail.categories && typeof detail.categories === "object" && !Array.isArray(detail.categories)
+    ? detail.categories as Record<string, unknown>
+    : {};
+  const captureQuality = detail.captureQuality && typeof detail.captureQuality === "object" && !Array.isArray(detail.captureQuality)
+    ? detail.captureQuality as Record<string, unknown>
+    : {};
+  const errors = Array.isArray(detail.errors)
+    ? detail.errors.slice(0, 10).filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+  const boundedScore = (value: unknown) => Math.round(Math.max(0, Math.min(100, Number(value) || 0)));
+
+  return {
+    analysisId: typeof detail.id === "string" ? detail.id : "",
+    engineVersion: typeof detail.engineVersion === "string" ? detail.engineVersion : "breaststroke-local-v1",
+    analyzedAt: typeof detail.analyzedAt === "string" ? detail.analyzedAt : row.created_at,
+    receivedAt: row.created_at,
+    cameraView: detail.cameraView === "side" ? "side" : "rear",
+    score: boundedScore(detail.score),
+    confidence: boundedScore(detail.confidence),
+    captureQuality: {
+      level: captureQuality.level === "good" ? "good" : "review",
+      poseCoverage: boundedScore(captureQuality.poseCoverage),
+      averageVisibility: boundedScore(captureQuality.averageVisibility),
+    },
+    categories: {
+      legs: boundedScore(categories.legs),
+      arms: boundedScore(categories.arms),
+      coordination: boundedScore(categories.coordination),
+      bodyLine: boundedScore(categories.bodyLine),
+    },
+    errors: errors.map((item) => ({
+      code: typeof item.code === "string" ? item.code : "UNKNOWN",
+      title: typeof item.title === "string" ? item.title : "Điểm cần xem lại",
+      timeSec: Math.max(0, Math.min(30, Number(item.timeSec) || 0)),
+      severity: item.severity === "critical" ? "critical" : "warning",
+      observed: typeof item.observed === "string" ? item.observed : "",
+      expected: typeof item.expected === "string" ? item.expected : "",
+      recommendation: typeof item.recommendation === "string" ? item.recommendation : "",
+    })),
+    analysisCount: Math.max(0, Number(row.analysis_count) || 0),
+    averageScore: boundedScore(row.average_score),
+    trust: "client-attested-assistive" as const,
+    mediaStored: false,
+  };
 }
 
 function isoDay(value: Date | string) {
@@ -240,6 +296,27 @@ async function attachActivity<T extends ReturnType<typeof view>>(devices: T[], d
   });
 }
 
+async function attachVideoAnalyses<T extends ReturnType<typeof view>>(devices: T[]) {
+  if (devices.length === 0) return devices;
+  const database = await getCourseDatabase();
+  const ids = devices.map((device) => device.deviceId);
+  const placeholders = ids.map(() => "?").join(", ");
+  const result = await database.prepare(
+    `SELECT device_id, detail_json, created_at, analysis_count, average_score
+       FROM (
+         SELECT device_id, detail_json, created_at,
+                COUNT(*) OVER (PARTITION BY device_id) AS analysis_count,
+                AVG(CAST(json_extract(detail_json, '$.score') AS REAL)) OVER (PARTITION BY device_id) AS average_score,
+                ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, id DESC) AS latest_rank
+           FROM course_activity_events
+          WHERE event_type = 'video_ai_analysis' AND device_id IN (${placeholders})
+       )
+      WHERE latest_rank = 1`,
+  ).bind(...ids).all<VideoAnalysisRow>();
+  const byDevice = new Map(result.results.map((row: VideoAnalysisRow) => [row.device_id, videoAnalysisSummary(row)]));
+  return devices.map((device) => ({ ...device, videoAnalysis: byDevice.get(device.deviceId) ?? null }));
+}
+
 async function rows(displayCodes?: string[], activityDayCount = 30) {
   if (displayCodes && displayCodes.length === 0) return [];
   const database = await getCourseDatabase();
@@ -260,7 +337,13 @@ async function rows(displayCodes?: string[], activityDayCount = 30) {
                COALESCE(p.last_activity_at, d.last_seen_at) DESC LIMIT 500`,
   );
   const result = await (displayCodes ? statement.bind(...displayCodes) : statement).all<Row>();
-  return attachActivity(result.results.map(view), activityDayCount);
+  const baseDevices = result.results.map(view);
+  const [withActivity, withVideoAnalysis] = await Promise.all([
+    attachActivity(baseDevices, activityDayCount),
+    attachVideoAnalyses(baseDevices),
+  ]);
+  const videoByDevice = new Map(withVideoAnalysis.map((device) => [device.deviceId, device.videoAnalysis]));
+  return withActivity.map((device) => ({ ...device, videoAnalysis: videoByDevice.get(device.deviceId) ?? null }));
 }
 
 async function auditRows() {
