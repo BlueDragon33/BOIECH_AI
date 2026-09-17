@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./student-role-shell.css";
+import "./teacher-role-shell.css";
 import StudentRoleShell from "./student-role-shell";
+import TeacherRoleShell from "./teacher-role-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +51,7 @@ export default function RootLayout({
       >
         {children}
         <StudentRoleShell />
+        <TeacherRoleShell />
       </body>
     </html>
   );
