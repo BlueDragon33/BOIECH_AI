@@ -1,0 +1,121 @@
+/*
+ * Vietnamese-safe typography for learner/teacher role shells.
+ * Keep this file dependency-free so the PWA remains usable offline.
+ * Cambria/Times New Roman on Windows and Noto/DejaVu fallbacks on Linux/Android
+ * provide substantially more reliable Vietnamese diacritics than Georgia.
+ */
+body[data-student-role-ui="active"],
+body[data-teacher-role-ui="active"] {
+  --role-ui-font: "Segoe UI", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --role-display-font: Cambria, "Noto Serif", "Times New Roman", "DejaVu Serif", serif;
+  font-family: var(--role-ui-font);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.student-dashboard,
+.teacher-dashboard,
+.student-role-nav,
+.teacher-role-nav,
+body[data-student-role-ui="active"] .topbar,
+body[data-teacher-role-ui="active"] .topbar {
+  font-family: var(--role-ui-font) !important;
+}
+
+/* Large Vietnamese display copy: avoid Georgia fallback splitting combining marks. */
+.student-hero h1,
+.teacher-hero h1,
+.student-capabilities h2,
+.student-learning-card h2,
+.student-video-card h2,
+.teacher-capabilities h2,
+.teacher-panel h2,
+.teacher-page h1,
+.teacher-privacy h2,
+.teacher-hero aside strong,
+.student-hero-visual blockquote {
+  font-family: var(--role-display-font) !important;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "kern" 1, "liga" 1;
+  word-spacing: 0;
+}
+
+.student-hero h1,
+.teacher-hero h1 {
+  line-height: 1.055;
+  letter-spacing: -0.022em;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.student-hero h1 em,
+.teacher-hero h1 em {
+  font-family: inherit;
+  letter-spacing: inherit;
+  word-spacing: 0;
+}
+
+/* Labels can keep a premium spaced look, but never spread Vietnamese words apart. */
+.student-hero-copy > span,
+.teacher-hero > div > span,
+.student-capabilities header span,
+.student-learning-card header span,
+.student-video-copy > span,
+.student-profile-card > div > span,
+.student-goals-card header span,
+.student-progress-card header span,
+.teacher-capabilities header span,
+.teacher-panel header span,
+.teacher-page > header > span,
+.teacher-privacy > span {
+  font-family: var(--role-ui-font) !important;
+  word-spacing: 0;
+  text-rendering: geometricPrecision;
+}
+
+.student-hero p,
+.teacher-hero p,
+.student-hero-actions button,
+.teacher-hero button,
+.teacher-hero a,
+.student-capability,
+.teacher-capabilities article,
+.teacher-table,
+.teacher-analysis-list {
+  font-family: var(--role-ui-font) !important;
+  word-spacing: 0;
+}
+
+/* Prevent inherited tracking from appearance/theme controls from damaging Vietnamese copy. */
+body[data-student-role-ui="active"] .student-dashboard :where(h1, h2, h3, p, button, a, strong, small),
+body[data-teacher-role-ui="active"] .teacher-dashboard :where(h1, h2, h3, p, button, a, strong, small) {
+  text-transform: none;
+}
+
+body[data-student-role-ui="active"] .student-dashboard :where(p, button, a, strong, small),
+body[data-teacher-role-ui="active"] .teacher-dashboard :where(p, button, a, strong, small) {
+  letter-spacing: normal;
+}
+
+/* Restore intentional uppercase eyebrow styling only. */
+.student-hero-copy > span,
+.teacher-hero > div > span,
+.student-capabilities header span,
+.teacher-capabilities header span,
+.teacher-panel header span,
+.teacher-page > header > span,
+.teacher-privacy > span {
+  text-transform: uppercase;
+  letter-spacing: .10em;
+}
+
+@media (max-width: 760px) {
+  .student-hero h1,
+  .teacher-hero h1 {
+    line-height: 1.08;
+    letter-spacing: -0.014em;
+  }
+}
