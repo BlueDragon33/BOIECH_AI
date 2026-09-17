@@ -7,10 +7,12 @@ import "./role-typography.css";
 import "./teacher-action-bridge.css";
 import "./multi-account-switcher.css";
 import "./teacher-dashboard-reference.css";
+import "./teacher-dashboard-blueprint.css";
 import StudentRoleShell from "./student-role-shell";
 import TeacherRoleShell from "./teacher-role-shell";
 import TeacherActionBridge from "./teacher-action-bridge";
 import MultiAccountSwitcher from "./multi-account-switcher";
+import TeacherDashboardBlueprint from "./teacher-dashboard-blueprint";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,6 +62,7 @@ export default function RootLayout({
         <TeacherRoleShell />
         <TeacherActionBridge />
         <MultiAccountSwitcher />
+        <TeacherDashboardBlueprint />
       </body>
     </html>
   );
