@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./student-role-shell.css";
 import "./teacher-role-shell.css";
+import "./teacher-action-bridge.css";
 import "./multi-account-switcher.css";
 import StudentRoleShell from "./student-role-shell";
 import TeacherRoleShell from "./teacher-role-shell";
