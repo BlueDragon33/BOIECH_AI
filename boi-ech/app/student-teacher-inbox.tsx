@@ -192,6 +192,7 @@ export default function StudentTeacherInbox() {
   const [actions, setActions] = useState<TeacherInboxAction[]>([]);
   const deviceRef = useRef("");
   const requestRef = useRef(0);
+  const loadedRefreshRef = useRef(-1);
   const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
@@ -212,8 +213,12 @@ export default function StudentTeacherInbox() {
       deriveDeviceId().then((deviceId) => {
         if (!deviceId) return;
         const changedDevice = deviceRef.current !== deviceId;
-        if (changedDevice) deviceRef.current = deviceId;
-        if (!changedDevice && refreshToken === 0) return;
+        if (changedDevice) {
+          deviceRef.current = deviceId;
+          loadedRefreshRef.current = -1;
+        }
+        if (!changedDevice && loadedRefreshRef.current === refreshToken) return;
+        loadedRefreshRef.current = refreshToken;
         const requestId = ++requestRef.current;
         loadInbox(deviceId)
           .then((items) => { if (requestRef.current === requestId) setActions(items); })
@@ -232,6 +237,7 @@ export default function StudentTeacherInbox() {
       observer.disconnect();
       requestRef.current += 1;
       deviceRef.current = "";
+      loadedRefreshRef.current = -1;
       setActions([]);
     };
   }, [refreshToken]);
