@@ -180,7 +180,7 @@ function ensureTopbarTools() {
     const badge = document.createElement("span");
     badge.className = "teacher-mode-badge";
     badge.dataset.teacherBlueprint = "mode-badge";
-    badge.textContent = "Không gian Giảng viên";
+    badge.textContent = "Giảng viên Pro";
     actions.insertBefore(badge, chip);
   }
   if (!actions.querySelector(".teacher-alert-shortcut")) {
