@@ -39,11 +39,11 @@ test("teacher central work surfaces are bright while supervision rail stays dark
   assert.match(css, /\.teacher-rail-card\s*\{[\s\S]*background:\s*linear-gradient/);
 });
 
-test("teacher navigation includes messages without inventing a message backend", () => {
+test("teacher navigation includes the audited two-way message surface", () => {
   assert.match(shell, /"messages"/);
   assert.match(shell, /label: "Tin nhắn"/);
-  assert.match(shell, /Kênh nhắn tin máy chủ chưa được triển khai/);
-  assert.match(shell, /không tạo tin nhắn giả/);
+  assert.match(shell, /TeacherTwoWayMessages/);
+  assert.match(shell, /overview\?\.messages/);
 });
 
 test("structure layer does not alter data APIs scoring or persistence", () => {
