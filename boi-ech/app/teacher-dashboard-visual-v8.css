@@ -1,0 +1,997 @@
+/* Teacher dashboard Visual V8 — final reference-fit polish.
+   Presentation only. It must not add API, scoring, persistence or media behavior. */
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+  --td8-sidebar: 220px;
+  --td8-rail: 372px;
+  --td8-gap: 10px;
+  --td8-radius: 12px;
+  --td8-navy: #031f35;
+  --td8-navy-2: #073650;
+  --td8-panel: #ffffff;
+  --td8-line: #d9e7ed;
+  --td8-soft: #f5f9fb;
+  --td8-ink: #173c5e;
+  --td8-muted: #718899;
+  --td8-blue: #1484ce;
+  --td8-cyan: #33c9df;
+  --td8-teal: #1db79d;
+  --td8-gold: #efc45c;
+  --td8-shadow: 0 9px 24px rgba(0, 24, 41, .09);
+}
+
+/* ===== Shell proportions ===== */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell {
+  grid-template-columns: var(--td8-sidebar) minmax(0, 1fr);
+  min-height: 100vh;
+  background: #04263d;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .sidebar {
+  width: var(--td8-sidebar);
+  border-right: 1px solid rgba(73, 189, 224, .16);
+  background:
+    radial-gradient(ellipse at 50% 94%, rgba(19, 170, 211, .20), transparent 25%),
+    linear-gradient(180deg, #02182b 0%, #052c47 56%, #031d33 100%);
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand-row {
+  min-height: 106px;
+  padding: 15px 17px 8px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand {
+  gap: 11px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand-mark {
+  width: 42px;
+  height: 42px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand strong {
+  font-size: 23px;
+  line-height: 1;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .brand small {
+  max-width: 150px;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.teacher-role-nav {
+  gap: 10px;
+  padding: 8px 8px 12px;
+}
+
+.teacher-nav-brand-note {
+  margin: 0 10px 6px;
+  padding-bottom: 8px;
+}
+
+.teacher-nav-brand-note span {
+  font-size: 9px;
+  letter-spacing: .09em;
+}
+
+.teacher-nav-brand-note small {
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.teacher-role-nav-list {
+  gap: 2px;
+  padding-inline: 2px;
+}
+
+.teacher-role-nav-list button {
+  min-height: 42px;
+  padding-inline: 12px;
+  border-radius: 9px;
+}
+
+.teacher-role-nav-list button span {
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.teacher-role-nav-list button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.teacher-editor-shortcut {
+  min-height: 49px;
+  margin: 6px 4px 0;
+  padding: 8px 9px;
+  border-radius: 10px;
+}
+
+.teacher-editor-shortcut small {
+  font-size: 8.5px;
+}
+
+.teacher-editor-shortcut strong {
+  font-size: 10.5px;
+}
+
+.teacher-nav-quote {
+  margin: 8px 6px 0;
+  padding: 10px 7px 6px;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.teacher-nav-profile {
+  margin: 4px 2px 0;
+  padding: 8px;
+}
+
+.teacher-nav-profile small {
+  font-size: 8.5px;
+}
+
+.teacher-nav-profile strong {
+  font-size: 10.5px;
+}
+
+/* ===== Command bar ===== */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .main-area > .topbar {
+  min-height: 58px;
+  grid-template-columns: minmax(300px, 680px) minmax(330px, 1fr);
+  gap: 16px;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(70, 188, 222, .14);
+  background: linear-gradient(90deg, #05223a 0%, #073856 57%, #05253d 100%);
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-search-mount {
+  max-width: 680px;
+}
+
+.teacher-search {
+  min-height: 40px;
+  border-radius: 10px;
+  background: rgba(2, 33, 55, .68);
+}
+
+.teacher-search input {
+  font-size: 12px;
+}
+
+.teacher-search kbd {
+  font-size: 9px;
+}
+
+.teacher-mode-badge {
+  min-height: 35px;
+  padding-inline: 11px;
+  font-size: 10px;
+}
+
+.teacher-alert-shortcut {
+  width: 35px;
+  height: 35px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip {
+  min-width: 188px;
+  min-height: 43px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip small {
+  font-size: 9px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip strong {
+  font-size: 11px;
+}
+
+/* ===== Main three-zone composition ===== */
+.teacher-dashboard {
+  min-height: calc(100vh - 58px);
+  padding: 10px 11px 0;
+  background:
+    radial-gradient(circle at 62% -12%, rgba(31, 170, 212, .09), transparent 32%),
+    #052640;
+}
+
+.teacher-overview-layout {
+  grid-template-columns: minmax(0, 1fr) var(--td8-rail);
+  gap: var(--td8-gap);
+}
+
+.teacher-overview-main,
+.teacher-right-rail {
+  gap: var(--td8-gap);
+}
+
+.teacher-white-card,
+.teacher-rail-card {
+  border-radius: var(--td8-radius);
+}
+
+/* ===== Hero ===== */
+.teacher-hero {
+  min-height: 226px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(245px, .58fr);
+  border: 1px solid rgba(72, 184, 216, .27);
+  border-radius: 13px;
+  background-image:
+    linear-gradient(90deg, rgba(2, 24, 43, .98) 0%, rgba(2, 38, 62, .90) 34%, rgba(3, 51, 73, .23) 64%, rgba(2, 34, 53, .68) 100%),
+    url('/course-media/0b1612e00b7cd8fd3853ee8791d4ade1.webp');
+  background-position: 57% 43%;
+  box-shadow: 0 11px 28px rgba(0, 17, 29, .20);
+}
+
+.teacher-hero::before {
+  background:
+    linear-gradient(90deg, rgba(2, 24, 43, .94) 0%, rgba(2, 35, 58, .72) 32%, rgba(2, 49, 70, .02) 66%, rgba(3, 31, 50, .30) 100%);
+}
+
+.teacher-hero::after {
+  right: 24px;
+  bottom: 22px;
+  width: 205px;
+  color: rgba(236, 248, 252, .74);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.teacher-hero-copy {
+  max-width: 720px;
+  padding: 22px 30px 25px;
+}
+
+.teacher-hero-copy > span {
+  font-size: 9px;
+  letter-spacing: .1em;
+}
+
+.teacher-hero h1 {
+  max-width: 650px;
+  margin: 7px 0 8px;
+  font-size: clamp(34px, 3vw, 47px);
+  line-height: 1.01;
+}
+
+.teacher-hero-motto {
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.teacher-hero p {
+  max-width: 650px;
+  font-size: 10.5px;
+  line-height: 1.48;
+}
+
+.teacher-hero-actions {
+  margin-top: 13px;
+  gap: 8px;
+}
+
+.teacher-hero-actions button,
+.teacher-hero-actions a {
+  min-height: 34px;
+  padding-inline: 13px;
+  border-radius: 8px;
+  font-size: 9.5px;
+}
+
+.teacher-hero-actions button {
+  min-width: 156px;
+}
+
+.teacher-hero-art {
+  padding: 17px 18px 20px 10px;
+}
+
+.teacher-hero-art > div {
+  max-width: 196px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: rgba(1, 27, 44, .53);
+}
+
+.teacher-hero-art small {
+  font-size: 8px;
+}
+
+.teacher-hero-art strong {
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.teacher-hero-art p {
+  margin-top: 4px;
+  font-size: 7.5px;
+}
+
+.teacher-hero-value-stack {
+  right: 17px;
+  top: 15px;
+  gap: 3px;
+  font-size: 7px;
+}
+
+.teacher-hero-dots {
+  bottom: 7px;
+}
+
+/* ===== Center work surfaces ===== */
+.teacher-white-card {
+  overflow: hidden;
+  border: 1px solid var(--td8-line);
+  background: var(--td8-panel);
+  box-shadow: var(--td8-shadow);
+}
+
+.teacher-white-card > header {
+  min-height: 42px;
+  padding: 8px 11px;
+  background: linear-gradient(180deg, #fff, #fbfdfe);
+}
+
+.teacher-white-card > header > div:first-child {
+  gap: 8px;
+}
+
+.teacher-white-card > header svg {
+  width: 18px;
+  height: 18px;
+}
+
+.teacher-white-card > header strong {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.teacher-white-card > header small,
+.teacher-watchlist > header small,
+.teacher-analysis-queue > header small {
+  font-size: 8px;
+  line-height: 1.3;
+}
+
+.teacher-white-card > header button {
+  font-size: 8.5px;
+}
+
+.teacher-upper-grid {
+  grid-template-columns: minmax(0, 1.46fr) minmax(315px, .72fr);
+  gap: var(--td8-gap);
+}
+
+.teacher-lower-grid {
+  grid-template-columns: minmax(0, 1.46fr) minmax(345px, .92fr);
+  gap: var(--td8-gap);
+}
+
+/* Capabilities: compact 4 × 2 matrix like the reference. */
+.teacher-capability-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+}
+
+.teacher-capability-action {
+  min-height: 72px;
+  grid-template-columns: 31px minmax(0, 1fr);
+  gap: 7px;
+  padding: 8px;
+  border-radius: 8px;
+  transform: none;
+}
+
+.teacher-capability-action:hover {
+  transform: translateY(-1px);
+}
+
+.teacher-capability-action > span {
+  width: 31px;
+  height: 31px;
+  border-radius: 8px;
+}
+
+.teacher-capability-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.teacher-capability-action strong {
+  font-size: 9px;
+  line-height: 1.24;
+}
+
+.teacher-capability-action small {
+  margin-top: 3px;
+  font-size: 7.5px;
+  line-height: 1.32;
+}
+
+/* Six KPI cards stay visually aligned with the capability matrix. */
+.teacher-class-summary .teacher-class-metrics {
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 8px;
+}
+
+.teacher-class-summary .teacher-metric {
+  min-height: 49px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px 7px;
+  border-radius: 8px;
+}
+
+.teacher-class-summary .teacher-metric-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.teacher-class-summary .teacher-metric-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.teacher-class-summary .teacher-metric > div > strong {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.teacher-class-summary .teacher-metric > div > span {
+  margin-top: 2px;
+  font-size: 7.5px;
+  line-height: 1.15;
+}
+
+.teacher-class-summary .teacher-metric > div > small {
+  margin-top: 2px;
+  font-size: 6.8px;
+  line-height: 1.15;
+}
+
+/* Watchlist: denser reference table, with its own scroll instead of stretching page. */
+.teacher-watch-toolbar {
+  min-height: 34px;
+  padding: 5px 8px;
+}
+
+.teacher-watch-filters {
+  gap: 4px;
+}
+
+.teacher-watch-filters button {
+  min-height: 24px;
+  padding-inline: 8px;
+  font-size: 7.5px;
+}
+
+.teacher-watch-tools > span {
+  font-size: 7.5px;
+}
+
+.teacher-watch-tools select {
+  min-height: 25px;
+  max-width: 118px;
+  font-size: 7.5px;
+}
+
+.teacher-watchlist .teacher-table-wrap {
+  min-height: 0;
+  max-height: 252px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.teacher-table {
+  min-width: 720px;
+}
+
+.teacher-table thead {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+}
+
+.teacher-table th {
+  padding: 7px 8px;
+  font-size: 8px;
+}
+
+.teacher-table td {
+  padding: 7px 8px;
+  font-size: 8.5px;
+  line-height: 1.25;
+}
+
+.teacher-student > span {
+  width: 28px;
+  height: 28px;
+  font-size: 9px;
+}
+
+.teacher-student strong {
+  font-size: 9px;
+}
+
+.teacher-student small,
+.teacher-cell-note {
+  font-size: 7px;
+}
+
+.teacher-progress > span {
+  width: 54px;
+}
+
+.teacher-progress b,
+.teacher-number-cell {
+  font-size: 8px;
+}
+
+.teacher-status {
+  max-width: 128px;
+  padding: 4px 6px;
+  font-size: 7px;
+  line-height: 1.2;
+}
+
+.teacher-row-action {
+  min-height: 25px;
+  padding-inline: 8px;
+  font-size: 7.5px;
+}
+
+/* Analysis queue: reference-like thumbnail row, bounded height. */
+.teacher-analysis-queue-list {
+  min-height: 0;
+  max-height: 252px;
+  overflow: auto;
+  padding: 0 8px 7px;
+  scrollbar-gutter: stable;
+}
+
+.teacher-analysis-queue-list article {
+  grid-template-columns: 92px minmax(0, 1fr) 55px;
+  gap: 8px;
+  min-height: 72px;
+  margin-top: 6px;
+  padding: 7px;
+  border-radius: 9px;
+}
+
+.teacher-analysis-thumb {
+  min-height: 58px;
+  border-radius: 7px;
+}
+
+.teacher-analysis-thumb span,
+.teacher-review-state {
+  font-size: 7px;
+}
+
+.teacher-analysis-copy strong {
+  font-size: 9px;
+}
+
+.teacher-analysis-copy small {
+  font-size: 7px;
+}
+
+.teacher-analysis-copy p {
+  margin-top: 3px;
+  font-size: 7.5px;
+  line-height: 1.3;
+}
+
+.teacher-analysis-score-chip b {
+  font-size: 14px;
+}
+
+.teacher-analysis-score-chip strong {
+  font-size: 11px;
+}
+
+.teacher-analysis-score-chip span,
+.teacher-analysis-score-chip small {
+  font-size: 6.5px;
+}
+
+.teacher-analysis-actions {
+  grid-column: 2 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.teacher-analysis-actions button,
+.teacher-analysis-actions a {
+  min-height: 25px;
+  padding-inline: 6px;
+  border-radius: 6px;
+  font-size: 7px;
+}
+
+/* ===== Right supervision rail ===== */
+.teacher-right-rail {
+  min-width: 0;
+  align-content: start;
+}
+
+.teacher-rail-card {
+  border: 1px solid rgba(67, 178, 211, .20);
+  background: linear-gradient(180deg, rgba(4, 47, 72, .98), rgba(3, 36, 58, .98));
+  box-shadow: 0 8px 20px rgba(0, 15, 27, .14);
+}
+
+.teacher-rail-card > header {
+  min-height: 39px;
+  padding: 8px 10px;
+  background: rgba(5, 54, 82, .80);
+}
+
+.teacher-rail-card > header strong {
+  font-size: 11px;
+}
+
+.teacher-rail-card > header button {
+  font-size: 7.5px;
+}
+
+.teacher-task-progress {
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 9px;
+  padding: 8px 10px 5px;
+}
+
+.teacher-task-progress b {
+  width: 48px;
+  height: 48px;
+  border-width: 5px;
+  font-size: 11px;
+}
+
+.teacher-task-list {
+  padding: 4px 9px 8px;
+}
+
+.teacher-task-list button {
+  min-height: 29px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.teacher-task-list i {
+  width: 15px;
+  height: 15px;
+  font-size: 8px;
+}
+
+.teacher-task-list span {
+  font-size: 8px;
+}
+
+.teacher-alert-list,
+.teacher-monitor-list {
+  min-height: 0;
+  padding: 4px 7px 7px;
+}
+
+.teacher-alert-list button {
+  min-height: 39px;
+  margin: 3px 3px;
+  grid-template-columns: 28px minmax(0, 1fr) 17px;
+  gap: 7px;
+  padding-inline: 5px;
+}
+
+.teacher-alert-list button > span {
+  width: 27px;
+  height: 27px;
+  font-size: 9px;
+}
+
+.teacher-alert-list strong,
+.teacher-monitor-list strong {
+  font-size: 8.5px;
+}
+
+.teacher-alert-list small,
+.teacher-monitor-list small {
+  font-size: 7px;
+  line-height: 1.25;
+}
+
+.teacher-rail-caption {
+  margin: 5px 8px 1px;
+  padding-inline: 0;
+  font-size: 7px;
+}
+
+.teacher-monitor-list button {
+  min-height: 36px;
+  margin: 2px 3px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 7px;
+  padding-inline: 5px;
+}
+
+.teacher-monitor-list button > span {
+  font-size: 10px;
+}
+
+.teacher-rail-empty {
+  font-size: 8px;
+}
+
+.teacher-ai-watch {
+  min-height: 154px;
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.teacher-ai-watch .teacher-ai-gauge {
+  width: 68px;
+  height: 68px;
+  margin: 10px 5px 10px 10px;
+  border-width: 6px;
+}
+
+.teacher-ai-gauge strong {
+  font-size: 14px;
+}
+
+.teacher-ai-gauge span {
+  font-size: 6.5px;
+}
+
+.teacher-ai-watch .teacher-ai-watch-grid {
+  gap: 4px;
+  margin: 7px 8px 8px 0;
+}
+
+.teacher-ai-watch-grid div {
+  min-height: 43px;
+  padding: 6px;
+}
+
+.teacher-ai-watch-grid b {
+  font-size: 11px;
+}
+
+.teacher-ai-watch-grid small {
+  margin-top: 2px;
+  font-size: 6.7px;
+  line-height: 1.2;
+}
+
+.teacher-ai-watch-grid .teacher-ai-common-issue {
+  min-height: 39px;
+}
+
+.teacher-ai-watch-grid .teacher-ai-common-issue b {
+  font-size: 8px;
+  line-height: 1.22;
+}
+
+/* ===== Secondary pages and action dialogs ===== */
+.teacher-page {
+  min-height: calc(100vh - 82px);
+  padding: 18px;
+  border-radius: 12px;
+  background: #f7fbfc;
+}
+
+.teacher-page > header h1 {
+  margin: 3px 0 4px;
+  font-size: 27px;
+}
+
+.teacher-page > header p,
+.teacher-primary-link {
+  font-size: 10px;
+}
+
+.teacher-learner-drawer {
+  width: min(430px, 94vw);
+}
+
+.teacher-action-dialog {
+  width: min(590px, 100%);
+}
+
+.teacher-action-dialog > header {
+  padding: 16px 18px 14px;
+}
+
+.teacher-action-dialog > header strong {
+  font-size: 17px;
+}
+
+.teacher-action-dialog input,
+.teacher-action-dialog select,
+.teacher-action-dialog textarea {
+  font-size: 10.5px;
+}
+
+.teacher-action-toast {
+  right: 18px;
+  bottom: 18px;
+}
+
+/* Footer should read as a quiet system footer, not another content card. */
+.teacher-dashboard-footer {
+  min-height: 34px;
+  margin: 8px -11px 0;
+  padding-inline: 14px;
+  gap: 14px;
+  font-size: 8px;
+}
+
+/* Keyboard focus is visible without changing the visual language. */
+.teacher-dashboard :where(button, a, input, select, textarea):focus-visible,
+.teacher-search input:focus-visible {
+  outline: 2px solid rgba(70, 205, 225, .80);
+  outline-offset: 2px;
+}
+
+/* ===== Desktop fit: target the supplied 1672 × 941 composition ===== */
+@media (min-width: 1440px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+    --td8-sidebar: 220px;
+    --td8-rail: 372px;
+  }
+
+  .teacher-overview-layout {
+    grid-template-columns: minmax(0, 1fr) var(--td8-rail);
+  }
+
+  .teacher-upper-grid,
+  .teacher-lower-grid {
+    align-items: stretch;
+  }
+}
+
+@media (min-width: 1440px) and (min-height: 820px) {
+  .teacher-dashboard {
+    max-height: calc(100vh - 58px);
+    overflow: auto;
+  }
+
+  .teacher-overview-main {
+    align-content: start;
+  }
+}
+
+/* Keep the desktop two-column center longer than V4/V5 did. */
+@media (min-width: 1181px) and (max-width: 1439px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+    --td8-sidebar: 196px;
+    --td8-rail: 318px;
+  }
+
+  .teacher-overview-layout {
+    grid-template-columns: minmax(0, 1fr) var(--td8-rail);
+  }
+
+  .teacher-upper-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(285px, .70fr);
+  }
+
+  .teacher-lower-grid {
+    grid-template-columns: minmax(0, 1.34fr) minmax(315px, .92fr);
+  }
+
+  .teacher-capability-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .teacher-overview-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-right-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-upper-grid,
+  .teacher-lower-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-capability-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .main-area > .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .teacher-mode-badge {
+    display: none;
+  }
+
+  .teacher-capability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .teacher-hero {
+    grid-template-columns: 1fr;
+    min-height: 215px;
+  }
+
+  .teacher-hero-art {
+    display: none;
+  }
+
+  .teacher-hero::after {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .teacher-dashboard {
+    padding: 7px 7px 0;
+  }
+
+  .teacher-right-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-hero-copy {
+    padding: 20px;
+  }
+
+  .teacher-hero h1 {
+    font-size: 32px;
+  }
+
+  .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-analysis-queue-list article {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .teacher-analysis-score-chip {
+    grid-column: 2;
+  }
+
+  .teacher-analysis-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-dashboard-footer {
+    margin-left: -7px;
+    margin-right: -7px;
+  }
+}
+
+@media (max-width: 520px) {
+  .teacher-capability-grid,
+  .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-watch-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .teacher-table {
+    min-width: 680px;
+  }
+}
