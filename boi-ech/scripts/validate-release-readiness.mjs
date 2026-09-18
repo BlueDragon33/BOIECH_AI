@@ -95,9 +95,9 @@ forbidMatch(
 requireMatch(videoRoute, /rejectBinaryPayload|binary-looking|BINARY_PAYLOAD|forbidden/i, "video API must retain binary/media payload protection");
 
 for (const column of ["device_type", "platform", "browser", "user_agent"]) {
-  requireMatch(deviceClassificationMigration, new RegExp(`ADD COLUMN \\`${column}\\``), `classification migration must add ${column}`);
-  requireMatch(dbSchema, new RegExp(`text\\("${column}"\\)`), `Drizzle schema must include ${column}`);
-  requireMatch(deviceAuth, new RegExp(column), `fresh/local device bootstrap must include ${column}`);
+  if (!deviceClassificationMigration.includes("ADD COLUMN `" + column + "`")) fail(`classification migration must add ${column}`);
+  if (!dbSchema.includes(`text("${column}")`)) fail(`Drizzle schema must include ${column}`);
+  if (!deviceAuth.includes(column)) fail(`fresh/local device bootstrap must include ${column}`);
 }
 requireMatch(dbSchema, /device_access_type_status_idx/, "Drizzle schema must include the device classification index");
 requireMatch(deviceAuth, /PRAGMA table_info\(device_access\)/, "local DB bootstrap must inspect legacy classification columns");
