@@ -120,10 +120,14 @@ function nearestEvidence(
   direction: "before" | "after",
 ) {
   const type = kind === "quiz" ? "quiz_submit" : "video_ai_analysis";
+  const evidenceWindow = 30 * 86_400_000;
   const matching = events.filter((event) => {
     if (event.event_type !== type || !sameLesson(event, lessonNumber)) return false;
     const eventTime = time(event.created_at);
-    return Number.isFinite(eventTime) && (direction === "before" ? eventTime <= interventionTime : eventTime > interventionTime);
+    if (!Number.isFinite(eventTime)) return false;
+    return direction === "before"
+      ? eventTime <= interventionTime && eventTime >= interventionTime - evidenceWindow
+      : eventTime > interventionTime && eventTime <= interventionTime + evidenceWindow;
   });
   matching.sort((left, right) => direction === "before"
     ? time(right.created_at) - time(left.created_at)
@@ -174,7 +178,7 @@ function observedChange(
 }
 
 function evidenceNote(value: InterventionLearningAnalytics["observedChange"]) {
-  if (value === "positive") return "Có tín hiệu kết quả tăng sau can thiệp; đây là thay đổi quan sát được, không khẳng định quan hệ nhân quả.";
+  if (value === "positive") return "Có tín hiệu kết quả tăng trong cửa sổ theo dõi sau can thiệp; đây là thay đổi quan sát được, không khẳng định quan hệ nhân quả.";
   if (value === "negative") return "Có tín hiệu kết quả giảm sau can thiệp; cần Giảng viên xem lại bối cảnh trước khi kết luận.";
   if (value === "mixed") return "Các tín hiệu sau can thiệp chưa đồng nhất giữa kiểm tra và phân tích AI.";
   if (value === "stable") return "Đã có dữ liệu trước/sau nhưng thay đổi nhỏ trong ngưỡng theo dõi.";
@@ -192,7 +196,17 @@ export function buildLearningAnalytics(events: LearningEventRow[]): LearnerLearn
       const detail = parseJson<Record<string, unknown>>(event.detail_json, {});
       const interventionTime = time(event.created_at);
       const detailLesson = typeof detail.lessonNumber === "string" && /^0[1-8]$/.test(detail.lessonNumber) ? detail.lessonNumber : null;
-      const lessonNumber = event.lesson_number && /^0[1-8]$/.test(event.lesson_number) ? event.lesson_number : detailLesson;
+      const reviewedAnalysisAt = action === "review" && typeof detail.analysisAt === "string" ? detail.analysisAt : "";
+      const reviewedVideo = reviewedAnalysisAt
+        ? ordered.find((candidate) => {
+            if (candidate.event_type !== "video_ai_analysis") return false;
+            const evidence = evidenceFor(candidate);
+            return evidence?.at === reviewedAnalysisAt || candidate.created_at === reviewedAnalysisAt;
+          })
+        : null;
+      const lessonNumber = event.lesson_number && /^0[1-8]$/.test(event.lesson_number)
+        ? event.lesson_number
+        : detailLesson ?? reviewedVideo?.lesson_number ?? null;
       const beforeQuiz = nearestEvidence(ordered, "quiz", lessonNumber, interventionTime, "before");
       const afterQuiz = nearestEvidence(ordered, "quiz", lessonNumber, interventionTime, "after");
       const beforeVideo = nearestEvidence(ordered, "video", lessonNumber, interventionTime, "before");
