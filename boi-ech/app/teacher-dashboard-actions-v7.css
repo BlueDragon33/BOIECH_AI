@@ -1,0 +1,417 @@
+/* Teacher dashboard Actions V7 — real supervision actions + learner inbox.
+   Server-backed text actions only; no original video/image media is stored or transmitted. */
+
+.teacher-analysis-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.teacher-analysis-actions button[data-server-feedback] {
+  color: #0a6ca8;
+  border-color: #b9dceb;
+  background: #eff9fd;
+}
+
+.teacher-analysis-actions button[data-server-review] {
+  color: #0f786c;
+  border-color: #bee6dc;
+  background: #eefaf7;
+}
+
+.teacher-learner-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px 16px;
+  border-top: 1px solid #e2edf2;
+  background: #f8fbfd;
+}
+
+.teacher-learner-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #c9e0ea;
+  border-radius: 9px;
+  color: #165f91;
+  background: #fff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.teacher-learner-actions button:hover {
+  border-color: #7abbd8;
+  box-shadow: 0 6px 14px rgba(21, 106, 153, .08);
+}
+
+.teacher-learner-actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+.teacher-last-intervention {
+  margin-top: 10px;
+  border-color: #d8e9ef !important;
+  background: linear-gradient(180deg, #fbfdfe, #f3f9fb);
+}
+
+.teacher-last-intervention small {
+  display: block;
+  margin-top: 6px;
+  color: #7690a0;
+  font-size: 9px;
+}
+
+.teacher-action-backdrop {
+  position: fixed;
+  z-index: 2500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 18, 31, .68);
+  backdrop-filter: blur(5px);
+}
+
+.teacher-action-dialog {
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 0;
+  border: 1px solid rgba(143, 205, 226, .34);
+  border-radius: 16px;
+  color: #173b5e;
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(0, 20, 35, .36);
+}
+
+.teacher-action-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px 15px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(42, 201, 221, .18), transparent 36%),
+    linear-gradient(135deg, #073753, #0a5c7d);
+}
+
+.teacher-action-dialog > header div {
+  min-width: 0;
+}
+
+.teacher-action-dialog > header small {
+  display: block;
+  color: #f4ca67;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.teacher-action-dialog > header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.teacher-action-dialog > header span {
+  display: block;
+  margin-top: 5px;
+  color: #c9e5ef;
+  font-size: 10px;
+}
+
+.teacher-action-dialog > header button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  color: #fff;
+  background: rgba(255,255,255,.06);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.teacher-action-dialog > label,
+.teacher-action-row {
+  margin: 14px 20px 0;
+}
+
+.teacher-action-dialog label {
+  display: grid;
+  gap: 6px;
+  color: #3c5f76;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.teacher-action-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.teacher-action-dialog input,
+.teacher-action-dialog select,
+.teacher-action-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfe0e8;
+  border-radius: 9px;
+  color: #1c405f;
+  background: #fbfdfe;
+  font: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.teacher-action-dialog input,
+.teacher-action-dialog select {
+  min-height: 39px;
+  padding: 0 10px;
+}
+
+.teacher-action-dialog textarea {
+  min-height: 132px;
+  padding: 10px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.teacher-action-dialog input:focus,
+.teacher-action-dialog select:focus,
+.teacher-action-dialog textarea:focus {
+  border-color: #5eb5dc;
+  box-shadow: 0 0 0 3px rgba(63, 160, 211, .10);
+}
+
+.teacher-action-safety {
+  margin: 10px 20px 0;
+  padding: 9px 11px;
+  border: 1px solid #d9e9ef;
+  border-radius: 9px;
+  color: #5f7889;
+  background: #f6fafc;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.teacher-action-error {
+  margin: 10px 20px 0;
+  color: #b9413d;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.teacher-action-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 13px 20px 18px;
+  border-top: 1px solid #e5eef2;
+  background: #fafcfd;
+}
+
+.teacher-action-dialog > footer button {
+  min-height: 38px;
+  padding: 0 15px;
+  border: 1px solid #cadde6;
+  border-radius: 9px;
+  color: #4f6f82;
+  background: #fff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.teacher-action-dialog > footer button[type="submit"] {
+  color: #fff;
+  border-color: #137bb8;
+  background: linear-gradient(180deg, #2097d5, #1478b2);
+}
+
+.teacher-action-dialog button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.teacher-action-toast {
+  position: fixed;
+  z-index: 2600;
+  right: 24px;
+  bottom: 24px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 11px 14px;
+  border: 1px solid rgba(92, 213, 187, .42);
+  border-radius: 11px;
+  color: #eafff8;
+  background: rgba(4, 77, 72, .96);
+  box-shadow: 0 12px 32px rgba(0, 30, 30, .24);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.teacher-export-button {
+  width: max-content;
+  margin-top: 10px;
+}
+
+/* ===== Learner delivery surface ===== */
+.student-teacher-inbox {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(71, 164, 201, .20);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(33, 199, 214, .09), transparent 34%),
+    linear-gradient(180deg, #072d48, #06253d);
+  box-shadow: 0 10px 26px rgba(0, 22, 39, .14);
+}
+
+.student-teacher-inbox > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 17px 11px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.student-teacher-inbox > header span {
+  color: #f1c963;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.student-teacher-inbox > header h2 {
+  margin: 3px 0 0;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.student-teacher-inbox > header > strong {
+  min-width: 46px;
+  padding: 6px 9px;
+  border: 1px solid rgba(102, 211, 221, .20);
+  border-radius: 999px;
+  color: #7ce8dc;
+  background: rgba(20, 163, 169, .09);
+  text-align: center;
+  font-size: 10px;
+}
+
+.student-teacher-inbox > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  padding: 11px;
+}
+
+.student-teacher-inbox article {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 100px;
+  padding: 11px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  color: #d7eaf1;
+  background: rgba(255,255,255,.035);
+}
+
+.student-teacher-inbox article > span {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: #5ee3dc;
+  background: rgba(36, 196, 202, .10);
+}
+
+.student-teacher-inbox article > span svg {
+  width: 19px;
+  height: 19px;
+}
+
+.student-teacher-inbox article small {
+  display: block;
+  color: #f1cc70;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+
+.student-teacher-inbox article strong {
+  display: block;
+  margin-top: 3px;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.student-teacher-inbox article p {
+  margin: 5px 0 0;
+  color: #b8d0da;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.student-teacher-inbox article em {
+  display: block;
+  margin-top: 7px;
+  color: #7fa6b6;
+  font-size: 8.5px;
+  font-style: normal;
+}
+
+.student-teacher-inbox article > button {
+  grid-column: 2;
+  justify-self: start;
+  min-height: 30px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border: 1px solid rgba(94, 210, 216, .24);
+  border-radius: 8px;
+  color: #dffff9;
+  background: rgba(25, 170, 178, .10);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+@media (max-width: 1080px) {
+  .teacher-analysis-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .student-teacher-inbox > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .teacher-action-row {
+    grid-template-columns: 1fr;
+  }
+  .teacher-learner-actions {
+    grid-template-columns: 1fr;
+  }
+  .teacher-action-dialog {
+    max-height: calc(100vh - 18px);
+    border-radius: 13px;
+  }
+}

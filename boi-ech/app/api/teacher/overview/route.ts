@@ -22,6 +22,10 @@ type LearnerRow = {
   analysis_count: number | null;
   last_analysis_json: string | null;
   last_analysis_at: string | null;
+  teacher_action_count: number | null;
+  last_teacher_action_type: string | null;
+  last_teacher_action_json: string | null;
+  last_teacher_action_at: string | null;
 };
 
 function json(data: unknown, status = 200) {
@@ -83,6 +87,29 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
   };
 }
 
+function teacherActionSummary(type: string | null, value: string | null, createdAt: string | null) {
+  const source = parseJson<Record<string, unknown> | null>(value, null);
+  if (!source || !type) return null;
+  const action = type === "teacher_assignment"
+    ? "assignment"
+    : type === "teacher_analysis_review"
+      ? "review"
+      : type === "teacher_feedback"
+        ? "feedback"
+        : null;
+  if (!action) return null;
+  return {
+    action,
+    teacherName: typeof source.teacherName === "string" ? source.teacherName.slice(0, 120) : "Giảng viên",
+    title: typeof source.title === "string" ? source.title.slice(0, 160) : "",
+    note: typeof source.note === "string" ? source.note.slice(0, 1200) : "",
+    lessonNumber: typeof source.lessonNumber === "string" ? source.lessonNumber.slice(0, 2) : "",
+    reviewStatus: source.reviewStatus === "follow-up" ? "follow-up" : source.reviewStatus === "reviewed" ? "reviewed" : "",
+    analysisAt: typeof source.analysisAt === "string" ? source.analysisAt.slice(0, 80) : "",
+    createdAt,
+  };
+}
+
 function hoursAgo(value: string | null) {
   if (!value) return Number.POSITIVE_INFINITY;
   const time = Date.parse(value);
@@ -122,7 +149,22 @@ export async function POST(request: Request) {
             ORDER BY e.id DESC LIMIT 1) AS last_analysis_json,
           (SELECT e.created_at FROM course_activity_events e
             WHERE e.device_id = da.device_id AND e.event_type = 'video_ai_analysis'
-            ORDER BY e.id DESC LIMIT 1) AS last_analysis_at
+            ORDER BY e.id DESC LIMIT 1) AS last_analysis_at,
+          (SELECT COUNT(*) FROM course_activity_events e
+            WHERE e.device_id = da.device_id
+              AND e.event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')) AS teacher_action_count,
+          (SELECT e.event_type FROM course_activity_events e
+            WHERE e.device_id = da.device_id
+              AND e.event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')
+            ORDER BY e.id DESC LIMIT 1) AS last_teacher_action_type,
+          (SELECT e.detail_json FROM course_activity_events e
+            WHERE e.device_id = da.device_id
+              AND e.event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')
+            ORDER BY e.id DESC LIMIT 1) AS last_teacher_action_json,
+          (SELECT e.created_at FROM course_activity_events e
+            WHERE e.device_id = da.device_id
+              AND e.event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')
+            ORDER BY e.id DESC LIMIT 1) AS last_teacher_action_at
         FROM device_access da
         LEFT JOIN device_profiles dp ON dp.device_id = da.device_id
         WHERE da.person_role = 'learner'
@@ -136,6 +178,7 @@ export async function POST(request: Request) {
       const completedLessons = completedLessonCount(row.completed_json);
       const progress = Math.round((completedLessons / LESSON_COUNT) * 100);
       const analysis = analysisSummary(row.last_analysis_json, row.last_analysis_at);
+      const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
       const inactivityHours = hoursAgo(row.last_activity_at ?? row.last_seen_at);
       const needsSupport = inactivityHours > 7 * 24 || progress < 50 || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
       return {
@@ -152,6 +195,8 @@ export async function POST(request: Request) {
         lastPart: row.last_part,
         analysisCount: Math.max(0, Number(row.analysis_count) || 0),
         lastAnalysis: analysis,
+        teacherActionCount: Math.max(0, Number(row.teacher_action_count) || 0),
+        latestTeacherAction,
         needsSupport,
         inactiveDays: Number.isFinite(inactivityHours) ? Math.floor(inactivityHours / 24) : null,
       };

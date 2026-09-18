@@ -165,6 +165,8 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
         </div>
       </section>
 
+      <div className="student-teacher-inbox-mount" data-student-teacher-inbox-mount />
+
       <div className="student-dashboard-grid">
         <section className="student-learning-card" id="student-learning-roadmap">
           <header><div><span>LỘ TRÌNH CÁ NHÂN</span><h2>8 bài học của bạn</h2></div><button onClick={() => clickOriginalNav(ORIGINAL_NAV.lessons)}>Mở bài đang học →</button></header>
