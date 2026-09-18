@@ -52,6 +52,17 @@ type LearnerReplyRow = {
   created_at: string;
 };
 
+type AssignmentEventRow = {
+  id: number;
+  event_type: string;
+  person_code: string | null;
+  learner_name: string | null;
+  class_name: string | null;
+  lesson_number: string | null;
+  detail_json: string;
+  created_at: string;
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, {
     status,
@@ -154,7 +165,7 @@ export async function POST(request: Request) {
     }
 
     const database = await getCourseDatabase();
-    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult] = await Promise.all([
+    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult, assignmentEventsResult] = await Promise.all([
       publishedCourseDocument(database),
       database.prepare(
       `SELECT
@@ -242,6 +253,18 @@ export async function POST(request: Request) {
           ORDER BY e.id DESC
           LIMIT 200`,
       ).bind(teacher.className).all<LearnerReplyRow>(),
+      database.prepare(
+        `SELECT e.id, e.event_type, da.person_code, da.learner_name, da.class_name,
+                e.lesson_number, e.detail_json, e.created_at
+           FROM course_activity_events e
+           JOIN device_access da ON da.device_id = e.device_id
+          WHERE da.person_role = 'learner'
+            AND da.status = 'approved'
+            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND e.event_type IN ('teacher_assignment', 'learner_assignment_status')
+          ORDER BY e.id DESC
+          LIMIT 1500`,
+      ).bind(teacher.className).all<AssignmentEventRow>(),
     ]);
 
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
@@ -286,6 +309,66 @@ export async function POST(request: Request) {
         createdAt: row.created_at,
       };
     }).filter((item) => item.actionId > 0 && item.message);
+
+    const latestStatusByAssignment = new Map<number, { status: "" | "acknowledged" | "completed" | "needs-help"; createdAt: string }>();
+    for (const row of assignmentEventsResult.results ?? []) {
+      if (row.event_type !== "learner_assignment_status") continue;
+      const detail = parseJson<Record<string, unknown>>(row.detail_json, {});
+      const actionId = Math.max(0, Number(detail.actionId) || 0);
+      const status = detail.status === "completed"
+        ? "completed"
+        : detail.status === "needs-help"
+          ? "needs-help"
+          : detail.status === "acknowledged"
+            ? "acknowledged"
+            : "";
+      if (actionId > 0 && status && !latestStatusByAssignment.has(actionId)) {
+        latestStatusByAssignment.set(actionId, { status, createdAt: row.created_at });
+      }
+    }
+
+    const assignments = (assignmentEventsResult.results ?? [])
+      .filter((row) => row.event_type === "teacher_assignment")
+      .map((row) => {
+        const detail = parseJson<Record<string, unknown>>(row.detail_json, {});
+        const dueAt = typeof detail.dueAt === "string" ? detail.dueAt.slice(0, 80) : "";
+        const dueTime = dueAt ? Date.parse(dueAt) : Number.NaN;
+        const status = latestStatusByAssignment.get(row.id)?.status ?? "";
+        const scheduleState = status === "completed"
+          ? "completed"
+          : status === "needs-help"
+            ? "needs-help"
+            : Number.isFinite(dueTime) && dueTime < Date.now()
+              ? "overdue"
+              : status === "acknowledged"
+                ? "acknowledged"
+                : dueAt
+                  ? "upcoming"
+                  : "open";
+        return {
+          id: row.id,
+          learnerName: row.learner_name?.trim() || "Học viên",
+          personCode: row.person_code?.trim() || "",
+          className: row.class_name?.trim() || teacher.className,
+          lessonNumber: typeof detail.lessonNumber === "string" ? detail.lessonNumber.slice(0, 2) : row.lesson_number?.slice(0, 2) || "",
+          title: typeof detail.title === "string" ? detail.title.slice(0, 160) : "",
+          note: typeof detail.note === "string" ? detail.note.slice(0, 1200) : "",
+          dueAt,
+          createdAt: row.created_at,
+          status,
+          statusAt: latestStatusByAssignment.get(row.id)?.createdAt ?? "",
+          scheduleState,
+        };
+      })
+      .sort((left, right) => {
+        const rank = { "needs-help": 5, overdue: 4, upcoming: 3, acknowledged: 2, open: 1, completed: 0 } as const;
+        const priority = rank[right.scheduleState] - rank[left.scheduleState];
+        if (priority) return priority;
+        const leftDue = Date.parse(left.dueAt);
+        const rightDue = Date.parse(right.dueAt);
+        if (Number.isFinite(leftDue) && Number.isFinite(rightDue) && leftDue !== rightDue) return leftDue - rightDue;
+        return Date.parse(right.createdAt) - Date.parse(left.createdAt);
+      });
 
     const learners = (result.results ?? []).map((row) => {
       const completedLessons = completedLessonCount(row.completed_json);
@@ -390,6 +473,7 @@ export async function POST(request: Request) {
       },
       learners,
       messages,
+      assignments,
       privacy: {
         mediaStored: false,
         note: "Bảng giám sát và Learning Analytics chỉ dùng sự kiện tiến độ, điểm, tóm tắt AI và can thiệp chuyên môn; video/ảnh gốc không được trả về Giảng viên.",
