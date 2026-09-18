@@ -95,6 +95,7 @@ export class DeviceAccessError extends Error {
 }
 
 let deviceSchemaReady: Promise<unknown> | null = null;
+let deviceClassificationSchemaReady: Promise<unknown> | null = null;
 
 export async function getCourseDatabase() {
   const workers = await import("cloudflare:workers");
@@ -107,6 +108,10 @@ export async function getCourseDatabase() {
         display_code TEXT NOT NULL UNIQUE,
         public_key_jwk TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
+        device_type TEXT NOT NULL DEFAULT 'desktop',
+        platform TEXT,
+        browser TEXT,
+        user_agent TEXT,
         label TEXT,
         learner_name TEXT,
         learner_family_name TEXT,
@@ -188,6 +193,20 @@ export async function getCourseDatabase() {
     ),
   ]);
   await deviceSchemaReady;
+  deviceClassificationSchemaReady ??= (async () => {
+    const info = await database.prepare("PRAGMA table_info(device_access)").all<{ name: string }>();
+    const columns = new Set((info.results ?? []).map((column) => column.name));
+    const repairs = [];
+    if (!columns.has("device_type")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type TEXT NOT NULL DEFAULT 'desktop'"));
+    if (!columns.has("platform")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN platform TEXT"));
+    if (!columns.has("browser")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN browser TEXT"));
+    if (!columns.has("user_agent")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN user_agent TEXT"));
+    if (repairs.length) await database.batch(repairs);
+    await database.prepare(
+      "CREATE INDEX IF NOT EXISTS device_access_type_status_idx ON device_access(device_type, status, last_seen_at)",
+    ).run();
+  })();
+  await deviceClassificationSchemaReady;
   return database;
 }
 
