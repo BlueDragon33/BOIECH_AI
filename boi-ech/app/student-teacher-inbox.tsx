@@ -13,6 +13,9 @@ type TeacherInboxAction = {
   lessonNumber: string;
   reviewStatus: "" | "reviewed" | "follow-up";
   analysisAt: string;
+  dueAt: string;
+  assignmentStatus: "" | "acknowledged" | "completed" | "needs-help";
+  assignmentStatusAt: string;
   createdAt: string;
   replies: { id: number; message: string; createdAt: string }[];
 };
@@ -127,6 +130,74 @@ function ReplyComposer({ actionId, deviceId, onSent }: { actionId: number; devic
   );
 }
 
+async function sendAssignmentStatus(deviceId: string, actionId: number, status: "acknowledged" | "completed" | "needs-help") {
+  const credential = await readCredential();
+  if (!credential) throw new Error("Không tìm thấy khóa thiết bị Học viên.");
+  const proof = await signedLearnerProof(credential, deviceId);
+  const response = await fetch("/api/course/teacher-actions/status", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      ...proof,
+      actionId,
+      status,
+      clientEventId: `assignment-status:${actionId}:${status}:${Date.now()}`,
+    }),
+  });
+  const data = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(data.error ?? "Không thể cập nhật trạng thái bài luyện.");
+}
+
+function AssignmentStatusControls({
+  actionId,
+  deviceId,
+  current,
+  onSent,
+}: {
+  actionId: number;
+  deviceId: string;
+  current: "" | "acknowledged" | "completed" | "needs-help";
+  onSent: () => void;
+}) {
+  const [saving, setSaving] = useState("");
+  const [error, setError] = useState("");
+  const options: Array<{ value: "acknowledged" | "completed" | "needs-help"; label: string }> = [
+    { value: "acknowledged", label: "Đã nhận" },
+    { value: "completed", label: "Đã hoàn thành" },
+    { value: "needs-help", label: "Cần hỗ trợ" },
+  ];
+
+  return (
+    <div className="student-assignment-status">
+      <span>Trạng thái nhiệm vụ</span>
+      <div>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={current === option.value ? "active" : ""}
+            disabled={Boolean(saving)}
+            onClick={() => {
+              if (!deviceId || current === option.value) return;
+              setSaving(option.value);
+              setError("");
+              sendAssignmentStatus(deviceId, actionId, option.value)
+                .then(onSent)
+                .catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể cập nhật trạng thái."))
+                .finally(() => setSaving(""));
+            }}
+          >
+            {saving === option.value ? "Đang lưu…" : option.label}
+          </button>
+        ))}
+      </div>
+      {error ? <p role="alert">{error}</p> : null}
+    </div>
+  );
+}
+
 async function deriveDeviceId() {
   const shell = document.querySelector<HTMLElement>(".app-shell");
   const direct = shell?.getAttribute("data-device-id") ?? "";
@@ -141,6 +212,14 @@ async function deriveDeviceId() {
   });
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
   return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
+}
+
+function dueDate(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
 function inboxDate(value: string) {
@@ -173,6 +252,7 @@ function Inbox({ actions, deviceId, onRefresh }: { actions: TeacherInboxAction[]
               <strong>{item.type === "assignment" ? (item.title || "Bài luyện bổ sung") : item.type === "review" ? (item.reviewStatus === "follow-up" ? "Cần luyện / quay lại để đối chiếu" : "Giảng viên đã xem phân tích") : `Nhận xét từ ${item.teacherName}`}</strong>
               <p>{item.note || "Không có ghi chú bổ sung."}</p>
               <em>{item.teacherName} · {inboxDate(item.createdAt)}</em>
+              {item.type === "assignment" && item.dueAt ? <b className="student-assignment-due">Hạn hoàn thành: {dueDate(item.dueAt)}</b> : null}
             </div>
             {item.replies?.length ? <div className="student-reply-history">{item.replies.map((reply) => <div key={reply.id}><span>Phản hồi của bạn</span><p>{reply.message}</p><small>{inboxDate(reply.createdAt)}</small></div>)}</div> : null}
             <div className="student-inbox-actions">
@@ -180,6 +260,7 @@ function Inbox({ actions, deviceId, onRefresh }: { actions: TeacherInboxAction[]
               {item.type === "review" ? <button type="button" onClick={() => window.location.assign("/phan-tich-video")}>Mở phân tích →</button> : null}
               <ReplyComposer actionId={item.id} deviceId={deviceId} onSent={onRefresh} />
             </div>
+            {item.type === "assignment" ? <AssignmentStatusControls actionId={item.id} deviceId={deviceId} current={item.assignmentStatus || ""} onSent={onRefresh} /> : null}
           </article>
         ))}
       </div>
