@@ -1,0 +1,502 @@
+/* Teacher dashboard Structure V4 — reference-first layout layer.
+   Keeps TeacherRoleShell as the only data/logic source. */
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+  --td4-sidebar: 218px;
+  --td4-rail: 378px;
+  --td4-gap: 10px;
+  --td4-panel-radius: 12px;
+  --td4-panel-border: #dce8ee;
+  --td4-panel-bg: #ffffff;
+  --td4-panel-soft: #f7fbfd;
+  --td4-ink: #153b5f;
+  --td4-muted: #6e8799;
+}
+
+/* ===== Desktop shell: reference 3-zone composition ===== */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell {
+  grid-template-columns: var(--td4-sidebar) minmax(0, 1fr);
+  background: #062840;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .sidebar {
+  width: var(--td4-sidebar);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+  border-right: 1px solid rgba(65, 180, 222, .16);
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-nav {
+  min-height: calc(100vh - 112px);
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  align-content: start;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-nav-list {
+  display: grid;
+  gap: 3px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-nav-list button {
+  border: 1px solid transparent;
+  border-radius: 11px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-nav-list button.active {
+  color: #fff;
+  border-color: rgba(48, 193, 240, .6);
+  background: linear-gradient(90deg, rgba(13, 148, 214, .96), rgba(4, 113, 175, .94));
+  box-shadow: 0 8px 24px rgba(3, 134, 205, .25), inset 4px 0 0 #6feaff;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-editor-shortcut {
+  margin-top: 10px;
+  border-color: rgba(237, 195, 92, .28);
+  background: linear-gradient(135deg, rgba(244, 202, 98, .13), rgba(38, 124, 153, .11));
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-nav-quote {
+  align-self: end;
+  margin-top: 18px;
+  padding: 14px 9px 9px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  color: #d8eaf1;
+  font-style: italic;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-nav-profile {
+  margin-top: 8px;
+  padding: 9px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+
+/* ===== Teacher topbar: remove learner/course controls from teacher context ===== */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .main-area > .topbar {
+  display: grid;
+  grid-template-columns: minmax(340px, 720px) minmax(360px, 1fr);
+  align-items: center;
+  gap: 18px;
+  min-height: 60px;
+  padding: 7px 14px 7px 16px;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar > .menu-button,
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar > .breadcrumb {
+  display: none;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-search-mount {
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions {
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Course/learner-only controls do not belong in the teacher command bar. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .top-status,
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .payment-access-status,
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .personal-content-actions,
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .editor-request-link,
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .appearance-trigger {
+  display: none !important;
+}
+
+/* Keep connectivity available, but reduce it to a compact operational indicator. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .network-state {
+  order: 2;
+  width: 11px;
+  min-width: 11px;
+  height: 11px;
+  min-height: 11px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 50%;
+  color: transparent;
+  background: transparent;
+  font-size: 0;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .network-state i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 0;
+  border-radius: 50%;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .network-state.online i {
+  background: #36dfbf;
+  box-shadow: 0 0 0 4px rgba(54, 223, 191, .12);
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .network-state.offline i {
+  background: #f1a849;
+  box-shadow: 0 0 0 4px rgba(241, 168, 73, .12);
+}
+
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-mode-badge { order: 1; }
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-alert-shortcut { order: 3; }
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip { order: 4; }
+
+/* Visually attach account switch control to the account chip, as requested earlier. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .multi-account-trigger {
+  order: 5;
+  margin-left: -9px;
+  min-width: 34px;
+  width: 34px;
+  min-height: 46px;
+  border-left: 1px solid rgba(139, 214, 235, .18);
+  border-radius: 0 11px 11px 0;
+  box-shadow: none;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .learner-chip {
+  margin-right: 0;
+  border-radius: 11px 0 0 11px !important;
+}
+
+/* ===== Dashboard center + supervision rail ===== */
+.teacher-dashboard {
+  background:
+    radial-gradient(circle at 70% -10%, rgba(20, 151, 203, .12), transparent 34%),
+    #052640;
+}
+
+.teacher-overview-layout {
+  grid-template-columns: minmax(0, 1fr) var(--td4-rail);
+  gap: var(--td4-gap);
+}
+
+.teacher-overview-main,
+.teacher-right-rail {
+  gap: var(--td4-gap);
+}
+
+/* ===== Hero: three visual zones, reference hierarchy ===== */
+.teacher-hero {
+  min-height: 270px;
+  grid-template-columns: minmax(0, 1.58fr) minmax(270px, .56fr);
+  overflow: hidden;
+  border: 1px solid rgba(83, 184, 219, .30);
+  border-radius: 13px;
+  background-image:
+    linear-gradient(90deg, rgba(2, 25, 45, .97) 0%, rgba(2, 39, 65, .88) 30%, rgba(2, 53, 78, .24) 62%, rgba(2, 34, 53, .66) 100%),
+    linear-gradient(180deg, rgba(0, 154, 207, .04), rgba(0,0,0,.08)),
+    url('/course-media/0b1612e00b7cd8fd3853ee8791d4ade1.webp');
+  background-size: cover;
+  background-position: 58% 45%;
+  box-shadow: 0 14px 32px rgba(0, 18, 31, .22);
+}
+
+.teacher-hero-copy {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 760px;
+  padding: 27px 34px 31px;
+}
+
+.teacher-hero-copy > span {
+  color: #f7cf6a;
+  letter-spacing: .12em;
+}
+
+.teacher-hero h1 {
+  margin: 10px 0 12px;
+  max-width: 680px;
+}
+
+.teacher-hero h1 em {
+  color: #f5ca62;
+  font-style: normal;
+}
+
+.teacher-hero p {
+  max-width: 690px;
+  color: rgba(245, 252, 255, .93);
+}
+
+.teacher-hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.teacher-hero-actions button {
+  color: #162d3e;
+  background: linear-gradient(180deg, #ffe69d, #f0c45a);
+  box-shadow: 0 9px 18px rgba(210, 159, 38, .20);
+}
+
+.teacher-hero-actions a {
+  color: #f1f8fb;
+  border-color: rgba(190, 224, 237, .18);
+  background: rgba(2, 41, 65, .74);
+}
+
+.teacher-hero-art {
+  position: relative;
+  min-width: 0;
+  padding: 26px 22px 24px 12px;
+}
+
+.teacher-hero-art > div {
+  align-self: end;
+  max-width: 225px;
+  margin-left: auto;
+  padding: 14px;
+  border: 1px solid rgba(137, 215, 233, .14);
+  border-radius: 12px;
+  background: rgba(3, 41, 62, .52);
+  backdrop-filter: blur(4px);
+}
+
+.teacher-hero-value-stack {
+  right: 22px;
+  top: 18px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.teacher-hero::after {
+  content: "“Người giảng viên tạo nên những hành trình vươn xa”";
+  position: absolute;
+  z-index: 3;
+  right: 28px;
+  bottom: 28px;
+  width: 225px;
+  color: rgba(235, 248, 252, .78);
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: right;
+  transform: rotate(-5deg);
+  pointer-events: none;
+}
+
+/* ===== Main panels: reference uses bright work surfaces ===== */
+.teacher-white-card {
+  color: var(--td4-ink);
+  border: 1px solid var(--td4-panel-border);
+  background: var(--td4-panel-bg);
+  box-shadow: 0 8px 22px rgba(2, 33, 52, .10);
+}
+
+.teacher-white-card > header {
+  color: var(--td4-ink);
+  border-bottom: 1px solid #e5eef2;
+  background: #fff;
+}
+
+.teacher-white-card > header small,
+.teacher-section-note {
+  color: var(--td4-muted);
+}
+
+.teacher-capability-grid,
+.teacher-class-metrics {
+  background: #fff;
+}
+
+.teacher-capability-action {
+  color: #173e61;
+  border: 1px solid #dce9ef;
+  background: linear-gradient(180deg, #fbfdff, #f5fafe);
+  box-shadow: 0 3px 10px rgba(13, 68, 101, .04);
+}
+.teacher-capability-action:hover {
+  border-color: #9dcde2;
+  box-shadow: 0 7px 16px rgba(17, 100, 145, .09);
+}
+.teacher-capability-action > span {
+  color: #1788d6;
+  background: #edf7ff;
+}
+
+.teacher-metric {
+  border: 1px solid #dce8ed;
+  background: linear-gradient(180deg, #fbfdfe, #f1f8fb);
+}
+
+.teacher-watch-toolbar {
+  border-bottom-color: #e4edf1;
+  background: #f7fbfd;
+}
+
+.teacher-table-wrap,
+.teacher-analysis-queue-list {
+  background: #fff;
+}
+
+.teacher-table thead {
+  background: #eef5f8;
+}
+
+.teacher-table tbody tr {
+  border-bottom: 1px solid #e7eef2;
+}
+
+.teacher-table tbody tr:hover {
+  background: #f6fbfd;
+}
+
+.teacher-analysis-queue-list article {
+  border-bottom: 1px solid #e4edf1;
+  background: #fff;
+}
+
+/* ===== Two-row center structure from reference ===== */
+.teacher-upper-grid {
+  grid-template-columns: minmax(0, 1.48fr) minmax(315px, .72fr);
+  gap: var(--td4-gap);
+}
+
+.teacher-lower-grid {
+  grid-template-columns: minmax(0, 1.44fr) minmax(350px, .92fr);
+  gap: var(--td4-gap);
+}
+
+/* ===== Right rail: keep it dark, compact and operational ===== */
+.teacher-right-rail {
+  align-content: start;
+}
+
+.teacher-rail-card {
+  overflow: hidden;
+  border: 1px solid rgba(61, 181, 218, .20);
+  background: linear-gradient(180deg, rgba(4, 46, 72, .96), rgba(3, 38, 61, .96));
+  box-shadow: 0 8px 20px rgba(0, 16, 28, .15);
+}
+
+.teacher-rail-card > header {
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  background: rgba(5, 53, 80, .82);
+}
+
+.teacher-rail-card > header strong {
+  color: #f1f9fc;
+}
+
+.teacher-task-list button:hover,
+.teacher-alert-list button:hover,
+.teacher-monitor-list button:hover {
+  background: rgba(63, 197, 220, .055);
+}
+
+/* ===== Secondary teacher pages ===== */
+.teacher-message-placeholder {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  padding: 28px;
+  text-align: center;
+}
+.teacher-message-placeholder strong {
+  display: block;
+  color: #174a70;
+  font-size: 18px;
+}
+.teacher-message-placeholder p {
+  max-width: 560px;
+  margin: 8px auto 0;
+  color: #71899a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Reference footer spans full center/rail content width. */
+.teacher-dashboard-footer {
+  min-height: 42px;
+  border-radius: 0 0 10px 10px;
+}
+
+/* ===== Responsive ===== */
+@media (min-width: 1440px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+    --td4-rail: 388px;
+  }
+  .teacher-overview-layout {
+    grid-template-columns: minmax(0, 1fr) var(--td4-rail);
+  }
+  .teacher-hero {
+    min-height: 278px;
+  }
+}
+
+@media (max-width: 1320px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] {
+    --td4-sidebar: 196px;
+    --td4-rail: 318px;
+  }
+  .teacher-upper-grid,
+  .teacher-lower-grid {
+    grid-template-columns: 1fr;
+  }
+  .teacher-hero::after {
+    display: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .main-area > .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .teacher-overview-layout {
+    grid-template-columns: 1fr;
+  }
+  .teacher-right-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .teacher-hero {
+    grid-template-columns: 1fr;
+  }
+  .teacher-hero-art {
+    min-height: 72px;
+  }
+}
+
+@media (max-width: 760px) {
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .main-area > .topbar {
+    display: flex;
+    gap: 8px;
+  }
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar > .menu-button {
+    display: inline-grid;
+  }
+  .teacher-role-search-mount {
+    flex: 1;
+  }
+  .teacher-mode-badge,
+  .teacher-alert-shortcut {
+    display: none !important;
+  }
+  .teacher-right-rail {
+    grid-template-columns: 1fr;
+  }
+  .teacher-upper-grid,
+  .teacher-lower-grid {
+    grid-template-columns: 1fr;
+  }
+  .teacher-hero {
+    min-height: 235px;
+  }
+  .teacher-hero-copy {
+    padding: 22px;
+  }
+  .teacher-hero-art {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .teacher-capability-grid,
+  .teacher-class-metrics {
+    grid-template-columns: 1fr;
+  }
+}
