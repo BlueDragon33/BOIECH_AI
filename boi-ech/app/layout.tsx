@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import "./student-role-shell.css";
+import "./student-role-shell.css";\nimport "./student-adaptive-coach.css";
 import "./teacher-role-shell.css";
 import "./role-typography.css";
 import "./teacher-action-bridge.css";
@@ -15,7 +15,7 @@ import "./teacher-dashboard-data-v6.css";
 import "./teacher-dashboard-actions-v7.css";
 import "./teacher-dashboard-visual-v8.css";
 import StudentRoleShell from "./student-role-shell";
-import StudentTeacherInbox from "./student-teacher-inbox";
+import StudentTeacherInbox from "./student-teacher-inbox";\nimport StudentAdaptiveCoach from "./student-adaptive-coach";
 import TeacherRoleShell from "./teacher-role-shell";
 import TeacherActionBridge from "./teacher-action-bridge";
 import MultiAccountSwitcher from "./multi-account-switcher";
@@ -66,7 +66,7 @@ export default function RootLayout({
       >
         {children}
         <StudentRoleShell />
-        <StudentTeacherInbox />
+        <StudentTeacherInbox />\n        <StudentAdaptiveCoach />
         <TeacherRoleShell />
         <TeacherActionBridge />
         <MultiAccountSwitcher />
