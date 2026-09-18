@@ -219,7 +219,9 @@ function ensureReviewActions(state: BlueprintState) {
     if (!article.querySelector(".teacher-review-state")) {
       const stateTag = document.createElement("span");
       stateTag.className = "teacher-review-state";
-      stateTag.textContent = "Cần xem";
+      const quality = article.dataset.analysisQuality === "good" ? "good" : "review";
+      stateTag.dataset.reviewQuality = quality;
+      stateTag.textContent = quality === "good" ? "Đủ bằng chứng" : "Cần xem";
       article.querySelector(".teacher-analysis-thumb")?.append(stateTag);
     }
     const actions = article.querySelector<HTMLElement>(".teacher-analysis-actions");
