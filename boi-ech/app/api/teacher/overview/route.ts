@@ -218,7 +218,7 @@ export async function POST(request: Request) {
               'offline_session',
               'part_complete'
             )
-          ORDER BY e.device_id ASC, e.created_at ASC, e.id ASC
+          ORDER BY e.created_at DESC, e.id DESC
           LIMIT 12000`,
       ).bind(teacher.className).all<LearningEventRow>(),
     ]);
