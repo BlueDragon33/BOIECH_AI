@@ -1,6 +1,7 @@
 import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } from "../../../ai-engine.server";
 import { publishedCourseDocument } from "../../../course-content.server";
 import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-learning-analytics.server";
+import { buildInterventionSuggestions } from "../../../teacher-intervention-engine.server";
 import {
   DeviceAccessError,
   getCourseDatabase,
@@ -265,6 +266,20 @@ export async function POST(request: Request) {
       const adaptiveAlerts = intelligence.alerts.filter((item) => item.level !== "info");
       const learningAnalytics = buildLearningAnalytics(learningEventsByDevice.get(row.device_id) ?? []);
       const inactivityHours = hoursAgo(row.last_activity_at ?? row.last_seen_at);
+      const interventionSuggestions = buildInterventionSuggestions({
+        name: row.learner_name?.trim() || "Học viên",
+        progress,
+        inactiveDays: Number.isFinite(inactivityHours) ? Math.floor(inactivityHours / 24) : null,
+        lastLesson: row.last_lesson,
+        lastAnalysis: analysis,
+        adaptive: {
+          priorityLesson: intelligence.priorityLesson,
+          priorityPart: intelligence.priorityPart,
+          averageMastery,
+          alerts: intelligence.alerts,
+        },
+        learningAnalytics,
+      });
       const teacherLoopNeedsFollowUp = ["negative", "mixed", "pending", "activity-only"].includes(
         learningAnalytics.latest?.observedChange ?? "",
       );
@@ -296,6 +311,7 @@ export async function POST(request: Request) {
           alerts: intelligence.alerts,
         },
         learningAnalytics,
+        interventionSuggestions,
         needsSupport,
         inactiveDays: Number.isFinite(inactivityHours) ? Math.floor(inactivityHours / 24) : null,
       };
@@ -311,6 +327,7 @@ export async function POST(request: Request) {
     const withFollowUpEvidence = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.withFollowUpEvidence, 0);
     const positiveObserved = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.positiveObserved, 0);
     const pendingFollowUp = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.pendingFollowUp, 0);
+    const interventionSuggestionCount = learners.reduce((sum, item) => sum + item.interventionSuggestions.length, 0);
 
     return json({
       teacher: {
@@ -328,6 +345,7 @@ export async function POST(request: Request) {
         withFollowUpEvidence,
         positiveObserved,
         pendingFollowUp,
+        interventionSuggestionCount,
       },
       learners,
       privacy: {
