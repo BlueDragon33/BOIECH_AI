@@ -265,9 +265,13 @@ export async function POST(request: Request) {
       const adaptiveAlerts = intelligence.alerts.filter((item) => item.level !== "info");
       const learningAnalytics = buildLearningAnalytics(learningEventsByDevice.get(row.device_id) ?? []);
       const inactivityHours = hoursAgo(row.last_activity_at ?? row.last_seen_at);
+      const teacherLoopNeedsFollowUp = ["negative", "mixed", "pending", "activity-only"].includes(
+        learningAnalytics.latest?.observedChange ?? "",
+      );
       const needsSupport = inactivityHours > 7 * 24
         || progress < 50
         || adaptiveAlerts.length > 0
+        || teacherLoopNeedsFollowUp
         || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
       return {
         name: row.learner_name?.trim() || "Học viên",
