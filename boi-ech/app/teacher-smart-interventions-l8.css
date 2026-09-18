@@ -1,0 +1,17 @@
+.teacher-smart-interventions{margin-bottom:16px;overflow:hidden;border:1px solid #d7e6eb;border-radius:18px;background:#fff;box-shadow:0 12px 30px rgba(17,70,92,.06)}
+.teacher-smart-interventions>header{display:flex;justify-content:space-between;gap:18px;align-items:end;padding:19px 20px;border-bottom:1px solid #e2ebee;background:linear-gradient(135deg,#f8fcfd,#eef8f8)}
+.teacher-smart-interventions>header span{color:#0b8195;font-size:9px;font-weight:900;letter-spacing:.12em}
+.teacher-smart-interventions h2{margin:5px 0;color:#143c57;font-family:Georgia,"Times New Roman",serif;font-size:25px}
+.teacher-smart-interventions>header p{max-width:850px;margin:0;color:#738995;font-size:10px;line-height:1.55}
+.teacher-smart-interventions>header>strong{display:grid;place-items:center;min-width:88px;min-height:54px;padding:8px;border-radius:12px;color:#0c6d84;background:#e8f5f7;font-size:12px}
+.teacher-smart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:12px}
+.teacher-smart-card{padding:13px;border:1px solid #e0eaed;border-radius:13px;background:#fbfdfe}
+.teacher-smart-card.critical{border-color:#efc9c0;background:#fff9f7}.teacher-smart-card.high{border-color:#e8d9ad;background:#fffcf5}
+.teacher-smart-card>header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.teacher-smart-card>header span{color:#117d91;font-size:8px;font-weight:900;letter-spacing:.06em}
+.teacher-smart-card>header strong{display:block;margin-top:3px;color:#153e59;font-size:12px}.teacher-smart-card>header small{display:block;margin-top:2px;color:#8b9ba5;font-size:8px}
+.teacher-smart-card>header>b{padding:5px 8px;border-radius:999px;color:#126b86;background:#e8f5f8;font-size:8px}.teacher-smart-card.critical>header>b{color:#99473b;background:#fde9e5}
+.teacher-smart-card h3{margin:10px 0 5px;color:#244c64;font-size:12px}.teacher-smart-card p{margin:0;color:#617986;font-size:9px;line-height:1.48}
+.teacher-smart-card ul{margin:8px 0 0;padding-left:17px;color:#738994;font-size:8px;line-height:1.5}.teacher-smart-card footer{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #e9eff1}
+.teacher-smart-card footer span{color:#8b9aa3;font-size:8px}.teacher-smart-card footer button{min-height:30px;padding:0 10px;border:1px solid #bcdbe2;border-radius:8px;color:#0d708a;background:#f1fafb;font-size:8px;font-weight:850;cursor:pointer}
+.teacher-smart-empty{grid-column:1/-1;padding:28px;border:1px dashed #ccdde3;border-radius:12px;color:#728792;text-align:center}.teacher-smart-empty strong{color:#31566c}.teacher-smart-empty p{margin:6px 0 0;font-size:9px}
+@media(max-width:850px){.teacher-smart-grid{grid-template-columns:1fr}}@media(max-width:600px){.teacher-smart-interventions>header,.teacher-smart-card>header,.teacher-smart-card footer{align-items:flex-start;flex-direction:column}}
