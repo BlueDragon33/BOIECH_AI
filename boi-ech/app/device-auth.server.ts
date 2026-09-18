@@ -95,7 +95,7 @@ export class DeviceAccessError extends Error {
 }
 
 let deviceSchemaReady: Promise<unknown> | null = null;
-let deviceClassificationSchemaReady: Promise<unknown> | null = null;
+let deviceRuntimeSchemaReady: Promise<unknown> | null = null;
 
 export async function getCourseDatabase() {
   const workers = await import("cloudflare:workers");
@@ -163,6 +163,11 @@ export async function getCourseDatabase() {
         device_id TEXT PRIMARY KEY NOT NULL,
         completed_json TEXT NOT NULL DEFAULT '[]',
         scores_json TEXT NOT NULL DEFAULT '{}',
+        attempts_json TEXT NOT NULL DEFAULT '{}',
+        total_active_seconds INTEGER NOT NULL DEFAULT 0,
+        last_activity_at TEXT,
+        last_lesson TEXT,
+        last_part TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
@@ -191,22 +196,34 @@ export async function getCourseDatabase() {
     database.prepare(
       "CREATE UNIQUE INDEX IF NOT EXISTS device_access_person_identity_unique ON device_access(person_role, person_code)",
     ),
+    database.prepare(
+      "CREATE UNIQUE INDEX IF NOT EXISTS device_access_phone_unique ON device_access(phone)",
+    ),
   ]);
   await deviceSchemaReady;
-  deviceClassificationSchemaReady ??= (async () => {
-    const info = await database.prepare("PRAGMA table_info(device_access)").all<{ name: string }>();
-    const columns = new Set((info.results ?? []).map((column) => column.name));
+  deviceRuntimeSchemaReady ??= (async () => {
+    const [accessInfo, profileInfo] = await Promise.all([
+      database.prepare("PRAGMA table_info(device_access)").all<{ name: string }>(),
+      database.prepare("PRAGMA table_info(device_profiles)").all<{ name: string }>(),
+    ]);
+    const accessColumns = new Set((accessInfo.results ?? []).map((column) => column.name));
+    const profileColumns = new Set((profileInfo.results ?? []).map((column) => column.name));
     const repairs = [];
-    if (!columns.has("device_type")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type TEXT NOT NULL DEFAULT 'desktop'"));
-    if (!columns.has("platform")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN platform TEXT"));
-    if (!columns.has("browser")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN browser TEXT"));
-    if (!columns.has("user_agent")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN user_agent TEXT"));
+    if (!accessColumns.has("device_type")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type TEXT NOT NULL DEFAULT 'desktop'"));
+    if (!accessColumns.has("platform")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN platform TEXT"));
+    if (!accessColumns.has("browser")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN browser TEXT"));
+    if (!accessColumns.has("user_agent")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN user_agent TEXT"));
+    if (!profileColumns.has("attempts_json")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN attempts_json TEXT NOT NULL DEFAULT '{}'"));
+    if (!profileColumns.has("total_active_seconds")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN total_active_seconds INTEGER NOT NULL DEFAULT 0"));
+    if (!profileColumns.has("last_activity_at")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN last_activity_at TEXT"));
+    if (!profileColumns.has("last_lesson")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN last_lesson TEXT"));
+    if (!profileColumns.has("last_part")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN last_part TEXT"));
     if (repairs.length) await database.batch(repairs);
     await database.prepare(
       "CREATE INDEX IF NOT EXISTS device_access_type_status_idx ON device_access(device_type, status, last_seen_at)",
     ).run();
   })();
-  await deviceClassificationSchemaReady;
+  await deviceRuntimeSchemaReady;
   return database;
 }
 
