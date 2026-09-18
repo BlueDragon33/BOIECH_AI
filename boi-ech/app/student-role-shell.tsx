@@ -3,9 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
-type TeacherInboxAction = { id: number; type: "feedback" | "assignment" | "review"; teacherName: string; title: string; note: string; lessonNumber: string; reviewStatus: "" | "reviewed" | "follow-up"; analysisAt: string; createdAt: string };
-
 type LessonSnapshot = {
   index: number;
   number: string;
@@ -58,13 +55,6 @@ const ORIGINAL_NAV: Record<string, string> = {
 function text(node: Element | null | undefined) {
   return (node?.textContent ?? "").replace(/\s+/g, " ").trim();
 }
-
-function base64Url(bytes: Uint8Array) { let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
-function openStudentDb(): Promise<IDBDatabase> { return new Promise((resolve, reject) => { const request = indexedDB.open("boi-ech-doc-lap", 4); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
-async function readStudentCredential() { const db = await openStudentDb(); return new Promise<StoredDeviceCredential | undefined>((resolve, reject) => { const request = db.transaction("thiet-bi", "readonly").objectStore("thiet-bi").get("chinh"); request.onsuccess = () => resolve(request.result as StoredDeviceCredential | undefined); request.onerror = () => reject(request.error); }); }
-async function signedStudentProof(credential: StoredDeviceCredential, deviceId: string) { const response = await fetch("/api/device", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId }) }); const data = await response.json() as { challenge?: string; error?: string }; if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể xác thực tài khoản Học viên."); const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`); const signature = credential.privateKey && crypto.subtle ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message) : crypto.getRandomValues(new Uint8Array(64)).buffer; return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) }; }
-async function loadTeacherInbox(deviceId: string) { const credential = await readStudentCredential(); if (!credential) return [] as TeacherInboxAction[]; const proof = await signedStudentProof(credential, deviceId); const response = await fetch("/api/course/teacher-actions", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(proof) }); const data = await response.json() as { actions?: TeacherInboxAction[]; error?: string }; if (!response.ok) throw new Error(data.error ?? "Không thể tải hướng dẫn từ Giảng viên."); return Array.isArray(data.actions) ? data.actions : []; }
-function inboxDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date); }
 
 function findOriginalNav(label: string) {
   return Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar nav button"))
@@ -136,7 +126,7 @@ function Capability({ icon, title, text, onClick }: { icon: string; title: strin
   return <button className="student-capability" onClick={onClick}><span><StudentIcon name={icon}/></span><strong>{title}</strong><small>{text}</small><i>→</i></button>;
 }
 
-function StudentDashboard({ snapshot, openLesson, teacherActions }: { snapshot: StudentSnapshot; openLesson: (index: number) => void; teacherActions: TeacherInboxAction[] }) {
+function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot; openLesson: (index: number) => void }) {
   const percent = Math.round((snapshot.completedLessons / Math.max(1, snapshot.totalLessons)) * 100);
   const remaining = Math.max(0, snapshot.totalLessons - snapshot.completedLessons);
   const visibleLessons = snapshot.lessons.slice(0, 8);
@@ -175,10 +165,7 @@ function StudentDashboard({ snapshot, openLesson, teacherActions }: { snapshot: 
         </div>
       </section>
 
-      {teacherActions.length ? <section className="student-teacher-inbox" aria-label="Hướng dẫn từ Giảng viên">
-        <header><div><span>TỪ GIẢNG VIÊN</span><h2>Hướng dẫn mới nhất dành cho bạn</h2></div><strong>{teacherActions.length} mục</strong></header>
-        <div>{teacherActions.slice(0, 4).map((item) => <article key={item.id} className={`teacher-inbox-${item.type}`}><span><StudentIcon name={item.type === "assignment" ? "practice" : item.type === "review" ? "shield" : "profile"}/></span><div><small>{item.type === "assignment" ? `BÀI LUYỆN · BÀI ${item.lessonNumber || "—"}` : item.type === "review" ? "REVIEW PHÂN TÍCH" : "NHẬN XÉT CHUYÊN MÔN"}</small><strong>{item.type === "assignment" ? (item.title || "Bài luyện bổ sung") : item.type === "review" ? (item.reviewStatus === "follow-up" ? "Cần luyện / quay lại để đối chiếu" : "Giảng viên đã xem phân tích") : `Nhận xét từ ${item.teacherName}`}</strong><p>{item.note || "Không có ghi chú bổ sung."}</p><em>{item.teacherName} · {inboxDate(item.createdAt)}</em></div>{item.type === "assignment" && item.lessonNumber ? <button type="button" onClick={() => clickOriginalNav(ORIGINAL_NAV.practice)}>Mở thực hành →</button> : item.type === "review" ? <button type="button" onClick={() => window.location.assign("/phan-tich-video")}>Mở phân tích →</button> : null}</article>)}</div>
-      </section> : null}
+      <div className="student-teacher-inbox-mount" data-student-teacher-inbox-mount />
 
       <div className="student-dashboard-grid">
         <section className="student-learning-card" id="student-learning-roadmap">
@@ -246,9 +233,7 @@ export default function StudentRoleShell() {
   const [active, setActive] = useState(false);
   const [dashboardMount, setDashboardMount] = useState<HTMLElement | null>(null);
   const [navMount, setNavMount] = useState<HTMLElement | null>(null);
-  const [teacherActions, setTeacherActions] = useState<TeacherInboxAction[]>([]);
   const signatureRef = useRef("");
-  const inboxDeviceRef = useRef("");
 
   useEffect(() => {
     if (window.location.pathname !== "/") return;
@@ -266,26 +251,10 @@ export default function StudentRoleShell() {
       if (!isLearner || !shell) {
         delete document.body.dataset.studentRoleUi;
         delete document.body.dataset.studentSection;
-        setTeacherActions([]);
-        inboxDeviceRef.current = "";
         return;
       }
 
       document.body.dataset.studentRoleUi = "active";
-      const loadInboxForDevice = (deviceId: string) => {
-        if (!deviceId || inboxDeviceRef.current === deviceId) return;
-        inboxDeviceRef.current = deviceId;
-        loadTeacherInbox(deviceId).then(setTeacherActions).catch(() => setTeacherActions([]));
-      };
-      const directDeviceId = shell.getAttribute("data-device-id") ?? "";
-      if (directDeviceId) loadInboxForDevice(directDeviceId);
-      else readStudentCredential().then(async (credential) => {
-        if (!credential?.publicKey) return;
-        const canonical = JSON.stringify({ kty: credential.publicKey.kty, crv: credential.publicKey.crv, x: credential.publicKey.x, y: credential.publicKey.y });
-        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-        const derived = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
-        loadInboxForDevice(derived);
-      }).catch(() => undefined);
       const main = shell.querySelector<HTMLElement>(".main-area");
       const sidebar = shell.querySelector<HTMLElement>(".sidebar");
       const topbar = main?.querySelector<HTMLElement>(":scope > .topbar");
@@ -368,8 +337,6 @@ export default function StudentRoleShell() {
       navNode?.remove();
       delete document.body.dataset.studentRoleUi;
       delete document.body.dataset.studentSection;
-      setTeacherActions([]);
-      inboxDeviceRef.current = "";
     };
   }, []);
 
@@ -377,5 +344,5 @@ export default function StudentRoleShell() {
   const openLesson = (index: number) => originalLessonButtons()[index]?.click();
 
   if (!active) return null;
-  return <>{navMount ? createPortal(<StudentNavigation snapshot={snapshot}/>, navMount) : null}{dashboardMount && snapshot.activeSection === "Tổng quan" ? createPortal(<StudentDashboard snapshot={snapshot} openLesson={openLesson} teacherActions={teacherActions}/>, dashboardMount) : null}</>;
+  return <>{navMount ? createPortal(<StudentNavigation snapshot={snapshot}/>, navMount) : null}{dashboardMount && snapshot.activeSection === "Tổng quan" ? createPortal(<StudentDashboard snapshot={snapshot} openLesson={openLesson}/>, dashboardMount) : null}</>;
 }
