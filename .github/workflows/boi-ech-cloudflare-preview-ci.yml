@@ -13,6 +13,9 @@ on:
       - "boi-ech/scripts/validate-cloudflare-build-artifact.mjs"
       - "boi-ech/app/**"
       - "boi-ech/worker/**"
+      - "boi-ech/tests/**"
+      - "boi-ech/scripts/**"
+      - "boi-ech/RELEASE_READINESS.md"
       - "boi-ech/package.json"
 
 permissions:
@@ -44,6 +47,7 @@ jobs:
       - name: Preserve Bơi ếch regressions
         run: |
           npm run validate:cloudflare-preview
+          npm run validate:release
           npm run lint
           npm test
 

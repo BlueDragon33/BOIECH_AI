@@ -47,6 +47,7 @@ jobs:
       - name: Validate and build before production deployment
         working-directory: boi-ech
         run: |
+          npm run validate:release
           npm run lint
           npm test
 

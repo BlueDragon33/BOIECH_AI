@@ -71,6 +71,7 @@ jobs:
         working-directory: boi-ech
         run: |
           npm run validate:cloudflare-preview
+          npm run validate:release
           npm run lint
           npm test
 
