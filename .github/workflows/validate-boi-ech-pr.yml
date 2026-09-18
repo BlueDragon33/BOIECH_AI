@@ -35,6 +35,9 @@ jobs:
       - name: Validate Cloudflare migration boundary
         working-directory: boi-ech
         run: npm run validate:cloudflare-preview
+      - name: Release readiness audit
+        working-directory: boi-ech
+        run: npm run validate:release
       - name: Lint
         working-directory: boi-ech
         run: npm run lint
