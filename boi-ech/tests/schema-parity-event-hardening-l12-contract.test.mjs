@@ -5,6 +5,8 @@ import fs from "node:fs";
 const schema = fs.readFileSync(new URL("../db/schema.ts", import.meta.url), "utf8");
 const bootstrap = fs.readFileSync(new URL("../app/device-auth.server.ts", import.meta.url), "utf8");
 const migration = fs.readFileSync(new URL("../drizzle/0015_device_classification.sql", import.meta.url), "utf8");
+const progressMigration = fs.readFileSync(new URL("../drizzle/0002_acoustic_bushwacker.sql", import.meta.url), "utf8");
+const phoneMigration = fs.readFileSync(new URL("../drizzle/0007_even_joshua_kane.sql", import.meta.url), "utf8");
 const statusRoute = fs.readFileSync(new URL("../app/api/course/teacher-actions/status/route.ts", import.meta.url), "utf8");
 const readiness = fs.readFileSync(new URL("../scripts/validate-release-readiness.mjs", import.meta.url), "utf8");
 
@@ -31,6 +33,25 @@ test("L12 repairs classification columns for older local databases before metada
   assert.match(bootstrap, /ALTER TABLE device_access ADD COLUMN browser/);
   assert.match(bootstrap, /ALTER TABLE device_access ADD COLUMN user_agent/);
   assert.match(bootstrap, /CREATE INDEX IF NOT EXISTS device_access_type_status_idx/);
+});
+
+test("L12 keeps fresh and legacy device_profiles aligned with progress migration", () => {
+  for (const column of ["attempts_json", "total_active_seconds", "last_activity_at", "last_lesson", "last_part"]) {
+    assert.ok(progressMigration.includes(column));
+    assert.ok(schema.includes(column));
+    assert.ok(bootstrap.includes(column));
+  }
+  assert.match(bootstrap, /PRAGMA table_info\(device_profiles\)/);
+  assert.match(bootstrap, /ALTER TABLE device_profiles ADD COLUMN attempts_json/);
+  assert.match(bootstrap, /ALTER TABLE device_profiles ADD COLUMN total_active_seconds/);
+  assert.match(bootstrap, /ALTER TABLE device_profiles ADD COLUMN last_activity_at/);
+  assert.match(bootstrap, /ALTER TABLE device_profiles ADD COLUMN last_lesson/);
+  assert.match(bootstrap, /ALTER TABLE device_profiles ADD COLUMN last_part/);
+});
+
+test("L12 fresh device bootstrap preserves phone uniqueness", () => {
+  assert.match(phoneMigration, /device_access_phone_unique/);
+  assert.match(bootstrap, /CREATE UNIQUE INDEX IF NOT EXISTS device_access_phone_unique/);
 });
 
 test("L12 assignment status events are bounded and same-state updates are no-ops", () => {
