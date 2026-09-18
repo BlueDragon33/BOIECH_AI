@@ -14,6 +14,12 @@ type ActionRow = {
   created_at: string;
 };
 
+type ReplyRow = {
+  id: number;
+  detail_json: string;
+  created_at: string;
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, {
     status,
@@ -56,14 +62,38 @@ export async function POST(request: Request) {
     }
 
     const database = await getCourseDatabase();
-    const result = await database.prepare(
-      `SELECT id, event_type, lesson_number, detail_json, created_at
-         FROM course_activity_events
-        WHERE device_id = ?
-          AND event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')
-        ORDER BY id DESC
-        LIMIT 20`,
-    ).bind(learner.deviceId).all<ActionRow>();
+    const [result, repliesResult] = await Promise.all([
+      database.prepare(
+        `SELECT id, event_type, lesson_number, detail_json, created_at
+           FROM course_activity_events
+          WHERE device_id = ?
+            AND event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')
+          ORDER BY id DESC
+          LIMIT 20`,
+      ).bind(learner.deviceId).all<ActionRow>(),
+      database.prepare(
+        `SELECT id, detail_json, created_at
+           FROM course_activity_events
+          WHERE device_id = ?
+            AND event_type = 'learner_teacher_reply'
+          ORDER BY id DESC
+          LIMIT 100`,
+      ).bind(learner.deviceId).all<ReplyRow>(),
+    ]);
+
+    const replies = (repliesResult.results ?? []).map((row) => {
+      try {
+        const detail = JSON.parse(row.detail_json) as Record<string, unknown>;
+        return {
+          id: row.id,
+          actionId: Number(detail.actionId) || 0,
+          message: typeof detail.message === "string" ? detail.message.slice(0, 1000) : "",
+          createdAt: row.created_at,
+        };
+      } catch {
+        return { id: row.id, actionId: 0, message: "", createdAt: row.created_at };
+      }
+    }).filter((item) => item.actionId > 0 && item.message);
 
     const actions = (result.results ?? []).map((row) => {
       const detail = parseDetail(row.detail_json);
@@ -81,6 +111,7 @@ export async function POST(request: Request) {
         reviewStatus: detail.reviewStatus,
         analysisAt: detail.analysisAt,
         createdAt: row.created_at,
+        replies: replies.filter((item) => item.actionId === row.id).slice().reverse(),
       };
     });
 
