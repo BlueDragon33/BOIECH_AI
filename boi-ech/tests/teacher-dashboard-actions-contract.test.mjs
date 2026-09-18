@@ -7,6 +7,7 @@ const inboxRoute = fs.readFileSync(new URL("../app/api/course/teacher-actions/ro
 const overviewRoute = fs.readFileSync(new URL("../app/api/teacher/overview/route.ts", import.meta.url), "utf8");
 const teacherShell = fs.readFileSync(new URL("../app/teacher-role-shell.tsx", import.meta.url), "utf8");
 const studentShell = fs.readFileSync(new URL("../app/student-role-shell.tsx", import.meta.url), "utf8");
+const studentInbox = fs.readFileSync(new URL("../app/student-teacher-inbox.tsx", import.meta.url), "utf8");
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/teacher-dashboard-actions-v7.css", import.meta.url), "utf8");
 
@@ -63,12 +64,15 @@ test("teacher dashboard wires feedback assignment review and CSV export to real 
   assert.match(teacherShell, /text\/csv;charset=utf-8/);
 });
 
-test("learner dashboard receives server-synced teacher actions", () => {
-  assert.match(studentShell, /fetch\("\/api\/course\/teacher-actions"/);
-  assert.match(studentShell, /TỪ GIẢNG VIÊN/);
-  assert.match(studentShell, /Hướng dẫn mới nhất dành cho bạn/);
-  assert.match(studentShell, /teacher-inbox-assignment/);
-  assert.match(studentShell, /Mở thực hành/);
+test("learner dashboard receives server-synced teacher actions through a separate network adapter", () => {
+  assert.doesNotMatch(studentShell, /fetch\(/);
+  assert.match(studentShell, /data-student-teacher-inbox-mount/);
+  assert.match(studentInbox, /fetch\("\/api\/course\/teacher-actions"/);
+  assert.match(studentInbox, /TỪ GIẢNG VIÊN/);
+  assert.match(studentInbox, /Hướng dẫn mới nhất dành cho bạn/);
+  assert.match(studentInbox, /data-teacher-action-type=\{item\.type\}/);
+  assert.match(studentInbox, /item\.type === "assignment"/);
+  assert.match(studentInbox, /Mở thực hành/);
 });
 
 test("actions V7 styles load last and keep modal/inbox responsive", () => {
