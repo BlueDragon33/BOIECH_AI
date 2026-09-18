@@ -207,6 +207,7 @@ export default function StudentTeacherInbox() {
       setMount(nextMount);
       if (!nextMount) {
         deviceRef.current = "";
+        loadedRefreshRef.current = -1;
         setActions([]);
         return;
       }
