@@ -5,10 +5,14 @@ import { createPortal } from "react-dom";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type TeacherAnalysis = { score: number; confidence: number; captureQuality: "good" | "review"; poseCoverage: number; averageVisibility: number; cameraView: "rear" | "side"; errorCount: number; topErrors: string[]; analyzedAt: string | null };
-type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; needsSupport: boolean; inactiveDays: number | null };
+type TeacherActionSummary = { action: "feedback" | "assignment" | "review"; teacherName: string; title: string; note: string; lessonNumber: string; reviewStatus: "" | "reviewed" | "follow-up"; analysisAt: string; createdAt: string | null };
+type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; teacherActionCount: number; latestTeacherAction: TeacherActionSummary | null; needsSupport: boolean; inactiveDays: number | null };
 type TeacherOverview = { teacher: { name: string | null; personCode: string | null; className: string | null }; summary: { learnerCount: number; active7d: number; needingSupport: number; analysisCount: number; averageProgress: number }; learners: TeacherLearner[]; privacy: { mediaStored: false; note: string } };
 type TeacherTab = "overview" | "class" | "learners" | "analysis" | "tasks" | "reports" | "messages" | "schedule" | "profile";
 type TabSetter = (tab: TeacherTab) => void;
+type TeacherActionMode = "feedback" | "assignment" | "review";
+type TeacherActionDraft = { mode: TeacherActionMode; learner: TeacherLearner; analysisAt?: string | null };
+type SubmitTeacherAction = (draft: TeacherActionDraft, payload: { note: string; title?: string; lessonNumber?: string; reviewStatus?: "reviewed" | "follow-up" }) => Promise<void>;
 
 function text(node: Element | null | undefined) { return (node?.textContent ?? "").replace(/\s+/g, " ").trim(); }
 function base64Url(bytes: Uint8Array) { let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
@@ -16,6 +20,62 @@ function openDb(): Promise<IDBDatabase> { return new Promise((resolve, reject) =
 async function readStoredDeviceCredential() { const db = await openDb(); return new Promise<StoredDeviceCredential | undefined>((resolve, reject) => { const request = db.transaction("thiet-bi", "readonly").objectStore("thiet-bi").get("chinh"); request.onsuccess = () => resolve(request.result as StoredDeviceCredential | undefined); request.onerror = () => reject(request.error); }); }
 async function signedTeacherProof(credential: StoredDeviceCredential, deviceId: string) { const response = await fetch("/api/device", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId }) }); const data = await response.json() as { challenge?: string; error?: string }; if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể xác thực thiết bị Giảng viên."); const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`); const signature = credential.privateKey && crypto.subtle ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message) : crypto.getRandomValues(new Uint8Array(64)).buffer; return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) }; }
 async function loadTeacherOverview(deviceId: string) { const credential = await readStoredDeviceCredential(); if (!credential) throw new Error("Không tìm thấy khóa thiết bị Giảng viên."); const proof = await signedTeacherProof(credential, deviceId); const response = await fetch("/api/teacher/overview", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(proof) }); const data = await response.json() as TeacherOverview & { error?: string }; if (!response.ok) throw new Error(data.error ?? "Không thể tải bảng giám sát."); return data; }
+
+async function saveTeacherAction(deviceId: string, draft: TeacherActionDraft, payload: { note: string; title?: string; lessonNumber?: string; reviewStatus?: "reviewed" | "follow-up" }) {
+  const credential = await readStoredDeviceCredential();
+  if (!credential) throw new Error("Không tìm thấy khóa thiết bị Giảng viên.");
+  if (!draft.learner.personCode) throw new Error("Học viên chưa có mã định danh để ghi nhận thao tác.");
+  const proof = await signedTeacherProof(credential, deviceId);
+  const clientEventId = `teacher:${draft.mode}:${Date.now()}:${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+  const response = await fetch("/api/teacher/action", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      ...proof,
+      action: draft.mode,
+      learnerPersonCode: draft.learner.personCode,
+      note: payload.note,
+      title: payload.title ?? "",
+      lessonNumber: payload.lessonNumber ?? "",
+      reviewStatus: payload.reviewStatus ?? "reviewed",
+      analysisAt: draft.analysisAt ?? "",
+      clientEventId,
+    }),
+  });
+  const data = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(data.error ?? "Không thể lưu thao tác chuyên môn.");
+}
+
+function csvCell(value: unknown) {
+  const textValue = String(value ?? "").replace(/"/g, '""');
+  return `"${textValue}"`;
+}
+
+function exportTeacherReport(learners: TeacherLearner[], className: string) {
+  const header = ["Học viên", "Mã", "Lớp", "Tiến độ", "Điểm TB", "Phút học", "Phân tích AI", "Can thiệp GV", "Hoạt động gần nhất", "Trạng thái"];
+  const rows = learners.map((learner) => [
+    learner.name,
+    learner.personCode,
+    learner.className,
+    `${learner.progress}%`,
+    learner.averageScore === null ? "" : learner.averageScore.toFixed(1),
+    learner.totalActiveMinutes,
+    learner.analysisCount,
+    learner.teacherActionCount,
+    shortDate(learner.lastActivityAt),
+    learner.needsSupport ? supportReason(learner) : "Đang ổn",
+  ]);
+  const csv = "\uFEFF" + [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `bao-cao-${className.replace(/[^A-Za-z0-9À-ỹ_-]+/g, "-").replace(/-+/g, "-") || "lop"}.csv`;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 function shortDate(value: string | null) { if (!value) return "Chưa có"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "Chưa có" : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date); }
 function supportReason(learner: TeacherLearner) { if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`; if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`; if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`; return "Cần Giảng viên kiểm tra thêm"; }
 function analysisQuality(analysis: TeacherAnalysis | null) { return analysis && analysis.captureQuality === "good" && analysis.confidence >= 70 ? "good" : "review"; }
