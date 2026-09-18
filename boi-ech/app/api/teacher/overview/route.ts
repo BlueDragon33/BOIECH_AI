@@ -334,7 +334,7 @@ export async function POST(request: Request) {
         const dueAt = typeof detail.dueAt === "string" ? detail.dueAt.slice(0, 80) : "";
         const dueTime = dueAt ? Date.parse(dueAt) : Number.NaN;
         const status = latestStatusByAssignment.get(row.id)?.status ?? "";
-        const scheduleState = status === "completed"
+        const scheduleState: "open" | "upcoming" | "acknowledged" | "completed" | "needs-help" | "overdue" = status === "completed"
           ? "completed"
           : status === "needs-help"
             ? "needs-help"
