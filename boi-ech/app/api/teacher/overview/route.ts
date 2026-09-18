@@ -1,3 +1,5 @@
+import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } from "../../../ai-engine.server";
+import { publishedCourseDocument } from "../../../course-content.server";
 import {
   DeviceAccessError,
   getCourseDatabase,
@@ -9,12 +11,14 @@ export const dynamic = "force-dynamic";
 const LESSON_COUNT = 8;
 
 type LearnerRow = {
+  device_id: string;
   learner_name: string | null;
   person_code: string | null;
   class_name: string | null;
   last_seen_at: string | null;
   completed_json: string | null;
   scores_json: string | null;
+  attempts_json: string | null;
   total_active_seconds: number | null;
   last_activity_at: string | null;
   last_lesson: string | null;
@@ -26,6 +30,15 @@ type LearnerRow = {
   last_teacher_action_type: string | null;
   last_teacher_action_json: string | null;
   last_teacher_action_at: string | null;
+};
+
+type AssessmentRow = {
+  device_id: string;
+  lesson_number: string;
+  section: string;
+  rating: number;
+  confidence: number;
+  created_at: string;
 };
 
 function json(data: unknown, status = 200) {
@@ -130,14 +143,18 @@ export async function POST(request: Request) {
     }
 
     const database = await getCourseDatabase();
-    const result = await database.prepare(
+    const [document, result, assessmentsResult] = await Promise.all([
+      publishedCourseDocument(database),
+      database.prepare(
       `SELECT
+          da.device_id,
           da.learner_name,
           da.person_code,
           da.class_name,
           da.last_seen_at,
           dp.completed_json,
           dp.scores_json,
+          dp.attempts_json,
           dp.total_active_seconds,
           dp.last_activity_at,
           dp.last_lesson,
@@ -172,15 +189,57 @@ export async function POST(request: Request) {
           AND lower(trim(da.class_name)) = lower(trim(?))
         ORDER BY COALESCE(dp.last_activity_at, da.last_seen_at) DESC, da.learner_name ASC
         LIMIT 200`,
-    ).bind(teacher.className).all<LearnerRow>();
+      ).bind(teacher.className).all<LearnerRow>(),
+      database.prepare(
+        `SELECT a.device_id, a.lesson_number, a.section, a.rating, a.confidence, a.created_at
+           FROM learner_self_assessments a
+           JOIN device_access da ON da.device_id = a.device_id
+          WHERE da.person_role = 'learner'
+            AND da.status = 'approved'
+            AND lower(trim(da.class_name)) = lower(trim(?))
+          ORDER BY a.created_at DESC
+          LIMIT 3000`,
+      ).bind(teacher.className).all<AssessmentRow>(),
+    ]);
+
+    const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
+    for (const row of assessmentsResult.results ?? []) {
+      const current = assessmentsByDevice.get(row.device_id) ?? [];
+      if (!current.some((item) => item.lessonNumber === row.lesson_number && item.section === row.section)) {
+        current.push({
+          lessonNumber: row.lesson_number,
+          section: row.section,
+          rating: row.rating,
+          confidence: row.confidence,
+          createdAt: row.created_at,
+        });
+        assessmentsByDevice.set(row.device_id, current);
+      }
+    }
 
     const learners = (result.results ?? []).map((row) => {
       const completedLessons = completedLessonCount(row.completed_json);
       const progress = Math.round((completedLessons / LESSON_COUNT) * 100);
       const analysis = analysisSummary(row.last_analysis_json, row.last_analysis_at);
       const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
+      const learnerProfile: AiLearnerProfile = {
+        completed: parseJson<string[]>(row.completed_json, []),
+        scores: parseJson<Record<string, number>>(row.scores_json, {}),
+        attempts: parseJson<Record<string, number>>(row.attempts_json, {}),
+        totalActiveSeconds: Math.max(0, Number(row.total_active_seconds) || 0),
+        lastActivityAt: row.last_activity_at,
+      };
+      const intelligence = learnerIntelligence(document, learnerProfile, assessmentsByDevice.get(row.device_id) ?? []);
+      const unlockedCompetencies = intelligence.competencies.filter((item) => item.unlocked);
+      const averageMastery = unlockedCompetencies.length
+        ? Math.round(unlockedCompetencies.reduce((sum, item) => sum + item.mastery, 0) / unlockedCompetencies.length)
+        : 0;
+      const adaptiveAlerts = intelligence.alerts.filter((item) => item.level !== "info");
       const inactivityHours = hoursAgo(row.last_activity_at ?? row.last_seen_at);
-      const needsSupport = inactivityHours > 7 * 24 || progress < 50 || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
+      const needsSupport = inactivityHours > 7 * 24
+        || progress < 50
+        || adaptiveAlerts.length > 0
+        || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
       return {
         name: row.learner_name?.trim() || "Học viên",
         personCode: row.person_code?.trim() || "",
@@ -197,6 +256,12 @@ export async function POST(request: Request) {
         lastAnalysis: analysis,
         teacherActionCount: Math.max(0, Number(row.teacher_action_count) || 0),
         latestTeacherAction,
+        adaptive: {
+          priorityLesson: intelligence.priorityLesson,
+          priorityPart: intelligence.priorityPart,
+          averageMastery,
+          alerts: intelligence.alerts,
+        },
         needsSupport,
         inactiveDays: Number.isFinite(inactivityHours) ? Math.floor(inactivityHours / 24) : null,
       };
