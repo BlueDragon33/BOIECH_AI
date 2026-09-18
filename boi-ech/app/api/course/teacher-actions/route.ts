@@ -20,6 +20,12 @@ type ReplyRow = {
   created_at: string;
 };
 
+type StatusRow = {
+  id: number;
+  detail_json: string;
+  created_at: string;
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, {
     status,
@@ -40,9 +46,10 @@ function parseDetail(value: string) {
       lessonNumber: typeof source.lessonNumber === "string" ? source.lessonNumber.slice(0, 2) : "",
       reviewStatus: source.reviewStatus === "follow-up" ? "follow-up" : source.reviewStatus === "reviewed" ? "reviewed" : "",
       analysisAt: typeof source.analysisAt === "string" ? source.analysisAt.slice(0, 80) : "",
+      dueAt: typeof source.dueAt === "string" ? source.dueAt.slice(0, 80) : "",
     };
   } catch {
-    return { teacherName: "Giảng viên", title: "", note: "", lessonNumber: "", reviewStatus: "", analysisAt: "" };
+    return { teacherName: "Giảng viên", title: "", note: "", lessonNumber: "", reviewStatus: "", analysisAt: "", dueAt: "" };
   }
 }
 
@@ -62,7 +69,7 @@ export async function POST(request: Request) {
     }
 
     const database = await getCourseDatabase();
-    const [result, repliesResult] = await Promise.all([
+    const [result, repliesResult, statusResult] = await Promise.all([
       database.prepare(
         `SELECT id, event_type, lesson_number, detail_json, created_at
            FROM course_activity_events
@@ -79,6 +86,14 @@ export async function POST(request: Request) {
           ORDER BY id DESC
           LIMIT 100`,
       ).bind(learner.deviceId).all<ReplyRow>(),
+      database.prepare(
+        `SELECT id, detail_json, created_at
+           FROM course_activity_events
+          WHERE device_id = ?
+            AND event_type = 'learner_assignment_status'
+          ORDER BY id DESC
+          LIMIT 100`,
+      ).bind(learner.deviceId).all<StatusRow>(),
     ]);
 
     const replies = (repliesResult.results ?? []).map((row) => {
@@ -95,6 +110,20 @@ export async function POST(request: Request) {
       }
     }).filter((item) => item.actionId > 0 && item.message);
 
+    const latestStatusByAction = new Map<number, { status: string; createdAt: string }>();
+    for (const row of statusResult.results ?? []) {
+      try {
+        const detail = JSON.parse(row.detail_json) as Record<string, unknown>;
+        const actionId = Number(detail.actionId) || 0;
+        const status = detail.status === "completed" ? "completed" : detail.status === "needs-help" ? "needs-help" : detail.status === "acknowledged" ? "acknowledged" : "";
+        if (actionId > 0 && status && !latestStatusByAction.has(actionId)) {
+          latestStatusByAction.set(actionId, { status, createdAt: row.created_at });
+        }
+      } catch {
+        // Ignore malformed legacy status rows.
+      }
+    }
+
     const actions = (result.results ?? []).map((row) => {
       const detail = parseDetail(row.detail_json);
       return {
@@ -110,6 +139,9 @@ export async function POST(request: Request) {
         lessonNumber: detail.lessonNumber || row.lesson_number || "",
         reviewStatus: detail.reviewStatus,
         analysisAt: detail.analysisAt,
+        dueAt: detail.dueAt,
+        assignmentStatus: latestStatusByAction.get(row.id)?.status ?? "",
+        assignmentStatusAt: latestStatusByAction.get(row.id)?.createdAt ?? "",
         createdAt: row.created_at,
         replies: replies.filter((item) => item.actionId === row.id).slice().reverse(),
       };

@@ -46,6 +46,15 @@ function normalizeAction(value: unknown): TeacherAction | null {
   return value === "feedback" || value === "assignment" || value === "review" ? value : null;
 }
 
+function normalizeDueAt(value: string) {
+  if (!value) return "";
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return null;
+  const now = Date.now();
+  if (time < now - 5 * 60_000 || time > now + 90 * 86_400_000) return null;
+  return new Date(time).toISOString();
+}
+
 export async function POST(request: Request) {
   try {
     const payload = await request.json() as Record<string, unknown>;
@@ -96,6 +105,8 @@ export async function POST(request: Request) {
     const lessonNumber = cleanText(payload.lessonNumber, 2);
     const analysisAt = cleanText(payload.analysisAt, 80);
     const reviewStatus = payload.reviewStatus === "follow-up" ? "follow-up" : "reviewed";
+    const dueInput = cleanText(payload.dueAt, 80);
+    const dueAt = dueInput ? normalizeDueAt(dueInput) : "";
     const clientEventId = normalizeClientEventId(payload.clientEventId);
 
     if (action === "feedback" && !note) {
@@ -103,6 +114,9 @@ export async function POST(request: Request) {
     }
     if (action === "assignment" && (!LESSONS.has(lessonNumber) || !note)) {
       return json({ error: "Bài giao cần chọn Bài 01–08 và có hướng dẫn luyện tập." }, 400);
+    }
+    if (action === "assignment" && dueInput && !dueAt) {
+      return json({ error: "Hạn hoàn thành phải là thời điểm hợp lệ trong 90 ngày tới." }, 400);
     }
     if (action === "review" && !analysisAt) {
       return json({ error: "Không xác định được lần phân tích cần review." }, 400);
@@ -124,6 +138,7 @@ export async function POST(request: Request) {
       note,
       ...(title ? { title } : {}),
       ...(lessonNumber ? { lessonNumber } : {}),
+      ...(action === "assignment" && dueAt ? { dueAt } : {}),
       ...(analysisAt ? { analysisAt } : {}),
       ...(action === "review" ? { reviewStatus } : {}),
     };
@@ -152,6 +167,7 @@ export async function POST(request: Request) {
         className: teacher.className,
         learnerName: learner.learner_name?.slice(0, 120) || "Học viên",
         lessonNumber: lessonNumber || null,
+        dueAt: action === "assignment" && dueAt ? dueAt : null,
         reviewStatus: action === "review" ? reviewStatus : null,
       }),
     ).run();
