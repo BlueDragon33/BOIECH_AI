@@ -18,6 +18,7 @@ import "./teacher-dashboard-visual-v8.css";
 import "./teacher-learning-analytics-l7.css";
 import "./teacher-smart-interventions-l8.css";
 import "./two-way-messaging-l9.css";
+import "./assignment-schedule-l10.css";
 import StudentRoleShell from "./student-role-shell";
 import StudentTeacherInbox from "./student-teacher-inbox";
 import StudentAdaptiveCoach from "./student-adaptive-coach";
