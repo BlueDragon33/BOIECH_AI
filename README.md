@@ -29,6 +29,17 @@ npm run dev
 
 Local dùng binding/database local riêng qua Vite/Miniflare; không thực hiện remote migration vào production.
 
+## Gate release-readiness
+
+Trước mọi preview/deploy, Bơi ếch chạy thêm audit:
+
+```bash
+cd boi-ech
+npm run validate:release
+```
+
+Gate này kiểm tra production vẫn manual-only, quyền Học viên/Giảng viên vẫn dùng xác thực thiết bị và scope lớp, các workflow Giảng viên cốt lõi không quay lại placeholder, cùng các ranh giới media-free. Chi tiết xem `boi-ech/RELEASE_READINESS.md`.
+
 ## Mã nguồn Trung tâm cũ
 
 ```text
