@@ -14,6 +14,7 @@ import "./teacher-dashboard-visual-v5.css";
 import "./teacher-dashboard-data-v6.css";
 import "./teacher-dashboard-actions-v7.css";
 import StudentRoleShell from "./student-role-shell";
+import StudentTeacherInbox from "./student-teacher-inbox";
 import TeacherRoleShell from "./teacher-role-shell";
 import TeacherActionBridge from "./teacher-action-bridge";
 import MultiAccountSwitcher from "./multi-account-switcher";
@@ -64,6 +65,7 @@ export default function RootLayout({
       >
         {children}
         <StudentRoleShell />
+        <StudentTeacherInbox />
         <TeacherRoleShell />
         <TeacherActionBridge />
         <MultiAccountSwitcher />
