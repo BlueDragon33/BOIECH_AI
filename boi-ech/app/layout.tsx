@@ -10,6 +10,7 @@ import "./teacher-dashboard-reference.css";
 import "./teacher-dashboard-blueprint.css";
 import "./teacher-dashboard-scale-v3.css";
 import "./teacher-dashboard-structure-v4.css";
+import "./teacher-dashboard-visual-v5.css";
 import StudentRoleShell from "./student-role-shell";
 import TeacherRoleShell from "./teacher-role-shell";
 import TeacherActionBridge from "./teacher-action-bridge";
