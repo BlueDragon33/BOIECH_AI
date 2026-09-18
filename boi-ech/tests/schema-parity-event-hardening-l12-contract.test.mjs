@@ -10,8 +10,8 @@ const readiness = fs.readFileSync(new URL("../scripts/validate-release-readiness
 
 test("L12 keeps Drizzle device classification schema in parity with migration 0015", () => {
   for (const column of ["device_type", "platform", "browser", "user_agent"]) {
-    assert.match(migration, new RegExp(`ADD COLUMN \\`${column}\\``));
-    assert.match(schema, new RegExp(`text\\("${column}"\\)`));
+    assert.ok(migration.includes("ADD COLUMN `" + column + "`"));
+    assert.ok(schema.includes(`text("${column}")`));
   }
   assert.match(schema, /deviceType: text\("device_type"\)\.notNull\(\)\.default\("desktop"\)/);
   assert.match(schema, /device_access_type_status_idx/);
