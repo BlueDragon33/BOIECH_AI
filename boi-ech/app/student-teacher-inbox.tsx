@@ -190,6 +190,7 @@ function Inbox({ actions, deviceId, onRefresh }: { actions: TeacherInboxAction[]
 export default function StudentTeacherInbox() {
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const [actions, setActions] = useState<TeacherInboxAction[]>([]);
+  const [deviceId, setDeviceId] = useState("");
   const deviceRef = useRef("");
   const requestRef = useRef(0);
   const loadedRefreshRef = useRef(-1);
@@ -208,6 +209,7 @@ export default function StudentTeacherInbox() {
       if (!nextMount) {
         deviceRef.current = "";
         loadedRefreshRef.current = -1;
+        setDeviceId("");
         setActions([]);
         return;
       }
@@ -217,6 +219,7 @@ export default function StudentTeacherInbox() {
         if (changedDevice) {
           deviceRef.current = deviceId;
           loadedRefreshRef.current = -1;
+          setDeviceId(deviceId);
         }
         if (!changedDevice && loadedRefreshRef.current === refreshToken) return;
         loadedRefreshRef.current = refreshToken;
@@ -239,9 +242,10 @@ export default function StudentTeacherInbox() {
       requestRef.current += 1;
       deviceRef.current = "";
       loadedRefreshRef.current = -1;
+      setDeviceId("");
       setActions([]);
     };
   }, [refreshToken]);
 
-  return mount ? createPortal(<Inbox actions={actions} deviceId={deviceRef.current} onRefresh={() => setRefreshToken((value) => value + 1)} />, mount) : null;
+  return mount ? createPortal(<Inbox actions={actions} deviceId={deviceId} onRefresh={() => setRefreshToken((value) => value + 1)} />, mount) : null;
 }
