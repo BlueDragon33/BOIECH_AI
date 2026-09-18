@@ -1,5 +1,6 @@
 import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } from "../../../ai-engine.server";
 import { publishedCourseDocument } from "../../../course-content.server";
+import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-learning-analytics.server";
 import {
   DeviceAccessError,
   getCourseDatabase,
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
     }
 
     const database = await getCourseDatabase();
-    const [document, result, assessmentsResult] = await Promise.all([
+    const [document, result, assessmentsResult, learningEventsResult] = await Promise.all([
       publishedCourseDocument(database),
       database.prepare(
       `SELECT
@@ -200,6 +201,26 @@ export async function POST(request: Request) {
           ORDER BY a.created_at DESC
           LIMIT 3000`,
       ).bind(teacher.className).all<AssessmentRow>(),
+      database.prepare(
+        `SELECT e.device_id, e.event_type, e.lesson_number, e.part, e.detail_json, e.created_at
+           FROM course_activity_events e
+           JOIN device_access da ON da.device_id = e.device_id
+          WHERE da.person_role = 'learner'
+            AND da.status = 'approved'
+            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND e.event_type IN (
+              'teacher_feedback',
+              'teacher_assignment',
+              'teacher_analysis_review',
+              'quiz_submit',
+              'video_ai_analysis',
+              'heartbeat',
+              'offline_session',
+              'part_complete'
+            )
+          ORDER BY e.created_at DESC, e.id DESC
+          LIMIT 12000`,
+      ).bind(teacher.className).all<LearningEventRow>(),
     ]);
 
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
@@ -215,6 +236,13 @@ export async function POST(request: Request) {
         });
         assessmentsByDevice.set(row.device_id, current);
       }
+    }
+
+    const learningEventsByDevice = new Map<string, LearningEventRow[]>();
+    for (const row of learningEventsResult.results ?? []) {
+      const current = learningEventsByDevice.get(row.device_id) ?? [];
+      current.push(row);
+      learningEventsByDevice.set(row.device_id, current);
     }
 
     const learners = (result.results ?? []).map((row) => {
@@ -235,10 +263,15 @@ export async function POST(request: Request) {
         ? Math.round(unlockedCompetencies.reduce((sum, item) => sum + item.mastery, 0) / unlockedCompetencies.length)
         : 0;
       const adaptiveAlerts = intelligence.alerts.filter((item) => item.level !== "info");
+      const learningAnalytics = buildLearningAnalytics(learningEventsByDevice.get(row.device_id) ?? []);
       const inactivityHours = hoursAgo(row.last_activity_at ?? row.last_seen_at);
+      const teacherLoopNeedsFollowUp = ["negative", "mixed", "pending", "activity-only"].includes(
+        learningAnalytics.latest?.observedChange ?? "",
+      );
       const needsSupport = inactivityHours > 7 * 24
         || progress < 50
         || adaptiveAlerts.length > 0
+        || teacherLoopNeedsFollowUp
         || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
       return {
         name: row.learner_name?.trim() || "Học viên",
@@ -262,6 +295,7 @@ export async function POST(request: Request) {
           averageMastery,
           alerts: intelligence.alerts,
         },
+        learningAnalytics,
         needsSupport,
         inactiveDays: Number.isFinite(inactivityHours) ? Math.floor(inactivityHours / 24) : null,
       };
@@ -273,6 +307,10 @@ export async function POST(request: Request) {
     const averageProgress = learners.length
       ? Math.round(learners.reduce((sum, item) => sum + item.progress, 0) / learners.length)
       : 0;
+    const interventionCount = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.interventionCount, 0);
+    const withFollowUpEvidence = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.withFollowUpEvidence, 0);
+    const positiveObserved = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.positiveObserved, 0);
+    const pendingFollowUp = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.pendingFollowUp, 0);
 
     return json({
       teacher: {
@@ -286,11 +324,15 @@ export async function POST(request: Request) {
         needingSupport,
         analysisCount,
         averageProgress,
+        interventionCount,
+        withFollowUpEvidence,
+        positiveObserved,
+        pendingFollowUp,
       },
       learners,
       privacy: {
         mediaStored: false,
-        note: "Bảng giám sát chỉ dùng tiến độ và tóm tắt phân tích; video/ảnh gốc không được trả về Giảng viên.",
+        note: "Bảng giám sát và Learning Analytics chỉ dùng sự kiện tiến độ, điểm, tóm tắt AI và can thiệp chuyên môn; video/ảnh gốc không được trả về Giảng viên.",
       },
     });
   } catch (error) {

@@ -15,6 +15,7 @@ import "./teacher-dashboard-visual-v5.css";
 import "./teacher-dashboard-data-v6.css";
 import "./teacher-dashboard-actions-v7.css";
 import "./teacher-dashboard-visual-v8.css";
+import "./teacher-learning-analytics-l7.css";
 import StudentRoleShell from "./student-role-shell";
 import StudentTeacherInbox from "./student-teacher-inbox";
 import StudentAdaptiveCoach from "./student-adaptive-coach";
