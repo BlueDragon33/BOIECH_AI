@@ -166,6 +166,7 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
       </section>
 
       <div className="student-teacher-inbox-mount" data-student-teacher-inbox-mount />
+      <div className="student-adaptive-coach-mount" data-student-adaptive-mount />
 
       <div className="student-dashboard-grid">
         <section className="student-learning-card" id="student-learning-roadmap">
