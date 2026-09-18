@@ -13,6 +13,7 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "validate:cloudflare-preview": "node scripts/validate-cloudflare-preview.mjs",
+    "validate:release": "node scripts/validate-release-readiness.mjs",
     "cloudflare:preview:prepare": "node scripts/prepare-cloudflare-preview.mjs",
     "cloudflare:artifact:check": "node scripts/validate-cloudflare-build-artifact.mjs",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
