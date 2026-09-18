@@ -99,6 +99,12 @@ function inboxDate(value: string) {
     : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
+function clickOriginalNav(label: string) {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>(".sidebar nav button"))
+    .find((item) => text(item.querySelector("b")) === label);
+  button?.click();
+}
+
 function Inbox({ actions }: { actions: TeacherInboxAction[] }) {
   if (!actions.length) return null;
   return (
@@ -117,7 +123,7 @@ function Inbox({ actions }: { actions: TeacherInboxAction[] }) {
               <p>{item.note || "Không có ghi chú bổ sung."}</p>
               <em>{item.teacherName} · {inboxDate(item.createdAt)}</em>
             </div>
-            {item.type === "assignment" && item.lessonNumber ? <button type="button" onClick={() => document.querySelector<HTMLButtonElement>(".sidebar nav button:nth-of-type(3)")?.click()}>Mở thực hành →</button> : null}
+            {item.type === "assignment" && item.lessonNumber ? <button type="button" onClick={() => clickOriginalNav("Thực hành")}>Mở thực hành →</button> : null}
             {item.type === "review" ? <button type="button" onClick={() => window.location.assign("/phan-tich-video")}>Mở phân tích →</button> : null}
           </article>
         ))}
