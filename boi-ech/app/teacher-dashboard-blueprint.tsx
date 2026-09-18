@@ -225,7 +225,7 @@ function ensureReviewActions(state: BlueprintState) {
       article.querySelector(".teacher-analysis-thumb")?.append(stateTag);
     }
     const actions = article.querySelector<HTMLElement>(".teacher-analysis-actions");
-    if (actions && !actions.querySelector(".teacher-local-note-action")) {
+    if (actions && !actions.querySelector(".teacher-local-note-action") && !actions.querySelector("[data-server-feedback]")) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "teacher-local-note-action";
