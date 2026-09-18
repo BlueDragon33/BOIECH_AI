@@ -14,6 +14,7 @@ type TeacherInboxAction = {
   reviewStatus: "" | "reviewed" | "follow-up";
   analysisAt: string;
   createdAt: string;
+  replies: { id: number; message: string; createdAt: string }[];
 };
 
 function text(node: Element | null | undefined) {
@@ -76,6 +77,56 @@ async function loadInbox(deviceId: string) {
   return Array.isArray(data.actions) ? data.actions : [];
 }
 
+async function sendLearnerReply(deviceId: string, actionId: number, message: string) {
+  const credential = await readCredential();
+  if (!credential) throw new Error("Không tìm thấy khóa thiết bị Học viên.");
+  const proof = await signedLearnerProof(credential, deviceId);
+  const response = await fetch("/api/course/teacher-actions/reply", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      ...proof,
+      actionId,
+      message,
+      clientEventId: `learner-reply:${actionId}:${Date.now()}`,
+    }),
+  });
+  const data = await response.json() as { error?: string };
+  if (!response.ok) throw new Error(data.error ?? "Không thể gửi phản hồi tới Giảng viên.");
+}
+
+function ReplyComposer({ actionId, deviceId, onSent }: { actionId: number; deviceId: string; onSent: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!open) return <button type="button" className="student-reply-open" onClick={() => setOpen(true)}>Phản hồi Giảng viên →</button>;
+
+  return (
+    <form className="student-reply-composer" onSubmit={(event) => {
+      event.preventDefault();
+      if (!message.trim() || !deviceId) return;
+      setSending(true);
+      setError("");
+      sendLearnerReply(deviceId, actionId, message.trim())
+        .then(() => {
+          setMessage("");
+          setOpen(false);
+          onSent();
+        })
+        .catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể gửi phản hồi."))
+        .finally(() => setSending(false));
+    }}>
+      <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1000} rows={3} placeholder="Viết câu hỏi, báo đã hoàn thành hoặc nêu khó khăn cần Giảng viên hỗ trợ…" />
+      {error ? <p role="alert">{error}</p> : null}
+      <div><button type="button" onClick={() => { setOpen(false); setError(""); }} disabled={sending}>Hủy</button><button type="submit" disabled={sending || !message.trim()}>{sending ? "Đang gửi…" : "Gửi phản hồi"}</button></div>
+    </form>
+  );
+}
+
 async function deriveDeviceId() {
   const shell = document.querySelector<HTMLElement>(".app-shell");
   const direct = shell?.getAttribute("data-device-id") ?? "";
@@ -105,7 +156,7 @@ function clickOriginalNav(label: string) {
   button?.click();
 }
 
-function Inbox({ actions }: { actions: TeacherInboxAction[] }) {
+function Inbox({ actions, deviceId, onRefresh }: { actions: TeacherInboxAction[]; deviceId: string; onRefresh: () => void }) {
   if (!actions.length) return null;
   return (
     <section className="student-teacher-inbox" aria-label="Hướng dẫn từ Giảng viên">
@@ -123,8 +174,12 @@ function Inbox({ actions }: { actions: TeacherInboxAction[] }) {
               <p>{item.note || "Không có ghi chú bổ sung."}</p>
               <em>{item.teacherName} · {inboxDate(item.createdAt)}</em>
             </div>
-            {item.type === "assignment" && item.lessonNumber ? <button type="button" onClick={() => clickOriginalNav("Thực hành")}>Mở thực hành →</button> : null}
-            {item.type === "review" ? <button type="button" onClick={() => window.location.assign("/phan-tich-video")}>Mở phân tích →</button> : null}
+            {item.replies?.length ? <div className="student-reply-history">{item.replies.map((reply) => <div key={reply.id}><span>Phản hồi của bạn</span><p>{reply.message}</p><small>{inboxDate(reply.createdAt)}</small></div>)}</div> : null}
+            <div className="student-inbox-actions">
+              {item.type === "assignment" && item.lessonNumber ? <button type="button" onClick={() => clickOriginalNav("Thực hành")}>Mở thực hành →</button> : null}
+              {item.type === "review" ? <button type="button" onClick={() => window.location.assign("/phan-tich-video")}>Mở phân tích →</button> : null}
+              <ReplyComposer actionId={item.id} deviceId={deviceId} onSent={onRefresh} />
+            </div>
           </article>
         ))}
       </div>
@@ -135,8 +190,11 @@ function Inbox({ actions }: { actions: TeacherInboxAction[] }) {
 export default function StudentTeacherInbox() {
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const [actions, setActions] = useState<TeacherInboxAction[]>([]);
+  const [deviceId, setDeviceId] = useState("");
   const deviceRef = useRef("");
   const requestRef = useRef(0);
+  const loadedRefreshRef = useRef(-1);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     if (window.location.pathname !== "/") return;
@@ -150,12 +208,21 @@ export default function StudentTeacherInbox() {
       setMount(nextMount);
       if (!nextMount) {
         deviceRef.current = "";
+        loadedRefreshRef.current = -1;
+        setDeviceId("");
         setActions([]);
         return;
       }
       deriveDeviceId().then((deviceId) => {
-        if (!deviceId || deviceRef.current === deviceId) return;
-        deviceRef.current = deviceId;
+        if (!deviceId) return;
+        const changedDevice = deviceRef.current !== deviceId;
+        if (changedDevice) {
+          deviceRef.current = deviceId;
+          loadedRefreshRef.current = -1;
+          setDeviceId(deviceId);
+        }
+        if (!changedDevice && loadedRefreshRef.current === refreshToken) return;
+        loadedRefreshRef.current = refreshToken;
         const requestId = ++requestRef.current;
         loadInbox(deviceId)
           .then((items) => { if (requestRef.current === requestId) setActions(items); })
@@ -174,9 +241,11 @@ export default function StudentTeacherInbox() {
       observer.disconnect();
       requestRef.current += 1;
       deviceRef.current = "";
+      loadedRefreshRef.current = -1;
+      setDeviceId("");
       setActions([]);
     };
-  }, []);
+  }, [refreshToken]);
 
-  return mount ? createPortal(<Inbox actions={actions}/>, mount) : null;
+  return mount ? createPortal(<Inbox actions={actions} deviceId={deviceId} onRefresh={() => setRefreshToken((value) => value + 1)} />, mount) : null;
 }

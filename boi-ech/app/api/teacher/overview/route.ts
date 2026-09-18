@@ -43,6 +43,15 @@ type AssessmentRow = {
   created_at: string;
 };
 
+type LearnerReplyRow = {
+  id: number;
+  person_code: string | null;
+  learner_name: string | null;
+  class_name: string | null;
+  detail_json: string;
+  created_at: string;
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, {
     status,
@@ -145,7 +154,7 @@ export async function POST(request: Request) {
     }
 
     const database = await getCourseDatabase();
-    const [document, result, assessmentsResult, learningEventsResult] = await Promise.all([
+    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult] = await Promise.all([
       publishedCourseDocument(database),
       database.prepare(
       `SELECT
@@ -222,6 +231,17 @@ export async function POST(request: Request) {
           ORDER BY e.created_at DESC, e.id DESC
           LIMIT 12000`,
       ).bind(teacher.className).all<LearningEventRow>(),
+      database.prepare(
+        `SELECT e.id, da.person_code, da.learner_name, da.class_name, e.detail_json, e.created_at
+           FROM course_activity_events e
+           JOIN device_access da ON da.device_id = e.device_id
+          WHERE da.person_role = 'learner'
+            AND da.status = 'approved'
+            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND e.event_type = 'learner_teacher_reply'
+          ORDER BY e.id DESC
+          LIMIT 200`,
+      ).bind(teacher.className).all<LearnerReplyRow>(),
     ]);
 
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
@@ -245,6 +265,27 @@ export async function POST(request: Request) {
       current.push(row);
       learningEventsByDevice.set(row.device_id, current);
     }
+
+    const messages = (learnerRepliesResult.results ?? []).map((row) => {
+      const detail = parseJson<Record<string, unknown>>(row.detail_json, {});
+      const teacherActionType = typeof detail.teacherActionType === "string" ? detail.teacherActionType : "";
+      return {
+        id: row.id,
+        learnerName: row.learner_name?.trim() || (typeof detail.learnerName === "string" ? detail.learnerName.slice(0, 120) : "Học viên"),
+        personCode: row.person_code?.trim() || "",
+        className: row.class_name?.trim() || teacher.className,
+        actionId: Math.max(0, Number(detail.actionId) || 0),
+        actionType: teacherActionType === "teacher_assignment"
+          ? "assignment"
+          : teacherActionType === "teacher_analysis_review"
+            ? "review"
+            : "feedback",
+        lessonNumber: typeof detail.lessonNumber === "string" ? detail.lessonNumber.slice(0, 2) : "",
+        message: typeof detail.message === "string" ? detail.message.slice(0, 1000) : "",
+        actionCreatedAt: typeof detail.actionCreatedAt === "string" ? detail.actionCreatedAt.slice(0, 80) : "",
+        createdAt: row.created_at,
+      };
+    }).filter((item) => item.actionId > 0 && item.message);
 
     const learners = (result.results ?? []).map((row) => {
       const completedLessons = completedLessonCount(row.completed_json);
@@ -348,6 +389,7 @@ export async function POST(request: Request) {
         interventionSuggestionCount,
       },
       learners,
+      messages,
       privacy: {
         mediaStored: false,
         note: "Bảng giám sát và Learning Analytics chỉ dùng sự kiện tiến độ, điểm, tóm tắt AI và can thiệp chuyên môn; video/ảnh gốc không được trả về Giảng viên.",
