@@ -118,6 +118,7 @@ function nearestEvidence(
   lessonNumber: string | null,
   interventionTime: number,
   direction: "before" | "after",
+  followUpCutoff = Number.POSITIVE_INFINITY,
 ) {
   const type = kind === "quiz" ? "quiz_submit" : "video_ai_analysis";
   const evidenceWindow = 30 * 86_400_000;
@@ -127,7 +128,7 @@ function nearestEvidence(
     if (!Number.isFinite(eventTime)) return false;
     return direction === "before"
       ? eventTime <= interventionTime && eventTime >= interventionTime - evidenceWindow
-      : eventTime > interventionTime && eventTime <= interventionTime + evidenceWindow;
+      : eventTime > interventionTime && eventTime <= Math.min(interventionTime + evidenceWindow, followUpCutoff);
   });
   matching.sort((left, right) => direction === "before"
     ? time(right.created_at) - time(left.created_at)
@@ -140,8 +141,8 @@ function roundedDelta(after: InterventionEvidence | null, before: InterventionEv
   return Math.round((after.score - before.score) * 10) / 10;
 }
 
-function activityAfter(events: LearningEventRow[], interventionTime: number) {
-  const windowEnd = interventionTime + 14 * 86_400_000;
+function activityAfter(events: LearningEventRow[], interventionTime: number, followUpCutoff = Number.POSITIVE_INFINITY) {
+  const windowEnd = Math.min(interventionTime + 14 * 86_400_000, followUpCutoff);
   let seconds = 0;
   let count = 0;
   for (const event of events) {
@@ -189,12 +190,14 @@ function evidenceNote(value: InterventionLearningAnalytics["observedChange"]) {
 
 export function buildLearningAnalytics(events: LearningEventRow[]): LearnerLearningAnalytics {
   const ordered = [...events].sort((left, right) => time(left.created_at) - time(right.created_at));
-  const interventions = ordered
-    .filter((event) => Boolean(actionType(event.event_type)))
-    .map((event) => {
+  const teacherEvents = ordered.filter((event) => Boolean(actionType(event.event_type)));
+  const interventions = teacherEvents
+    .map((event, actionIndex) => {
       const action = actionType(event.event_type)!;
       const detail = parseJson<Record<string, unknown>>(event.detail_json, {});
       const interventionTime = time(event.created_at);
+      const nextInterventionTime = time(teacherEvents[actionIndex + 1]?.created_at);
+      const followUpCutoff = Number.isFinite(nextInterventionTime) ? nextInterventionTime : Number.POSITIVE_INFINITY;
       const detailLesson = typeof detail.lessonNumber === "string" && /^0[1-8]$/.test(detail.lessonNumber) ? detail.lessonNumber : null;
       const reviewedAnalysisAt = action === "review" && typeof detail.analysisAt === "string" ? detail.analysisAt : "";
       const reviewedVideo = reviewedAnalysisAt
@@ -208,12 +211,12 @@ export function buildLearningAnalytics(events: LearningEventRow[]): LearnerLearn
         ? event.lesson_number
         : detailLesson ?? reviewedVideo?.lesson_number ?? null;
       const beforeQuiz = nearestEvidence(ordered, "quiz", lessonNumber, interventionTime, "before");
-      const afterQuiz = nearestEvidence(ordered, "quiz", lessonNumber, interventionTime, "after");
+      const afterQuiz = nearestEvidence(ordered, "quiz", lessonNumber, interventionTime, "after", followUpCutoff);
       const beforeVideo = nearestEvidence(ordered, "video", lessonNumber, interventionTime, "before");
-      const afterVideo = nearestEvidence(ordered, "video", lessonNumber, interventionTime, "after");
+      const afterVideo = nearestEvidence(ordered, "video", lessonNumber, interventionTime, "after", followUpCutoff);
       const quizDelta = roundedDelta(afterQuiz, beforeQuiz);
       const videoDelta = roundedDelta(afterVideo, beforeVideo);
-      const activity = activityAfter(ordered, interventionTime);
+      const activity = activityAfter(ordered, interventionTime, followUpCutoff);
       const hasAfterEvidence = Boolean(afterQuiz || afterVideo);
       const change = observedChange(quizDelta, videoDelta, hasAfterEvidence, activity.count);
       return {
@@ -245,7 +248,7 @@ export function buildLearningAnalytics(events: LearningEventRow[]): LearnerLearn
       interventionCount: interventions.length,
       withFollowUpEvidence: interventions.filter((item) => item.afterQuiz || item.afterVideo).length,
       positiveObserved: interventions.filter((item) => item.observedChange === "positive").length,
-      pendingFollowUp: interventions.filter((item) => item.observedChange === "pending" || item.observedChange === "activity-only").length,
+      pendingFollowUp: interventions.filter((item) => ["pending", "activity-only", "negative", "mixed"].includes(item.observedChange)).length,
     },
   };
 }
