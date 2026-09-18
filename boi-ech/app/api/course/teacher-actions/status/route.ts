@@ -7,6 +7,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const STATUSES = new Set(["acknowledged", "completed", "needs-help"]);
+const MAX_STATUS_EVENTS_PER_ASSIGNMENT = 24;
 
 function json(data: unknown, status = 200) {
   return Response.json(data, {
@@ -65,6 +66,41 @@ export async function POST(request: Request) {
         "SELECT id FROM course_activity_events WHERE device_id = ? AND client_event_id = ? LIMIT 1",
       ).bind(learner.deviceId, clientEventId).first<{ id: number }>();
       if (duplicate) return json({ ok: true, duplicate: true, id: duplicate.id, status });
+    }
+
+    const [statusCount, latestStatusRow] = await Promise.all([
+      database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM course_activity_events
+          WHERE device_id = ?
+            AND event_type = 'learner_assignment_status'
+            AND CAST(json_extract(detail_json, '$.actionId') AS INTEGER) = ?`,
+      ).bind(learner.deviceId, actionId).first<{ count: number }>(),
+      database.prepare(
+        `SELECT detail_json
+           FROM course_activity_events
+          WHERE device_id = ?
+            AND event_type = 'learner_assignment_status'
+            AND CAST(json_extract(detail_json, '$.actionId') AS INTEGER) = ?
+          ORDER BY id DESC
+          LIMIT 1`,
+      ).bind(learner.deviceId, actionId).first<{ detail_json: string }>(),
+    ]);
+
+    let latestStatus = "";
+    if (latestStatusRow?.detail_json) {
+      try {
+        const detail = JSON.parse(latestStatusRow.detail_json) as Record<string, unknown>;
+        latestStatus = typeof detail.status === "string" ? detail.status : "";
+      } catch {
+        latestStatus = "";
+      }
+    }
+    if (latestStatus === status) {
+      return json({ ok: true, unchanged: true, actionId, status });
+    }
+    if ((Number(statusCount?.count) || 0) >= MAX_STATUS_EVENTS_PER_ASSIGNMENT) {
+      return json({ error: "Nhiệm vụ đã có quá nhiều lần đổi trạng thái. Hãy dùng phản hồi để liên hệ Giảng viên." }, 409);
     }
 
     const result = await database.prepare(
