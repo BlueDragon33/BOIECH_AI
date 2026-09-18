@@ -20,7 +20,7 @@ function json(data: unknown, status = 200) {
 
 function cleanText(value: unknown, max: number) {
   return typeof value === "string"
-    ? value.replace(/[\\u0000-\\u001F\\u007F]/g, " ").replace(/\\s+/g, " ").trim().slice(0, max)
+    ? value.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim().slice(0, max)
     : "";
 }
 
