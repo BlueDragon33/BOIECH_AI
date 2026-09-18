@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import TeacherLearningAnalyticsPanel, { type LearnerLearningAnalyticsClient } from "./teacher-learning-analytics";
+import TeacherLearningAnalyticsPanel, { type InterventionLearningAnalyticsClient, type LearnerLearningAnalyticsClient } from "./teacher-learning-analytics";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type TeacherAnalysis = { score: number; confidence: number; captureQuality: "good" | "review"; poseCoverage: number; averageVisibility: number; cameraView: "rear" | "side"; errorCount: number; topErrors: string[]; analyzedAt: string | null };
@@ -87,7 +87,7 @@ function exportTeacherReport(learners: TeacherLearner[], className: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 function shortDate(value: string | null) { if (!value) return "Chưa có"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "Chưa có" : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date); }
-function observedChangeLabel(value: LearnerLearningAnalyticsClient["latest"] extends infer T ? T extends { observedChange: infer C } ? C | undefined : undefined : undefined) { if (value === "positive") return "Tín hiệu tăng"; if (value === "negative") return "Tín hiệu giảm"; if (value === "mixed") return "Tín hiệu chưa đồng nhất"; if (value === "stable") return "Ít thay đổi"; if (value === "new-evidence") return "Có bằng chứng mới"; if (value === "activity-only") return "Đã hoạt động lại"; if (value === "pending") return "Chờ theo dõi"; return ""; }
+function observedChangeLabel(value: InterventionLearningAnalyticsClient["observedChange"] | undefined) { if (value === "positive") return "Tín hiệu tăng"; if (value === "negative") return "Tín hiệu giảm"; if (value === "mixed") return "Tín hiệu chưa đồng nhất"; if (value === "stable") return "Ít thay đổi"; if (value === "new-evidence") return "Có bằng chứng mới"; if (value === "activity-only") return "Đã hoạt động lại"; if (value === "pending") return "Chờ theo dõi"; return ""; }
 function supportReason(learner: TeacherLearner) { const loop = learner.learningAnalytics.latest; if (loop?.observedChange === "negative") return "Tín hiệu sau can thiệp đang giảm"; if (loop?.observedChange === "mixed") return "Tín hiệu sau can thiệp chưa đồng nhất"; if (loop?.observedChange === "pending" || loop?.observedChange === "activity-only") return `Cần theo dõi sau ${loop.actionLabel.toLowerCase()}`; const adaptiveAlert = learner.adaptive?.alerts.find((alert) => alert.level === "critical") ?? learner.adaptive?.alerts.find((alert) => alert.level === "warning"); if (adaptiveAlert) return adaptiveAlert.text; if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`; if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`; if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`; return "Cần Giảng viên kiểm tra thêm"; }
 function analysisQuality(analysis: TeacherAnalysis | null) { return analysis && analysis.captureQuality === "good" && analysis.confidence >= 70 ? "good" : "review"; }
 function teacherInsights(learners: TeacherLearner[]) {
