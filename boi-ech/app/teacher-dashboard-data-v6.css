@@ -1,0 +1,250 @@
+/* Teacher dashboard Data V6 — real-data density and honest empty states.
+   Uses only data already returned by TeacherRoleShell. */
+
+.teacher-class-summary .teacher-class-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+}
+
+.teacher-class-summary .teacher-metric {
+  min-height: 74px;
+  padding: 9px;
+}
+
+.teacher-class-summary .teacher-metric-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.teacher-class-summary .teacher-metric > div > strong {
+  font-size: 20px;
+}
+
+.teacher-class-summary .teacher-metric > div > span {
+  font-size: 9.5px;
+}
+
+.teacher-class-summary .teacher-metric > div > small {
+  font-size: 8.5px;
+}
+
+.teacher-rich-empty {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 112px;
+  margin: 10px;
+  padding: 18px;
+  border: 1px dashed #c8dce5;
+  border-radius: 12px;
+  color: #567287;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(58, 173, 221, .08), transparent 38%),
+    linear-gradient(180deg, #fbfdfe, #f4f9fb);
+}
+
+.teacher-rich-empty > span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #1789cf;
+  background: #e9f6fb;
+}
+
+.teacher-rich-empty > span svg {
+  width: 23px;
+  height: 23px;
+}
+
+.teacher-rich-empty strong {
+  display: block;
+  color: #183f60;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.teacher-rich-empty p {
+  margin: 5px 0 0;
+  max-width: 560px;
+  color: #718798;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.teacher-rich-empty-action {
+  margin-top: 10px;
+}
+
+.teacher-rich-empty-action a,
+.teacher-rich-empty-action button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 31px;
+  padding: 0 11px;
+  border: 1px solid #b9dceb;
+  border-radius: 8px;
+  color: #126ba4;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.teacher-watchlist .teacher-table-wrap {
+  min-height: 178px;
+}
+
+.teacher-analysis-queue-list {
+  min-height: 178px;
+}
+
+.teacher-watchlist > header small,
+.teacher-analysis-queue > header small {
+  display: block;
+  margin-top: 2px;
+  color: #7a909f;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.teacher-review-state[data-review-quality="good"] {
+  color: #eafff8;
+  background: rgba(8, 129, 93, .84);
+}
+
+.teacher-review-state[data-review-quality="review"] {
+  color: #fff8e9;
+  background: rgba(198, 117, 21, .88);
+}
+
+.teacher-rail-empty-good {
+  color: #72dfc8;
+}
+
+.teacher-ai-watch {
+  display: grid;
+  grid-template-columns: 102px minmax(0, 1fr);
+  align-items: start;
+  min-height: 210px;
+}
+
+.teacher-ai-watch > header {
+  grid-column: 1 / -1;
+}
+
+.teacher-ai-watch .teacher-ai-gauge {
+  grid-column: 1;
+  align-self: center;
+  margin: 14px 8px 14px 12px;
+}
+
+.teacher-ai-watch .teacher-ai-watch-grid {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  grid-column: 2;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 10px 12px 0;
+}
+
+.teacher-ai-watch-grid div {
+  min-width: 0;
+  min-height: 58px;
+  padding: 8px;
+}
+
+.teacher-ai-watch-grid b {
+  overflow: hidden;
+  color: #40ddcb;
+  font-size: 14px;
+  text-overflow: ellipsis;
+}
+
+.teacher-ai-watch-grid small {
+  display: block;
+  margin-top: 3px;
+  color: #9bb7c4;
+  font-size: 8.5px;
+  line-height: 1.35;
+}
+
+.teacher-ai-watch-grid .teacher-ai-common-issue {
+  grid-column: 1 / -1;
+  min-height: 54px;
+}
+
+.teacher-ai-watch-grid .teacher-ai-common-issue b {
+  white-space: normal;
+  color: #f0c86c;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.teacher-task-list button {
+  min-height: 36px;
+}
+
+.teacher-monitor-list,
+.teacher-alert-list {
+  min-height: 72px;
+}
+
+.teacher-rail-caption {
+  padding-inline: 11px;
+}
+
+/* Give six KPI tiles roughly the same total visual height as the 8 capability tiles. */
+@media (min-width: 1321px) {
+  .teacher-class-summary .teacher-class-metrics {
+    min-height: 218px;
+  }
+}
+
+@media (max-width: 1320px) {
+  .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .teacher-class-summary .teacher-metric {
+    min-height: 82px;
+  }
+}
+
+@media (max-width: 760px) {
+  .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .teacher-rich-empty {
+    grid-template-columns: 38px minmax(0, 1fr);
+    padding: 14px;
+  }
+  .teacher-rich-empty > span {
+    width: 38px;
+    height: 38px;
+  }
+  .teacher-ai-watch {
+    grid-template-columns: 90px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: 1fr;
+  }
+  .teacher-ai-watch {
+    grid-template-columns: 1fr;
+  }
+  .teacher-ai-watch .teacher-ai-gauge,
+  .teacher-ai-watch .teacher-ai-watch-grid {
+    grid-column: 1;
+  }
+  .teacher-ai-watch .teacher-ai-watch-grid {
+    margin: 0 10px 12px;
+  }
+}
