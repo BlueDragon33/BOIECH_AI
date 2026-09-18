@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type TeacherAnalysis = { score: number; confidence: number; captureQuality: "good" | "review"; poseCoverage: number; averageVisibility: number; cameraView: "rear" | "side"; errorCount: number; topErrors: string[]; analyzedAt: string | null };
 type TeacherActionSummary = { action: "feedback" | "assignment" | "review"; teacherName: string; title: string; note: string; lessonNumber: string; reviewStatus: "" | "reviewed" | "follow-up"; analysisAt: string; createdAt: string | null };
-type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; teacherActionCount: number; latestTeacherAction: TeacherActionSummary | null; needsSupport: boolean; inactiveDays: number | null };
+type TeacherAdaptive = { priorityLesson: string; priorityPart: string; averageMastery: number; alerts: { level: "info" | "warning" | "critical"; code: string; text: string }[] };
+type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; teacherActionCount: number; latestTeacherAction: TeacherActionSummary | null; adaptive: TeacherAdaptive | null; needsSupport: boolean; inactiveDays: number | null };
 type TeacherOverview = { teacher: { name: string | null; personCode: string | null; className: string | null }; summary: { learnerCount: number; active7d: number; needingSupport: number; analysisCount: number; averageProgress: number }; learners: TeacherLearner[]; privacy: { mediaStored: false; note: string } };
 type TeacherTab = "overview" | "class" | "learners" | "analysis" | "tasks" | "reports" | "messages" | "schedule" | "profile";
 type TabSetter = (tab: TeacherTab) => void;
@@ -54,7 +55,7 @@ function csvCell(value: unknown) {
 }
 
 function exportTeacherReport(learners: TeacherLearner[], className: string) {
-  const header = ["Học viên", "Mã", "Lớp", "Tiến độ", "Điểm TB", "Phút học", "Phân tích AI", "Can thiệp GV", "Hoạt động gần nhất", "Trạng thái"];
+  const header = ["Học viên", "Mã", "Lớp", "Tiến độ", "Điểm TB", "Phút học", "Phân tích AI", "Can thiệp GV", "Bài AI ưu tiên", "Năng lực AI", "Cảnh báo AI", "Hoạt động gần nhất", "Trạng thái"];
   const rows = learners.map((learner) => [
     learner.name,
     learner.personCode,
@@ -64,6 +65,9 @@ function exportTeacherReport(learners: TeacherLearner[], className: string) {
     learner.totalActiveMinutes,
     learner.analysisCount,
     learner.teacherActionCount,
+    learner.adaptive?.priorityLesson ? `Bài ${learner.adaptive.priorityLesson}` : "",
+    learner.adaptive ? `${learner.adaptive.averageMastery}%` : "",
+    learner.adaptive?.alerts.find((alert) => alert.level !== "info")?.text ?? "",
     shortDate(learner.lastActivityAt),
     learner.needsSupport ? supportReason(learner) : "Đang ổn",
   ]);
@@ -77,7 +81,7 @@ function exportTeacherReport(learners: TeacherLearner[], className: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 function shortDate(value: string | null) { if (!value) return "Chưa có"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "Chưa có" : new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date); }
-function supportReason(learner: TeacherLearner) { if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`; if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`; if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`; return "Cần Giảng viên kiểm tra thêm"; }
+function supportReason(learner: TeacherLearner) { const adaptiveAlert = learner.adaptive?.alerts.find((alert) => alert.level === "critical") ?? learner.adaptive?.alerts.find((alert) => alert.level === "warning"); if (adaptiveAlert) return adaptiveAlert.text; if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`; if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`; if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`; return "Cần Giảng viên kiểm tra thêm"; }
 function analysisQuality(analysis: TeacherAnalysis | null) { return analysis && analysis.captureQuality === "good" && analysis.confidence >= 70 ? "good" : "review"; }
 function teacherInsights(learners: TeacherLearner[]) {
   const completedCount = learners.filter((item) => item.progress >= 100).length;
@@ -96,7 +100,7 @@ function teacherInsights(learners: TeacherLearner[]) {
   const commonIssue = [...issueCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "vi"))[0]?.[0] ?? "";
   return { completedCount, active24h, analyses, trustworthy, reviewCount, averageConfidence, totalStudyMinutes, completionRate, commonIssue };
 }
-function matchesQuery(learner: TeacherLearner, query: string) { const needle = query.trim().toLocaleLowerCase("vi"); if (!needle) return true; return [learner.name, learner.personCode, learner.className, learner.lastLesson ?? "", learner.lastPart ?? "", ...(learner.lastAnalysis?.topErrors ?? [])].join(" ").toLocaleLowerCase("vi").includes(needle); }
+function matchesQuery(learner: TeacherLearner, query: string) { const needle = query.trim().toLocaleLowerCase("vi"); if (!needle) return true; return [learner.name, learner.personCode, learner.className, learner.lastLesson ?? "", learner.lastPart ?? "", learner.adaptive?.priorityLesson ?? "", ...(learner.adaptive?.alerts.map((alert) => alert.text) ?? []), ...(learner.lastAnalysis?.topErrors ?? [])].join(" ").toLocaleLowerCase("vi").includes(needle); }
 function openTeacherEditor() { const personal = document.querySelector<HTMLButtonElement>(".personal-edit-trigger"); if (personal) return personal.click(); const request = document.querySelector<HTMLAnchorElement>(".editor-request-link"); if (request) return request.click(); window.location.assign("/bien-tap-noi-dung"); }
 
 function TeacherIcon({ name }: { name: string }) {
