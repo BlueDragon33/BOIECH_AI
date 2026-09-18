@@ -41,6 +41,11 @@ const learnerReply = read("boi-ech/app/api/course/teacher-actions/reply/route.ts
 const assignmentStatus = read("boi-ech/app/api/course/teacher-actions/status/route.ts");
 const teacherOverview = read("boi-ech/app/api/teacher/overview/route.ts");
 const videoRoute = read("boi-ech/app/api/video-analysis/route.ts");
+const dbSchema = read("boi-ech/db/schema.ts");
+const deviceAuth = read("boi-ech/app/device-auth.server.ts");
+const deviceClassificationMigration = read("boi-ech/drizzle/0015_device_classification.sql");
+const courseProgressMigration = read("boi-ech/drizzle/0002_acoustic_bushwacker.sql");
+const phoneUniquenessMigration = read("boi-ech/drizzle/0007_even_joshua_kane.sql");
 
 requireMatch(productionWorkflow, /workflow_dispatch:/, "production deployment must remain manual");
 forbidMatch(productionWorkflow, /\bpush\s*:/, "production deployment must not run on push");
@@ -62,6 +67,8 @@ requireMatch(teacherOverview, /teacher\.personRole !== "teacher"/, "teacher over
 requireMatch(teacherOverview, /lower\(trim\(da\.class_name\)\) = lower\(trim\(\?\)\)/, "teacher overview must remain class-scoped");
 requireMatch(learnerReply, /WHERE id = \? AND device_id = \?/, "learner replies must remain bound to the learner device");
 requireMatch(assignmentStatus, /event_type = 'teacher_assignment'/, "assignment status must target a real teacher assignment");
+requireMatch(assignmentStatus, /MAX_STATUS_EVENTS_PER_ASSIGNMENT/, "assignment status changes must be bounded");
+requireMatch(assignmentStatus, /latestStatus === status/, "duplicate assignment status transitions must be ignored");
 
 requireMatch(teacherShell, /TeacherLearningAnalyticsPanel/, "Learning Analytics surface is missing");
 requireMatch(teacherShell, /TeacherSmartInterventions/, "Smart Intervention surface is missing");
@@ -89,6 +96,24 @@ forbidMatch(
 );
 requireMatch(videoRoute, /rejectBinaryPayload|binary-looking|BINARY_PAYLOAD|forbidden/i, "video API must retain binary/media payload protection");
 
+for (const column of ["device_type", "platform", "browser", "user_agent"]) {
+  if (!deviceClassificationMigration.includes("ADD COLUMN `" + column + "`")) fail(`classification migration must add ${column}`);
+  if (!dbSchema.includes(`text("${column}")`)) fail(`Drizzle schema must include ${column}`);
+  if (!deviceAuth.includes(column)) fail(`fresh/local device bootstrap must include ${column}`);
+}
+requireMatch(dbSchema, /device_access_type_status_idx/, "Drizzle schema must include the device classification index");
+requireMatch(deviceAuth, /PRAGMA table_info\(device_access\)/, "local DB bootstrap must inspect legacy classification columns");
+requireMatch(deviceAuth, /CREATE INDEX IF NOT EXISTS device_access_type_status_idx/, "local DB bootstrap must repair the classification index");
+
+for (const column of ["attempts_json", "total_active_seconds", "last_activity_at", "last_lesson", "last_part"]) {
+  if (!courseProgressMigration.includes("device_profiles") || !courseProgressMigration.includes(column)) fail(`progress migration must include ${column}`);
+  if (!dbSchema.includes(column)) fail(`Drizzle device_profiles schema must include ${column}`);
+  if (!deviceAuth.includes(column)) fail(`fresh/local device_profiles bootstrap must include ${column}`);
+}
+requireMatch(deviceAuth, /PRAGMA table_info\(device_profiles\)/, "local DB bootstrap must inspect legacy profile columns");
+requireMatch(phoneUniquenessMigration, /device_access_phone_unique/, "phone uniqueness migration must remain present");
+requireMatch(deviceAuth, /CREATE UNIQUE INDEX IF NOT EXISTS device_access_phone_unique/, "fresh DB bootstrap must enforce phone uniqueness");
+
 const activeSourceRoot = path.join(appRoot, "app");
 const activeFiles = walk(activeSourceRoot).filter((file) => /\.(ts|tsx|js|jsx|css)$/.test(file));
 const hygiene = /\bTODO\b|\bFIXME\b|\bHACK\b|not implemented|coming soon/i;
@@ -97,4 +122,4 @@ for (const file of activeFiles) {
   if (hygiene.test(content)) fail(`active source contains unresolved marker: ${path.relative(repoRoot, file)}`);
 }
 
-console.log("Bơi ếch release-readiness audit PASS: manual production boundary, signed roles, class scoping, real teacher workflows, media-free supervision, and source hygiene verified.");
+console.log("Bơi ếch release-readiness audit PASS: manual production boundary, signed roles, class scoping, bounded assignment events, runtime schema parity, media-free supervision, and source hygiene verified.");

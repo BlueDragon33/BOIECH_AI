@@ -15,6 +15,10 @@ export const deviceAccess = sqliteTable("device_access", {
   displayCode: text("display_code").notNull().unique(),
   publicKeyJwk: text("public_key_jwk").notNull(),
   status: text("status").notNull().default("pending"),
+  deviceType: text("device_type").notNull().default("desktop"),
+  platform: text("platform"),
+  browser: text("browser"),
+  userAgent: text("user_agent"),
   label: text("label"),
   learnerName: text("learner_name"),
   learnerFamilyName: text("learner_family_name"),
@@ -45,6 +49,7 @@ export const deviceAccess = sqliteTable("device_access", {
   updatedAt: text("updated_at"),
 }, (table) => [
   uniqueIndex("device_access_person_identity_unique").on(table.personRole, table.personCode),
+  index("device_access_type_status_idx").on(table.deviceType, table.status, table.lastSeenAt),
 ]);
 
 export const accessAutomationSettings = sqliteTable("access_automation_settings", {
