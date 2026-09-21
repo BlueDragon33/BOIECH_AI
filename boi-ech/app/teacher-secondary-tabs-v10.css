@@ -1,0 +1,546 @@
+/* Teacher secondary tabs V10 — one visual system across all instructor pages.
+   Presentation-only. Loaded after feature-specific L7-L10 styles. */
+
+body[data-teacher-role-ui="active"] {
+  --teacher-tab-panel: #ffffff;
+  --teacher-tab-line: #d9e7ed;
+  --teacher-tab-soft: #f5f9fb;
+  --teacher-tab-ink: #173c5e;
+  --teacher-tab-muted: #718899;
+  --teacher-tab-blue: #157fbd;
+  --teacher-tab-teal: #138b8f;
+  --teacher-tab-shadow: 0 9px 24px rgba(0, 25, 42, .08);
+}
+
+/* Compact page masthead shared by Class, Learners, Analysis, Tasks, Reports, Messages, Schedule, Profile. */
+.teacher-page {
+  display: grid;
+  gap: 12px;
+  min-height: calc(100vh - 82px);
+  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 90% -5%, rgba(35, 177, 210, .08), transparent 28%),
+    #f4f9fb;
+}
+
+.teacher-page > header {
+  position: relative;
+  overflow: hidden;
+  margin: 0;
+  padding: 18px 20px 17px;
+  border: 1px solid rgba(79, 176, 207, .24);
+  border-radius: 13px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 86% 0%, rgba(47, 210, 215, .17), transparent 34%),
+    linear-gradient(135deg, #062d49 0%, #084b69 62%, #06354e 100%);
+  box-shadow: 0 10px 28px rgba(0, 27, 45, .12);
+}
+
+.teacher-page > header::after {
+  content: "";
+  position: absolute;
+  right: -25px;
+  bottom: -30px;
+  width: 210px;
+  height: 70px;
+  border-top: 2px solid rgba(73, 216, 226, .13);
+  border-radius: 50%;
+  transform: rotate(-7deg);
+  pointer-events: none;
+}
+
+.teacher-page > header > span {
+  position: relative;
+  z-index: 1;
+  display: block;
+  color: #f2cb69;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: .10em;
+}
+
+.teacher-page > header h1 {
+  position: relative;
+  z-index: 1;
+  margin: 4px 0 5px;
+  max-width: 920px;
+  color: #fff;
+  font-family: var(--role-display-font) !important;
+  font-size: clamp(25px, 2.25vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -.018em;
+}
+
+.teacher-page > header p {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0;
+  color: #cce2eb;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.teacher-page > header .teacher-primary-link,
+.teacher-page > header [data-teacher-sync-mount] {
+  position: relative;
+  z-index: 2;
+}
+
+.teacher-page .teacher-primary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  width: max-content;
+  padding: 0 12px;
+  border: 1px solid #b9dce7;
+  border-radius: 8px;
+  color: #126a92;
+  background: #fff;
+  font-size: 9px;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.teacher-page > header .teacher-primary-link {
+  margin-top: 10px;
+  border-color: rgba(156, 221, 235, .30);
+  color: #e5f7fb;
+  background: rgba(255,255,255,.07);
+}
+
+.teacher-page > header .teacher-primary-link:hover {
+  background: rgba(255,255,255,.12);
+}
+
+/* Shared white surfaces. */
+.teacher-page .teacher-white-card,
+.teacher-learning-analytics,
+.teacher-smart-interventions,
+.teacher-two-way-messages,
+.teacher-assignment-schedule,
+.teacher-roster-manager {
+  margin: 0;
+  border: 1px solid var(--teacher-tab-line);
+  border-radius: 13px;
+  background: var(--teacher-tab-panel);
+  box-shadow: var(--teacher-tab-shadow);
+}
+
+/* Feature panels use the same compact white header instead of separate visual languages. */
+.teacher-learning-analytics > header,
+.teacher-smart-interventions > header,
+.teacher-two-way-messages > header,
+.teacher-assignment-schedule > header,
+.teacher-roster-manager > header {
+  gap: 14px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #e4edf1;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(37, 178, 198, .08), transparent 34%),
+    linear-gradient(180deg, #fff, #f9fcfd);
+}
+
+.teacher-learning-analytics > header > div:first-child > span,
+.teacher-smart-interventions > header span,
+.teacher-two-way-messages > header span,
+.teacher-assignment-schedule > header > div:first-child > span,
+.teacher-roster-manager > header span {
+  color: #12839b;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .09em;
+}
+
+.teacher-learning-analytics h2,
+.teacher-smart-interventions h2,
+.teacher-two-way-messages h2,
+.teacher-assignment-schedule h2,
+.teacher-roster-manager h2 {
+  margin: 4px 0 4px;
+  color: var(--teacher-tab-ink);
+  font-family: var(--role-display-font) !important;
+  font-size: 20px;
+  line-height: 1.08;
+  letter-spacing: -.012em;
+}
+
+.teacher-learning-analytics > header p,
+.teacher-smart-interventions > header p,
+.teacher-two-way-messages > header p,
+.teacher-assignment-schedule > header p,
+.teacher-roster-manager > header p {
+  color: var(--teacher-tab-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+/* Summary metric language reused across Reports/Schedule/Interventions. */
+.teacher-loop-summary,
+.teacher-roster-summary {
+  gap: 6px;
+}
+
+.teacher-loop-summary article,
+.teacher-roster-summary > div,
+.teacher-smart-interventions > header > strong,
+.teacher-two-way-messages > header > strong,
+.teacher-assignment-schedule > header > div:last-child {
+  border: 1px solid #dce9ee;
+  border-radius: 9px;
+  background: #f6fafc;
+  box-shadow: none;
+}
+
+.teacher-loop-summary article {
+  padding: 8px;
+}
+
+.teacher-loop-summary strong {
+  font-size: 18px;
+}
+
+.teacher-loop-summary span {
+  font-size: 7.5px;
+}
+
+/* Cards across analytics/interventions/messages/schedule use identical geometry. */
+.teacher-loop-list,
+.teacher-smart-grid,
+.teacher-message-list,
+.teacher-schedule-items {
+  gap: 8px;
+  padding: 10px;
+}
+
+.teacher-loop-card,
+.teacher-smart-card,
+.teacher-message-list > article,
+.teacher-schedule-items > article {
+  border: 1px solid #e0eaee;
+  border-radius: 10px;
+  background: #fbfdfe;
+  box-shadow: none;
+}
+
+.teacher-loop-card,
+.teacher-smart-card,
+.teacher-message-list > article {
+  padding: 11px;
+}
+
+.teacher-loop-card:hover,
+.teacher-smart-card:hover,
+.teacher-message-list > article:hover,
+.teacher-schedule-items > article:hover {
+  border-color: #b8dce7;
+  box-shadow: 0 6px 16px rgba(15, 91, 127, .06);
+}
+
+/* Keep semantic warning colors but reduce visual noise. */
+.teacher-smart-card.critical,
+.teacher-schedule-items > article.overdue {
+  border-color: #edcbc4;
+  background: #fff9f7;
+}
+
+.teacher-smart-card.high,
+.teacher-schedule-items > article.needs-help {
+  border-color: #eadcb3;
+  background: #fffdf7;
+}
+
+/* Analytics density. */
+.teacher-learning-analytics > header {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .72fr);
+}
+
+.teacher-loop-evidence-grid {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.teacher-loop-evidence {
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.teacher-loop-evidence > span {
+  font-size: 7px;
+}
+
+.teacher-loop-evidence strong {
+  font-size: 11px;
+}
+
+.teacher-loop-evidence small,
+.teacher-loop-note,
+.teacher-loop-card blockquote,
+.teacher-loop-card > footer span {
+  font-size: 7.5px;
+}
+
+.teacher-loop-card > footer button,
+.teacher-smart-card footer button,
+.teacher-message-list footer button,
+.teacher-schedule-items aside button {
+  min-height: 27px;
+  padding: 0 9px;
+  border: 1px solid #bedbe5;
+  border-radius: 7px;
+  color: #126c8d;
+  background: #f2fafc;
+  font-size: 7.5px;
+  font-weight: 850;
+}
+
+/* Smart interventions: 2 columns on wide screens, calm header badge. */
+.teacher-smart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.teacher-smart-interventions > header > strong {
+  min-width: 78px;
+  min-height: 46px;
+  padding: 7px;
+  color: #126d82;
+  font-size: 10px;
+}
+
+.teacher-smart-card h3 {
+  margin: 8px 0 4px;
+  font-size: 10px;
+}
+
+.teacher-smart-card p {
+  font-size: 8px;
+}
+
+.teacher-smart-card ul {
+  margin-top: 6px;
+  font-size: 7px;
+}
+
+/* Messages become a clean inbox list consistent with learner roster/table surfaces. */
+.teacher-message-list > article > header > div > span {
+  width: 29px;
+  height: 29px;
+}
+
+.teacher-message-list strong {
+  font-size: 9.5px;
+}
+
+.teacher-message-list small,
+.teacher-message-list footer span {
+  font-size: 7px;
+}
+
+.teacher-message-list blockquote {
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: 8.5px;
+  line-height: 1.42;
+}
+
+/* Schedule keeps three-column operation layout on desktop. */
+.teacher-schedule-items > article {
+  grid-template-columns: 108px minmax(0, 1fr) 118px;
+  gap: 10px;
+  padding: 10px;
+}
+
+.teacher-schedule-date {
+  font-size: 8px;
+}
+
+.teacher-schedule-items small {
+  font-size: 7px;
+}
+
+.teacher-schedule-items strong {
+  font-size: 9.5px;
+}
+
+.teacher-schedule-items h3 {
+  font-size: 9px;
+}
+
+.teacher-schedule-items p {
+  font-size: 7.5px;
+}
+
+.teacher-schedule-items aside b {
+  font-size: 7px;
+}
+
+/* Class and learner tabs reuse dashboard metrics/tables without oversized spacing. */
+.teacher-page > .teacher-class-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+}
+
+.teacher-page > .teacher-class-metrics .teacher-metric {
+  min-height: 78px;
+  border: 1px solid #dbe8ed;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 28, 47, .05);
+}
+
+.teacher-page .teacher-table-wrap {
+  max-height: min(560px, calc(100vh - 320px));
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.teacher-page .teacher-table thead {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+}
+
+/* Profile tab follows same card language. */
+.teacher-profile {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+
+.teacher-profile > div {
+  min-height: 86px;
+  padding: 13px;
+  border: 1px solid var(--teacher-tab-line);
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 28, 47, .05);
+}
+
+.teacher-profile dt {
+  color: #78909f;
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.teacher-profile dd {
+  margin: 6px 0 0;
+  color: #173e5f;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+/* Harmonize empty states. */
+.teacher-loop-empty,
+.teacher-smart-empty,
+.teacher-message-empty,
+.teacher-schedule-empty,
+.teacher-roster-empty {
+  border-color: #cbdfe6;
+  border-radius: 10px;
+  color: #768c99;
+  background: #f9fcfd;
+}
+
+.teacher-loop-empty strong,
+.teacher-smart-empty strong,
+.teacher-message-empty strong,
+.teacher-schedule-empty strong {
+  color: #31566c;
+}
+
+/* Vietnamese-safe display fonts: feature CSS must not reintroduce Georgia. */
+.teacher-learning-analytics h2,
+.teacher-smart-interventions h2,
+.teacher-two-way-messages h2,
+.teacher-assignment-schedule h2 {
+  font-family: var(--role-display-font) !important;
+}
+
+/* Focus consistency for all secondary-tab actions. */
+.teacher-page :where(button, a, input, select, textarea):focus-visible,
+.teacher-learning-analytics :where(button, a):focus-visible,
+.teacher-smart-interventions :where(button, a):focus-visible,
+.teacher-two-way-messages :where(button, a):focus-visible,
+.teacher-assignment-schedule :where(button, a):focus-visible {
+  outline: 2px solid rgba(57, 190, 211, .78);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1080px) {
+  .teacher-learning-analytics > header {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-page > .teacher-class-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 850px) {
+  .teacher-smart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-schedule-items > article {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-schedule-items aside {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .teacher-page {
+    padding: 8px;
+  }
+
+  .teacher-page > header {
+    padding: 15px;
+  }
+
+  .teacher-page > header h1 {
+    font-size: 25px;
+  }
+
+  .teacher-loop-summary,
+  .teacher-roster-summary,
+  .teacher-profile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-loop-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-loop-card > header,
+  .teacher-loop-card > footer,
+  .teacher-smart-interventions > header,
+  .teacher-smart-card > header,
+  .teacher-smart-card footer,
+  .teacher-two-way-messages > header,
+  .teacher-message-list > article > header,
+  .teacher-message-list footer,
+  .teacher-assignment-schedule > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 520px) {
+  .teacher-page > .teacher-class-metrics,
+  .teacher-loop-summary,
+  .teacher-roster-summary,
+  .teacher-profile {
+    grid-template-columns: 1fr;
+  }
+}
