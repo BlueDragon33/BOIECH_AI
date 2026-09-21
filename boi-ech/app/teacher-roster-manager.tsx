@@ -244,20 +244,42 @@ export default function TeacherRosterManager() {
   const [error, setError] = useState("");
   const [changedCount, setChangedCount] = useState(0);
   const deviceIdRef = useRef("");
+  const syncedDeviceRef = useRef("");
   const rosterSignatureRef = useRef("");
   const approvedSignatureRef = useRef("");
   const syncingRef = useRef(false);
+  const teacherActiveRef = useRef(false);
+  const syncGenerationRef = useRef(0);
 
-  const syncRoster = async (source: "manual" | "auto" | "mutation" = "manual") => {
+  const clearRosterState = () => {
+    deviceIdRef.current = "";
+    syncedDeviceRef.current = "";
+    rosterSignatureRef.current = "";
+    approvedSignatureRef.current = "";
+    syncingRef.current = false;
+    setData({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
+    setChangedCount(0);
+    setError("");
+    setLoading(false);
+  };
+
+  const syncRoster = async (
+    source: "manual" | "auto" | "mutation" = "manual",
+    forcedDeviceId = "",
+  ) => {
+    if (document.body.dataset.teacherRoleUi !== "active") return;
     if (syncingRef.current) return;
+    const generation = syncGenerationRef.current;
     syncingRef.current = true;
     setLoading(true);
     if (source !== "auto") setError("");
     try {
-      const deviceId = deviceIdRef.current || await deriveDeviceId();
+      const deviceId = forcedDeviceId || deviceIdRef.current || await deriveDeviceId();
       if (!deviceId) throw new Error("Chưa xác định được thiết bị Giảng viên.");
+      if (generation !== syncGenerationRef.current || document.body.dataset.teacherRoleUi !== "active") return;
       deviceIdRef.current = deviceId;
       const next = await requestRoster(deviceId, "list");
+      if (generation !== syncGenerationRef.current || deviceIdRef.current !== deviceId) return;
       const nextRosterSignature = rosterSignature(next.roster);
       const nextApprovedSignature = approvedSignature(next.roster);
       if (rosterSignatureRef.current && nextRosterSignature !== rosterSignatureRef.current) {
@@ -270,39 +292,53 @@ export default function TeacherRosterManager() {
       }
       rosterSignatureRef.current = nextRosterSignature;
       approvedSignatureRef.current = nextApprovedSignature;
+      syncedDeviceRef.current = deviceId;
       setData(next);
     } catch (caught) {
-      if (source !== "auto") setError(caught instanceof Error ? caught.message : "Không thể đồng bộ học viên.");
+      if (generation === syncGenerationRef.current && source !== "auto") {
+        setError(caught instanceof Error ? caught.message : "Không thể đồng bộ học viên.");
+      }
     } finally {
-      syncingRef.current = false;
-      setLoading(false);
+      if (generation === syncGenerationRef.current) {
+        syncingRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
   const mutate = async (action: "approve" | "remove", item: RosterItem) => {
+    if (document.body.dataset.teacherRoleUi !== "active") return;
     if (action === "remove") {
       const confirmed = window.confirm(`Loại ${item.name} khỏi lớp? Học viên sẽ bị khóa truy cập nhưng có thể được khôi phục sau.`);
       if (!confirmed) return;
     }
     if (syncingRef.current) return;
+    const generation = syncGenerationRef.current;
     syncingRef.current = true;
     setLoading(true);
     setError("");
     try {
       const deviceId = deviceIdRef.current || await deriveDeviceId();
       if (!deviceId) throw new Error("Chưa xác định được thiết bị Giảng viên.");
+      if (generation !== syncGenerationRef.current || document.body.dataset.teacherRoleUi !== "active") return;
       deviceIdRef.current = deviceId;
       const next = await requestRoster(deviceId, action, item.personCode);
+      if (generation !== syncGenerationRef.current || deviceIdRef.current !== deviceId) return;
       rosterSignatureRef.current = rosterSignature(next.roster);
       approvedSignatureRef.current = approvedSignature(next.roster);
+      syncedDeviceRef.current = deviceId;
       setData(next);
       setChangedCount(0);
       window.dispatchEvent(new CustomEvent("boi-ech:teacher-roster-changed", { detail: next.changed }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Không thể cập nhật quyền học viên.");
+      if (generation === syncGenerationRef.current) {
+        setError(caught instanceof Error ? caught.message : "Không thể cập nhật quyền học viên.");
+      }
     } finally {
-      syncingRef.current = false;
-      setLoading(false);
+      if (generation === syncGenerationRef.current) {
+        syncingRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -310,39 +346,96 @@ export default function TeacherRosterManager() {
     if (window.location.pathname !== "/") return;
     let timer = 0;
     let interval = 0;
+
+    const resetForInactiveRole = () => {
+      if (!teacherActiveRef.current && !deviceIdRef.current && !syncedDeviceRef.current) return;
+      teacherActiveRef.current = false;
+      syncGenerationRef.current += 1;
+      clearRosterState();
+    };
+
+    const ensureTeacherDeviceSynced = async () => {
+      if (document.body.dataset.teacherRoleUi !== "active") return false;
+      const deviceId = await deriveDeviceId().catch(() => "");
+      if (!deviceId || document.body.dataset.teacherRoleUi !== "active") return false;
+      const changedDevice = Boolean(deviceIdRef.current && deviceIdRef.current !== deviceId);
+      const needsInitialSync = syncedDeviceRef.current !== deviceId;
+      if (changedDevice) {
+        syncGenerationRef.current += 1;
+        syncingRef.current = false;
+        deviceIdRef.current = deviceId;
+        syncedDeviceRef.current = "";
+        rosterSignatureRef.current = "";
+        approvedSignatureRef.current = "";
+        setData({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
+        setChangedCount(0);
+        setError("");
+      } else {
+        deviceIdRef.current = deviceId;
+      }
+      if (needsInitialSync || changedDevice) {
+        await syncRoster("auto", deviceId);
+        return true;
+      }
+      return false;
+    };
+
     const updateMounts = () => {
       timer = 0;
       const active = document.body.dataset.teacherRoleUi === "active";
       if (!active) {
         setCompactMounts([]);
         setPanelMount(null);
+        resetForInactiveRole();
         return;
       }
+      const becameActive = !teacherActiveRef.current;
+      teacherActiveRef.current = true;
       setCompactMounts(Array.from(document.querySelectorAll<HTMLElement>("[data-teacher-sync-mount]")));
       setPanelMount(document.querySelector<HTMLElement>("[data-teacher-roster-manager-mount]"));
+      if (becameActive || syncedDeviceRef.current === "") void ensureTeacherDeviceSynced();
+      else void deriveDeviceId().then((deviceId) => {
+        if (deviceId && deviceIdRef.current && deviceId !== deviceIdRef.current) void ensureTeacherDeviceSynced();
+      }).catch(() => undefined);
     };
+
     const schedule = () => {
       if (!timer) timer = window.setTimeout(updateMounts, 0);
     };
+
     schedule();
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-teacher-role-ui", "class"] });
-    deriveDeviceId().then((deviceId) => {
-      deviceIdRef.current = deviceId;
-      if (deviceId) void syncRoster("auto");
-    }).catch(() => undefined);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-teacher-role-ui", "class", "title", "data-device-id"],
+    });
+
+    const refreshVisibleTeacher = async () => {
+      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") {
+        const alreadySynced = await ensureTeacherDeviceSynced();
+        if (!alreadySynced) await syncRoster("auto");
+      }
+    };
+
     interval = window.setInterval(() => {
-      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") void syncRoster("auto");
+      void refreshVisibleTeacher();
     }, 60_000);
+
     const onVisible = () => {
-      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") void syncRoster("auto");
+      void refreshVisibleTeacher();
     };
     document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       if (timer) window.clearTimeout(timer);
       if (interval) window.clearInterval(interval);
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisible);
+      syncGenerationRef.current += 1;
+      teacherActiveRef.current = false;
+      clearRosterState();
       setCompactMounts([]);
       setPanelMount(null);
     };
@@ -359,6 +452,7 @@ export default function TeacherRosterManager() {
     />,
     mount,
   ));
+
   const panel = panelMount ? createPortal(
     <RosterPanel
       roster={data.roster}
