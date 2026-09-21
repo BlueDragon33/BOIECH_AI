@@ -1,0 +1,391 @@
+/* Teacher roster Sync V9 — scoped class management + manual/60s sync.
+   UI only; the security boundary is enforced by /api/teacher/roster. */
+
+.teacher-roster-sync-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.teacher-roster-sync-compact > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.teacher-roster-sync-compact small {
+  color: #6f8798;
+  font-size: 6.8px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.teacher-roster-sync-compact span {
+  color: #4c7085;
+  font-size: 7px;
+  white-space: nowrap;
+}
+
+.teacher-roster-sync-compact > b {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border-radius: 999px;
+  color: #8b5200;
+  background: #fff2cb;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.teacher-roster-sync-compact > button {
+  min-height: 27px;
+  padding: 0 9px;
+  border: 1px solid #b9dce9;
+  border-radius: 7px;
+  color: #126a9e;
+  background: linear-gradient(180deg, #ffffff, #eef8fc);
+  font: inherit;
+  font-size: 7.5px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.teacher-roster-sync-compact > button:hover {
+  border-color: #78bdd9;
+  box-shadow: 0 5px 12px rgba(13, 102, 148, .08);
+}
+
+.teacher-roster-sync-compact > button:disabled {
+  opacity: .58;
+  cursor: wait;
+}
+
+.teacher-page > header [data-teacher-sync-mount] {
+  display: block;
+  width: max-content;
+  margin-top: 10px;
+}
+
+.teacher-roster-manager {
+  margin: 0 0 12px;
+  overflow: hidden;
+  border: 1px solid #d9e8ee;
+  border-radius: 13px;
+  color: #173d5f;
+  background: #fff;
+  box-shadow: 0 9px 24px rgba(0, 27, 45, .08);
+}
+
+.teacher-roster-manager > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #e5eef2;
+  background:
+    radial-gradient(circle at 95% 0%, rgba(47, 194, 215, .09), transparent 35%),
+    linear-gradient(180deg, #fff, #f9fcfd);
+}
+
+.teacher-roster-manager > header span {
+  display: block;
+  color: #1785b8;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .09em;
+}
+
+.teacher-roster-manager > header h2 {
+  margin: 3px 0 3px;
+  color: #143b5d;
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.teacher-roster-manager > header p {
+  max-width: 720px;
+  margin: 0;
+  color: #728a99;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.teacher-roster-manager > header > button {
+  min-height: 35px;
+  flex: 0 0 auto;
+  padding: 0 13px;
+  border: 1px solid #1685bd;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(180deg, #1f9ed6, #167bb2);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.teacher-roster-manager > header > button:disabled {
+  opacity: .58;
+  cursor: wait;
+}
+
+.teacher-roster-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 140px)) minmax(180px, 1fr);
+  gap: 7px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5eef2;
+  background: #f8fbfc;
+}
+
+.teacher-roster-summary > div {
+  display: grid;
+  min-height: 54px;
+  align-content: center;
+  padding: 7px 9px;
+  border: 1px solid #dbe9ee;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.teacher-roster-summary strong {
+  color: #1380c3;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.teacher-roster-summary span {
+  margin-top: 3px;
+  color: #748b9a;
+  font-size: 7.5px;
+  font-weight: 700;
+}
+
+.teacher-roster-summary .pending strong {
+  color: #e0a026;
+}
+
+.teacher-roster-summary .blocked strong {
+  color: #df5f58;
+}
+
+.teacher-roster-summary .synced strong {
+  color: #2e667d;
+  font-size: 11px;
+}
+
+.teacher-roster-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5eef2;
+}
+
+.teacher-roster-filters {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.teacher-roster-filters button {
+  min-height: 27px;
+  padding: 0 9px;
+  border: 1px solid #d6e6ec;
+  border-radius: 999px;
+  color: #587389;
+  background: #fff;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.teacher-roster-filters button.active {
+  border-color: #76b5df;
+  color: #155e9c;
+  background: #edf6ff;
+}
+
+.teacher-roster-toolbar input {
+  width: min(260px, 36vw);
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d4e4eb;
+  border-radius: 8px;
+  color: #234a65;
+  background: #fbfdfe;
+  font: inherit;
+  font-size: 8.5px;
+  outline: none;
+}
+
+.teacher-roster-toolbar input:focus {
+  border-color: #69b7d6;
+  box-shadow: 0 0 0 3px rgba(55, 167, 207, .09);
+}
+
+.teacher-roster-error {
+  margin: 9px 10px 0;
+  padding: 8px 10px;
+  border: 1px solid #f0c5c1;
+  border-radius: 8px;
+  color: #a9423d;
+  background: #fff3f1;
+  font-size: 8.5px;
+  font-weight: 750;
+}
+
+.teacher-roster-table-wrap {
+  max-height: 310px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.teacher-roster-table {
+  width: 100%;
+  min-width: 670px;
+  border-collapse: collapse;
+}
+
+.teacher-roster-table thead {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  background: #eef5f8;
+}
+
+.teacher-roster-table th,
+.teacher-roster-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8eff2;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 8.5px;
+}
+
+.teacher-roster-table th {
+  color: #557286;
+  font-size: 7.5px;
+  font-weight: 900;
+}
+
+.teacher-roster-table td {
+  color: #355a72;
+}
+
+.teacher-roster-table td:first-child {
+  min-width: 175px;
+}
+
+.teacher-roster-table td strong {
+  display: block;
+  color: #173f61;
+  font-size: 9px;
+}
+
+.teacher-roster-table td small {
+  display: block;
+  margin-top: 2px;
+  color: #8699a5;
+  font-size: 7px;
+}
+
+.teacher-roster-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 21px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 7px;
+  font-weight: 850;
+}
+
+.teacher-roster-status.approved {
+  color: #0c8064;
+  background: #eaf8f3;
+}
+
+.teacher-roster-status.pending {
+  color: #9b6a0e;
+  background: #fff5db;
+}
+
+.teacher-roster-status.blocked {
+  color: #ad4844;
+  background: #fff0ee;
+}
+
+.teacher-roster-table td:last-child button {
+  min-height: 27px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 7.5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.teacher-roster-table button.approve,
+.teacher-roster-table button.restore {
+  border: 1px solid #b6ddcf;
+  color: #0d7760;
+  background: #eef9f5;
+}
+
+.teacher-roster-table button.remove {
+  border: 1px solid #efc6c2;
+  color: #a94742;
+  background: #fff4f2;
+}
+
+.teacher-roster-table button:disabled {
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.teacher-roster-empty {
+  padding: 24px;
+  color: #79909e;
+  text-align: center;
+  font-size: 9px;
+}
+
+@media (max-width: 900px) {
+  .teacher-roster-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .teacher-roster-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .teacher-roster-toolbar input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .teacher-roster-manager > header {
+    flex-direction: column;
+  }
+
+  .teacher-roster-manager > header > button {
+    width: 100%;
+  }
+
+  .teacher-roster-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .teacher-roster-sync-compact > div {
+    display: none;
+  }
+}

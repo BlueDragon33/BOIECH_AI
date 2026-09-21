@@ -15,6 +15,7 @@ import "./teacher-dashboard-visual-v5.css";
 import "./teacher-dashboard-data-v6.css";
 import "./teacher-dashboard-actions-v7.css";
 import "./teacher-dashboard-visual-v8.css";
+import "./teacher-roster-sync-v9.css";
 import "./teacher-learning-analytics-l7.css";
 import "./teacher-smart-interventions-l8.css";
 import "./two-way-messaging-l9.css";
@@ -26,6 +27,7 @@ import TeacherRoleShell from "./teacher-role-shell";
 import TeacherActionBridge from "./teacher-action-bridge";
 import MultiAccountSwitcher from "./multi-account-switcher";
 import TeacherDashboardBlueprint from "./teacher-dashboard-blueprint";
+import TeacherRosterManager from "./teacher-roster-manager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -78,6 +80,7 @@ export default function RootLayout({
         <TeacherActionBridge />
         <MultiAccountSwitcher />
         <TeacherDashboardBlueprint />
+        <TeacherRosterManager />
       </body>
     </html>
   );
