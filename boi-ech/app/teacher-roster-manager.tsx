@@ -413,9 +413,10 @@ export default function TeacherRosterManager() {
     });
 
     const refreshVisibleTeacher = async () => {
-      if (document.visibilityState !== "visible" || document.body.dataset.teacherRoleUi !== "active") return;
-      const alreadySynced = await ensureTeacherDeviceSynced();
-      if (!alreadySynced) await syncRoster("auto");
+      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") {
+        const alreadySynced = await ensureTeacherDeviceSynced();
+        if (!alreadySynced) await syncRoster("auto");
+      }
     };
 
     interval = window.setInterval(() => {
