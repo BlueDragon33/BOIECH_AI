@@ -4,12 +4,22 @@ import fs from "node:fs";
 
 const manager = fs.readFileSync(new URL("../app/teacher-roster-manager.tsx", import.meta.url), "utf8");
 
-test("roster sync never calls the teacher endpoint while teacher role UI is inactive", () => {
-  assert.match(manager, /if \(document\.body\.dataset\.teacherRoleUi !== "active"\) return;/);
-  const effectStart = manager.indexOf("useEffect(() =>");
-  const intervalStart = manager.indexOf("window.setInterval", effectStart);
-  const effectPrefix = manager.slice(effectStart, intervalStart);
-  assert.doesNotMatch(effectPrefix, /deriveDeviceId\(\)\.then\([\s\S]*syncRoster\("auto"\)/);
+test("roster sync guards teacher role before deriving identity or calling roster API", () => {
+  const syncStart = manager.indexOf("const syncRoster = async");
+  const syncEnd = manager.indexOf("const mutate = async", syncStart);
+  const syncBlock = manager.slice(syncStart, syncEnd);
+  const syncGuard = syncBlock.indexOf('document.body.dataset.teacherRoleUi !== "active"');
+  const syncRequest = syncBlock.indexOf('requestRoster(deviceId, "list")');
+  assert.ok(syncGuard >= 0);
+  assert.ok(syncRequest > syncGuard);
+
+  const ensureStart = manager.indexOf("const ensureTeacherDeviceSynced = async () => {");
+  const ensureEnd = manager.indexOf("const updateMounts", ensureStart);
+  const ensureBlock = manager.slice(ensureStart, ensureEnd);
+  const ensureGuard = ensureBlock.indexOf('document.body.dataset.teacherRoleUi !== "active"');
+  const derive = ensureBlock.indexOf("deriveDeviceId()");
+  assert.ok(ensureGuard >= 0);
+  assert.ok(derive > ensureGuard);
 });
 
 test("leaving teacher role clears roster state and invalidates in-flight requests", () => {
@@ -41,6 +51,6 @@ test("only one roster request is allowed at a time for the active account", () =
 
 test("visible-tab auto refresh remains at the requested 60-second cadence", () => {
   assert.match(manager, /window\.setInterval\([\s\S]*60_000/);
-  assert.match(manager, /document\.visibilityState !== "visible"/);
+  assert.match(manager, /document\.visibilityState === "visible"/);
   assert.match(manager, /document\.addEventListener\("visibilitychange", onVisible\)/);
 });
