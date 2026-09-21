@@ -268,7 +268,7 @@ export default function TeacherRosterManager() {
     forcedDeviceId = "",
   ) => {
     if (document.body.dataset.teacherRoleUi !== "active") return;
-    if (syncingRef.current && !forcedDeviceId) return;
+    if (syncingRef.current) return;
     const generation = syncGenerationRef.current;
     syncingRef.current = true;
     setLoading(true);
@@ -355,9 +355,9 @@ export default function TeacherRosterManager() {
     };
 
     const ensureTeacherDeviceSynced = async () => {
-      if (document.body.dataset.teacherRoleUi !== "active") return;
+      if (document.body.dataset.teacherRoleUi !== "active") return false;
       const deviceId = await deriveDeviceId().catch(() => "");
-      if (!deviceId || document.body.dataset.teacherRoleUi !== "active") return;
+      if (!deviceId || document.body.dataset.teacherRoleUi !== "active") return false;
       const changedDevice = Boolean(deviceIdRef.current && deviceIdRef.current !== deviceId);
       const needsInitialSync = syncedDeviceRef.current !== deviceId;
       if (changedDevice) {
@@ -373,7 +373,11 @@ export default function TeacherRosterManager() {
       } else {
         deviceIdRef.current = deviceId;
       }
-      if (needsInitialSync || changedDevice) void syncRoster("auto", deviceId);
+      if (needsInitialSync || changedDevice) {
+        await syncRoster("auto", deviceId);
+        return true;
+      }
+      return false;
     };
 
     const updateMounts = () => {
@@ -408,16 +412,18 @@ export default function TeacherRosterManager() {
       attributeFilter: ["data-teacher-role-ui", "class", "title", "data-device-id"],
     });
 
+    const refreshVisibleTeacher = async () => {
+      if (document.visibilityState !== "visible" || document.body.dataset.teacherRoleUi !== "active") return;
+      const alreadySynced = await ensureTeacherDeviceSynced();
+      if (!alreadySynced) await syncRoster("auto");
+    };
+
     interval = window.setInterval(() => {
-      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") {
-        void ensureTeacherDeviceSynced().then(() => void syncRoster("auto"));
-      }
+      void refreshVisibleTeacher();
     }, 60_000);
 
     const onVisible = () => {
-      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") {
-        void ensureTeacherDeviceSynced().then(() => void syncRoster("auto"));
-      }
+      void refreshVisibleTeacher();
     };
     document.addEventListener("visibilitychange", onVisible);
 
