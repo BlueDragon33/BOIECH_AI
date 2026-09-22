@@ -8,11 +8,9 @@ import MediaPipeConsentGate from "./privacy-consent";
 const VideoAnalyzer = dynamic(() => import("./video-analyzer"), {
   ssr: false,
   loading: () => (
-    <div style={{ maxWidth: 1240, margin: "0 auto", padding: 28, fontFamily: "Arial, Helvetica, sans-serif", color: "#102b3f" }}>
-      <div style={{ padding: 24, border: "1px solid #dbe8ea", borderRadius: 20, background: "#f4fbfb" }}>
-        Đang mở bộ phân tích video cục bộ…
-      </div>
-    </div>
+    <section className="video-analysis-loading-v37">
+      <div>Đang mở bộ phân tích video cục bộ…</div>
+    </section>
   ),
 });
 
@@ -25,12 +23,14 @@ export default function LocalVideoAnalysisPage() {
   const returnTab = teacherTabs.has(requestedTab) ? requestedTab : "analysis";
   const classQuery = requestedClass ? `&class=${encodeURIComponent(requestedClass)}` : "";
   const returnHref = returnMode === "teacher" ? `/?workspace=teacher&tab=${encodeURIComponent(returnTab)}${classQuery}` : "/";
+
   return (
-    <main style={{ minHeight: "100vh", background: "#f6fafb", paddingBottom: 48 }}>
-      <div style={{ maxWidth: 1240, margin: "0 auto", padding: "18px 28px 0", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <Link href={returnHref} style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#075568", textDecoration: "none", fontWeight: 800, fontSize: 13 }}>
-          ← Quay lại Bơi ếch AI
-        </Link>
+    <main data-video-analysis-v37>
+      <div className="video-analysis-topbar-v37">
+        <div className="video-analysis-topbar-inner-v37">
+          <Link href={returnHref} className="video-analysis-back-v37">← Quay lại Bơi ếch AI</Link>
+          <div className="video-analysis-topbar-state-v37"><i/>Xử lý video cục bộ · không tải video gốc lên máy chủ</div>
+        </div>
       </div>
       <MediaPipeConsentGate>
         <VideoAnalyzer lessonNumber="03" />
