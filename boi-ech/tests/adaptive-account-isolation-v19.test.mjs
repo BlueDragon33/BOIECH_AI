@@ -16,17 +16,19 @@ test("adaptive coach invalidates requests when learner role leaves the surface",
 
 test("adaptive coach clears previous learner data before loading a different device", () => {
   const changed = adaptive.indexOf("if (!deviceId || deviceRef.current === deviceId) return;");
-  const assign = adaptive.indexOf("deviceRef.current = deviceId;", changed);
-  const request = adaptive.indexOf("const requestId = ++requestRef.current;", assign);
-  const clear = adaptive.indexOf("setData(null);", request);
-  const load = adaptive.indexOf("loadAdaptiveProfile(deviceId)", clear);
+  const invalidate = adaptive.indexOf("requestRef.current += 1;", changed);
+  const assign = adaptive.indexOf("deviceRef.current = deviceId;", invalidate);
+  const clear = adaptive.indexOf("setData(null);", assign);
+  const refresh = adaptive.indexOf("refresh(false);", clear);
   assert.ok(changed >= 0);
-  assert.ok(assign > changed);
-  assert.ok(request > assign);
-  assert.ok(clear > request && clear < load);
+  assert.ok(invalidate > changed);
+  assert.ok(assign > invalidate);
+  assert.ok(clear > assign);
+  assert.ok(refresh > clear);
 });
 
 test("adaptive coach ignores stale responses after an account generation changes", () => {
-  assert.ok(adaptive.includes("if (requestRef.current === requestId) setData(next)"));
-  assert.ok(adaptive.includes("if (requestRef.current === requestId) setData(null)"));
+  assert.ok(adaptive.includes("const requestId = ++requestRef.current;"));
+  assert.ok(adaptive.includes("requestRef.current === requestId && deviceRef.current === deviceId"));
+  assert.ok(adaptive.includes("requestRef.current += 1;"));
 });

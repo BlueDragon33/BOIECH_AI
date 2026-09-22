@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
@@ -251,21 +251,33 @@ export default function StudentAdaptiveCoach() {
   const [loading, setLoading] = useState(false);
   const deviceRef = useRef("");
   const requestRef = useRef(0);
+  const loadingRef = useRef(false);
 
-  const refresh = () => {
+  const refresh = useCallback((preserveData = true) => {
     const deviceId = deviceRef.current;
-    if (!deviceId || loading) return;
+    if (!deviceId || loadingRef.current) return;
     const requestId = ++requestRef.current;
+    loadingRef.current = true;
     setLoading(true);
     loadAdaptiveProfile(deviceId)
-      .then((next) => { if (requestRef.current === requestId) setData(next); })
-      .catch(() => { if (requestRef.current === requestId) setData(null); })
-      .finally(() => { if (requestRef.current === requestId) setLoading(false); });
-  };
+      .then((next) => {
+        if (requestRef.current === requestId && deviceRef.current === deviceId) setData(next);
+      })
+      .catch(() => {
+        if (requestRef.current === requestId && !preserveData) setData(null);
+      })
+      .finally(() => {
+        if (requestRef.current === requestId) {
+          loadingRef.current = false;
+          setLoading(false);
+        }
+      });
+  }, []);
 
   useEffect(() => {
     if (window.location.pathname !== "/") return;
     let timer = 0;
+    let interval = 0;
 
     const sync = () => {
       timer = 0;
@@ -277,6 +289,7 @@ export default function StudentAdaptiveCoach() {
 
       if (!nextMount) {
         requestRef.current += 1;
+        loadingRef.current = false;
         deviceRef.current = "";
         setLoading(false);
         setData(null);
@@ -285,20 +298,22 @@ export default function StudentAdaptiveCoach() {
 
       deriveDeviceId().then((deviceId) => {
         if (!deviceId || deviceRef.current === deviceId) return;
+        requestRef.current += 1;
+        loadingRef.current = false;
         deviceRef.current = deviceId;
-        const requestId = ++requestRef.current;
+        setLoading(false);
         setData(null);
-        setLoading(true);
-        loadAdaptiveProfile(deviceId)
-          .then((next) => { if (requestRef.current === requestId) setData(next); })
-          .catch(() => { if (requestRef.current === requestId) setData(null); })
-          .finally(() => { if (requestRef.current === requestId) setLoading(false); });
+        refresh(false);
       }).catch(() => undefined);
     };
 
     const schedule = () => {
       if (timer) return;
       timer = window.setTimeout(sync, 0);
+    };
+
+    const refreshVisibleAdaptive = () => {
+      if (document.visibilityState === "visible") refresh(true);
     };
 
     schedule();
@@ -310,15 +325,21 @@ export default function StudentAdaptiveCoach() {
       attributes: true,
       attributeFilter: ["class", "title", "data-device-id"],
     });
+    interval = window.setInterval(refreshVisibleAdaptive, 120_000);
+    document.addEventListener("visibilitychange", refreshVisibleAdaptive);
 
     return () => {
       if (timer) window.clearTimeout(timer);
+      if (interval) window.clearInterval(interval);
       observer.disconnect();
+      document.removeEventListener("visibilitychange", refreshVisibleAdaptive);
       requestRef.current += 1;
+      loadingRef.current = false;
       deviceRef.current = "";
+      setLoading(false);
       setData(null);
     };
-  }, []);
+  }, [refresh]);
 
   if (!mount) return null;
   if (loading && !data) {
