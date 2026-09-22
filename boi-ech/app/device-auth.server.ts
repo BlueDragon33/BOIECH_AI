@@ -12,6 +12,7 @@ type DeviceAccessRow = {
   public_key_jwk: string;
   status: DeviceStatus;
   device_type?: DeviceType | null;
+  device_type_override?: DeviceType | null;
   platform?: string | null;
   browser?: string | null;
   label: string | null;
@@ -53,6 +54,8 @@ export type PublicDeviceState = {
   deviceCode: string;
   status: DeviceStatus;
   deviceType: DeviceType;
+  detectedDeviceType: DeviceType;
+  deviceTypeOverride: DeviceType | null;
   platform: string | null;
   browser: string | null;
   label: string | null;
@@ -116,6 +119,7 @@ export async function getCourseDatabase() {
         public_key_jwk TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
         device_type TEXT NOT NULL DEFAULT 'desktop',
+        device_type_override TEXT,
         platform TEXT,
         browser TEXT,
         user_agent TEXT,
@@ -217,6 +221,7 @@ export async function getCourseDatabase() {
     const profileColumns = new Set((profileInfo.results ?? []).map((column) => column.name));
     const repairs = [];
     if (!accessColumns.has("device_type")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type TEXT NOT NULL DEFAULT 'desktop'"));
+    if (!accessColumns.has("device_type_override")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type_override TEXT"));
     if (!accessColumns.has("platform")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN platform TEXT"));
     if (!accessColumns.has("browser")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN browser TEXT"));
     if (!accessColumns.has("user_agent")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN user_agent TEXT"));
@@ -296,6 +301,10 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
   const personCode = row.person_code?.trim() || null;
   const className = row.class_name?.trim() || null;
   const phone = row.phone?.trim() || null;
+  const detectedDeviceType: DeviceType = row.device_type === "phone" || row.device_type === "tablet" ? row.device_type : "desktop";
+  const deviceTypeOverride: DeviceType | null = row.device_type_override === "desktop" || row.device_type_override === "phone" || row.device_type_override === "tablet"
+    ? row.device_type_override
+    : null;
   const accessExpiresAt = row.access_expires_at ?? null;
   const expiryTime = accessExpiresAt ? Date.parse(accessExpiresAt) : Number.NaN;
   const accessExpired = Number.isFinite(expiryTime) && expiryTime <= Date.now();
@@ -307,7 +316,9 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
     deviceId: row.device_id,
     deviceCode: row.display_code,
     status: row.status,
-    deviceType: row.device_type === "phone" || row.device_type === "tablet" ? row.device_type : "desktop",
+    deviceType: deviceTypeOverride ?? detectedDeviceType,
+    detectedDeviceType,
+    deviceTypeOverride,
     platform: row.platform?.trim() || null,
     browser: row.browser?.trim() || null,
     label: row.label,
@@ -334,13 +345,21 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
   };
 }
 
-const deviceColumns = `device_id, display_code, public_key_jwk, status, device_type, platform, browser, label, learner_name,
+const deviceColumns = `device_id, display_code, public_key_jwk, status, device_type, device_type_override, platform, browser, label, learner_name,
   learner_family_name, learner_given_name, person_role, person_code,
   class_name, phone, registration_submitted_at, access_group, payment_status,
   payment_proof_key, payment_proof_name, payment_proof_content_type, payment_proof_size,
   payment_submitted_at, payment_verified_at, payment_rejected_at, payment_review_note,
   access_expires_at, personal_edit_enabled, auto_confirmed_at, created_at,
   approved_at, blocked_at, last_seen_at`;
+
+export async function getPublicDeviceState(deviceId: string): Promise<PublicDeviceState | null> {
+  const database = await getCourseDatabase();
+  const row = await database.prepare(
+    `SELECT ${deviceColumns} FROM device_access WHERE device_id = ?`,
+  ).bind(deviceId).first<DeviceAccessRow>();
+  return row ? publicState(row) : null;
+}
 
 export async function getAccessAutomationSettings(): Promise<AccessAutomationSettings> {
   const database = await getCourseDatabase();
@@ -445,6 +464,8 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
     deviceCode: displayCode,
     status,
     deviceType: "desktop",
+    detectedDeviceType: "desktop",
+    deviceTypeOverride: null,
     platform: null,
     browser: null,
     label: null,

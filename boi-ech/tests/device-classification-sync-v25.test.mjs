@@ -10,12 +10,17 @@ test("device classification is synchronized from server metadata into the author
 
   assert.match(auth, /export type DeviceType = "desktop" \| "phone" \| "tablet"/);
   assert.match(auth, /deviceType: DeviceType/);
-  assert.match(auth, /device_type, platform, browser/);
-  assert.match(auth, /deviceType: row\.device_type === "phone" \|\| row\.device_type === "tablet"/);
+  assert.match(auth, /device_type, device_type_override, platform, browser/);
+  assert.match(auth, /deviceType: deviceTypeOverride \?\? detectedDeviceType/);
 
   assert.match(metadata, /return \{ deviceType, platform, browser \}/);
-  assert.match(route, /const metadata = await captureDeviceMetadata\(request, device\.deviceId\)/);
-  assert.match(route, /device = \{ \.\.\.device, \.\.\.metadata \}/);
+  assert.match(route, /await captureDeviceMetadata\(request, device\.deviceId\)/);
+  assert.match(route, /getPublicDeviceState\(device\.deviceId\)/);
+
+  const capture = route.indexOf("await captureDeviceMetadata(request, device.deviceId)");
+  const canonical = route.indexOf("getPublicDeviceState(device.deviceId)", capture);
+  assert.ok(capture >= 0);
+  assert.ok(canonical > capture);
 
   assert.match(page, /deviceType: "desktop" \| "phone" \| "tablet"/);
   assert.match(page, /data-device-id=\{deviceAccess\.deviceId\}/);

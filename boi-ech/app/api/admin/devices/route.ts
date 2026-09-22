@@ -15,6 +15,7 @@ type AdminDeviceRow = {
   display_code: string;
   status: "pending" | "approved" | "blocked";
   device_type: "desktop" | "phone" | "tablet";
+  device_type_override: "desktop" | "phone" | "tablet" | null;
   platform: string | null;
   browser: string | null;
   label: string | null;
@@ -61,11 +62,17 @@ function summary(row: AdminDeviceRow) {
   const lastActivityTime = Date.parse(lastActivity);
   const accessExpired = Boolean(row.access_expires_at && Date.parse(row.access_expires_at) <= Date.now());
   const active = row.status === "approved" && !accessExpired && Number.isFinite(lastActivityTime) && Date.now() - lastActivityTime <= 15 * 60 * 1000;
+  const detectedDeviceType = row.device_type === "phone" || row.device_type === "tablet" ? row.device_type : "desktop";
+  const deviceTypeOverride = row.device_type_override === "desktop" || row.device_type_override === "phone" || row.device_type_override === "tablet"
+    ? row.device_type_override
+    : null;
   return {
     deviceId: row.device_id,
     deviceCode: row.display_code,
     status: row.status,
-    deviceType: row.device_type,
+    deviceType: deviceTypeOverride ?? detectedDeviceType,
+    detectedDeviceType,
+    deviceTypeOverride,
     platform: row.platform,
     browser: row.browser,
     label: row.label,
@@ -96,7 +103,7 @@ function summary(row: AdminDeviceRow) {
 async function listDevices() {
   const database = await getCourseDatabase();
   const result = await database.prepare(
-    `SELECT d.device_id, d.display_code, d.status, d.device_type, d.platform, d.browser, d.label, d.learner_name,
+    `SELECT d.device_id, d.display_code, d.status, d.device_type, d.device_type_override, d.platform, d.browser, d.label, d.learner_name,
             d.learner_family_name, d.learner_given_name, d.class_name,
             d.phone, d.registration_submitted_at,
             d.access_expires_at, d.created_at, d.approved_at, d.blocked_at, d.last_seen_at,
@@ -162,6 +169,14 @@ export async function POST(request: Request) {
       await database.prepare(
         "UPDATE device_access SET label = ? WHERE device_id = ?",
       ).bind(label || null, deviceId).run();
+    } else if (action === "device-type") {
+      const requestedType = typeof payload.deviceType === "string" ? payload.deviceType : "auto";
+      if (!["auto", "desktop", "phone", "tablet"].includes(requestedType)) {
+        throw new DeviceAccessError("Phân loại thiết bị không hợp lệ.", 400, "INVALID_DEVICE_TYPE");
+      }
+      await database.prepare(
+        "UPDATE device_access SET device_type_override = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
+      ).bind(requestedType === "auto" ? null : requestedType, deviceId).run();
     } else if (action === "profile") {
       const learnerName = typeof payload.learnerName === "string" ? payload.learnerName.trim().slice(0, 100) : "";
       const accessExpiresAt = normalizeAccessExpiry(payload.accessExpiresAt);

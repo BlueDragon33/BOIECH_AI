@@ -239,7 +239,10 @@ test("keeps device administration separate from the learner route", async () => 
   assert.match(adminPage, /requireChatGPTUser\("\/quan-ly-thiet-bi"\)/);
   assert.match(adminPage, /isDeviceAdminEmail\(user\.email\)/);
   assert.match(deviceServer, /DEVICE_ADMIN_EMAILS/);
-  assert.match(adminClient, /action, deviceId/);
+  assert.match(adminClient, /body: JSON\.stringify\(/);
+  assert.match(adminClient, /action,/);
+  assert.match(adminClient, /deviceId,/);
+  assert.match(adminClient, /fetch\("\/api\/admin\/devices"/);
   assert.match(adminClient, /Cấp quyền/);
   assert.match(adminClient, /Khóa thiết bị/);
 });

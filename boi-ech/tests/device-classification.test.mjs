@@ -14,7 +14,7 @@ test("classifies Boi Ech access devices without replacing BE identities", async 
   assert.match(metadata, /UPDATE device_access/);
   assert.match(deviceRoute, /registerDevice\(payload\.publicKey, payload\.legacyToken, autoApprove\)/);
   assert.match(deviceRoute, /captureDeviceMetadata\(request, device\.deviceId\)/);
-  assert.match(adminRoute, /d\.device_type, d\.platform, d\.browser/);
+  assert.match(adminRoute, /d\.device_type, d\.device_type_override, d\.platform, d\.browser/);
   assert.match(manager, /Máy tính bảng \/ iPad/);
   assert.match(manager, /Điện thoại/);
   assert.match(manager, /device\.deviceType/);

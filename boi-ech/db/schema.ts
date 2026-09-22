@@ -16,6 +16,7 @@ export const deviceAccess = sqliteTable("device_access", {
   publicKeyJwk: text("public_key_jwk").notNull(),
   status: text("status").notNull().default("pending"),
   deviceType: text("device_type").notNull().default("desktop"),
+  deviceTypeOverride: text("device_type_override"),
   platform: text("platform"),
   browser: text("browser"),
   userAgent: text("user_agent"),
