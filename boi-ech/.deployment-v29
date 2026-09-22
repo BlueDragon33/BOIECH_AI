@@ -1,7 +1,10 @@
-Production deployment trigger for Bơi ếch V29.
+Production deployment trigger for Bơi ếch.
 
 Target source commit before trigger:
-dcfb24a125f20d742fa4d74b9c351041ec8829b0
+844275755dcf44d40471dec041b96300cb495985
+
+Release scope:
+Teacher multi-class control center V30-V34, clean navigation, working lesson editor return flow, scoped tasks/reports/messages/schedule/video analysis.
 
 Purpose:
-Re-deploy the current main branch to Cloudflare production after the V29 production pipeline fix.
+Deploy the current main branch to Cloudflare production.
