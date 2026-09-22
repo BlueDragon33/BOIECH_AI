@@ -432,12 +432,15 @@ export default function TeacherRosterManager() {
       void refreshVisibleTeacher();
     };
     document.addEventListener("visibilitychange", onVisible);
+    const onManualSyncRequested = () => { setChangedCount(0); void syncRoster("manual"); };
+    window.addEventListener("boi-ech:teacher-roster-sync", onManualSyncRequested);
 
     return () => {
       if (timer) window.clearTimeout(timer);
       if (interval) window.clearInterval(interval);
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("boi-ech:teacher-roster-sync", onManualSyncRequested);
       syncGenerationRef.current += 1;
       teacherActiveRef.current = false;
       clearRosterState();
