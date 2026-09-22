@@ -72,7 +72,7 @@ jobs:
         working-directory: boi-ech
         env:
           CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.d1.jsonc
-        run: npx vite build
+        run: npm run build
 
       - name: Verify production D1 binding in generated artifact
         working-directory: boi-ech
