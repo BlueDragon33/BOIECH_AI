@@ -7,7 +7,9 @@ const adaptive = fs.readFileSync(new URL("../app/student-adaptive-coach.tsx", im
 test("manual Adaptive Coach refresh exposes loading feedback without clearing current data", () => {
   assert.ok(adaptive.includes("loading: boolean;"));
   assert.ok(adaptive.includes('disabled={loading}>{loading ? "Đang cập nhật…" : "Cập nhật"}</button>'));
-  assert.ok(adaptive.includes("<AdaptiveCoach data={data} reload={refresh} loading={loading} />"));
+  assert.ok(adaptive.includes("<AdaptiveCoach data={data}"));
+  assert.ok(adaptive.includes("reload={refresh}"));
+  assert.ok(adaptive.includes("loading={loading}"));
 });
 
 test("manual refresh feedback reuses the existing duplicate-request guard", () => {
@@ -18,5 +20,6 @@ test("manual refresh feedback reuses the existing duplicate-request guard", () =
 
 test("background refresh still preserves the current learner model", () => {
   assert.ok(adaptive.includes("refresh(true)"));
-  assert.ok(adaptive.includes("if (requestRef.current === requestId && !preserveData)"));
+  assert.ok(adaptive.includes("if (requestRef.current === requestId)"));
+  assert.ok(adaptive.includes("if (!preserveData) setData(null);"));
 });
