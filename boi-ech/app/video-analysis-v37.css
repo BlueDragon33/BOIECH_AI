@@ -1,0 +1,207 @@
+/* V37 · Standalone local video workspace shell */
+[data-video-analysis-v37] {
+  min-height: 100vh;
+  padding-bottom: 54px;
+  color: #edf8fc;
+  background:
+    radial-gradient(circle at 75% -12%, rgba(35, 183, 224, .18), transparent 33%),
+    radial-gradient(circle at 8% 96%, rgba(13, 111, 158, .18), transparent 30%),
+    linear-gradient(180deg, #082338, #061927 64%, #051723);
+}
+
+.video-analysis-topbar-v37 {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  border-bottom: 1px solid rgba(91, 206, 234, .14);
+  background: rgba(4, 29, 45, .92);
+  backdrop-filter: blur(18px);
+}
+
+.video-analysis-topbar-inner-v37 {
+  max-width: 1240px;
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.video-analysis-back-v37 {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(77, 197, 229, .20);
+  border-radius: 10px;
+  color: #dff7fd;
+  background: rgba(8, 54, 76, .58);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.video-analysis-topbar-state-v37 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #91b4c4;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.video-analysis-topbar-state-v37 i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #46e4a4;
+  box-shadow: 0 0 0 5px rgba(70, 228, 164, .08);
+}
+
+.video-analysis-loading-v37,
+.video-consent-shell-v37 {
+  max-width: 1240px;
+  margin: 18px auto 0;
+  padding: 0 28px;
+}
+
+.video-analysis-loading-v37 > div,
+.video-consent-card-v37,
+.video-consent-active-v37 {
+  border: 1px solid rgba(95, 190, 218, .18);
+  border-radius: 16px;
+  color: #dceef5;
+  background: rgba(6, 35, 53, .94);
+  box-shadow: 0 14px 30px rgba(0, 12, 23, .16);
+}
+
+.video-analysis-loading-v37 > div {
+  padding: 20px;
+}
+
+.video-consent-card-v37 {
+  padding: 22px;
+}
+
+.video-consent-card-v37 > span {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #59d7f4;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.video-consent-card-v37 h1 {
+  margin: 0 0 10px;
+  color: #f4fbfd;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.video-consent-card-v37 p {
+  margin: 0 0 12px;
+  color: #a7c0cc;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.video-consent-card-v37 p.secondary {
+  color: #80a4b5;
+  font-size: 12px;
+}
+
+.video-consent-check-v37 {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid rgba(95, 190, 218, .14);
+  border-radius: 12px;
+  color: #b9d0da;
+  background: rgba(5, 30, 46, .56);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.video-consent-check-v37 input {
+  margin-top: 3px;
+  accent-color: #2fc1ed;
+}
+
+.video-consent-actions-v37 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.video-consent-actions-v37 button,
+.video-consent-actions-v37 a,
+.video-consent-active-v37 button {
+  min-height: 40px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(73, 204, 237, .26);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.video-consent-actions-v37 button {
+  border: 0;
+  color: #04293a;
+  background: linear-gradient(135deg, #59ddff, #30bae9);
+}
+
+.video-consent-actions-v37 button:disabled {
+  color: #7893a0;
+  background: #294554;
+  cursor: not-allowed;
+}
+
+.video-consent-actions-v37 a,
+.video-consent-active-v37 button {
+  color: #dff7fd;
+  background: rgba(9, 67, 92, .52);
+}
+
+.video-consent-active-v37 {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #9fbac7;
+  font-size: 11px;
+}
+
+.video-consent-active-v37 strong {
+  color: #64e6b0;
+}
+
+@media (max-width: 640px) {
+  .video-analysis-topbar-inner-v37,
+  .video-analysis-loading-v37,
+  .video-consent-shell-v37 {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .video-analysis-topbar-state-v37 {
+    display: none;
+  }
+
+  .video-consent-active-v37 {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

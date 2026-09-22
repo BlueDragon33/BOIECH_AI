@@ -22,3 +22,170 @@
 .qualityRetry{border-color:#efcfcf;background:#fff7f7}.qualityRetry>header span{color:#963434}.qualityRetry>header>b{background:#f4dada;color:#963434}
 @media(max-width:900px){.preflight{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.preflight{grid-template-columns:1fr 1fr}.preflight>div{padding:9px}.qualityPanel{padding:17px}.qualityPanel>header{display:grid}.qualityMetrics{grid-template-columns:1fr}}
+
+
+/* V37 dark reference skin — aligns local video analysis with teacher V36/V37 workspace. */
+.shell{
+  --ink:#eef8fc;
+  --muted:#96b2c0;
+  --line:rgba(96,190,218,.18);
+  --panel:rgba(6,35,53,.94);
+  --soft:rgba(8,47,67,.72);
+  --accent:#43cef4;
+  --deep:#0e709c;
+  color:var(--ink);
+}
+.hero{
+  border-color:rgba(83,198,229,.20);
+  background:
+    radial-gradient(circle at 90% 0%,rgba(47,201,239,.13),transparent 36%),
+    linear-gradient(145deg,rgba(8,46,66,.98),rgba(5,29,45,.98));
+  box-shadow:0 18px 48px rgba(0,12,23,.20);
+}
+.hero p{color:var(--muted)}
+.hero aside{
+  border:1px solid rgba(73,205,238,.18);
+  background:rgba(4,27,42,.70);
+}
+.hero aside span{color:#90afbd}
+.privacyBar{
+  border-color:rgba(70,228,164,.22);
+  background:rgba(20,92,70,.22);
+}
+.privacyBar i{background:#168860}
+.privacyBar span{color:#a5c5b9}
+.privacyBar b{background:rgba(47,189,132,.18);color:#71edb8}
+.reference,.videoPanel,.controlPanel,.report{
+  border-color:var(--line);
+  background:var(--panel);
+  box-shadow:0 14px 34px rgba(0,12,23,.17);
+}
+.reference header small{color:var(--muted)}
+.referenceInput input{
+  border-color:rgba(89,190,219,.20);
+  color:#e8f6fb;
+  background:rgba(4,28,43,.72);
+}
+.referenceInput input:focus{
+  border-color:rgba(67,206,244,.62);
+  box-shadow:0 0 0 3px rgba(55,205,247,.08);
+}
+.referenceInput button,.aiCache button{
+  color:#dff8ff;
+  background:rgba(12,83,111,.72);
+}
+.videoPanel header b{
+  background:rgba(76,135,158,.17);
+  color:#a8c4d0;
+}
+.fileActions span{
+  border-color:rgba(91,190,219,.20);
+  color:#d7edf5;
+  background:rgba(7,44,63,.70);
+}
+.emptyVideo{
+  border-color:rgba(100,196,222,.25);
+  background:linear-gradient(145deg,rgba(7,42,60,.78),rgba(4,27,42,.78));
+}
+.emptyVideo span{background:linear-gradient(135deg,#1d9bca,#0d668f)}
+.viewSwitch button{
+  border-color:rgba(91,190,219,.18);
+  color:var(--ink);
+  background:rgba(7,42,60,.66);
+}
+.viewSwitch button small{color:var(--muted)}
+.viewSwitch button.active{
+  border-color:rgba(61,210,246,.64);
+  background:rgba(15,104,139,.32);
+  box-shadow:inset 0 0 0 1px rgba(61,210,246,.24);
+}
+.aiCache{background:rgba(5,30,46,.58)}
+.aiCache i{background:#d8a12f}
+.aiCache i.ready{background:#46e4a4}
+.analyzeButton{
+  color:#04283a;
+  background:linear-gradient(135deg,#59ddff,#31b8e7);
+  box-shadow:0 10px 26px rgba(17,143,196,.20);
+}
+.progress{background:rgba(96,168,193,.16)}
+.progress i{background:linear-gradient(90deg,#37cdf7,#46e4c0)}
+.status{color:#a9c2cd}
+.disclaimer{
+  border-top-color:rgba(97,183,209,.14);
+  color:#789aaa;
+}
+.report>header p{color:var(--muted)}
+.report>header>strong{color:#62daf8}
+.report>header>strong small{color:#85a7b6}
+.scores div{background:rgba(7,44,63,.68)}
+.scores span{color:#91afbd}
+.errorList article{
+  border-color:rgba(255,211,77,.24);
+  background:rgba(91,71,26,.18);
+}
+.errorList article.critical{
+  border-color:rgba(255,110,102,.28);
+  background:rgba(91,35,38,.20);
+}
+.errorList article header>span{
+  background:rgba(208,158,46,.18);
+  color:#ffd760;
+}
+.errorList article.critical header>span{
+  background:rgba(208,79,72,.18);
+  color:#ff8d86;
+}
+.errorList article header small,.errorList article p{color:#a7bdc7}
+.errorList article header>b{
+  background:rgba(209,159,47,.18);
+  color:#ffd760;
+}
+.errorList article.critical header>b{
+  background:rgba(208,79,72,.18);
+  color:#ff8d86;
+}
+.errorList article footer{border-top-color:rgba(121,184,204,.12)}
+.errorList article footer span{color:#91afbd}
+.frames{border-top-color:var(--line)}
+.frames>header small,.frames figcaption span{color:#85a5b4}
+.frames figure{
+  border-color:var(--line);
+  background:rgba(5,30,46,.74);
+}
+.preflight>div{
+  border-color:rgba(94,187,214,.18);
+  background:rgba(7,43,61,.68);
+}
+.preflight i{background:rgba(87,139,159,.18);color:#a3bdc9}
+.preflight span{color:#8dabba}
+.preflight .pass{
+  border-color:rgba(70,228,164,.22);
+  background:rgba(24,105,78,.18);
+}
+.preflight .pass i{background:rgba(51,190,136,.18);color:#70edb8}
+.preflight .fail{
+  border-color:rgba(255,110,102,.28);
+  background:rgba(92,36,39,.19);
+}
+.preflight .fail i{background:rgba(209,79,72,.18);color:#ff8d86}
+.qualityPanel{
+  border-color:rgba(70,228,164,.22);
+  background:rgba(20,91,69,.19);
+  box-shadow:0 14px 34px rgba(0,12,23,.14);
+}
+.qualityPanel>header span{color:#65e8ae}
+.qualityPanel>header>b{background:rgba(51,190,136,.18);color:#70edb8}
+.qualityMetrics>div{background:rgba(5,31,47,.48)}
+.qualityMetrics span,.qualityPanel ul{color:#a5c0b6}
+.qualityReview{
+  border-color:rgba(255,211,77,.25);
+  background:rgba(91,71,26,.18);
+}
+.qualityReview>header span{color:#ffd760}
+.qualityReview>header>b{background:rgba(209,159,47,.18);color:#ffd760}
+.qualityRetry{
+  border-color:rgba(255,110,102,.28);
+  background:rgba(91,35,38,.20);
+}
+.qualityRetry>header span{color:#ff8d86}
+.qualityRetry>header>b{background:rgba(208,79,72,.18);color:#ff8d86}
