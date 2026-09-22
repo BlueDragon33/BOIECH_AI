@@ -163,10 +163,12 @@ function AdaptiveCoach({
   data,
   reload,
   loading,
+  refreshError,
 }: {
   data: AdaptiveBootstrap;
   reload: () => void;
   loading: boolean;
+  refreshError: string;
 }) {
   const intelligence = data.intelligence;
   if (!data.settings?.enabled || !intelligence) return null;
@@ -191,6 +193,13 @@ function AdaptiveCoach({
           <span>Nắm vững bài ưu tiên</span>
         </div>
       </header>
+
+      {refreshError ? (
+        <div className="student-adaptive-stale" role="status">
+          <strong>Chưa cập nhật được Learner Model.</strong>
+          <span>Hệ thống đang giữ dữ liệu gần nhất để bạn tiếp tục học.</span>
+        </div>
+      ) : null}
 
       <div className="student-adaptive-body">
         <div className="student-adaptive-plan">
@@ -271,8 +280,8 @@ export default function StudentAdaptiveCoach() {
         }
       })
       .catch((caught) => {
-        if (requestRef.current === requestId && !preserveData) {
-          setData(null);
+        if (requestRef.current === requestId) {
+          if (!preserveData) setData(null);
           setError(caught instanceof Error ? caught.message : "Không thể tải Learner Model.");
         }
       })
@@ -377,5 +386,5 @@ export default function StudentAdaptiveCoach() {
       mount,
     );
   }
-  return data ? createPortal(<AdaptiveCoach data={data} reload={refresh} loading={loading} />, mount) : null;
+  return data ? createPortal(<AdaptiveCoach data={data} reload={refresh} loading={loading} refreshError={error} />, mount) : null;
 }
