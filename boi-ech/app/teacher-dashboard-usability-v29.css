@@ -101,7 +101,7 @@ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .main-area 
 .teacher-mode-badge,
 .teacher-topbar-tool,
 .teacher-alert-shortcut,
-body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .appearance-trigger {
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .appearance-trigger {
   min-height: 40px;
   font-size: calc(14px + var(--font-adjust, 0px)) !important;
 }
@@ -133,7 +133,7 @@ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .appearance
   background: rgba(255,255,255,.065);
   box-shadow: none;
 }
-body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .appearance-trigger > span {
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .topbar-actions > .appearance-trigger > span {
   color: #08334b;
   background: #7de3df;
 }
@@ -429,4 +429,10 @@ body[data-teacher-role-ui="active"] .appearance-panel input {
   .teacher-profile {
     grid-template-columns: 1fr !important;
   }
+}
+
+
+.teacher-watchlist .teacher-table-wrap,
+.teacher-analysis-queue-list {
+  max-height: 390px !important;
 }
