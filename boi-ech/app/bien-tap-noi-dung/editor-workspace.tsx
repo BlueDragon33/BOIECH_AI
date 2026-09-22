@@ -343,7 +343,7 @@ function VisualSectionEditor({ content, scope, onChange }: { content: EditableLe
   );
 }
 
-export default function EditorWorkspace({ user, initialLesson }: { user: { displayName: string; email: string }; initialLesson: string }) {
+export default function EditorWorkspace({ user, initialLesson, returnHref }: { user: { displayName: string; email: string }; initialLesson: string; returnHref: string }) {
   const [credential, setCredential] = useState<Credential | null>(null);
   const [device, setDevice] = useState<EditorDevice | null>(null);
   const [versions, setVersions] = useState<ContentVersion[]>([]);
@@ -469,7 +469,7 @@ export default function EditorWorkspace({ user, initialLesson }: { user: { displ
 
   return (
     <main className="edit-workspace">
-      <header className="edit-topbar"><Link href="/">← Trở lại khóa học</Link><div><span>Biên tập tại Site nội dung</span><strong>Bơi ếch</strong></div><div className="edit-user"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{user.email}</small></div><a href="/signout-with-chatgpt?return_to=/">Đăng xuất</a></div></header>
+      <header className="edit-topbar"><Link href={returnHref}>← Trở lại Bơi ếch AI</Link><div><span>Biên tập tại Site nội dung</span><strong>Bơi ếch</strong></div><div className="edit-user"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{user.email}</small></div><a href={`/signout-with-chatgpt?return_to=${encodeURIComponent(returnHref)}`}>Đăng xuất</a></div></header>
       <section className="edit-shell">
         <aside className="edit-rail">
           <div className="edit-device"><span>Laptop biên tập</span><strong>{device?.deviceCode || "Đang đăng ký…"}</strong><small>Yêu cầu chỉ có hiệu lực trên đúng laptop và tài khoản này.</small></div>
