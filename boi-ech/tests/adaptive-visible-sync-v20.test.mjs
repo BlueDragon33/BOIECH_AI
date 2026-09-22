@@ -25,6 +25,6 @@ test("adaptive refresh cannot write a stale learner response", () => {
 });
 
 test("transient background refresh failures preserve the current learner model", () => {
-  assert.ok(adaptive.includes("const refresh = (preserveData = true)"));
+  assert.ok(adaptive.includes("const refresh = useCallback((preserveData = true)"));
   assert.ok(adaptive.includes("requestRef.current === requestId && !preserveData"));
 });
