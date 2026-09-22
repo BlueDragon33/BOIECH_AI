@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type TeacherClassLearner = {
   name: string;
@@ -57,14 +57,6 @@ export default function TeacherClassWorkspace({
   }, [classes, learners]);
 
   const [selectedClass, setSelectedClass] = useState("");
-  useEffect(() => {
-    if (!summaries.length) {
-      setSelectedClass("");
-      return;
-    }
-    if (!summaries.some((item) => item.name === selectedClass)) setSelectedClass(summaries[0].name);
-  }, [selectedClass, summaries]);
-
   const selected = summaries.find((item) => item.name === selectedClass) ?? summaries[0] ?? null;
   const totalLearners = summaries.reduce((sum, item) => sum + item.learners.length, 0);
   const totalSupport = summaries.reduce((sum, item) => sum + item.support, 0);
