@@ -347,7 +347,13 @@ export default function StudentRoleShell() {
       if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-student-role-ui]"))) return;
       schedule();
     });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "disabled", "title"] });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["class", "disabled", "title", "data-device-id", "data-device-type", "data-device-platform", "data-device-browser"],
+    });
     return () => {
       if (timer) window.clearTimeout(timer);
       observer?.disconnect();
