@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 type TeacherClassLearner = {
   name: string;
@@ -17,6 +17,8 @@ type TeacherClassLearner = {
 type TeacherClassWorkspaceProps = {
   classes: string[];
   learners: TeacherClassLearner[];
+  selectedClass: string;
+  onSelectedClassChange: (className: string) => void;
   onOpenLearner: (personCode: string) => void;
   onOpenTasks: () => void;
   onOpenReports: () => void;
@@ -46,6 +48,8 @@ function classStats(name: string, learners: TeacherClassLearner[]) {
 export default function TeacherClassWorkspace({
   classes,
   learners,
+  selectedClass,
+  onSelectedClassChange,
   onOpenLearner,
   onOpenTasks,
   onOpenReports,
@@ -56,14 +60,16 @@ export default function TeacherClassWorkspace({
     return assigned.map((name) => classStats(name, learners));
   }, [classes, learners]);
 
-  const [selectedClass, setSelectedClass] = useState("");
   const selected = summaries.find((item) => item.name === selectedClass) ?? summaries[0] ?? null;
+  useEffect(() => {
+    if (selected && selected.name !== selectedClass) onSelectedClassChange(selected.name);
+  }, [onSelectedClassChange, selected, selectedClass]);
   const totalLearners = summaries.reduce((sum, item) => sum + item.learners.length, 0);
   const totalSupport = summaries.reduce((sum, item) => sum + item.support, 0);
   const averageProgress = totalLearners
     ? Math.round(summaries.reduce((sum, item) => sum + item.learners.reduce((inside, learner) => inside + learner.progress, 0), 0) / totalLearners)
     : 0;
-  const supportLearners = learners.filter((item) => item.needsSupport).slice(0, 5);
+  const supportLearners = selected?.learners.filter((item) => item.needsSupport).slice(0, 5) ?? [];
 
   return <section className="teacher-class-control-center">
     <header className="teacher-class-control-header">
@@ -82,7 +88,7 @@ export default function TeacherClassWorkspace({
       {summaries.map((item) => {
         const active = item.name === selected?.name;
         const status = item.support > 0 ? "Cần chú ý" : item.learners.length === 0 ? "Chưa có học viên" : "Đang theo dõi";
-        return <button key={item.name} type="button" role="listitem" className={active ? "active" : ""} onClick={() => setSelectedClass(item.name)}>
+        return <button key={item.name} type="button" role="listitem" className={active ? "active" : ""} onClick={() => onSelectedClassChange(item.name)}>
           <header><div className="teacher-class-card-icon">▦</div><div><strong>{item.name}</strong><small>{shortActivity(item.lastActivityAt)}</small></div><em data-tone={item.support > 0 ? "warn" : "ok"}>{status}</em></header>
           <dl>
             <div><dt>Sĩ số</dt><dd>{item.learners.length}</dd></div>
@@ -112,7 +118,7 @@ export default function TeacherClassWorkspace({
 
       <aside className="teacher-class-side">
         <section><header><strong>Cảnh báo nhanh</strong><button type="button" onClick={onOpenTasks}>Xử lý →</button></header>
-          {supportLearners.length ? supportLearners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner.personCode)}><span>!</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.progress}% tiến độ</small></div></button>) : <p>Không có học viên cần can thiệp trong dữ liệu hiện tại.</p>}
+          {supportLearners.length ? supportLearners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner.personCode)}><span>!</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.progress}% tiến độ</small></div></button>) : <p>Không có học viên cần can thiệp trong lớp đang chọn.</p>}
         </section>
         <section className="teacher-class-editor-card"><span>QUẢN LÝ NỘI DUNG</span><strong>Biên tập nội dung bài giảng</strong><p>Mở trình biên tập chuẩn, xin quyền theo bài/phần và quay lại đúng giao diện Giảng viên.</p><button type="button" onClick={onOpenEditor}>Vào trình biên tập →</button></section>
       </aside>
