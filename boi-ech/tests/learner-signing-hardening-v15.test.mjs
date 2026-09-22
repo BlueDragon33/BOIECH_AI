@@ -21,7 +21,8 @@ for (const [name, source] of [["student teacher inbox", inbox], ["student adapti
 
 for (const [name, source] of [["student teacher inbox", inbox], ["student adaptive coach", adaptive]]) {
   test(`${name} accepts only canonical device ids from the DOM`, () => {
-    assert.match(source, /if \/\^\[a-f0-9\]\{64\}\$\/i\.test\(direct\)\) return direct;/);
+    const canonicalGuard = "if (/^[a-f0-9]{64}$/i.test(direct)) return direct;";
+    assert.ok(source.includes(canonicalGuard), "canonical 64-hex device-id guard missing");
     assert.doesNotMatch(source, /if \(direct\) return direct;/);
   });
 }
