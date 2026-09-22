@@ -202,7 +202,7 @@ function AssignmentStatusControls({
 async function deriveDeviceId() {
   const shell = document.querySelector<HTMLElement>(".app-shell");
   const direct = shell?.getAttribute("data-device-id") ?? "";
-  if (direct) return direct;
+  if (/^[a-f0-9]{64}$/i.test(direct)) return direct;
   const credential = await readCredential();
   if (!credential?.publicKey || !crypto.subtle) return "";
   const canonical = JSON.stringify({
