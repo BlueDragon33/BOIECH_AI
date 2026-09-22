@@ -22,6 +22,7 @@ type AdminDeviceRow = {
   learner_name: string | null;
   learner_family_name: string | null;
   learner_given_name: string | null;
+  person_role: "learner" | "teacher" | null;
   class_name: string | null;
   phone: string | null;
   registration_submitted_at: string | null;
@@ -38,6 +39,18 @@ type AdminDeviceRow = {
   last_lesson: string | null;
   last_part: string | null;
 };
+
+function normalizeTeacherClasses(value: unknown) {
+  const raw = typeof value === "string" ? value : "";
+  const classes = raw
+    .split(/[;\n,]+/)
+    .map((item) => item.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  const unique = [...new Map(classes.map((item) => [item.toLocaleLowerCase("vi"), item])).values()];
+  if (unique.length > 12) throw new DeviceAccessError("Mỗi giảng viên được phân tối đa 12 lớp.", 400, "TOO_MANY_TEACHER_CLASSES");
+  if (unique.some((item) => item.length > 50)) throw new DeviceAccessError("Tên mỗi lớp không được vượt quá 50 ký tự.", 400, "INVALID_TEACHER_CLASS");
+  return unique;
+}
 
 function response(data: unknown, status = 200) {
   return Response.json(data, {
@@ -79,7 +92,9 @@ function summary(row: AdminDeviceRow) {
     learnerName: row.learner_name,
     learnerFamilyName: row.learner_family_name,
     learnerGivenName: row.learner_given_name,
+    personRole: row.person_role,
     className: row.class_name,
+    teacherClasses: row.person_role === "teacher" ? normalizeTeacherClasses(row.class_name) : [],
     phone: row.phone,
     registrationComplete: Boolean(row.learner_name?.trim() && row.class_name?.trim() && row.phone?.trim() && row.registration_submitted_at),
     accessExpiresAt: row.access_expires_at,
@@ -104,7 +119,7 @@ async function listDevices() {
   const database = await getCourseDatabase();
   const result = await database.prepare(
     `SELECT d.device_id, d.display_code, d.status, d.device_type, d.device_type_override, d.platform, d.browser, d.label, d.learner_name,
-            d.learner_family_name, d.learner_given_name, d.class_name,
+            d.learner_family_name, d.learner_given_name, d.person_role, d.class_name,
             d.phone, d.registration_submitted_at,
             d.access_expires_at, d.created_at, d.approved_at, d.blocked_at, d.last_seen_at,
             p.completed_json, p.scores_json, p.attempts_json, p.total_active_seconds,
@@ -138,8 +153,8 @@ export async function POST(request: Request) {
     }
     const database = await getCourseDatabase();
     const exists = await database.prepare(
-      "SELECT device_id, learner_name, class_name, phone, registration_submitted_at FROM device_access WHERE device_id = ?",
-    ).bind(deviceId).first<{ device_id: string; learner_name: string | null; class_name: string | null; phone: string | null; registration_submitted_at: string | null }>();
+      "SELECT device_id, learner_name, person_role, class_name, phone, registration_submitted_at FROM device_access WHERE device_id = ?",
+    ).bind(deviceId).first<{ device_id: string; learner_name: string | null; person_role: "learner" | "teacher" | null; class_name: string | null; phone: string | null; registration_submitted_at: string | null }>();
     if (!exists) throw new DeviceAccessError("Không tìm thấy thiết bị.", 404, "DEVICE_NOT_FOUND");
 
     if (action === "approve") {
@@ -177,6 +192,20 @@ export async function POST(request: Request) {
       await database.prepare(
         "UPDATE device_access SET device_type_override = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
       ).bind(requestedType === "auto" ? null : requestedType, deviceId).run();
+    } else if (action === "teacher-classes") {
+      if (exists.person_role !== "teacher") {
+        throw new DeviceAccessError("Chỉ hồ sơ Giảng viên mới có thể được phân nhiều lớp.", 409, "TEACHER_ROLE_REQUIRED");
+      }
+      const classes = normalizeTeacherClasses(payload.teacherClasses);
+      if (!classes.length) {
+        throw new DeviceAccessError("Giảng viên phải được phân ít nhất một lớp.", 400, "TEACHER_CLASS_REQUIRED");
+      }
+      await database.prepare(
+        "UPDATE device_access SET class_name = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
+      ).bind(classes.join("; "), deviceId).run();
+      await database.prepare(
+        "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES ('admin', 'teacher_classes_updated', ?, ?)",
+      ).bind(deviceId, JSON.stringify({ classes })).run();
     } else if (action === "profile") {
       const learnerName = typeof payload.learnerName === "string" ? payload.learnerName.trim().slice(0, 100) : "";
       const accessExpiresAt = normalizeAccessExpiry(payload.accessExpiresAt);
