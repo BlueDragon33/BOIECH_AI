@@ -145,6 +145,14 @@ function teacherActionSummary(type: string | null, value: string | null, created
   };
 }
 
+function teacherClassNames(value: string | null) {
+  const classes = String(value ?? "")
+    .split(/[;\n,]+/)
+    .map((item) => item.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  return [...new Map(classes.map((item) => [item.toLocaleLowerCase("vi"), item])).values()].slice(0, 12);
+}
+
 function hoursAgo(value: string | null) {
   if (!value) return Number.POSITIVE_INFINITY;
   const time = Date.parse(value);
@@ -160,9 +168,11 @@ export async function POST(request: Request) {
     if (teacher.personRole !== "teacher") {
       throw new DeviceAccessError("Chỉ Giảng viên được xem bảng giám sát học viên.", 403, "TEACHER_ROLE_REQUIRED", teacher);
     }
-    if (!teacher.className) {
+    const teacherClasses = teacherClassNames(teacher.className);
+    if (!teacherClasses.length) {
       throw new DeviceAccessError("Hồ sơ Giảng viên chưa có lớp / đơn vị phụ trách.", 400, "TEACHER_CLASS_REQUIRED", teacher);
     }
+    const classPlaceholders = teacherClasses.map(() => "lower(trim(?))").join(", ");
 
     const database = await getCourseDatabase();
     const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult, assignmentEventsResult] = await Promise.all([
@@ -208,27 +218,27 @@ export async function POST(request: Request) {
         LEFT JOIN device_profiles dp ON dp.device_id = da.device_id
         WHERE da.person_role = 'learner'
           AND da.status = 'approved'
-          AND lower(trim(da.class_name)) = lower(trim(?))
+          AND lower(trim(da.class_name)) IN (${classPlaceholders})
         ORDER BY COALESCE(dp.last_activity_at, da.last_seen_at) DESC, da.learner_name ASC
         LIMIT 200`,
-      ).bind(teacher.className).all<LearnerRow>(),
+      ).bind(...teacherClasses).all<LearnerRow>(),
       database.prepare(
         `SELECT a.device_id, a.lesson_number, a.section, a.rating, a.confidence, a.created_at
            FROM learner_self_assessments a
            JOIN device_access da ON da.device_id = a.device_id
           WHERE da.person_role = 'learner'
             AND da.status = 'approved'
-            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND lower(trim(da.class_name)) IN (${classPlaceholders})
           ORDER BY a.created_at DESC
           LIMIT 3000`,
-      ).bind(teacher.className).all<AssessmentRow>(),
+      ).bind(...teacherClasses).all<AssessmentRow>(),
       database.prepare(
         `SELECT e.device_id, e.event_type, e.lesson_number, e.part, e.detail_json, e.created_at
            FROM course_activity_events e
            JOIN device_access da ON da.device_id = e.device_id
           WHERE da.person_role = 'learner'
             AND da.status = 'approved'
-            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND lower(trim(da.class_name)) IN (${classPlaceholders})
             AND e.event_type IN (
               'teacher_feedback',
               'teacher_assignment',
@@ -241,18 +251,18 @@ export async function POST(request: Request) {
             )
           ORDER BY e.created_at DESC, e.id DESC
           LIMIT 12000`,
-      ).bind(teacher.className).all<LearningEventRow>(),
+      ).bind(...teacherClasses).all<LearningEventRow>(),
       database.prepare(
         `SELECT e.id, da.person_code, da.learner_name, da.class_name, e.detail_json, e.created_at
            FROM course_activity_events e
            JOIN device_access da ON da.device_id = e.device_id
           WHERE da.person_role = 'learner'
             AND da.status = 'approved'
-            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND lower(trim(da.class_name)) IN (${classPlaceholders})
             AND e.event_type = 'learner_teacher_reply'
           ORDER BY e.id DESC
           LIMIT 200`,
-      ).bind(teacher.className).all<LearnerReplyRow>(),
+      ).bind(...teacherClasses).all<LearnerReplyRow>(),
       database.prepare(
         `SELECT e.id, e.event_type, da.person_code, da.learner_name, da.class_name,
                 e.lesson_number, e.detail_json, e.created_at
@@ -260,11 +270,11 @@ export async function POST(request: Request) {
            JOIN device_access da ON da.device_id = e.device_id
           WHERE da.person_role = 'learner'
             AND da.status = 'approved'
-            AND lower(trim(da.class_name)) = lower(trim(?))
+            AND lower(trim(da.class_name)) IN (${classPlaceholders})
             AND e.event_type IN ('teacher_assignment', 'learner_assignment_status')
           ORDER BY e.id DESC
           LIMIT 1500`,
-      ).bind(teacher.className).all<AssignmentEventRow>(),
+      ).bind(...teacherClasses).all<AssignmentEventRow>(),
     ]);
 
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
@@ -458,6 +468,7 @@ export async function POST(request: Request) {
         name: teacher.learnerName,
         personCode: teacher.personCode,
         className: teacher.className,
+        classes: teacherClasses,
       },
       summary: {
         learnerCount: learners.length,
