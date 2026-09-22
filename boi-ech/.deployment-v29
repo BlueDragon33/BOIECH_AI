@@ -1,7 +1,7 @@
 Production deployment trigger for Bơi ếch V29.
 
 Target source commit before trigger:
-61262b7ff2bb896235d80ccd9e3f4da1f1a05807
+dcfb24a125f20d742fa4d74b9c351041ec8829b0
 
 Purpose:
-Trigger the repository's guarded one-shot production workflow for V29.
+Re-deploy the current main branch to Cloudflare production after the V29 production pipeline fix.
