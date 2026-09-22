@@ -1308,7 +1308,10 @@ export default function Home() {
   useEffect(() => {
     if (!deviceCredential || !deviceAccess || deviceAccess.status === "blocked") return;
     let cancelled = false;
+    let presenceRunning = false;
     const sendPresence = () => {
+      if (cancelled || presenceRunning || !navigator.onLine) return;
+      presenceRunning = true;
       postDevicePresence(deviceCredential, deviceAccess)
         .then((access) => {
           if (!cancelled) {
@@ -1320,12 +1323,25 @@ export default function Home() {
           if (cancelled) return;
           if (error instanceof CourseApiError && error.device) setDeviceAccess(error.device);
           setDeviceError(error instanceof Error ? error.message : "Chưa thể cập nhật trạng thái thiết bị.");
-        });
+        })
+        .finally(() => { presenceRunning = false; });
+    };
+    const syncVisibleDeviceProfile = () => {
+      if (document.visibilityState === "visible") sendPresence();
     };
     sendPresence();
     const timer = window.setInterval(sendPresence, 60_000);
-    return () => { cancelled = true; window.clearInterval(timer); };
-  // Presence follows the bound device and stops immediately if the server blocks it.
+    document.addEventListener("visibilitychange", syncVisibleDeviceProfile);
+    window.addEventListener("focus", syncVisibleDeviceProfile);
+    window.addEventListener("online", syncVisibleDeviceProfile);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", syncVisibleDeviceProfile);
+      window.removeEventListener("focus", syncVisibleDeviceProfile);
+      window.removeEventListener("online", syncVisibleDeviceProfile);
+    };
+  // Presence follows the bound device and refreshes device-managed UX when the app becomes active again.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceAccess?.deviceId, deviceAccess?.status, deviceCredential]);
 
