@@ -10,7 +10,8 @@ const editorPage = fs.readFileSync(new URL("../app/bien-tap-noi-dung/page.tsx", 
 test("V31 scopes quick alerts to the selected class", () => {
   assert.match(workspace, /selected\?\.learners\.filter\(\(item\) => item\.needsSupport\)/);
   assert.doesNotMatch(workspace, /const supportLearners = learners\.filter/);
-  assert.match(workspace, /Không có học viên cần can thiệp trong lớp đang chọn/);
+  assert.match(workspace, /teacher-class-alert-items/);
+  assert.match(workspace, /supportLearners\.map/);
 });
 
 test("V31 keeps selected class outside the class-tab component", () => {
@@ -27,7 +28,7 @@ test("V31 persists selected class across teacher tab and full-page return flows"
   assert.match(shell, /window\.sessionStorage\.setItem/);
   assert.match(shell, /params\.get\("class"\)/);
   assert.match(shell, /setSelectedClass\(requestedClass\)/);
-  assert.match(shell, /openTeacherEditor\("01", "class", selectedClass\)/);
+  assert.match(shell, /onOpenEditor=\{\(scopeClass\) => openTeacherEditor\("01", "class", scopeClass\)\}/);
 });
 
 test("V31 propagates class context through editor and video return links", () => {
