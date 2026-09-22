@@ -35,11 +35,13 @@ test("L9 learner inbox returns reply history only for the signed learner", () =>
   assert.match(studentInbox, /Phản hồi của bạn/);
 });
 
-test("L9 teacher sees replies only from approved learners in the same class", () => {
+test("L9 teacher sees replies only from approved learners in the authorized class set", () => {
   assert.match(teacherApi, /e\.event_type = 'learner_teacher_reply'/);
   assert.match(teacherApi, /da\.person_role = 'learner'/);
   assert.match(teacherApi, /da\.status = 'approved'/);
-  assert.match(teacherApi, /lower\(trim\(da\.class_name\)\) = lower\(trim\(\?\)\)/);
+  assert.match(teacherApi, /teacherClassNames\(teacher\.className\)/);
+  assert.match(teacherApi, /lower\(trim\(da\.class_name\)\) IN \(\$\{classPlaceholders\}\)/);
+  assert.match(teacherApi, /\.bind\(\.\.\.teacherClasses\)/);
   assert.match(teacherApi, /messages,/);
   assert.doesNotMatch(teacherApi, /SELECT[^\`]*da\.phone/s);
 });
