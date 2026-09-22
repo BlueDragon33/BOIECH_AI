@@ -17,7 +17,7 @@ type TeacherClassLearner = {
 type TeacherClassWorkspaceProps = {
   classes: string[];
   learners: TeacherClassLearner[];
-  onOpenLearner: (learner: TeacherClassLearner) => void;
+  onOpenLearner: (personCode: string) => void;
   onOpenTasks: () => void;
   onOpenReports: () => void;
   onOpenEditor: () => void;
@@ -108,7 +108,7 @@ export default function TeacherClassWorkspace({
       <section className="teacher-class-detail">
         <header><div><span>LỚP ĐANG CHỌN</span><h2>{selected.name}</h2><p>{selected.learners.length} học viên · {selected.averageProgress}% tiến độ trung bình · {selected.analyses} phân tích AI</p></div><div><button type="button" onClick={onOpenTasks}>Bài tập</button><button type="button" onClick={onOpenReports}>Báo cáo</button></div></header>
         <div className="teacher-class-student-list">
-          {selected.learners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner)}>
+          {selected.learners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner.personCode)}>
             <span>{learner.name.slice(0,1).toUpperCase()}</span>
             <div><strong>{learner.name}</strong><small>{learner.lastLesson ? `Bài ${learner.lastLesson} · ` : ""}{shortActivity(learner.lastActivityAt)}</small></div>
             <div className="teacher-class-student-progress"><i><b style={{ width: `${learner.progress}%` }}/></i><strong>{learner.progress}%</strong></div>
@@ -120,7 +120,7 @@ export default function TeacherClassWorkspace({
 
       <aside className="teacher-class-side">
         <section><header><strong>Cảnh báo nhanh</strong><button type="button" onClick={onOpenTasks}>Xử lý →</button></header>
-          {supportLearners.length ? supportLearners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner)}><span>!</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.progress}% tiến độ</small></div></button>) : <p>Không có học viên cần can thiệp trong dữ liệu hiện tại.</p>}
+          {supportLearners.length ? supportLearners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner.personCode)}><span>!</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.progress}% tiến độ</small></div></button>) : <p>Không có học viên cần can thiệp trong dữ liệu hiện tại.</p>}
         </section>
         <section className="teacher-class-editor-card"><span>QUẢN LÝ NỘI DUNG</span><strong>Biên tập nội dung bài giảng</strong><p>Mở trình biên tập chuẩn, xin quyền theo bài/phần và quay lại đúng giao diện Giảng viên.</p><button type="button" onClick={onOpenEditor}>Vào trình biên tập →</button></section>
       </aside>
