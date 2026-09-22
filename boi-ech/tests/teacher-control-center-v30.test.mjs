@@ -35,20 +35,23 @@ test("V30 supports multiple admin-assigned classes without broadening teacher ac
 });
 
 test("V30 class page is a real multi-class control center backed by learner data", () => {
-  for (const label of [
-    "LỚP HỌC CỦA TÔI",
-    "Quản lý nhiều lớp trong một màn hình",
-    "Lớp phụ trách",
-    "Học viên",
-    "Tiến độ trung bình",
-    "Cần can thiệp",
-    "LỚP ĐANG CHỌN",
+  for (const contract of [
+    "teacher-class-control-header",
+    "teacher-class-control-toolbar",
+    "teacher-class-card-grid",
+    "teacher-class-reference-rail",
     "Cảnh báo nhanh",
+    "Lịch nhiệm vụ",
+    "Việc cần xử lý",
     "Biên tập nội dung bài giảng",
-  ]) assert.ok(classWorkspace.includes(label), label);
+  ]) assert.ok(classWorkspace.includes(contract), contract);
   assert.match(classWorkspace, /learners\.filter/);
   assert.match(classWorkspace, /averageProgress/);
-  assert.match(classWorkspace, /onOpenLearner/);
+  assert.match(classWorkspace, /onOpenLearners/);
+  assert.match(classWorkspace, /onOpenTasks/);
+  assert.match(classWorkspace, /onOpenReports/);
+  assert.match(classWorkspace, /onOpenAnalysis/);
+  assert.match(classWorkspace, /onOpenEditor/);
   assert.doesNotMatch(classWorkspace, /32|52|78%|K01|K02|K03/);
   assert.match(shell, /<TeacherClassWorkspace/);
 });
