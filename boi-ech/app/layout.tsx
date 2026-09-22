@@ -26,6 +26,8 @@ import "./teacher-control-center-v30.css";
 import "./teacher-class-filter-v32.css";
 import "./teacher-class-actions-v33.css";
 import "./teacher-reference-layout-v36.css";
+import "./teacher-secondary-tabs-v37.css";
+import "./video-analysis-v37.css";
 import StudentRoleShell from "./student-role-shell";
 import StudentTeacherInbox from "./student-teacher-inbox";
 import StudentAdaptiveCoach from "./student-adaptive-coach";
