@@ -24,7 +24,8 @@ test("L11 keeps production deployment manual and explicitly confirmed", () => {
 test("L11 release audit protects signed role and class boundaries", () => {
   assert.match(readiness, /verifyDeviceRequest/);
   assert.match(readiness, /teacher overview must require teacher role/);
-  assert.match(readiness, /teacher overview must remain class-scoped/);
+  assert.match(readiness, /teacher overview must derive its authorized class set from the signed teacher profile/);
+  assert.match(readiness, /teacher overview must remain scoped to the authorized class set/);
   assert.match(readiness, /learner replies must remain bound to the learner device/);
 });
 
