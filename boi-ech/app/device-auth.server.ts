@@ -4,12 +4,16 @@ export type DeviceStatus = "pending" | "approved" | "blocked";
 export type AccessGroup = "unassigned" | "free" | "paid";
 export type PaymentStatus = "unassigned" | "awaiting_payment" | "proof_submitted" | "free_approved" | "paid_verified";
 export type PersonRole = "learner" | "teacher";
+export type DeviceType = "desktop" | "phone" | "tablet";
 
 type DeviceAccessRow = {
   device_id: string;
   display_code: string;
   public_key_jwk: string;
   status: DeviceStatus;
+  device_type?: DeviceType | null;
+  platform?: string | null;
+  browser?: string | null;
   label: string | null;
   learner_name?: string | null;
   learner_family_name?: string | null;
@@ -48,6 +52,9 @@ export type PublicDeviceState = {
   deviceId: string;
   deviceCode: string;
   status: DeviceStatus;
+  deviceType: DeviceType;
+  platform: string | null;
+  browser: string | null;
   label: string | null;
   learnerName: string | null;
   learnerFamilyName: string | null;
@@ -300,6 +307,9 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
     deviceId: row.device_id,
     deviceCode: row.display_code,
     status: row.status,
+    deviceType: row.device_type === "phone" || row.device_type === "tablet" ? row.device_type : "desktop",
+    platform: row.platform?.trim() || null,
+    browser: row.browser?.trim() || null,
     label: row.label,
     learnerName,
     learnerFamilyName,
@@ -324,7 +334,7 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
   };
 }
 
-const deviceColumns = `device_id, display_code, public_key_jwk, status, label, learner_name,
+const deviceColumns = `device_id, display_code, public_key_jwk, status, device_type, platform, browser, label, learner_name,
   learner_family_name, learner_given_name, person_role, person_code,
   class_name, phone, registration_submitted_at, access_group, payment_status,
   payment_proof_key, payment_proof_name, payment_proof_content_type, payment_proof_size,
@@ -434,6 +444,9 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
     deviceId,
     deviceCode: displayCode,
     status,
+    deviceType: "desktop",
+    platform: null,
+    browser: null,
     label: null,
     learnerName: null,
     learnerFamilyName: null,
