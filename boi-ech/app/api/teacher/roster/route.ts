@@ -31,6 +31,14 @@ function response(data: unknown, status = 200) {
   });
 }
 
+function teacherClassNames(value: string | null) {
+  const classes = String(value ?? "")
+    .split(/[;\n,]+/)
+    .map((item) => item.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  return [...new Map(classes.map((item) => [item.toLocaleLowerCase("vi"), item])).values()].slice(0, 12);
+}
+
 function normalizeTarget(value: unknown) {
   const target = typeof value === "string"
     ? value.trim().replace(/\s+/g, "").toUpperCase().slice(0, 32)
@@ -61,19 +69,20 @@ function rosterItem(row: RosterRow) {
   };
 }
 
-async function listRoster(className: string) {
+async function listRoster(classNames: string[]) {
   const database = await getCourseDatabase();
+  const classPlaceholders = classNames.map(() => "lower(trim(?))").join(", ");
   const result = await database.prepare(
     `SELECT device_id, display_code, status, learner_name, person_code, class_name, phone,
             registration_submitted_at, created_at, approved_at, blocked_at, last_seen_at
        FROM device_access
       WHERE person_role = 'learner'
-        AND lower(trim(class_name)) = lower(trim(?))
+        AND lower(trim(class_name)) IN (${classPlaceholders})
       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
                datetime(COALESCE(registration_submitted_at, created_at)) DESC,
                learner_name COLLATE NOCASE ASC
       LIMIT 250`,
-  ).bind(className).all<RosterRow>();
+  ).bind(...classNames).all<RosterRow>();
   const roster = (result.results ?? []).map(rosterItem);
   return {
     roster,
@@ -101,7 +110,8 @@ export async function POST(request: Request) {
         teacher,
       );
     }
-    if (!teacher.className?.trim()) {
+    const teacherClasses = teacherClassNames(teacher.className);
+    if (!teacherClasses.length) {
       throw new DeviceAccessError(
         "Hồ sơ Giảng viên chưa có lớp / đơn vị phụ trách.",
         400,
@@ -109,10 +119,11 @@ export async function POST(request: Request) {
         teacher,
       );
     }
+    const classPlaceholders = teacherClasses.map(() => "lower(trim(?))").join(", ");
 
     const action = typeof payload.action === "string" ? payload.action : "list";
     if (action === "list") {
-      return response(await listRoster(teacher.className));
+      return response(await listRoster(teacherClasses));
     }
     if (action !== "approve" && action !== "remove") {
       throw new DeviceAccessError("Thao tác quản lý học viên không hợp lệ.", 400, "INVALID_TEACHER_ROSTER_ACTION");
@@ -126,9 +137,9 @@ export async function POST(request: Request) {
          FROM device_access
         WHERE person_role = 'learner'
           AND person_code = ?
-          AND lower(trim(class_name)) = lower(trim(?))
+          AND lower(trim(class_name)) IN (${classPlaceholders})
         LIMIT 1`,
-    ).bind(personCode, teacher.className).first<RosterRow>();
+    ).bind(personCode, ...teacherClasses).first<RosterRow>();
 
     if (!target) {
       throw new DeviceAccessError(
@@ -142,7 +153,7 @@ export async function POST(request: Request) {
       (action === "approve" && target.status === "approved")
       || (action === "remove" && target.status === "blocked");
     if (alreadyInRequestedState) {
-      return response(await listRoster(teacher.className));
+      return response(await listRoster(teacherClasses));
     }
 
     if (action === "approve") {
@@ -189,14 +200,14 @@ export async function POST(request: Request) {
       action === "approve" ? "teacher_roster_approved" : "teacher_roster_removed",
       target.person_code || target.device_id,
       JSON.stringify({
-        className: teacher.className,
+        className: target.class_name || teacherClasses[0],
         learnerName: target.learner_name?.slice(0, 120) || "Học viên",
         reversible: true,
       }),
     ).run();
 
     return response({
-      ...(await listRoster(teacher.className)),
+      ...(await listRoster(teacherClasses)),
       changed: {
         action,
         personCode,
