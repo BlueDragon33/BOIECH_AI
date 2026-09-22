@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
@@ -253,7 +253,7 @@ export default function StudentAdaptiveCoach() {
   const requestRef = useRef(0);
   const loadingRef = useRef(false);
 
-  const refresh = (preserveData = true) => {
+  const refresh = useCallback((preserveData = true) => {
     const deviceId = deviceRef.current;
     if (!deviceId || loadingRef.current) return;
     const requestId = ++requestRef.current;
@@ -272,7 +272,7 @@ export default function StudentAdaptiveCoach() {
           setLoading(false);
         }
       });
-  };
+  }, []);
 
   useEffect(() => {
     if (window.location.pathname !== "/") return;
@@ -339,7 +339,7 @@ export default function StudentAdaptiveCoach() {
       setLoading(false);
       setData(null);
     };
-  }, []);
+  }, [refresh]);
 
   if (!mount) return null;
   if (loading && !data) {
