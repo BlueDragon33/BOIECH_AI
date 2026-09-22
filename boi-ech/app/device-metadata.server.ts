@@ -40,16 +40,20 @@ function platformFromRequest(request: Request) {
 
 export async function captureDeviceMetadata(request: Request, deviceId: string) {
   const userAgent = cleanHeader(request.headers.get("user-agent"));
+  const deviceType = deviceTypeFromHeaders(request);
+  const platform = platformFromRequest(request);
+  const browser = browserFromUa(userAgent);
   const database = await getCourseDatabase();
   await database.prepare(
     `UPDATE device_access
         SET device_type = ?, platform = ?, browser = ?, user_agent = ?, updated_at = CURRENT_TIMESTAMP
       WHERE device_id = ?`,
   ).bind(
-    deviceTypeFromHeaders(request),
-    platformFromRequest(request),
-    browserFromUa(userAgent),
+    deviceType,
+    platform,
+    browser,
     userAgent || null,
     deviceId,
   ).run();
+  return { deviceType, platform, browser };
 }

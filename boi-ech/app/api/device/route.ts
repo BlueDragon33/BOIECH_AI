@@ -59,7 +59,8 @@ export async function POST(request: Request) {
         ).bind(ADDITIONAL_ACCOUNT_REVIEW_LABEL, device.deviceId).run();
         device = { ...pendingReviewDevice(device), label: ADDITIONAL_ACCOUNT_REVIEW_LABEL };
       }
-      await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
+      const metadata = await captureDeviceMetadata(request, device.deviceId).catch(() => null);
+      if (metadata) device = { ...device, ...metadata };
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     if (action === "challenge") {
@@ -88,8 +89,9 @@ export async function POST(request: Request) {
     if (action === "presence") {
       const hostname = new URL(request.url).hostname;
       const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      const device = await verifyDeviceIdentityRequest(payload, previewRequest);
-      await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
+      let device = await verifyDeviceIdentityRequest(payload, previewRequest);
+      const metadata = await captureDeviceMetadata(request, device.deviceId).catch(() => null);
+      if (metadata) device = { ...device, ...metadata };
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     return Response.json({ error: "Thao tác không được hỗ trợ." }, { status: 400 });
