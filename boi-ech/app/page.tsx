@@ -363,6 +363,9 @@ type DeviceAccessState = {
   deviceId: string;
   deviceCode: string;
   status: "pending" | "approved" | "blocked";
+  deviceType: "desktop" | "phone" | "tablet";
+  platform: string | null;
+  browser: string | null;
   label: string | null;
   learnerName: string | null;
   learnerFamilyName: string | null;
@@ -1708,6 +1711,10 @@ export default function Home() {
   return (
     <div
       className={`app-shell ${installPrompt ? "has-install-prompt" : ""}`}
+      data-device-id={deviceAccess.deviceId}
+      data-device-type={deviceAccess.deviceType}
+      data-device-platform={deviceAccess.platform ?? ""}
+      data-device-browser={deviceAccess.browser ?? ""}
       style={{
         "--app-background": appearance.background,
         "--page-ink": usesDarkBackground ? "#f4fbfb" : "#102b3f",
