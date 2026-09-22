@@ -1,0 +1,7 @@
+Production deployment trigger for Bơi ếch V29.
+
+Target source commit before trigger:
+61262b7ff2bb896235d80ccd9e3f4da1f1a05807
+
+Purpose:
+Trigger the repository's guarded one-shot production workflow for V29.
