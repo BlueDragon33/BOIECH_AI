@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type TeacherClassLearner = {
   name: string;
@@ -13,6 +13,9 @@ type TeacherClassLearner = {
   lastActivityAt: string | null;
   lastLesson: string | null;
 };
+
+type TeacherClassFilter = "all" | "attention" | "active" | "empty";
+type TeacherClassSort = "attention" | "progress" | "recent" | "name";
 
 type TeacherClassWorkspaceProps = {
   classes: string[];
@@ -60,6 +63,29 @@ export default function TeacherClassWorkspace({
     return assigned.map((name) => classStats(name, learners));
   }, [classes, learners]);
 
+  const [classQuery, setClassQuery] = useState("");
+  const [classFilter, setClassFilter] = useState<TeacherClassFilter>("all");
+  const [classSort, setClassSort] = useState<TeacherClassSort>("attention");
+  const attentionCount = summaries.filter((item) => item.support > 0).length;
+  const activeCount = summaries.filter((item) => item.learners.length > 0).length;
+  const emptyCount = summaries.filter((item) => item.learners.length === 0).length;
+  const visibleSummaries = useMemo(() => {
+    const needle = classQuery.trim().toLocaleLowerCase("vi");
+    const filtered = summaries.filter((item) => {
+      if (needle && !item.name.toLocaleLowerCase("vi").includes(needle)) return false;
+      if (classFilter === "attention") return item.support > 0;
+      if (classFilter === "active") return item.learners.length > 0;
+      if (classFilter === "empty") return item.learners.length === 0;
+      return true;
+    });
+    return [...filtered].sort((left, right) => {
+      if (classSort === "progress") return left.averageProgress - right.averageProgress || left.name.localeCompare(right.name, "vi");
+      if (classSort === "recent") return (Date.parse(right.lastActivityAt ?? "") || 0) - (Date.parse(left.lastActivityAt ?? "") || 0) || left.name.localeCompare(right.name, "vi");
+      if (classSort === "name") return left.name.localeCompare(right.name, "vi");
+      return right.support - left.support || left.averageProgress - right.averageProgress || left.name.localeCompare(right.name, "vi");
+    });
+  }, [classFilter, classQuery, classSort, summaries]);
+
   const selected = summaries.find((item) => item.name === selectedClass) ?? summaries[0] ?? null;
   useEffect(() => {
     if (selected && selected.name !== selectedClass) onSelectedClassChange(selected.name);
@@ -84,8 +110,22 @@ export default function TeacherClassWorkspace({
       <article className={totalSupport ? "warn" : ""}><span>Cần can thiệp</span><strong>{totalSupport}</strong><small>Trên toàn bộ lớp phụ trách</small></article>
     </div>
 
+    <section className="teacher-class-control-toolbar" aria-label="Tìm kiếm và lọc lớp học">
+      <div className="teacher-class-filter-tabs">
+        <button type="button" className={classFilter === "all" ? "active" : ""} aria-pressed={classFilter === "all"} onClick={() => setClassFilter("all")}>Tất cả lớp <b>{summaries.length}</b></button>
+        <button type="button" className={classFilter === "attention" ? "active" : ""} aria-pressed={classFilter === "attention"} onClick={() => setClassFilter("attention")}>Cần chú ý <b>{attentionCount}</b></button>
+        <button type="button" className={classFilter === "active" ? "active" : ""} aria-pressed={classFilter === "active"} onClick={() => setClassFilter("active")}>Có học viên <b>{activeCount}</b></button>
+        <button type="button" className={classFilter === "empty" ? "active" : ""} aria-pressed={classFilter === "empty"} onClick={() => setClassFilter("empty")}>Chưa có học viên <b>{emptyCount}</b></button>
+      </div>
+      <div className="teacher-class-tools">
+        <label className="teacher-class-search"><span aria-hidden="true">⌕</span><input value={classQuery} onChange={(event) => setClassQuery(event.target.value.slice(0, 80))} placeholder="Tìm lớp học…" aria-label="Tìm lớp học"/></label>
+        <label className="teacher-class-sort"><span>Sắp xếp</span><select value={classSort} onChange={(event) => setClassSort(event.target.value as TeacherClassSort)} aria-label="Sắp xếp lớp học"><option value="attention">Ưu tiên can thiệp</option><option value="progress">Tiến độ thấp trước</option><option value="recent">Hoạt động gần nhất</option><option value="name">Tên A–Z</option></select></label>
+      </div>
+      <small className="teacher-class-result-count">Hiển thị {visibleSummaries.length}/{summaries.length} lớp</small>
+    </section>
+
     <div className="teacher-class-card-grid" role="list" aria-label="Các lớp được phân công">
-      {summaries.map((item) => {
+      {visibleSummaries.map((item) => {
         const active = item.name === selected?.name;
         const status = item.support > 0 ? "Cần chú ý" : item.learners.length === 0 ? "Chưa có học viên" : "Đang theo dõi";
         return <button key={item.name} type="button" role="listitem" className={active ? "active" : ""} onClick={() => onSelectedClassChange(item.name)}>
@@ -100,6 +140,7 @@ export default function TeacherClassWorkspace({
         </button>;
       })}
       {!summaries.length ? <div className="teacher-class-empty">Chưa có lớp nào được phân. Quản trị cần cập nhật “Lớp Giảng viên phụ trách” trong quản lý thiết bị.</div> : null}
+      {summaries.length > 0 && visibleSummaries.length === 0 ? <div className="teacher-class-empty">Không có lớp phù hợp với bộ lọc hiện tại. Hãy đổi trạng thái lọc hoặc từ khóa tìm kiếm.</div> : null}
     </div>
 
     {selected ? <div className="teacher-class-detail-grid">
