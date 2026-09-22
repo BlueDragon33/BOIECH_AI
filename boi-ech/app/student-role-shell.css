@@ -181,7 +181,7 @@ body[data-student-role-ui="active"][data-student-section="overview"] .page-overv
 .student-avatar { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; color: #0b3651; background: linear-gradient(135deg, #8ef1e3, #7cc9f0); font-size: 20px; font-weight: 900; }
 .student-profile-card h3 { margin: 3px 0; color: #153d55; font-size: 16px; }
 .student-profile-card p { margin: 0; color: #8798a2; font-size: 9px; }
-.student-profile-card dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+.student-profile-card dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0; }
 .student-profile-card dl div { padding: 9px 11px; border-radius: 10px; background: #f2f8fa; }
 .student-profile-card dt { color: #8b9ba5; font-size: 8px; }
 .student-profile-card dd { margin: 3px 0 0; color: #1c5874; font-size: 10px; font-weight: 800; }
@@ -215,4 +215,137 @@ body[data-student-role-ui="active"][data-student-section="overview"] .page-overv
   .student-lesson-grid { grid-template-columns: 1fr; }
   .student-video-flow { grid-template-columns: 1fr; }
   .student-profile-card dl { grid-template-columns: 1fr; }
+}
+
+
+/* V26 · device-aware learner UX. Server-authorized device classification complements viewport media queries. */
+.app-shell[data-device-type="tablet"] .student-capabilities > div {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-shell[data-device-type="tablet"] .student-capability,
+.app-shell[data-device-type="tablet"] .student-role-nav-list button,
+.app-shell[data-device-type="tablet"] .student-ai-shortcut {
+  min-height: 48px;
+  touch-action: manipulation;
+}
+
+.app-shell[data-device-type="tablet"] .student-dashboard-grid {
+  grid-template-columns: 1fr;
+}
+
+.app-shell[data-device-type="tablet"] .student-side-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell[data-device-type="tablet"] .student-lesson-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell[data-device-type="tablet"] .student-profile-card dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell[data-device-type="phone"] .student-dashboard {
+  padding: 10px 10px 30px;
+}
+
+.app-shell[data-device-type="phone"] .student-hero {
+  grid-template-columns: 1fr;
+  min-height: auto;
+  border-radius: 18px;
+}
+
+.app-shell[data-device-type="phone"] .student-hero-copy {
+  padding: 26px 20px;
+}
+
+.app-shell[data-device-type="phone"] .student-hero-visual {
+  display: none;
+}
+
+.app-shell[data-device-type="phone"] .student-hero h1 {
+  font-size: clamp(30px, 9vw, 38px);
+}
+
+.app-shell[data-device-type="phone"] .student-hero-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.app-shell[data-device-type="phone"] .student-hero-actions button {
+  width: 100%;
+  min-height: 48px;
+  touch-action: manipulation;
+}
+
+.app-shell[data-device-type="phone"] .student-capabilities {
+  overflow: hidden;
+  padding: 16px;
+}
+
+.app-shell[data-device-type="phone"] .student-capabilities > header {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.app-shell[data-device-type="phone"] .student-capabilities header p {
+  text-align: left;
+}
+
+.app-shell[data-device-type="phone"] .student-capabilities > div {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(172px, 78vw);
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scrollbar-width: thin;
+  padding-bottom: 5px;
+}
+
+.app-shell[data-device-type="phone"] .student-capability {
+  min-height: 112px;
+  scroll-snap-align: start;
+  touch-action: manipulation;
+}
+
+.app-shell[data-device-type="phone"] .student-dashboard-grid,
+.app-shell[data-device-type="phone"] .student-side-stack,
+.app-shell[data-device-type="phone"] .student-video-card,
+.app-shell[data-device-type="phone"] .student-video-flow {
+  grid-template-columns: 1fr;
+}
+
+.app-shell[data-device-type="phone"] .student-learning-card,
+.app-shell[data-device-type="phone"] .student-video-card {
+  padding: 16px;
+}
+
+.app-shell[data-device-type="phone"] .student-lesson-grid {
+  grid-template-columns: 1fr;
+}
+
+.app-shell[data-device-type="phone"] .student-profile-card {
+  grid-template-columns: 44px minmax(0, 1fr);
+  padding: 16px;
+}
+
+.app-shell[data-device-type="phone"] .student-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.app-shell[data-device-type="phone"] .student-profile-card dl {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell[data-device-type="phone"] .student-role-nav-list button,
+.app-shell[data-device-type="phone"] .student-ai-shortcut {
+  min-height: 48px;
+  touch-action: manipulation;
 }
