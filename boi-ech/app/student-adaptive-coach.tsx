@@ -162,9 +162,11 @@ function masteryTone(value: number) {
 function AdaptiveCoach({
   data,
   reload,
+  loading,
 }: {
   data: AdaptiveBootstrap;
   reload: () => void;
+  loading: boolean;
 }) {
   const intelligence = data.intelligence;
   if (!data.settings?.enabled || !intelligence) return null;
@@ -194,7 +196,7 @@ function AdaptiveCoach({
         <div className="student-adaptive-plan">
           <div className="student-adaptive-heading">
             <div><span>3 VIỆC NÊN LÀM TIẾP</span><strong>Kế hoạch ngắn, có lý do rõ ràng</strong></div>
-            <button type="button" onClick={reload}>Cập nhật</button>
+            <button type="button" onClick={reload} disabled={loading}>{loading ? "Đang cập nhật…" : "Cập nhật"}</button>
           </div>
           <div className="student-adaptive-plan-grid">
             {intelligence.todayPlan.slice(0, 3).map((item, index) => (
@@ -375,5 +377,5 @@ export default function StudentAdaptiveCoach() {
       mount,
     );
   }
-  return data ? createPortal(<AdaptiveCoach data={data} reload={refresh} />, mount) : null;
+  return data ? createPortal(<AdaptiveCoach data={data} reload={refresh} loading={loading} />, mount) : null;
 }
