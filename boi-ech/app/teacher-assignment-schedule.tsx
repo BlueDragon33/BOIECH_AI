@@ -72,7 +72,7 @@ export default function TeacherAssignmentSchedule({
   return (
     <section className="teacher-assignment-schedule" aria-label="Lịch bài luyện">
       <header>
-        <div><span>LỊCH NHIỆM VỤ</span><h2>Tiến độ bài luyện theo trạng thái thực tế</h2><p>Dữ liệu vẫn lấy từ assignment Giảng viên đã gửi và trạng thái Học viên xác nhận; giao diện mới ưu tiên việc phát hiện việc quá hạn hoặc cần hỗ trợ.</p></div>
+        <div><span>LỊCH NHIỆM VỤ</span><h2>Bài luyện có hạn và trạng thái thực tế</h2><p>Dữ liệu vẫn lấy từ assignment Giảng viên đã gửi và trạng thái Học viên xác nhận; giao diện mới ưu tiên việc phát hiện việc quá hạn hoặc cần hỗ trợ.</p></div>
         <div><strong>{counts.overdue ?? 0}</strong><span>Quá hạn</span><strong>{counts["needs-help"] ?? 0}</strong><span>Cần hỗ trợ</span></div>
       </header>
       <div className="teacher-schedule-summary-v37">
