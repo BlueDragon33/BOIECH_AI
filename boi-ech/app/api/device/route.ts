@@ -2,6 +2,7 @@ import {
   createDeviceChallenge,
   deviceErrorResponse,
   getCourseDatabase,
+  getPublicDeviceState,
   registerDevice,
   saveDeviceRegistration,
   verifyDeviceIdentityRequest,
@@ -59,8 +60,8 @@ export async function POST(request: Request) {
         ).bind(ADDITIONAL_ACCOUNT_REVIEW_LABEL, device.deviceId).run();
         device = { ...pendingReviewDevice(device), label: ADDITIONAL_ACCOUNT_REVIEW_LABEL };
       }
-      const metadata = await captureDeviceMetadata(request, device.deviceId).catch(() => null);
-      if (metadata) device = { ...device, ...metadata };
+      await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
+      device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     if (action === "challenge") {
@@ -90,8 +91,8 @@ export async function POST(request: Request) {
       const hostname = new URL(request.url).hostname;
       const previewRequest = hostname === "terminal.local" || hostname === "localhost";
       let device = await verifyDeviceIdentityRequest(payload, previewRequest);
-      const metadata = await captureDeviceMetadata(request, device.deviceId).catch(() => null);
-      if (metadata) device = { ...device, ...metadata };
+      await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
+      device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     return Response.json({ error: "Thao tác không được hỗ trợ." }, { status: 400 });
