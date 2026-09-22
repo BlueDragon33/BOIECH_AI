@@ -48,6 +48,9 @@ async function readCredential() {
 }
 
 async function signedLearnerProof(credential: StoredDeviceCredential, deviceId: string) {
+  if (!credential.privateKey || !crypto.subtle) {
+    throw new Error("Không tìm thấy khóa ký của thiết bị Học viên.");
+  }
   const response = await fetch("/api/device", {
     method: "POST",
     credentials: "same-origin",
@@ -58,9 +61,7 @@ async function signedLearnerProof(credential: StoredDeviceCredential, deviceId: 
   const data = await response.json() as { challenge?: string; error?: string };
   if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể xác thực tài khoản Học viên.");
   const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`);
-  const signature = credential.privateKey && crypto.subtle
-    ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message)
-    : crypto.getRandomValues(new Uint8Array(64)).buffer;
+  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message);
   return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) };
 }
 
