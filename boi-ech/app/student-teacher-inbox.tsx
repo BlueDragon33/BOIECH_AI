@@ -275,13 +275,16 @@ export default function StudentTeacherInbox() {
   const [deviceId, setDeviceId] = useState("");
   const deviceRef = useRef("");
   const requestRef = useRef(0);
+  const inFlightDeviceRef = useRef("");
   const loadedRefreshRef = useRef(-1);
   const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     if (window.location.pathname !== "/") return;
     let timer = 0;
-    const sync = () => {
+    let interval = 0;
+
+    const sync = (forceRefresh = false) => {
       timer = 0;
       const role = text(document.querySelector(".learner-chip small"));
       const nextMount = role === "Học viên"
@@ -289,6 +292,8 @@ export default function StudentTeacherInbox() {
         : null;
       setMount(nextMount);
       if (!nextMount) {
+        requestRef.current += 1;
+        inFlightDeviceRef.current = "";
         deviceRef.current = "";
         loadedRefreshRef.current = -1;
         setDeviceId("");
@@ -299,29 +304,54 @@ export default function StudentTeacherInbox() {
         if (!deviceId) return;
         const changedDevice = deviceRef.current !== deviceId;
         if (changedDevice) {
+          requestRef.current += 1;
+          inFlightDeviceRef.current = "";
           deviceRef.current = deviceId;
           loadedRefreshRef.current = -1;
           setDeviceId(deviceId);
+          setActions([]);
         }
-        if (!changedDevice && loadedRefreshRef.current === refreshToken) return;
+        if (!changedDevice && !forceRefresh && loadedRefreshRef.current === refreshToken) return;
+        if (inFlightDeviceRef.current === deviceId) return;
         loadedRefreshRef.current = refreshToken;
+        inFlightDeviceRef.current = deviceId;
         const requestId = ++requestRef.current;
         loadInbox(deviceId)
-          .then((items) => { if (requestRef.current === requestId) setActions(items); })
-          .catch(() => { if (requestRef.current === requestId) setActions([]); });
+          .then((items) => {
+            if (requestRef.current === requestId && deviceRef.current === deviceId) setActions(items);
+          })
+          .catch(() => {
+            if (requestRef.current === requestId && !forceRefresh) setActions([]);
+          })
+          .finally(() => {
+            if (requestRef.current === requestId) inFlightDeviceRef.current = "";
+          });
       }).catch(() => undefined);
     };
+
     const schedule = () => {
       if (timer) return;
-      timer = window.setTimeout(sync, 0);
+      timer = window.setTimeout(() => sync(false), 0);
     };
+
+    const refreshVisibleInbox = () => {
+      if (document.visibilityState === "visible") sync(true);
+    };
+
     schedule();
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "title", "data-device-id"] });
+
+    interval = window.setInterval(refreshVisibleInbox, 60_000);
+    document.addEventListener("visibilitychange", refreshVisibleInbox);
+
     return () => {
       if (timer) window.clearTimeout(timer);
+      if (interval) window.clearInterval(interval);
       observer.disconnect();
+      document.removeEventListener("visibilitychange", refreshVisibleInbox);
       requestRef.current += 1;
+      inFlightDeviceRef.current = "";
       deviceRef.current = "";
       loadedRefreshRef.current = -1;
       setDeviceId("");
