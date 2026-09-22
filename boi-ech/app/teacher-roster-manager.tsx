@@ -112,8 +112,14 @@ function statusLabel(status: RosterStatus) {
   return "Chờ duyệt";
 }
 
-function rosterSignature(items: RosterItem[]) {
-  return items.map((item) => `${item.personCode}:${item.status}`).sort().join("|");
+function rosterIdentitySignature(items: RosterItem[]) {
+  return items.map((item) => item.personCode).filter(Boolean).sort().join("|");
+}
+
+function countNewRosterMembers(previousSignature: string, items: RosterItem[]) {
+  if (!previousSignature) return 0;
+  const previous = new Set(previousSignature.split("|").filter(Boolean));
+  return items.reduce((count, item) => count + (item.personCode && !previous.has(item.personCode) ? 1 : 0), 0);
 }
 
 function approvedSignature(items: RosterItem[]) {
@@ -245,7 +251,7 @@ export default function TeacherRosterManager() {
   const [changedCount, setChangedCount] = useState(0);
   const deviceIdRef = useRef("");
   const syncedDeviceRef = useRef("");
-  const rosterSignatureRef = useRef("");
+  const rosterIdentitySignatureRef = useRef("");
   const approvedSignatureRef = useRef("");
   const syncingRef = useRef(false);
   const teacherActiveRef = useRef(false);
@@ -254,7 +260,7 @@ export default function TeacherRosterManager() {
   const clearRosterState = () => {
     deviceIdRef.current = "";
     syncedDeviceRef.current = "";
-    rosterSignatureRef.current = "";
+    rosterIdentitySignatureRef.current = "";
     approvedSignatureRef.current = "";
     syncingRef.current = false;
     setData({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
@@ -280,17 +286,16 @@ export default function TeacherRosterManager() {
       deviceIdRef.current = deviceId;
       const next = await requestRoster(deviceId, "list");
       if (generation !== syncGenerationRef.current || deviceIdRef.current !== deviceId) return;
-      const nextRosterSignature = rosterSignature(next.roster);
+      const nextRosterIdentitySignature = rosterIdentitySignature(next.roster);
       const nextApprovedSignature = approvedSignature(next.roster);
-      if (rosterSignatureRef.current && nextRosterSignature !== rosterSignatureRef.current) {
-        const previous = new Set(rosterSignatureRef.current.split("|"));
-        const additions = nextRosterSignature.split("|").filter((item) => item && !previous.has(item)).length;
-        if (additions > 0) setChangedCount(additions);
+      if (rosterIdentitySignatureRef.current && nextRosterIdentitySignature !== rosterIdentitySignatureRef.current) {
+        const additions = countNewRosterMembers(rosterIdentitySignatureRef.current, next.roster);
+        if (additions > 0) setChangedCount((current) => current + additions);
       }
       if (approvedSignatureRef.current && nextApprovedSignature !== approvedSignatureRef.current) {
         window.dispatchEvent(new CustomEvent("boi-ech:teacher-roster-changed"));
       }
-      rosterSignatureRef.current = nextRosterSignature;
+      rosterIdentitySignatureRef.current = nextRosterIdentitySignature;
       approvedSignatureRef.current = nextApprovedSignature;
       syncedDeviceRef.current = deviceId;
       setData(next);
@@ -324,7 +329,7 @@ export default function TeacherRosterManager() {
       deviceIdRef.current = deviceId;
       const next = await requestRoster(deviceId, action, item.personCode);
       if (generation !== syncGenerationRef.current || deviceIdRef.current !== deviceId) return;
-      rosterSignatureRef.current = rosterSignature(next.roster);
+      rosterIdentitySignatureRef.current = rosterIdentitySignature(next.roster);
       approvedSignatureRef.current = approvedSignature(next.roster);
       syncedDeviceRef.current = deviceId;
       setData(next);
@@ -365,7 +370,7 @@ export default function TeacherRosterManager() {
         syncingRef.current = false;
         deviceIdRef.current = deviceId;
         syncedDeviceRef.current = "";
-        rosterSignatureRef.current = "";
+        rosterIdentitySignatureRef.current = "";
         approvedSignatureRef.current = "";
         setData({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
         setChangedCount(0);
