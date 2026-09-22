@@ -1,10 +1,10 @@
 Production deployment trigger for Bơi ếch.
 
 Target source commit before trigger:
-d70caa44a3e8c13b8e6c6767b7bf5919c416d978
+190aa5a8daf91f1d6ef1b548e67574802633a448
 
 Release scope:
-Teacher multi-class control center V30-V34 plus V35 runtime fix for OverviewDashboard summary scope.
+Teacher UI V36 aligned with the approved class-management reference layout, plus all prior V30-V35 fixes.
 
 Purpose:
 Deploy the current main branch to Cloudflare production.
