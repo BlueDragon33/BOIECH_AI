@@ -23,8 +23,8 @@ type TeacherClassWorkspaceProps = {
   selectedClass: string;
   onSelectedClassChange: (className: string) => void;
   onOpenLearner: (personCode: string) => void;
-  onOpenTasks: () => void;
-  onOpenReports: () => void;
+  onOpenTasks: (className: string) => void;
+  onOpenReports: (className: string) => void;
   onOpenEditor: () => void;
 };
 
@@ -145,7 +145,7 @@ export default function TeacherClassWorkspace({
 
     {selected ? <div className="teacher-class-detail-grid">
       <section className="teacher-class-detail">
-        <header><div><span>LỚP ĐANG CHỌN</span><h2>{selected.name}</h2><p>{selected.learners.length} học viên · {selected.averageProgress}% tiến độ trung bình · {selected.analyses} phân tích AI</p></div><div><button type="button" onClick={onOpenTasks}>Bài tập</button><button type="button" onClick={onOpenReports}>Báo cáo</button></div></header>
+        <header><div><span>LỚP ĐANG CHỌN</span><h2>{selected.name}</h2><p>{selected.learners.length} học viên · {selected.averageProgress}% tiến độ trung bình · {selected.analyses} phân tích AI</p></div><div><button type="button" onClick={() => onOpenTasks(selected.name)}>Bài tập</button><button type="button" onClick={() => onOpenReports(selected.name)}>Báo cáo</button></div></header>
         <div className="teacher-class-student-list">
           {selected.learners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner.personCode)}>
             <span>{learner.name.slice(0,1).toUpperCase()}</span>
@@ -158,7 +158,7 @@ export default function TeacherClassWorkspace({
       </section>
 
       <aside className="teacher-class-side">
-        <section><header><strong>Cảnh báo nhanh</strong><button type="button" onClick={onOpenTasks}>Xử lý →</button></header>
+        <section><header><strong>Cảnh báo nhanh</strong><button type="button" onClick={() => onOpenTasks(selected.name)}>Xử lý →</button></header>
           {supportLearners.length ? supportLearners.map((learner) => <button key={learner.personCode || learner.name} type="button" onClick={() => onOpenLearner(learner.personCode)}><span>!</span><div><strong>{learner.name}</strong><small>{learner.className} · {learner.progress}% tiến độ</small></div></button>) : <p>Không có học viên cần can thiệp trong lớp đang chọn.</p>}
         </section>
         <section className="teacher-class-editor-card"><span>QUẢN LÝ NỘI DUNG</span><strong>Biên tập nội dung bài giảng</strong><p>Mở trình biên tập chuẩn, xin quyền theo bài/phần và quay lại đúng giao diện Giảng viên.</p><button type="button" onClick={onOpenEditor}>Vào trình biên tập →</button></section>

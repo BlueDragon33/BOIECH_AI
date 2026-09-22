@@ -1,0 +1,99 @@
+/* V33 — Explicit class work scope for Tasks and Reports. */
+
+.teacher-class-scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 78px;
+  padding: 14px 17px;
+  border: 1px solid rgba(91, 205, 229, .22);
+  border-radius: 15px;
+  color: #eefaff;
+  background:
+    radial-gradient(circle at 92% -15%, rgba(48, 202, 234, .16), transparent 42%),
+    linear-gradient(145deg, rgba(13, 48, 69, .97), rgba(8, 31, 47, .99));
+  box-shadow: 0 10px 28px rgba(0, 13, 23, .10);
+}
+
+.teacher-class-scope-bar > div {
+  min-width: 0;
+}
+
+.teacher-class-scope-bar > div > span {
+  display: block;
+  color: #f2c75e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.teacher-class-scope-bar > div > strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: #f4fbfe;
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-class-scope-bar > div > small {
+  display: block;
+  margin-top: 3px;
+  color: #82a5b4;
+  font-size: 12px;
+}
+
+.teacher-class-scope-bar > label {
+  min-width: min(310px, 42%);
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: #88aab8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.teacher-class-scope-bar select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 34px 0 12px;
+  border: 1px solid rgba(74, 203, 233, .30);
+  border-radius: 10px;
+  outline: 0;
+  color: #eaf9fd;
+  background: #09263a;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.teacher-class-scope-bar select:focus-visible {
+  border-color: #43d2f1;
+  box-shadow: 0 0 0 3px rgba(67, 210, 241, .14);
+}
+
+.teacher-class-scope-bar option {
+  color: #173a4c;
+  background: #fff;
+}
+
+@media (max-width: 760px) {
+  .teacher-class-scope-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .teacher-class-scope-bar > label {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .teacher-class-scope-bar > label {
+    grid-template-columns: 1fr;
+  }
+}
