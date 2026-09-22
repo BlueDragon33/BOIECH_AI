@@ -22,6 +22,7 @@ import "./two-way-messaging-l9.css";
 import "./assignment-schedule-l10.css";
 import "./teacher-secondary-tabs-v10.css";
 import "./teacher-dashboard-usability-v29.css";
+import "./teacher-control-center-v30.css";
 import StudentRoleShell from "./student-role-shell";
 import StudentTeacherInbox from "./student-teacher-inbox";
 import StudentAdaptiveCoach from "./student-adaptive-coach";
