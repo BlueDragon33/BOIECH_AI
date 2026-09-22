@@ -16,7 +16,7 @@ test("V31 scopes quick alerts to the selected class", () => {
 test("V31 keeps selected class outside the class-tab component", () => {
   assert.match(workspace, /selectedClass: string/);
   assert.match(workspace, /onSelectedClassChange: \(className: string\) => void/);
-  assert.doesNotMatch(workspace, /useState\("")/);
+  assert.ok(!workspace.includes('useState("")'));
   assert.match(workspace, /onSelectedClassChange\(item\.name\)/);
   assert.match(shell, /selectedClass=\{selectedClass\}/);
   assert.match(shell, /onSelectedClassChange=\{setSelectedClass\}/);
