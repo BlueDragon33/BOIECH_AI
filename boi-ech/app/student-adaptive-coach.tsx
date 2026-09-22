@@ -313,7 +313,7 @@ export default function StudentAdaptiveCoach() {
     };
 
     const refreshVisibleAdaptive = () => {
-      if (document.visibilityState === "visible") refresh(true);
+      if (document.visibilityState === "visible" && navigator.onLine) refresh(true);
     };
 
     schedule();
@@ -327,12 +327,14 @@ export default function StudentAdaptiveCoach() {
     });
     interval = window.setInterval(refreshVisibleAdaptive, 120_000);
     document.addEventListener("visibilitychange", refreshVisibleAdaptive);
+    window.addEventListener("online", refreshVisibleAdaptive);
 
     return () => {
       if (timer) window.clearTimeout(timer);
       if (interval) window.clearInterval(interval);
       observer.disconnect();
       document.removeEventListener("visibilitychange", refreshVisibleAdaptive);
+      window.removeEventListener("online", refreshVisibleAdaptive);
       requestRef.current += 1;
       loadingRef.current = false;
       deviceRef.current = "";
