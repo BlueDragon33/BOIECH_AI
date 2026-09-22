@@ -4,8 +4,10 @@ import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
 const LOCAL_ONLY_DATABASE_ID = "00000000-0000-0000-0000-000000000004";
+const PRODUCTION_DATABASE_ID = "7816425d-ce8a-4b3c-b303-7697fd4a529c";
 const { d1 } = hostingConfig;
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
+const isProductionCloudflareBuild = process.env.BOI_ECH_PRODUCTION_BUILD === "true";
 const allowLan = process.env.LOCAL_CONTROL_ALLOW_LAN === "true";
 const cloudflareConfigPath = process.env.CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH?.trim();
 
@@ -20,7 +22,7 @@ const localVars = [
   return values;
 }, {});
 
-const localBindingConfig = {
+const bindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   vars: localVars,
@@ -28,8 +30,10 @@ const localBindingConfig = {
     ? [
         {
           binding: d1,
-          database_name: "boi-ech-local",
-          database_id: process.env.BOI_ECH_LOCAL_DATABASE_ID || LOCAL_ONLY_DATABASE_ID,
+          database_name: isProductionCloudflareBuild ? "boi-ech-db" : "boi-ech-local",
+          database_id: isProductionCloudflareBuild
+            ? PRODUCTION_DATABASE_ID
+            : process.env.BOI_ECH_LOCAL_DATABASE_ID || LOCAL_ONLY_DATABASE_ID,
         },
       ]
     : [],
@@ -48,7 +52,7 @@ export default defineConfig(async () => {
         inspectorPort: false as const,
       }
     : {
-        config: localBindingConfig,
+        config: bindingConfig,
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false as const,
       };
