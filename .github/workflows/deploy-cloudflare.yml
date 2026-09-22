@@ -70,7 +70,21 @@ jobs:
 
       - name: Build with Cloudflare Vite plugin
         working-directory: boi-ech
+        env:
+          CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.d1.jsonc
         run: npx vite build
+
+      - name: Verify production D1 binding in generated artifact
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/server/wrangler.json
+          grep -q '7816425d-ce8a-4b3c-b303-7697fd4a529c' dist/server/wrangler.json
+          if grep -q '00000000-0000-0000-0000-000000000004' dist/server/wrangler.json; then
+            echo '::error::Generated production artifact still references the local D1 placeholder.'
+            exit 1
+          fi
 
       - name: Deploy current Bơi ếch production Worker
         working-directory: boi-ech
