@@ -91,16 +91,36 @@ const roadmapGroups = [
 ];
 
 type AppearanceSettings = {
+  theme: "light" | "dark" | "system";
   background: string;
+  contentBackground: string;
+  cardBackground: string;
+  accent: string;
   font: "arial" | "readable" | "serif";
   textSize: 0 | 2 | 4;
+  density: "comfortable" | "compact";
+  radius: 10 | 14 | 18;
 };
 
 const defaultAppearance: AppearanceSettings = {
+  theme: "light",
   background: "#f7fbfb",
+  contentBackground: "#eef5f8",
+  cardBackground: "#ffffff",
+  accent: "#168dc2",
   font: "arial",
   textSize: 0,
+  density: "comfortable",
+  radius: 14,
 };
+
+function appearanceThemePreset(theme: AppearanceSettings["theme"]) {
+  const prefersDark = theme === "dark"
+    || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  return prefersDark
+    ? { theme, background: "#031c30", contentBackground: "#052640", cardBackground: "#0b314b", accent: "#35d6dc" }
+    : { theme, background: "#f7fbfb", contentBackground: "#eef5f8", cardBackground: "#ffffff", accent: "#168dc2" };
+}
 
 const backgroundOptions = [
   { name: "Trắng nước", value: "#f7fbfb" },
@@ -1422,6 +1442,8 @@ export default function Home() {
   const learnerFullName = deviceAccess?.learnerName?.trim() || [deviceAccess?.learnerFamilyName, learnerGivenName].filter(Boolean).join(" ");
   const learnerInitial = learnerGivenName.slice(0, 1).toUpperCase();
   const usesDarkBackground = darkBackground(appearance.background);
+  const usesDarkContent = darkBackground(appearance.contentBackground);
+  const usesDarkCard = darkBackground(appearance.cardBackground);
   const activeLessonCanSubmit = canSubmitLesson(progress.completed, selectedLesson);
   const activeSubmissionReady = activeLessonAnswered === activeQuestions.length && activeLessonCanSubmit;
   const activeSubmissionStatus = activeLessonAnswered < activeQuestions.length
@@ -1731,10 +1753,21 @@ export default function Home() {
       data-device-type={deviceAccess.deviceType}
       data-device-platform={deviceAccess.platform ?? ""}
       data-device-browser={deviceAccess.browser ?? ""}
+      data-appearance-theme={appearance.theme}
+      data-appearance-density={appearance.density}
       style={{
         "--app-background": appearance.background,
+        "--content-background": appearance.contentBackground,
+        "--card-background": appearance.cardBackground,
+        "--accent-color": appearance.accent,
+        "--ui-radius": `${appearance.radius}px`,
+        "--ui-density": appearance.density === "compact" ? "0.88" : "1",
         "--page-ink": usesDarkBackground ? "#f4fbfb" : "#102b3f",
         "--page-muted": usesDarkBackground ? "#cee2e4" : "#5d7282",
+        "--content-ink": usesDarkContent ? "#f4fbfb" : "#123b61",
+        "--content-muted": usesDarkContent ? "#bad0da" : "#657d8d",
+        "--card-ink": usesDarkCard ? "#f4fbfb" : "#173c5e",
+        "--card-muted": usesDarkCard ? "#bdd0da" : "#718899",
         "--site-font": fontStack,
         "--font-adjust": `${appearance.textSize}px`,
       } as React.CSSProperties}
@@ -1789,6 +1822,14 @@ export default function Home() {
               <header><div><span>Tùy chỉnh hiển thị</span><h2 id="appearance-title">Giao diện</h2></div><button onClick={() => setAppearanceOpen(false)} aria-label="Đóng">×</button></header>
 
               <section>
+                <label>Chế độ màu</label>
+                <p>Đổi nhanh toàn bộ hệ nền; sau đó vẫn có thể tinh chỉnh từng lớp màu bên dưới.</p>
+                <div className="segmented-control">
+                  {(["light", "dark", "system"] as const).map((mode) => <button key={mode} className={appearance.theme === mode ? "active" : ""} onClick={() => setAppearance((current) => ({ ...current, ...appearanceThemePreset(mode) }))}>{mode === "light" ? "Sáng" : mode === "dark" ? "Tối" : "Theo hệ thống"}</button>)}
+                </div>
+              </section>
+
+              <section>
                 <label>Nền trang</label>
                 <p>Chọn nền dịu mắt hoặc tự chọn màu riêng.</p>
                 <div className="background-options">
@@ -1798,10 +1839,31 @@ export default function Home() {
               </section>
 
               <section>
+                <label>Màu vùng nội dung</label>
+                <p>Tách riêng nền khu vực làm việc, nền card và màu nhấn để giao diện không bị một màu.</p>
+                <div className="appearance-color-grid">
+                  <label className="color-picker">Vùng làm việc <input type="color" value={appearance.contentBackground} onChange={(event) => setAppearance((current) => ({ ...current, contentBackground: event.target.value }))} /></label>
+                  <label className="color-picker">Card nội dung <input type="color" value={appearance.cardBackground} onChange={(event) => setAppearance((current) => ({ ...current, cardBackground: event.target.value }))} /></label>
+                  <label className="color-picker">Màu nhấn <input type="color" value={appearance.accent} onChange={(event) => setAppearance((current) => ({ ...current, accent: event.target.value }))} /></label>
+                </div>
+              </section>
+
+              <section>
                 <label>Cỡ chữ</label>
                 <p>Tăng đồng đều chữ nội dung, nhãn và nút bấm.</p>
                 <div className="segmented-control">
                   {([{ value: 0, label: "Tiêu chuẩn" }, { value: 2, label: "Lớn" }, { value: 4, label: "Rất lớn" }] as const).map((item) => <button key={item.value} className={appearance.textSize === item.value ? "active" : ""} onClick={() => setAppearance((current) => ({ ...current, textSize: item.value }))}>{item.label}</button>)}
+                </div>
+              </section>
+
+              <section>
+                <label>Mật độ & bo góc</label>
+                <p>Chọn khoảng cách hiển thị và độ bo của các khối làm việc.</p>
+                <div className="segmented-control">
+                  {(["comfortable", "compact"] as const).map((density) => <button key={density} className={appearance.density === density ? "active" : ""} onClick={() => setAppearance((current) => ({ ...current, density }))}>{density === "comfortable" ? "Thoải mái" : "Gọn"}</button>)}
+                </div>
+                <div className="segmented-control appearance-radius-control">
+                  {([10, 14, 18] as const).map((radius) => <button key={radius} className={appearance.radius === radius ? "active" : ""} onClick={() => setAppearance((current) => ({ ...current, radius }))}>Bo {radius}px</button>)}
                 </div>
               </section>
 
