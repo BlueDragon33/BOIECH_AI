@@ -18,3 +18,10 @@ for (const [name, source] of [["student teacher inbox", inbox], ["student adapti
     assert.ok(sign > challenge, "real ECDSA signing must follow the challenge");
   });
 }
+
+for (const [name, source] of [["student teacher inbox", inbox], ["student adaptive coach", adaptive]]) {
+  test(`${name} accepts only canonical device ids from the DOM`, () => {
+    assert.match(source, /if \/\^\[a-f0-9\]\{64\}\$\/i\.test\(direct\)\) return direct;/);
+    assert.doesNotMatch(source, /if \(direct\) return direct;/);
+  });
+}
