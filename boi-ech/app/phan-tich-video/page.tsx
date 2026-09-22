@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import MediaPipeConsentGate from "./privacy-consent";
 
 const VideoAnalyzer = dynamic(() => import("./video-analyzer"), {
@@ -16,10 +17,16 @@ const VideoAnalyzer = dynamic(() => import("./video-analyzer"), {
 });
 
 export default function LocalVideoAnalysisPage() {
+  const searchParams = useSearchParams();
+  const returnMode = searchParams.get("return");
+  const requestedTab = searchParams.get("tab") ?? "analysis";
+  const teacherTabs = new Set(["overview","class","learners","tasks","reports","messages","schedule","profile","analysis"]);
+  const returnTab = teacherTabs.has(requestedTab) ? requestedTab : "analysis";
+  const returnHref = returnMode === "teacher" ? `/?workspace=teacher&tab=${encodeURIComponent(returnTab)}` : "/";
   return (
     <main style={{ minHeight: "100vh", background: "#f6fafb", paddingBottom: 48 }}>
       <div style={{ maxWidth: 1240, margin: "0 auto", padding: "18px 28px 0", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#075568", textDecoration: "none", fontWeight: 800, fontSize: 13 }}>
+        <Link href={returnHref} style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#075568", textDecoration: "none", fontWeight: 800, fontSize: 13 }}>
           ← Quay lại Bơi ếch AI
         </Link>
       </div>
