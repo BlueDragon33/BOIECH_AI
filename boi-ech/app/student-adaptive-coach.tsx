@@ -249,6 +249,7 @@ export default function StudentAdaptiveCoach() {
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const [data, setData] = useState<AdaptiveBootstrap | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const deviceRef = useRef("");
   const requestRef = useRef(0);
   const loadingRef = useRef(false);
@@ -259,12 +260,19 @@ export default function StudentAdaptiveCoach() {
     const requestId = ++requestRef.current;
     loadingRef.current = true;
     setLoading(true);
+    if (!preserveData) setError("");
     loadAdaptiveProfile(deviceId)
       .then((next) => {
-        if (requestRef.current === requestId && deviceRef.current === deviceId) setData(next);
+        if (requestRef.current === requestId && deviceRef.current === deviceId) {
+          setData(next);
+          setError("");
+        }
       })
-      .catch(() => {
-        if (requestRef.current === requestId && !preserveData) setData(null);
+      .catch((caught) => {
+        if (requestRef.current === requestId && !preserveData) {
+          setData(null);
+          setError(caught instanceof Error ? caught.message : "Không thể tải Learner Model.");
+        }
       })
       .finally(() => {
         if (requestRef.current === requestId) {
@@ -293,6 +301,7 @@ export default function StudentAdaptiveCoach() {
         deviceRef.current = "";
         setLoading(false);
         setData(null);
+        setError("");
         return;
       }
 
@@ -303,6 +312,7 @@ export default function StudentAdaptiveCoach() {
         deviceRef.current = deviceId;
         setLoading(false);
         setData(null);
+        setError("");
         refresh(false);
       }).catch(() => undefined);
     };
@@ -340,6 +350,7 @@ export default function StudentAdaptiveCoach() {
       deviceRef.current = "";
       setLoading(false);
       setData(null);
+      setError("");
     };
   }, [refresh]);
 
@@ -349,6 +360,17 @@ export default function StudentAdaptiveCoach() {
       <section className="student-adaptive-coach student-adaptive-loading" role="status">
         <span>LEARNER MODEL</span>
         <strong>Đang tính lộ trình phù hợp từ dữ liệu học tập…</strong>
+      </section>,
+      mount,
+    );
+  }
+  if (error && !data) {
+    return createPortal(
+      <section className="student-adaptive-coach student-adaptive-error" role="alert">
+        <span>LEARNER MODEL</span>
+        <strong>Chưa thể tải lộ trình thích ứng</strong>
+        <p>{error}</p>
+        <button type="button" onClick={() => refresh(false)}>Thử lại</button>
       </section>,
       mount,
     );

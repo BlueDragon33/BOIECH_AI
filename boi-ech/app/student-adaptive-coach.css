@@ -335,6 +335,44 @@
   font-size: 12px;
 }
 
+.student-adaptive-error {
+  display: grid;
+  gap: 7px;
+  padding: 20px;
+}
+
+.student-adaptive-error > span {
+  color: #b16a20;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .09em;
+}
+
+.student-adaptive-error > strong {
+  color: #6d4320;
+  font-size: 13px;
+}
+
+.student-adaptive-error > p {
+  margin: 0;
+  color: #8b6a4f;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.student-adaptive-error > button {
+  width: max-content;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #d7a365;
+  border-radius: 8px;
+  background: #fff8ef;
+  color: #8a571f;
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
 @media (max-width: 980px) {
   .student-adaptive-body {
     grid-template-columns: 1fr;
