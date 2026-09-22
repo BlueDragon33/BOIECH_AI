@@ -64,7 +64,9 @@ for (const [name, content] of [
 }
 
 requireMatch(teacherOverview, /teacher\.personRole !== "teacher"/, "teacher overview must require teacher role");
-requireMatch(teacherOverview, /lower\(trim\(da\.class_name\)\) = lower\(trim\(\?\)\)/, "teacher overview must remain class-scoped");
+requireMatch(teacherOverview, /teacherClassNames\(teacher\.className\)/, "teacher overview must derive its authorized class set from the signed teacher profile");
+requireMatch(teacherOverview, /lower\(trim\(da\.class_name\)\) IN \(\$\{classPlaceholders\}\)/, "teacher overview must remain scoped to the authorized class set");
+requireMatch(teacherOverview, /\.bind\(\.\.\.teacherClasses\)/, "teacher overview class scope must be bound, not interpolated from request input");
 requireMatch(learnerReply, /WHERE id = \? AND device_id = \?/, "learner replies must remain bound to the learner device");
 requireMatch(assignmentStatus, /event_type = 'teacher_assignment'/, "assignment status must target a real teacher assignment");
 requireMatch(assignmentStatus, /MAX_STATUS_EVENTS_PER_ASSIGNMENT/, "assignment status changes must be bounded");

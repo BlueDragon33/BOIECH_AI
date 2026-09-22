@@ -41,11 +41,12 @@ test("L10 learner inbox exposes due date and three real status controls", () => 
   assert.match(studentInbox, /Hạn hoàn thành/);
 });
 
-test("L10 teacher overview builds a same-class real assignment schedule", () => {
+test("L10 teacher overview builds a real assignment schedule inside the authorized teacher class set", () => {
   assert.match(teacherApi, /teacher_assignment', 'learner_assignment_status/);
   assert.match(teacherApi, /da\.person_role = 'learner'/);
   assert.match(teacherApi, /da\.status = 'approved'/);
-  assert.match(teacherApi, /lower\(trim\(da\.class_name\)\) = lower\(trim\(\?\)\)/);
+  assert.match(teacherApi, /lower\(trim\(da\.class_name\)\) IN \(\$\{classPlaceholders\}\)/);
+  assert.match(teacherApi, /\.bind\(\.\.\.teacherClasses\)/);
   assert.match(teacherApi, /latestStatusByAssignment/);
   assert.match(teacherApi, /scheduleState/);
   assert.match(teacherApi, /assignments,/);

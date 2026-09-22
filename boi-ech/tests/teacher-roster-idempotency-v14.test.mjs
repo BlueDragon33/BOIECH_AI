@@ -7,7 +7,7 @@ const route = fs.readFileSync(new URL("../app/api/teacher/roster/route.ts", impo
 test("duplicate teacher roster mutations are no-ops", () => {
   assert.match(route, /action === "approve" && target\.status === "approved"/);
   assert.match(route, /action === "remove" && target\.status === "blocked"/);
-  assert.match(route, /if \(alreadyInRequestedState\) \{[\s\S]*?return response\(await listRoster\(teacher\.className\)\);[\s\S]*?\}/);
+  assert.match(route, /if \(alreadyInRequestedState\) \{[\s\S]*?return response\(await listRoster\(teacherClasses\)\);[\s\S]*?\}/);
 });
 
 test("idempotency guard runs before mutation and audit writes", () => {

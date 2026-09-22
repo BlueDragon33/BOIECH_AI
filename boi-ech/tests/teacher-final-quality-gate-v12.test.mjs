@@ -45,11 +45,12 @@ test("all instructor navigation destinations remain present", () => {
   ]) assert.ok(shell.includes(`label: "${label}"`), label);
 });
 
-test("teacher roster remains signed same-class and reversible", () => {
+test("teacher roster remains signed authorized-class and reversible", () => {
   assert.match(rosterRoute, /verifyDeviceRequest\(payload, previewRequest\)/);
   assert.match(rosterRoute, /teacher\.personRole !== "teacher"/);
   assert.match(rosterRoute, /person_role = 'learner'/);
-  assert.match(rosterRoute, /lower\(trim\(class_name\)\) = lower\(trim\(\?\)\)/);
+  assert.match(rosterRoute, /teacherClassNames\(teacher\.className\)/);
+  assert.match(rosterRoute, /lower\(trim\(class_name\)\) IN \(\$\{classPlaceholders\}\)/);
   assert.match(rosterRoute, /SET status = 'blocked'/);
   assert.doesNotMatch(rosterRoute, /DELETE FROM device_access/);
 });

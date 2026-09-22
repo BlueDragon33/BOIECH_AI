@@ -11,15 +11,16 @@ const studentInbox = fs.readFileSync(new URL("../app/student-teacher-inbox.tsx",
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/teacher-dashboard-actions-v7.css", import.meta.url), "utf8");
 
-test("teacher actions require signed teacher role and same-class learner scope", () => {
+test("teacher actions require signed teacher role and authorized-class learner scope", () => {
   assert.match(teacherRoute, /verifyDeviceRequest\(payload, previewRequest\)/);
   assert.match(teacherRoute, /teacher\.personRole !== "teacher"/);
   assert.match(teacherRoute, /TEACHER_ROLE_REQUIRED/);
   assert.match(teacherRoute, /person_role = 'learner'/);
   assert.match(teacherRoute, /status = 'approved'/);
   assert.match(teacherRoute, /person_code = \?/);
-  assert.match(teacherRoute, /lower\(trim\(class_name\)\) = lower\(trim\(\?\)\)/);
-  assert.match(teacherRoute, /\.bind\(learnerPersonCode, teacher\.className\)/);
+  assert.match(teacherRoute, /teacherClassNames\(teacher\.className\)/);
+  assert.match(teacherRoute, /lower\(trim\(class_name\)\) IN \(\$\{classPlaceholders\}\)/);
+  assert.match(teacherRoute, /\.bind\(learnerPersonCode, \.\.\.teacherClasses\)/);
 });
 
 test("teacher actions persist only bounded text supervision events and an audit trail", () => {

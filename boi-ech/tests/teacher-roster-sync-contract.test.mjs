@@ -5,15 +5,17 @@ import fs from "node:fs";
 const route = fs.readFileSync(new URL("../app/api/teacher/roster/route.ts", import.meta.url), "utf8");
 const manager = fs.readFileSync(new URL("../app/teacher-roster-manager.tsx", import.meta.url), "utf8");
 const shell = fs.readFileSync(new URL("../app/teacher-role-shell.tsx", import.meta.url), "utf8");
+const classWorkspace = fs.readFileSync(new URL("../app/teacher-class-workspace.tsx", import.meta.url), "utf8");
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/teacher-roster-sync-v9.css", import.meta.url), "utf8");
 
-test("teacher roster API is signed and scoped to learner role plus teacher class", () => {
+test("teacher roster API is signed and scoped to learner role plus authorized teacher classes", () => {
   assert.match(route, /verifyDeviceRequest\(payload, previewRequest\)/);
   assert.match(route, /teacher\.personRole !== "teacher"/);
   assert.match(route, /person_role = 'learner'/);
-  assert.match(route, /lower\(trim\(class_name\)\) = lower\(trim\(\?\)\)/);
-  assert.match(route, /\.bind\(personCode, teacher\.className\)/);
+  assert.match(route, /teacherClassNames\(teacher\.className\)/);
+  assert.match(route, /lower\(trim\(class_name\)\) IN \(\$\{classPlaceholders\}\)/);
+  assert.match(route, /\.bind\(personCode, \.\.\.teacherClasses\)/);
   assert.match(route, /LEARNER_NOT_IN_TEACHER_CLASS/);
 });
 
@@ -60,7 +62,7 @@ test("teacher learner management exposes approve remove and restore without fake
 test("teacher shell provides sync and roster mounts and refreshes overview after roster changes", () => {
   assert.match(shell, /data-teacher-sync-mount="overview"/);
   assert.match(shell, /data-teacher-sync-mount="learners"/);
-  assert.match(shell, /data-teacher-sync-mount="class"/);
+  assert.match(classWorkspace, /data-teacher-sync-mount="class"/);
   assert.match(shell, /data-teacher-roster-manager-mount/);
   assert.match(shell, /addEventListener\("boi-ech:teacher-roster-changed", onRosterChanged\)/);
 });

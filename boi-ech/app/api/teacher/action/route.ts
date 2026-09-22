@@ -38,6 +38,14 @@ function cleanText(value: unknown, max: number) {
     : "";
 }
 
+function teacherClassNames(value: string | null) {
+  const classes = String(value ?? "")
+    .split(/[;\n,]+/)
+    .map((item) => item.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  return [...new Map(classes.map((item) => [item.toLocaleLowerCase("vi"), item])).values()].slice(0, 12);
+}
+
 function normalizeClientEventId(value: unknown) {
   return typeof value === "string" && /^[A-Za-z0-9:_-]{8,100}$/.test(value) ? value : null;
 }
@@ -70,7 +78,8 @@ export async function POST(request: Request) {
         teacher,
       );
     }
-    if (!teacher.className) {
+    const teacherClasses = teacherClassNames(teacher.className);
+    if (!teacherClasses.length) {
       throw new DeviceAccessError(
         "Hồ sơ Giảng viên chưa có lớp / đơn vị phụ trách.",
         400,
@@ -78,6 +87,7 @@ export async function POST(request: Request) {
         teacher,
       );
     }
+    const classPlaceholders = teacherClasses.map(() => "lower(trim(?))").join(", ");
 
     const action = normalizeAction(payload.action);
     if (!action) return json({ error: "Thao tác Giảng viên không hợp lệ." }, 400);
@@ -92,9 +102,9 @@ export async function POST(request: Request) {
         WHERE person_role = 'learner'
           AND status = 'approved'
           AND person_code = ?
-          AND lower(trim(class_name)) = lower(trim(?))
+          AND lower(trim(class_name)) IN (${classPlaceholders})
         LIMIT 1`,
-    ).bind(learnerPersonCode, teacher.className).first<LearnerTarget>();
+    ).bind(learnerPersonCode, ...teacherClasses).first<LearnerTarget>();
 
     if (!learner) {
       return json({ error: "Học viên không thuộc lớp / đơn vị Giảng viên đang phụ trách." }, 404);
@@ -133,7 +143,7 @@ export async function POST(request: Request) {
     const detail = {
       source: "teacher-dashboard",
       teacherName: teacher.learnerName?.slice(0, 120) || "Giảng viên",
-      teacherClassName: teacher.className,
+      teacherClassName: learner.class_name || teacherClasses[0],
       action,
       note,
       ...(title ? { title } : {}),
@@ -164,7 +174,7 @@ export async function POST(request: Request) {
       eventType,
       learner.person_code || learner.device_id,
       JSON.stringify({
-        className: teacher.className,
+        className: learner.class_name || teacherClasses[0],
         learnerName: learner.learner_name?.slice(0, 120) || "Học viên",
         lessonNumber: lessonNumber || null,
         dueAt: action === "assignment" && dueAt ? dueAt : null,
@@ -179,7 +189,7 @@ export async function POST(request: Request) {
       learner: {
         name: learner.learner_name?.trim() || "Học viên",
         personCode: learner.person_code || "",
-        className: learner.class_name || teacher.className,
+        className: learner.class_name || teacherClasses[0],
       },
       saved: {
         note,

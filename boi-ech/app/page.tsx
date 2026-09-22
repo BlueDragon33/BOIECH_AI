@@ -1750,6 +1750,7 @@ export default function Home() {
     <div
       className={`app-shell ${installPrompt ? "has-install-prompt" : ""}`}
       data-device-id={deviceAccess.deviceId}
+      data-person-role={deviceAccess.personRole ?? ""}
       data-device-type={deviceAccess.deviceType}
       data-device-platform={deviceAccess.platform ?? ""}
       data-device-browser={deviceAccess.browser ?? ""}

@@ -14,13 +14,14 @@ test("teacher shell activates only for the registered teacher role", () => {
   assert.match(css, /body\[data-teacher-role-ui="active"\]/);
 });
 
-test("teacher oversight API requires signed teacher access and scopes learners to the assigned class", () => {
+test("teacher oversight API requires signed teacher access and scopes learners to assigned classes", () => {
   assert.match(route, /verifyDeviceRequest\(payload, previewRequest\)/);
   assert.match(route, /teacher\.personRole !== "teacher"/);
   assert.match(route, /TEACHER_ROLE_REQUIRED/);
+  assert.match(route, /teacherClassNames\(teacher\.className\)/);
   assert.match(route, /da\.person_role = 'learner'/);
-  assert.match(route, /lower\(trim\(da\.class_name\)\) = lower\(trim\(\?\)\)/);
-  assert.match(route, /\.bind\(teacher\.className\)/);
+  assert.match(route, /lower\(trim\(da\.class_name\)\) IN \(\$\{classPlaceholders\}\)/);
+  assert.match(route, /\.bind\(\.\.\.teacherClasses\)/);
 });
 
 test("teacher supervision returns learning evidence without learner phone or original media", () => {

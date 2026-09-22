@@ -30,13 +30,15 @@ test("L7 does not treat weak video evidence as a score-change signal", () => {
   assert.doesNotMatch(analytics, /videoBlob|frameData|imageData|thumbnail|base64/);
 });
 
-test("teacher overview scopes analytics to approved learners in the signed teacher class", () => {
+test("teacher overview scopes analytics to approved learners in the signed teacher class set", () => {
   assert.match(teacherApi, /verifyDeviceRequest\(payload, previewRequest\)/);
   assert.match(teacherApi, /teacher\.personRole !== "teacher"/);
   assert.match(teacherApi, /JOIN device_access da ON da\.device_id = e\.device_id/);
   assert.match(teacherApi, /da\.person_role = 'learner'/);
   assert.match(teacherApi, /da\.status = 'approved'/);
-  assert.match(teacherApi, /lower\(trim\(da\.class_name\)\) = lower\(trim\(\?\)\)/);
+  assert.match(teacherApi, /teacherClassNames\(teacher\.className\)/);
+  assert.match(teacherApi, /lower\(trim\(da\.class_name\)\) IN \(\$\{classPlaceholders\}\)/);
+  assert.match(teacherApi, /\.bind\(\.\.\.teacherClasses\)/);
   assert.match(teacherApi, /buildLearningAnalytics/);
   assert.match(teacherApi, /learningAnalytics/);
 });
