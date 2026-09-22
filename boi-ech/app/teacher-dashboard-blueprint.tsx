@@ -176,6 +176,24 @@ function ensureTopbarTools() {
   const actions = document.querySelector<HTMLElement>("body[data-teacher-role-ui='active'] .topbar-actions");
   const chip = actions?.querySelector<HTMLElement>(".learner-chip");
   if (!actions || !chip) return;
+  if (!actions.querySelector(".teacher-topbar-refresh")) {
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "teacher-topbar-tool teacher-topbar-refresh";
+    refresh.dataset.teacherBlueprint = "refresh";
+    refresh.textContent = "Làm mới";
+    refresh.addEventListener("click", () => window.dispatchEvent(new CustomEvent("boi-ech:teacher-refresh")));
+    actions.insertBefore(refresh, chip);
+  }
+  if (!actions.querySelector(".teacher-topbar-sync")) {
+    const sync = document.createElement("button");
+    sync.type = "button";
+    sync.className = "teacher-topbar-tool teacher-topbar-sync";
+    sync.dataset.teacherBlueprint = "sync";
+    sync.textContent = "Đồng bộ";
+    sync.addEventListener("click", () => window.dispatchEvent(new CustomEvent("boi-ech:teacher-roster-sync")));
+    actions.insertBefore(sync, chip);
+  }
   if (!actions.querySelector(".teacher-mode-badge")) {
     const badge = document.createElement("span");
     badge.className = "teacher-mode-badge";
