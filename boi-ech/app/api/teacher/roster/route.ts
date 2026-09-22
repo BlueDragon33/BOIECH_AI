@@ -138,6 +138,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const alreadyInRequestedState =
+      (action === "approve" && target.status === "approved")
+      || (action === "remove" && target.status === "blocked");
+    if (alreadyInRequestedState) {
+      return response(await listRoster(teacher.className));
+    }
+
     if (action === "approve") {
       if (!target.learner_name?.trim() || !target.person_code?.trim() || !target.class_name?.trim()
         || !target.phone?.trim() || !target.registration_submitted_at) {
