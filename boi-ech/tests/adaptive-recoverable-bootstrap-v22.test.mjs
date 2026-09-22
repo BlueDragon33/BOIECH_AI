@@ -18,7 +18,8 @@ test("retry uses a non-preserving bootstrap so another failure remains visible",
 });
 
 test("background refresh failures still preserve the current learner model", () => {
-  assert.ok(adaptive.includes("if (requestRef.current === requestId && !preserveData)"));
+  assert.ok(adaptive.includes("if (requestRef.current === requestId)"));
+  assert.ok(adaptive.includes("if (!preserveData) setData(null);"));
   assert.ok(adaptive.includes("refresh(true)"));
 });
 
