@@ -276,7 +276,9 @@ export default function StudentAdaptiveCoach() {
       setMount(nextMount);
 
       if (!nextMount) {
+        requestRef.current += 1;
         deviceRef.current = "";
+        setLoading(false);
         setData(null);
         return;
       }
@@ -285,6 +287,7 @@ export default function StudentAdaptiveCoach() {
         if (!deviceId || deviceRef.current === deviceId) return;
         deviceRef.current = deviceId;
         const requestId = ++requestRef.current;
+        setData(null);
         setLoading(true);
         loadAdaptiveProfile(deviceId)
           .then((next) => { if (requestRef.current === requestId) setData(next); })
