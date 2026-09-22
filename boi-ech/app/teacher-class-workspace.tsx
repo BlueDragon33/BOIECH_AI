@@ -67,7 +67,7 @@ export default function TeacherClassWorkspace({
 
   return <section className="teacher-class-control-center">
     <header className="teacher-class-control-header">
-      <div><span>LỚP HỌC CỦA TÔI</span><h1>Quản lý nhiều lớp trong một màn hình</h1><p>Chỉ hiển thị các lớp đã được quản trị phân cho Giảng viên. Chọn một lớp để xem học viên, tiến độ, bài tập và cảnh báo.</p></div>
+      <div><span>LỚP HỌC CỦA TÔI</span><h1>Quản lý nhiều lớp trong một màn hình</h1><p>Chỉ hiển thị các lớp đã được quản trị phân cho Giảng viên. Chọn một lớp để xem học viên, tiến độ, bài tập và cảnh báo.</p><span data-teacher-sync-mount="class"/></div>
       <div className="teacher-class-header-actions"><button type="button" onClick={onOpenEditor}>Biên tập bài giảng</button><button type="button" onClick={onOpenReports}>Báo cáo tổng hợp</button></div>
     </header>
 
