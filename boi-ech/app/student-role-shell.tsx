@@ -25,6 +25,9 @@ type StudentSnapshot = {
   selectedLesson: string;
   network: string;
   access: string;
+  deviceType: "desktop" | "phone" | "tablet";
+  platform: string;
+  browser: string;
   lessons: LessonSnapshot[];
 };
 
@@ -39,8 +42,17 @@ const EMPTY: StudentSnapshot = {
   selectedLesson: "01",
   network: "Đang kết nối",
   access: "",
+  deviceType: "desktop",
+  platform: "",
+  browser: "",
   lessons: [],
 };
+
+const DEVICE_TYPE_LABELS = {
+  desktop: "Máy tính",
+  phone: "Điện thoại",
+  tablet: "Máy tính bảng / iPad",
+} as const;
 
 const ORIGINAL_NAV: Record<string, string> = {
   home: "Tổng quan",
@@ -223,7 +235,7 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
       <section className="student-profile-card" id="student-profile">
         <div className="student-avatar">{snapshot.initial}</div>
         <div><span>HỒ SƠ HỌC VIÊN</span><h3>{snapshot.name}</h3><p>{snapshot.personCode || "Mã học viên được bảo vệ theo thiết bị"}</p></div>
-        <dl><div><dt>Vai trò</dt><dd>Học viên</dd></div><div><dt>Quyền truy cập</dt><dd>{snapshot.access || "Đã xác thực"}</dd></div><div><dt>Trạng thái</dt><dd>{snapshot.network}</dd></div></dl>
+        <dl><div><dt>Vai trò</dt><dd>Học viên</dd></div><div><dt>Quyền truy cập</dt><dd>{snapshot.access || "Đã xác thực"}</dd></div><div><dt>Trạng thái</dt><dd>{snapshot.network}</dd></div><div><dt>Thiết bị</dt><dd>{DEVICE_TYPE_LABELS[snapshot.deviceType]}{snapshot.platform ? ` · ${snapshot.platform}` : ""}{snapshot.browser ? ` · ${snapshot.browser}` : ""}</dd></div></dl>
       </section>
     </div>
   );
@@ -301,6 +313,8 @@ export default function StudentRoleShell() {
         done: button.classList.contains("done"),
         current: button.classList.contains("current"),
       }));
+      const classifiedType = shell.dataset.deviceType;
+      const deviceType = classifiedType === "phone" || classifiedType === "tablet" ? classifiedType : "desktop";
       const next: StudentSnapshot = {
         name: rawName,
         initial: rawName.slice(0, 1).toUpperCase() || "H",
@@ -312,6 +326,9 @@ export default function StudentRoleShell() {
         selectedLesson: selectedMatch?.[1] ?? lessons.find((item) => item.current)?.number ?? "01",
         network: text(document.querySelector(".network-state")) || "Đã kết nối",
         access: text(document.querySelector(".payment-access-status")),
+        deviceType,
+        platform: shell.dataset.devicePlatform ?? "",
+        browser: shell.dataset.deviceBrowser ?? "",
         lessons,
       };
       const signature = JSON.stringify(next);
