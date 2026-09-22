@@ -8,7 +8,7 @@ type Device = {
   deviceId: string; deviceCode: string; status: "pending" | "approved" | "blocked";
   deviceType: DeviceType; detectedDeviceType: DeviceType; deviceTypeOverride: DeviceType | null;
   platform: string | null; browser: string | null; label: string | null;
-  learnerName: string | null; className: string | null; phone: string | null; registrationComplete: boolean;
+  learnerName: string | null; personRole: "learner" | "teacher" | null; className: string | null; teacherClasses: string[]; phone: string | null; registrationComplete: boolean;
   createdAt: string; lastSeenAt: string; completedLessons: number; completedSteps: number;
 };
 type DeviceResponse = { devices?: Device[]; error?: string };
@@ -24,12 +24,14 @@ export default function DeviceManager() {
   const [notice, setNotice] = useState("");
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [deviceTypes, setDeviceTypes] = useState<Record<string, "auto" | DeviceType>>({});
+  const [teacherClasses, setTeacherClasses] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<Filter>("all");
 
   const apply = useCallback((data: DeviceResponse) => {
     setDevices(data.devices ?? []);
     setLabels(Object.fromEntries((data.devices ?? []).map((device) => [device.deviceId, device.label ?? ""])));
     setDeviceTypes(Object.fromEntries((data.devices ?? []).map((device) => [device.deviceId, device.deviceTypeOverride ?? "auto"])));
+    setTeacherClasses(Object.fromEntries((data.devices ?? []).map((device) => [device.deviceId, (device.teacherClasses ?? []).join("; ")])));
   }, []);
 
   const read = useCallback(async (response: Response) => {
@@ -46,7 +48,7 @@ export default function DeviceManager() {
     finally { setLoading(false); }
   }, [read]);
 
-  async function act(action: "approve" | "block" | "label" | "device-type", deviceId: string) {
+  async function act(action: "approve" | "block" | "label" | "device-type" | "teacher-classes", deviceId: string) {
     setNotice("");
     try {
       await read(await fetch("/api/admin/devices", {
@@ -58,6 +60,7 @@ export default function DeviceManager() {
           deviceId,
           label: labels[deviceId] ?? "",
           deviceType: deviceTypes[deviceId] ?? "auto",
+          teacherClasses: teacherClasses[deviceId] ?? "",
         }),
       }));
       setNotice(
@@ -67,7 +70,9 @@ export default function DeviceManager() {
             ? "Đã khóa thiết bị."
             : action === "device-type"
               ? "Đã đồng bộ phân loại giao diện cho thiết bị."
-              : "Đã lưu tên gợi nhớ.",
+              : action === "teacher-classes"
+                ? "Đã cập nhật danh sách lớp phụ trách của Giảng viên."
+                : "Đã lưu tên gợi nhớ.",
       );
     } catch (error) { setNotice(error instanceof Error ? error.message : "Không thể cập nhật thiết bị."); }
   }
@@ -107,10 +112,14 @@ export default function DeviceManager() {
                 <option value="tablet">Máy tính bảng / iPad</option>
               </select>
             </label>
+            {device.personRole === "teacher" ? <label className="device-admin-teacher-classes">Lớp Giảng viên phụ trách
+              <textarea value={teacherClasses[device.deviceId] ?? ""} maxLength={620} placeholder="Ví dụ: 5A; 5B; CLB Bơi ếch" onChange={event => setTeacherClasses(current => ({ ...current, [device.deviceId]: event.target.value }))} />
+              <small>Ngăn cách nhiều lớp bằng dấu chấm phẩy hoặc xuống dòng.</small>
+            </label> : null}
           </div>
-          <dl><div><dt>Thiết bị hiệu lực</dt><dd>{typeLabels[device.deviceType]} · {device.platform || "Nền tảng chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}</dd></div><div><dt>Nguồn phân loại</dt><dd>{device.deviceTypeOverride ? "Quản trị ghi đè" : `Tự động · ${typeLabels[device.detectedDeviceType]}`}</dd></div><div><dt>Người học</dt><dd>{device.learnerName || "Chưa gửi"}</dd></div><div><dt>Lớp / SĐT</dt><dd>{device.className || "—"} · {device.phone || "—"}</dd></div><div><dt>Yêu cầu lúc</dt><dd>{formatDate(device.createdAt)}</dd></div><div><dt>Hoạt động gần nhất</dt><dd>{formatDate(device.lastSeenAt)}</dd></div><div><dt>Tiến độ</dt><dd>{device.completedLessons}/8 bài · {device.completedSteps} mốc</dd></div></dl>
+          <dl><div><dt>Thiết bị hiệu lực</dt><dd>{typeLabels[device.deviceType]} · {device.platform || "Nền tảng chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}</dd></div><div><dt>Nguồn phân loại</dt><dd>{device.deviceTypeOverride ? "Quản trị ghi đè" : `Tự động · ${typeLabels[device.detectedDeviceType]}`}</dd></div><div><dt>Vai trò</dt><dd>{device.personRole === "teacher" ? "Giảng viên" : "Học viên"}</dd></div><div><dt>Người dùng</dt><dd>{device.learnerName || "Chưa gửi"}</dd></div><div><dt>Lớp / SĐT</dt><dd>{device.className || "—"} · {device.phone || "—"}</dd></div><div><dt>Yêu cầu lúc</dt><dd>{formatDate(device.createdAt)}</dd></div><div><dt>Hoạt động gần nhất</dt><dd>{formatDate(device.lastSeenAt)}</dd></div><div><dt>Tiến độ</dt><dd>{device.completedLessons}/8 bài · {device.completedSteps} mốc</dd></div></dl>
         </div>
-        <div className="device-admin-actions"><button onClick={() => void act("label", device.deviceId)}>Lưu tên</button><button onClick={() => void act("device-type", device.deviceId)}>Lưu phân loại</button>{device.status !== "approved" ? <button className="approve" disabled={!device.registrationComplete} onClick={() => void act("approve", device.deviceId)}>Cấp quyền miễn phí</button> : null}{device.status !== "blocked" ? <button className="block" onClick={() => void act("block", device.deviceId)}>Khóa thiết bị</button> : null}</div>
+        <div className="device-admin-actions"><button onClick={() => void act("label", device.deviceId)}>Lưu tên</button><button onClick={() => void act("device-type", device.deviceId)}>Lưu phân loại</button>{device.personRole === "teacher" ? <button onClick={() => void act("teacher-classes", device.deviceId)}>Lưu lớp phụ trách</button> : null}{device.status !== "approved" ? <button className="approve" disabled={!device.registrationComplete} onClick={() => void act("approve", device.deviceId)}>Cấp quyền miễn phí</button> : null}{device.status !== "blocked" ? <button className="block" onClick={() => void act("block", device.deviceId)}>Khóa thiết bị</button> : null}</div>
       </article>)}
     </section>
   </main>;
