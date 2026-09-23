@@ -71,7 +71,7 @@ jobs:
       - name: Build with Cloudflare Vite plugin
         working-directory: boi-ech
         env:
-          CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.d1.jsonc
+          BOI_ECH_LOCAL_DATABASE_ID: 7816425d-ce8a-4b3c-b303-7697fd4a529c
         run: npm run build
 
       - name: Verify production D1 binding in generated artifact
