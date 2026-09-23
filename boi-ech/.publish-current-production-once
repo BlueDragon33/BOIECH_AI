@@ -9,3 +9,7 @@ Requirements:
 - release validation, lint and tests pass
 - production D1 migrations are applied before deploy
 - this marker and its one-shot workflow are removed after a successful publish
+
+Retry:
+- first production attempt failed only at production-specific Vite binding build
+- retry uses the previously successful BOI_ECH_LOCAL_DATABASE_ID production build path
