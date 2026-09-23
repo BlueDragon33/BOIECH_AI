@@ -649,6 +649,9 @@ export async function POST(request: Request) {
       if (enabled && current.person_role !== "teacher") {
         return respond({ error: "Quyền sửa nội dung chỉ cấp cho hồ sơ Giảng viên." }, 409);
       }
+      if (enabled && current.access_group === "paid" && current.payment_status !== "paid_verified") {
+        return respond({ error: "Tài khoản đang ở luồng trả phí; hãy xác minh thanh toán trước khi bật quyền sửa nội dung." }, 409);
+      }
       const automation = await getAccessAutomationSettings();
       if (enabled) {
         const keepPaid = current.payment_status === "paid_verified";
@@ -670,6 +673,9 @@ export async function POST(request: Request) {
     } else if (action === "renew-access") {
       if (!registrationComplete) return respond({ error: "Thiết bị chưa nhập đủ thông tin người học." }, 409);
       if (current.status === "blocked") return respond({ error: "Hãy mở khóa thiết bị trước khi gia hạn." }, 409);
+      if (!["free_approved", "paid_verified"].includes(current.payment_status)) {
+        return respond({ error: "Chỉ gia hạn sau khi quyền miễn phí hoặc thanh toán đã được xác nhận." }, 409);
+      }
       const automation = await getAccessAutomationSettings();
       const keepPaid = current.payment_status === "paid_verified";
       await database.prepare(
