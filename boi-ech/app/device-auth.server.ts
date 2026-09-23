@@ -156,7 +156,7 @@ export async function getCourseDatabase() {
     database.prepare(
       `CREATE TABLE IF NOT EXISTS access_automation_settings (
         id TEXT PRIMARY KEY NOT NULL,
-        auto_confirm_new_devices INTEGER NOT NULL DEFAULT 1,
+        auto_confirm_new_devices INTEGER NOT NULL DEFAULT 0,
         default_access_days INTEGER NOT NULL DEFAULT 60,
         default_device_limit INTEGER NOT NULL DEFAULT 20,
         updated_by TEXT,
@@ -166,8 +166,17 @@ export async function getCourseDatabase() {
     database.prepare(
       `INSERT INTO access_automation_settings
         (id, auto_confirm_new_devices, default_access_days, default_device_limit)
-       VALUES ('global', 1, 60, 20)
+       VALUES ('global', 0, 60, 20)
        ON CONFLICT(id) DO NOTHING`,
+    ),
+    database.prepare(
+      `UPDATE access_automation_settings
+          SET auto_confirm_new_devices = 0,
+              updated_by = 'system:payment-classification-migration',
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = 'global'
+          AND auto_confirm_new_devices = 1
+          AND updated_by IS NULL`,
     ),
     database.prepare(
       `CREATE TABLE IF NOT EXISTS device_profiles (
