@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/deploy-current-production-once.yml"
+      - "boi-ech/.publish-current-production-once"
 
 permissions:
   contents: read
@@ -29,6 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           test "${GITHUB_SHA}" = "$(git rev-parse HEAD)"
+          test -f boi-ech/.publish-current-production-once
           test -f boi-ech/app/api/control/runtime/route.ts
           grep -q 'controlGeneration: 2' boi-ech/app/api/control/runtime/route.ts
           test ! -e boi-ech/.deployment-v29
