@@ -574,6 +574,7 @@ export async function POST(request: Request) {
     }
 
     let auditAction = action;
+    let paidAccessDays: number | null = null;
     if (action === "grant-free") {
       if (current.payment_status === "paid_verified") {
         return respond({ error: "Tài khoản đã xác minh thanh toán, không thể chuyển ngược sang miễn phí." }, 409);
@@ -604,12 +605,17 @@ export async function POST(request: Request) {
       if (current.access_group !== "paid" || current.payment_status !== "proof_submitted" || !current.payment_proof_key) {
         return respond({ error: "Cần có ảnh chuyển khoản hợp lệ trước khi xác minh." }, 409);
       }
+      const automation = await getAccessAutomationSettings();
+      paidAccessDays = payload.paidAccessDays === undefined ? automation.defaultAccessDays : Number(payload.paidAccessDays);
+      if (!Number.isInteger(paidAccessDays) || paidAccessDays < 1 || paidAccessDays > 365) {
+        return respond({ error: "Thời hạn tài khoản trả phí phải từ 1 đến 365 ngày." }, 400);
+      }
       await database.prepare(
         `UPDATE device_access SET status = 'approved', access_group = 'paid', payment_status = 'paid_verified',
                 approved_at = CURRENT_TIMESTAMP, payment_verified_at = CURRENT_TIMESTAMP, blocked_at = NULL,
-                payment_rejected_at = NULL, payment_review_note = NULL, updated_at = CURRENT_TIMESTAMP
+                access_expires_at = ?, payment_rejected_at = NULL, payment_review_note = NULL, updated_at = CURRENT_TIMESTAMP
           WHERE device_id = ?`,
-      ).bind(deviceId).run();
+      ).bind(accessExpiryAfterDays(paidAccessDays), deviceId).run();
       await database.prepare(
         `UPDATE payment_reviews SET status = 'verified', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
                 review_note = NULL
@@ -733,7 +739,7 @@ export async function POST(request: Request) {
     }
     await database.prepare(
       "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, ?, ?, ?)",
-    ).bind(actor, auditAction, deviceId, JSON.stringify({ source: "control-center" })).run();
+    ).bind(actor, auditAction, deviceId, JSON.stringify({ source: "control-center", ...(paidAccessDays === null ? {} : { paidAccessDays }) })).run();
     return respond({ devices: await rows([current.display_code], 30) });
   } catch (error) {
     return withControlCors(request, deviceErrorResponse(error));
