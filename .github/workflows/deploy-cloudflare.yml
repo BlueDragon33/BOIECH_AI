@@ -114,7 +114,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 20             https://boi-ech.boiech-ai.workers.dev/api/application-management/contract             > /tmp/boi-universal-contract.json
+          READY=0
+          for attempt in {1..12}; do
+            CODE="$(curl --silent --show-error --output /tmp/boi-universal-contract.json --write-out '%{http_code}' --max-time 20               https://boi-ech.boiech-ai.workers.dev/api/application-management/contract || true)"
+            if [[ "$CODE" == "200" ]]; then
+              READY=1
+              break
+            fi
+            if [[ "$CODE" != "404" && "$CODE" != "000" ]]; then
+              echo "::error::Unexpected Universal Contract HTTP $CODE."
+              cat /tmp/boi-universal-contract.json || true
+              exit 1
+            fi
+            echo "Universal Contract route not ready yet (HTTP $CODE, attempt $attempt/12); waiting for Worker version propagation..."
+            sleep 5
+          done
+          if [[ "$READY" != "1" ]]; then
+            echo '::error::Universal Contract route did not become live within 60 seconds.'
+            cat /tmp/boi-universal-contract.json || true
+            exit 1
+          fi
           node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           const value = JSON.parse(fs.readFileSync('/tmp/boi-universal-contract.json', 'utf8'));
