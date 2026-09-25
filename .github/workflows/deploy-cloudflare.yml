@@ -7,8 +7,6 @@ on:
         description: "Gõ DEPLOY_PRODUCTION để triển khai Bơi ếch vào production hiện tại"
         required: true
         type: string
-  issue_comment:
-    types: [created]
 
 permissions:
   contents: read
@@ -27,24 +25,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ inputs.confirm }}" != "DEPLOY_PRODUCTION" ]]; then
-              echo '::error::Deployment cancelled. Enter DEPLOY_PRODUCTION exactly.'
-              exit 1
-            fi
-          else
-            if [[ "${{ github.actor }}" != "BlueDragon33" ]]; then
-              echo '::error::One-shot contract deploy must be requested by repository owner.'
-              exit 1
-            fi
-            if [[ "${{ github.event.issue.number }}" != "95" ]]; then
-              echo '::error::One-shot contract deploy is restricted to PR #95.'
-              exit 1
-            fi
-            if [[ "${{ github.event.comment.body }}" != "/deploy-universal-contract-production" ]]; then
-              echo '::error::One-shot contract deploy command mismatch.'
-              exit 1
-            fi
+          if [[ "${{ inputs.confirm }}" != "DEPLOY_PRODUCTION" ]]; then
+            echo '::error::Deployment cancelled. Enter DEPLOY_PRODUCTION exactly.'
+            exit 1
           fi
 
       - name: Checkout repository
