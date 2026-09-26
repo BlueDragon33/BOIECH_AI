@@ -14,6 +14,35 @@ export const dynamic = "force-dynamic";
 export const ADDITIONAL_ACCOUNT_REVIEW_TOKEN = "boi-ech-additional-account-manual-review-v1";
 export const ADDITIONAL_ACCOUNT_REVIEW_LABEL = "Tài khoản bổ sung · chờ quản trị duyệt";
 
+function standaloneDevelopmentMode() {
+  return String(process.env.BOI_ECH_ACCESS_MODE || "standalone").trim().toLowerCase() !== "managed";
+}
+
+async function ensureStandaloneDevice(deviceId: string) {
+  const database = await getCourseDatabase();
+  const now = new Date().toISOString();
+  await database.prepare(
+    `UPDATE device_access
+        SET status = 'approved',
+            access_group = 'free',
+            payment_status = 'free_approved',
+            learner_family_name = COALESCE(NULLIF(learner_family_name, ''), 'Local'),
+            learner_given_name = COALESCE(NULLIF(learner_given_name, ''), 'Người học'),
+            person_role = COALESCE(NULLIF(person_role, ''), 'learner'),
+            person_code = COALESCE(NULLIF(person_code, ''), 'DEV-LOCAL'),
+            class_name = COALESCE(NULLIF(class_name, ''), 'Standalone'),
+            phone = COALESCE(NULLIF(phone, ''), '0000000000'),
+            registration_submitted_at = COALESCE(registration_submitted_at, ?),
+            approved_at = COALESCE(approved_at, ?),
+            blocked_at = NULL,
+            access_expires_at = NULL,
+            auto_confirmed_at = COALESCE(auto_confirmed_at, ?),
+            updated_at = CURRENT_TIMESTAMP
+      WHERE device_id = ?`,
+  ).bind(now, now, now, deviceId).run();
+  return (await getPublicDeviceState(deviceId))!;
+}
+
 function pendingReviewDevice<T extends {
   status: string;
   accessGroup: string;
@@ -46,10 +75,12 @@ export async function POST(request: Request) {
     if (action === "register") {
       const hostname = new URL(request.url).hostname;
       const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      const autoApprove = previewRequest;
+      const standalone = standaloneDevelopmentMode();
+      const autoApprove = standalone || previewRequest;
       let device = await registerDevice(payload.publicKey, payload.legacyToken, autoApprove);
+      if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       const additionalAccount = payload.legacyToken === ADDITIONAL_ACCOUNT_REVIEW_TOKEN;
-      if (additionalAccount && !previewRequest) {
+      if (additionalAccount && !previewRequest && !standalone) {
         const database = await getCourseDatabase();
         await database.prepare(
           `UPDATE device_access
@@ -73,8 +104,10 @@ export async function POST(request: Request) {
     if (action === "save-registration") {
       const hostname = new URL(request.url).hostname;
       const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      let device = await saveDeviceRegistration(payload, previewRequest);
-      if (!previewRequest && device.label === ADDITIONAL_ACCOUNT_REVIEW_LABEL) {
+      const standalone = standaloneDevelopmentMode();
+      let device = await saveDeviceRegistration(payload, standalone || previewRequest);
+      if (standalone) device = await ensureStandaloneDevice(device.deviceId);
+      if (!standalone && !previewRequest && device.label === ADDITIONAL_ACCOUNT_REVIEW_LABEL) {
         const database = await getCourseDatabase();
         await database.prepare(
           `UPDATE device_access
@@ -90,7 +123,9 @@ export async function POST(request: Request) {
     if (action === "presence") {
       const hostname = new URL(request.url).hostname;
       const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      let device = await verifyDeviceIdentityRequest(payload, previewRequest);
+      const standalone = standaloneDevelopmentMode();
+      let device = await verifyDeviceIdentityRequest(payload, standalone || previewRequest);
+      if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
       device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
