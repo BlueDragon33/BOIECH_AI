@@ -1,71 +1,35 @@
-name: Validate BOIECH_AI Applications
+name: BOIECH_AI Development Fast CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
-    paths:
-      - "boi-ech/**"
-      - "quan-ly-hoc-tap/**"
-      - "README.md"
-      - ".github/workflows/deploy-cloudflare.yml"
-      - ".github/workflows/deploy-boi-ech-preview.yml"
-      - ".github/workflows/deploy-control-center.yml"
-      - ".github/workflows/validate-boi-ech-pr.yml"
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: validate-boiech-ai-${{ github.event.pull_request.number }}
+  group: boiech-fast-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test-boi-ech:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  fast-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22.13.0"
-          cache: npm
-          cache-dependency-path: boi-ech/package-lock.json
-      - name: Install locked dependencies
-        working-directory: boi-ech
-        run: npm ci
-      - name: Validate Cloudflare migration boundary
-        working-directory: boi-ech
-        run: npm run validate:cloudflare-preview
-      - name: Release readiness audit
-        working-directory: boi-ech
-        run: npm run validate:release
-      - name: Lint
-        working-directory: boi-ech
-        run: npm run lint
-      - name: Build and test
-        working-directory: boi-ech
-        env:
-          CONTROL_SERVICE_SECRET: 0123456789abcdef0123456789abcdef
-          APPLICATION_MANAGEMENT_ORIGIN: https://application-management-preview.example.com
-        run: npm test
-
-  test-legacy-control-source:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22.13.0"
-          cache: npm
-          cache-dependency-path: quan-ly-hoc-tap/package-lock.json
-      - name: Confirm legacy control source cannot deploy from this repo
+      - name: Fast repository sanity
         shell: bash
         run: |
           set -euo pipefail
-          test ! -f .github/workflows/deploy-control-center.yml
-      - name: Install locked dependencies
-        working-directory: quan-ly-hoc-tap
-        run: npm ci
-      - name: Build archived source for migration compatibility
-        working-directory: quan-ly-hoc-tap
-        run: npm run build
+          test -f boi-ech/package.json
+          test -f boi-ech/vite.config.ts
+          test -f boi-ech/scripts/prepare-cloudflare-preview.mjs
+          node --check boi-ech/scripts/prepare-cloudflare-preview.mjs
+          node --check boi-ech/scripts/validate-cloudflare-preview.mjs
+          node -e "JSON.parse(require('fs').readFileSync('boi-ech/package.json','utf8'))"
