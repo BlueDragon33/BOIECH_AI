@@ -51,6 +51,17 @@ jobs:
           npm run lint
           npm test
 
+      - name: Switch access gate back to managed for release
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const path = "wrangler.d1.jsonc";
+          const value = fs.readFileSync(path, "utf8").replace('"BOI_ECH_ACCESS_MODE": "standalone"', '"BOI_ECH_ACCESS_MODE": "managed"');
+          fs.writeFileSync(path, value);
+          NODE
+
       - name: Require Cloudflare production credentials
         shell: bash
         env:
