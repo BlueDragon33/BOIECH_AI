@@ -71,7 +71,7 @@ jobs:
       - name: Deploy preview
         if: steps.config.outputs.ready == 'true'
         working-directory: boi-ech
-        run: npx wrangler deploy --config wrangler.cloudflare.preview.jsonc
+        run: npx wrangler deploy
 
       - name: Quick availability check
         if: steps.config.outputs.ready == 'true' && env.BOI_ECH_PREVIEW_ORIGIN != ''
