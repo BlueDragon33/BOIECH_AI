@@ -1,8 +1,6 @@
 name: Boi Ech Cloudflare Preview Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
