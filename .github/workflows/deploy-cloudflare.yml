@@ -1,16 +1,19 @@
-name: Boi Ech Live Deploy
+name: Boi Ech Cloudflare Production Deploy (manual)
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Gõ DEPLOY_PRODUCTION để triển khai Bơi ếch vào production hiện tại"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
   group: deploy-boi-ech-production-cloudflare
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -18,8 +21,14 @@ jobs:
     timeout-minutes: 20
     environment: boi-ech-production
     steps:
-      - name: Development live mode
-        run: echo "main -> live · standalone access"
+      - name: Require explicit production confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm }}" != "DEPLOY_PRODUCTION" ]]; then
+            echo '::error::Deployment cancelled. Enter DEPLOY_PRODUCTION exactly.'
+            exit 1
+          fi
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,9 +44,23 @@ jobs:
         working-directory: boi-ech
         run: npm ci
 
-      - name: Fast build preparation
+      - name: Validate and build before production deployment
         working-directory: boi-ech
-        run: node --check scripts/prepare-cloudflare-preview.mjs || true
+        run: |
+          npm run validate:release
+          npm run lint
+          npm test
+
+      - name: Switch access gate back to managed for release
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const path = "wrangler.d1.jsonc";
+          const value = fs.readFileSync(path, "utf8").replace('"BOI_ECH_ACCESS_MODE": "standalone"', '"BOI_ECH_ACCESS_MODE": "managed"');
+          fs.writeFileSync(path, value);
+          NODE
 
       - name: Require Cloudflare production credentials
         shell: bash
