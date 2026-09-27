@@ -1,0 +1,11 @@
+name: Universal Constitution
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  constitution:
+    uses: BlueDragon33/Software-Blueprint-Hub/.github/workflows/constitution-compliance.yml@main
