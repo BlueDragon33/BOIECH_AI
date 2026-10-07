@@ -53,3 +53,17 @@ BlueDragon33/Application-Management
 ```
 
 Yêu cầu Node.js `>=22.13.0`.
+
+
+## Operational sovereignty
+
+BOIECH_AI adopts **Universal Constitution 1.2.0** at **B3**.
+
+Bơi ếch is currently in a truthful sovereignty migration:
+- lessons and teaching truth must remain provider-independent;
+- AI is optional intelligence only;
+- Cloudflare Workers/D1/R2 currently remain essential for published device/progress/payment state;
+- Application Management remains remote administration, not learner-state ownership;
+- Google Drive or equivalent is optional export/backup, not runtime authority.
+
+The project must not claim full local-first compliance until the documented migration blockers in `.blueprint/dependency-budget.json` are closed with evidence.

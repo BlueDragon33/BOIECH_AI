@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "policyId": "blueprint-os:universal-century-grade",
+  "policyVersion": "1.2.0",
+  "projectId": "project:boiech-ai",
+  "posture": "MIGRATION_REQUIRED_LOCAL_LEARNING_CORE",
+  "complianceState": "MIGRATION_REQUIRED",
+  "canonicalAuthority": {
+    "curriculumAndTeachingTruth": "repository-content-and-domain-contracts",
+    "ai": "optional-intelligence-only",
+    "learnerState": "application-owned-state",
+    "controlPlane": "Application-Management-remote-admin-only"
+  },
+  "dependencies": [
+    {
+      "id": "cloudflare-workers-d1-r2",
+      "class": "EXTERNAL_ESSENTIAL",
+      "costClass": "free-tier-or-paid-by-usage",
+      "purpose": "Current published runtime, device registry, learner progress, payment/audit and media/payment object storage",
+      "dataBoundary": "Application-owned remote state; no authority transferred to Application Management",
+      "offlineBehavior": "Current full learner-state/payment path is unavailable; local/degraded core-learning path still requires implementation evidence",
+      "exitPath": "Keep data contracts/provider boundaries explicit and maintain export/migration plan to alternate/local storage"
+    },
+    {
+      "id": "application-management",
+      "class": "OPTIONAL_SYNC",
+      "costClass": "replaceable-external",
+      "purpose": "Remote administration/control metadata only",
+      "dataBoundary": "Does not own Bơi ếch database or canonical learner state",
+      "offlineBehavior": "Published app should not corrupt learner state when control plane is unavailable",
+      "exitPath": "Control API adapter can be disabled/replaced"
+    },
+    {
+      "id": "ai-provider",
+      "class": "OPTIONAL_INTELLIGENCE",
+      "costClass": "optional",
+      "purpose": "Tutoring, explanation and author assistance",
+      "dataBoundary": "Only explicitly provided learning context",
+      "offlineBehavior": "Canonical lessons/rubrics/content remain available without AI",
+      "exitPath": "Provider can be replaced or removed"
+    },
+    {
+      "id": "google-drive-or-equivalent",
+      "class": "OPTIONAL_SYNC",
+      "costClass": "free-or-optional-paid",
+      "purpose": "Optional content/export/backup bridge",
+      "dataBoundary": "Portable exports only; not payment/device/session authority",
+      "offlineBehavior": "No effect on canonical runtime correctness",
+      "exitPath": "Portable files/JSON and provider-independent restore"
+    }
+  ],
+  "migrationBlockers": [
+    "Prove a local/browser degraded learning path for core content when Workers/D1 is unavailable.",
+    "Define portable learner-progress export/import or provider migration path.",
+    "Keep payment/device registry remote-only where intrinsically required while preventing them from becoming teaching-truth authority."
+  ],
+  "forbidden": [
+    "ai-owned-teaching-truth",
+    "application-management-owned-learner-database",
+    "drive-as-payment-or-device-authority",
+    "silent-mandatory-paid-provider-without-exit-path"
+  ]
+}
