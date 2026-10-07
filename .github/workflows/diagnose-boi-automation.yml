@@ -1,0 +1,42 @@
+name: Diagnose Boi Automation Persistence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-boi-automation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: boi-ech-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install Wrangler
+        working-directory: boi-ech
+        run: npm ci --no-audit --no-fund
+
+      - name: Read current automation row
+        working-directory: boi-ech
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command             "SELECT id, auto_confirm_new_devices, default_access_days, default_device_limit, updated_by, updated_at FROM access_automation_settings WHERE id='global';"
+
+      - name: Read recent automation writes
+        working-directory: boi-ech
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command             "SELECT id, actor, detail_json, created_at FROM course_audit_log WHERE action='access_automation_updated' ORDER BY id DESC LIMIT 12;"
