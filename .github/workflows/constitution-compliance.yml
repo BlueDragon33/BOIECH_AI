@@ -12,3 +12,34 @@ permissions:
 jobs:
   constitution:
     uses: BlueDragon33/Software-Blueprint-Hub/.github/workflows/constitution-compliance.yml@main
+
+  dependency-sovereignty:
+    name: Constitution 1.2 dependency sovereignty
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate truthful migration posture
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          a=json.loads(Path(".blueprint/constitution-adoption.json").read_text())
+          b=json.loads(Path(".blueprint/dependency-budget.json").read_text())
+
+          assert a["policyVersion"]=="1.2.0"
+          assert "operational-sovereignty-dependency-minimization" in a["inheritedPillars"]
+          assert b["policyVersion"]=="1.2.0"
+          assert b["projectId"]==a["projectId"]
+          assert b["posture"]=="MIGRATION_REQUIRED_LOCAL_LEARNING_CORE"
+          assert b["complianceState"]=="MIGRATION_REQUIRED"
+          assert len(b.get("migrationBlockers",[])) >= 2
+
+          ai=next(d for d in b["dependencies"] if d["id"]=="ai-provider")
+          assert ai["class"]=="OPTIONAL_INTELLIGENCE"
+          cloud=next(d for d in b["dependencies"] if d["id"]=="cloudflare-workers-d1-r2")
+          assert cloud["class"]=="EXTERNAL_ESSENTIAL"
+
+          print("Bơi ếch Constitution 1.2 truthful migration posture: PASS")
+          PY
