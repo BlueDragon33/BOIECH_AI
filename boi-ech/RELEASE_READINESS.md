@@ -29,3 +29,24 @@ PR thay đổi Bơi ếch phải qua validation và Cloudflare preview CI. Lện
 ## Production hold
 
 Mọi thay đổi trong chuỗi phát triển hiện tại chỉ được merge vào GitHub. Không chạy workflow production cho đến khi chủ dự án chủ động quyết định triển khai.
+
+
+## Constitution 1.2 sovereignty migration
+
+Bơi ếch adopts Universal Constitution 1.2 but remains **MIGRATION_REQUIRED** for operational sovereignty.
+
+Current truth:
+- canonical curriculum/teaching truth stays in repository/domain contracts;
+- AI is optional intelligence and must never become teaching-truth authority;
+- current published device/progress/payment paths still rely on Cloudflare Workers/D1/R2;
+- Application Management is remote administration only and does not own Bơi ếch learner data;
+- Google Drive/equivalent may be optional export/backup only.
+
+Before claiming local-first sovereignty PASS:
+1. prove a browser/local degraded core-learning path while Workers/D1 is unavailable;
+2. define portable learner-progress export/import or a provider migration path;
+3. keep payment/device registry remote where intrinsically required without making them curriculum authority.
+
+Canonical dependency posture: `.blueprint/dependency-budget.json`.
+
+This migration blocker does not authorize Production and must not be hidden by changing CI expectations.
