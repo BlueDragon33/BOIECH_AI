@@ -37,6 +37,7 @@ export async function GET(request: Request) {
       endpoints: {
         status: "/api/control/status",
         overview: "/api/control/overview",
+        automation: "/api/control/automation",
         content: "/api/control/content",
         paymentProof: "/api/control/payment-proof",
       },
