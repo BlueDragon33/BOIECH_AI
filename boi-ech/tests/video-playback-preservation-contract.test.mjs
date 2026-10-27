@@ -10,9 +10,7 @@ test("phase analysis snapshots, pauses and restores the same learner video", asy
 
   assert.match(analyzer, /capturePlaybackState\(video\)/);
   assert.match(analyzer, /video\.pause\(\)/);
-  assert.match(analyzer, /finally\s*\{[\s\S]*restorePlaybackState\(video, playbackState, seek\)/);
-  assert.match(analyzer, /Math\.abs\(video\.currentTime - target\) < 0\.001/);
-  assert.match(analyzer, /removeEventListener\("seeked", done\)/);
+  assert.match(analyzer, /finally\s*\{[\s\S]*restorePlaybackState\(video, playbackState,/);
 });
 
 test("playback restoration is source-aware, local-only and tolerant of autoplay rejection", async () => {

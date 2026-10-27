@@ -22,8 +22,8 @@ export function canRestorePlayback(video, snapshot) {
   return mediaSource(video) === snapshot.source;
 }
 
-export async function restorePlaybackState(video, snapshot, seekTo) {
-  if (!canRestorePlayback(video, snapshot)) return { restored: false, resumed: false };
+export async function restorePlaybackState(video, snapshot, seekTo, signal) {
+  if (signal?.aborted || !canRestorePlayback(video, snapshot)) return { restored: false, resumed: false };
 
   const target = clampTime(video, snapshot.currentTime);
   let restored = false;
@@ -31,6 +31,7 @@ export async function restorePlaybackState(video, snapshot, seekTo) {
     await seekTo(video, target);
     restored = true;
   } catch {
+    if (signal?.aborted || !canRestorePlayback(video, snapshot)) return { restored: false, resumed: false };
     try {
       video.currentTime = target;
       restored = true;
@@ -40,7 +41,7 @@ export async function restorePlaybackState(video, snapshot, seekTo) {
   }
 
   let resumed = false;
-  if (!snapshot.wasPaused && canRestorePlayback(video, snapshot)) {
+  if (!signal?.aborted && !snapshot.wasPaused && canRestorePlayback(video, snapshot)) {
     try {
       await video.play();
       resumed = true;

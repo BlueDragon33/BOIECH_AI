@@ -3,6 +3,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cancelVideoAnalysisRuns, seekVideoFrame } from "./video-analysis-run.mjs";
+import { useVideoAnalysisRun } from "./use-video-analysis-run";
 import styles from "./video-analyzer.module.css";
 
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
@@ -206,17 +208,19 @@ function serverPayload(result: Analysis) {
   };
 }
 
-async function cachedAsset(url: string) {
+async function cachedAsset(url: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   if (!("caches" in window)) {
-    const response = await fetch(url, { mode: "cors" });
+    const response = await fetch(url, { mode: "cors", signal });
     if (!response.ok) throw new Error("Không tải được tài nguyên AI.");
     return response;
   }
   const cache = await caches.open(AI_CACHE);
   const cached = await cache.match(url);
+  signal?.throwIfAborted();
   if (cached) return cached;
   if (!navigator.onLine) throw new Error("Bộ AI chưa có trên máy. Hãy kết nối mạng một lần và bấm Tải AI offline.");
-  const response = await fetch(url, { mode: "cors", cache: "no-store" });
+  const response = await fetch(url, { mode: "cors", cache: "no-store", signal });
   if (!response.ok) throw new Error(`Không tải được tài nguyên AI (${response.status}).`);
   await cache.put(url, response.clone());
   return response;
@@ -228,53 +232,63 @@ async function assetsReady() {
   return (await Promise.all(AI_ASSETS.map((url) => cache.match(url)))).every(Boolean);
 }
 
-async function prepareAssets(progress?: (done: number, total: number) => void) {
+async function prepareAssets(progress?: (done: number, total: number) => void, signal?: AbortSignal) {
   let done = 0;
   for (const url of AI_ASSETS) {
-    await cachedAsset(url);
+    await cachedAsset(url, signal);
+    signal?.throwIfAborted();
     done += 1;
     progress?.(done, AI_ASSETS.length);
   }
 }
 
-async function createLandmarker() {
-  await prepareAssets();
-  const [bundle, loader, wasm, model] = await Promise.all(AI_ASSETS.map(cachedAsset));
-  const bundleUrl = URL.createObjectURL(new Blob([await bundle.text()], { type: "text/javascript" }));
-  const loaderUrl = URL.createObjectURL(new Blob([await loader.text()], { type: "text/javascript" }));
-  const wasmUrl = URL.createObjectURL(await wasm.blob());
-  const importModule = new Function("url", "return import(url)") as (url: string) => Promise<Record<string, unknown>>;
-  const vision = await importModule(bundleUrl) as {
-    PoseLandmarker?: { createFromOptions: (fileset: Record<string, string>, options: Record<string, unknown>) => Promise<PoseLandmarker> };
+async function createLandmarker(signal?: AbortSignal) {
+  const objectUrls: string[] = [];
+  let landmarker: PoseLandmarker | undefined;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    try { landmarker?.close?.(); }
+    finally { objectUrls.forEach((url) => URL.revokeObjectURL(url)); }
   };
-  if (!vision.PoseLandmarker) throw new Error("Không khởi tạo được MediaPipe Pose Landmarker.");
-  const landmarker = await vision.PoseLandmarker.createFromOptions(
-    { wasmLoaderPath: loaderUrl, wasmBinaryPath: wasmUrl },
-    {
-      baseOptions: { modelAssetBuffer: new Uint8Array(await model.arrayBuffer()), delegate: "CPU" },
-      runningMode: "VIDEO",
-      numPoses: 1,
-      minPoseDetectionConfidence: 0.45,
-      minPosePresenceConfidence: 0.45,
-      minTrackingConfidence: 0.45,
-    },
-  );
-  return {
-    landmarker,
-    dispose: () => {
-      landmarker.close?.();
-      URL.revokeObjectURL(bundleUrl); URL.revokeObjectURL(loaderUrl); URL.revokeObjectURL(wasmUrl);
-    },
-  };
+  try {
+    await prepareAssets(undefined, signal);
+    const [bundle, loader, wasm, model] = await Promise.all(AI_ASSETS.map((url) => cachedAsset(url, signal)));
+    const bundleUrl = URL.createObjectURL(new Blob([await bundle.text()], { type: "text/javascript" }));
+    objectUrls.push(bundleUrl);
+    const loaderUrl = URL.createObjectURL(new Blob([await loader.text()], { type: "text/javascript" }));
+    objectUrls.push(loaderUrl);
+    const wasmUrl = URL.createObjectURL(await wasm.blob());
+    objectUrls.push(wasmUrl);
+    const importModule = new Function("url", "return import(url)") as (url: string) => Promise<Record<string, unknown>>;
+    const vision = await importModule(bundleUrl) as {
+      PoseLandmarker?: { createFromOptions: (fileset: Record<string, string>, options: Record<string, unknown>) => Promise<PoseLandmarker> };
+    };
+    if (!vision.PoseLandmarker) throw new Error("Không khởi tạo được MediaPipe Pose Landmarker.");
+    const modelAssetBuffer = new Uint8Array(await model.arrayBuffer());
+    signal?.throwIfAborted();
+    landmarker = await vision.PoseLandmarker.createFromOptions(
+      { wasmLoaderPath: loaderUrl, wasmBinaryPath: wasmUrl },
+      {
+        baseOptions: { modelAssetBuffer, delegate: "CPU" },
+        runningMode: "VIDEO",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.45,
+        minPosePresenceConfidence: 0.45,
+        minTrackingConfidence: 0.45,
+      },
+    );
+    signal?.throwIfAborted();
+    return { landmarker, dispose };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
 }
 
-function seek(video: HTMLVideoElement, seconds: number) {
-  return new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Không đọc được khung hình video.")), 5000);
-    const done = () => { window.clearTimeout(timer); resolve(); };
-    video.addEventListener("seeked", done, { once: true });
-    video.currentTime = Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.01));
-  });
+function seek(video: HTMLVideoElement, seconds: number, signal?: AbortSignal) {
+  return seekVideoFrame(video, seconds, signal);
 }
 
 function metricAt(time: number, points: Point[]): Metric | null {
@@ -398,21 +412,22 @@ function base64Url(bytes: Uint8Array) {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-async function syncResult(lessonNumber: string, analysis: Record<string, unknown>) {
+async function syncResult(lessonNumber: string, analysis: Record<string, unknown>, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const credential = await readCredential();
   if (!credential?.privateKey || !crypto.subtle) throw new Error("Thiết bị chưa có khóa ký an toàn.");
-  const register = await fetch("/api/device", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "register", publicKey: credential.publicKey }) });
+  const register = await fetch("/api/device", { method: "POST", signal, credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "register", publicKey: credential.publicKey }) });
   const registered = await register.json() as { device?: DeviceState; error?: string };
   if (!register.ok || !registered.device) throw new Error(registered.error ?? "Không đọc được thiết bị.");
   const device = registered.device;
   if (device.status !== "approved" || !device.registrationComplete || device.accessExpired) throw new Error("Thiết bị chưa đủ quyền đồng bộ.");
-  const challengeResponse = await fetch("/api/device", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId: device.deviceId }) });
+  const challengeResponse = await fetch("/api/device", { method: "POST", signal, credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId: device.deviceId }) });
   const challengeData = await challengeResponse.json() as { challenge?: string; error?: string };
   if (!challengeResponse.ok || !challengeData.challenge) throw new Error(challengeData.error ?? "Không tạo được thử thách thiết bị.");
   const message = new TextEncoder().encode(`boi-ech:${device.deviceId}:${challengeData.challenge}`);
   const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message);
   const response = await fetch("/api/video-analysis", {
-    method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" },
+    method: "POST", signal, credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" },
     body: JSON.stringify({ lessonNumber, analysis, deviceId: device.deviceId, challenge: challengeData.challenge, signature: base64Url(new Uint8Array(signature)) }),
   });
   const data = await response.json() as { saved?: boolean; error?: string };
@@ -429,6 +444,7 @@ function youtubeId(value: string) {
 }
 
 export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: string }) {
+  const lifecycle = useVideoAnalysisRun();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [objectUrl, setObjectUrl] = useState("");
@@ -472,15 +488,19 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
 
   async function downloadOfflineAi() {
     if (busy) return;
+    const run = lifecycle.begin();
     setBusy(true); setProgress(0); setStatus("Đang tải bộ AI về thiết bị…");
     try {
-      await prepareAssets((done, total) => setProgress(Math.round(done / total * 100)));
+      await prepareAssets((done, total) => setProgress(Math.round(done / total * 100)), run.signal);
+      run.check();
       setReady(true); setStatus("Bộ AI đã được lưu trên máy. Có thể phân tích khi mất mạng.");
-    } catch (error) { setStatus(error instanceof Error ? error.message : "Không tải được bộ AI."); }
-    finally { setBusy(false); }
+    } catch (error) { if (!run.signal.aborted && lifecycle.isCurrent(run)) setStatus(error instanceof Error ? error.message : "Không tải được bộ AI."); }
+    finally { if (lifecycle.end(run)) setBusy(false); }
   }
 
   function chooseFile(next: File | null) {
+    cancelVideoAnalysisRuns();
+    setBusy(false);
     setResult(null); setProgress(0); setMetadata(null); setQualityReport(null);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     setFile(null); setObjectUrl("");
@@ -508,20 +528,24 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
     if (!video || !file || busy) return;
     if (!Number.isFinite(video.duration) || video.duration <= 0) { setStatus("Không đọc được thời lượng video."); return; }
     if (video.duration > MAX_VIDEO_SECONDS + 0.05) { setStatus(`Video dài ${video.duration.toFixed(1)} giây; giới hạn là 30 giây.`); return; }
+    const run = lifecycle.begin(video);
+    video.pause();
     setBusy(true); setProgress(0); setResult(null); setQualityReport(null); setStatus("Đang khởi tạo AI cục bộ…");
-    let dispose = () => undefined;
     try {
-      const pose = await createLandmarker(); dispose = pose.dispose; setReady(true);
+      const pose = await run.acquire(createLandmarker(run.signal));
+      run.check(); setReady(true);
       const sampleCount = Math.max(3, Math.min(150, Math.ceil(video.duration * SAMPLE_FPS)));
       const frames: Metric[] = [];
       for (let index = 0; index < sampleCount; index += 1) {
         const time = Math.min(video.duration - 0.01, index / SAMPLE_FPS);
-        await seek(video, time);
+        await seek(video, time, run.signal);
+        run.check();
         const points = pose.landmarker.detectForVideo(video, index * 200 + 1).landmarks?.[0];
         const metric = points ? metricAt(time, points) : null;
         if (metric) frames.push(metric);
         setProgress(Math.round((index + 1) / sampleCount * 82));
-        if (index % 5 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        run.check();
       }
       const captureQuality = assessCaptureQuality(frames, sampleCount);
       setQualityReport(captureQuality);
@@ -538,7 +562,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       const localFrames: LocalFrame[] = [];
       for (const error of errors.slice(0, MAX_ERROR_FRAMES)) {
         const metric = frames[error.frameIndex]; if (!metric) continue;
-        await seek(video, metric.time); const dataUrl = snapshot(video, metric, error);
+        await seek(video, metric.time, run.signal); run.check(); const dataUrl = snapshot(video, metric, error);
         if (dataUrl) localFrames.push({ timeSec: metric.time, title: error.title, dataUrl });
       }
       const analysis: Analysis = {
@@ -548,29 +572,35 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         score, confidence, captureQuality, categories, errors, localFrames, syncState: navigator.onLine ? "pending" : "local",
       };
       await putLocalAnalysis(analysis);
+      run.check();
       await putStore("pending", { id: analysis.id, lessonNumber, analysis: serverPayload(analysis), createdAt: utcNow() });
+      run.check();
       setResult(analysis); setProgress(95);
       if (navigator.onLine) {
         try {
-          await syncResult(lessonNumber, serverPayload(analysis)); await deletePending(analysis.id);
-          const synced = { ...analysis, syncState: "synced" as const }; await putLocalAnalysis(synced); setResult(synced);
+          await syncResult(lessonNumber, serverPayload(analysis), run.signal); await deletePending(analysis.id);
+          run.check();
+          const synced = { ...analysis, syncState: "synced" as const }; await putLocalAnalysis(synced); run.check(); setResult(synced);
           setStatus("Phân tích xong. Video gốc không rời thiết bị; máy chủ chỉ nhận kết quả JSON.");
-        } catch { setStatus("Phân tích xong. Kết quả đang chờ đồng bộ; video vẫn chỉ nằm trên thiết bị."); }
+        } catch { run.check(); setStatus("Phân tích xong. Kết quả đang chờ đồng bộ; video vẫn chỉ nằm trên thiết bị."); }
       } else setStatus("Phân tích xong khi offline. Kết quả sẽ tự đồng bộ khi có mạng.");
       setProgress(100);
-    } catch (error) { setStatus(error instanceof Error ? error.message : "Không thể phân tích video."); }
-    finally { dispose(); setBusy(false); }
+    } catch (error) { if (!run.signal.aborted && lifecycle.isCurrent(run)) setStatus(error instanceof Error ? error.message : "Không thể phân tích video."); }
+    finally { if (lifecycle.end(run)) setBusy(false); }
   }
 
   async function jumpToError(error: AnalysisError) {
     const video = videoRef.current;
     if (!video) return;
+    const run = lifecycle.begin(video);
     try {
-      await seek(video, error.timeSec);
+      await seek(video, error.timeSec, run.signal);
+      run.check();
       video.pause();
       video.scrollIntoView({ behavior: "smooth", block: "center" });
       setStatus(`Đang xem khung hình lỗi tại ${timeLabel(error.timeSec)}. Video vẫn nằm trên thiết bị này.`);
-    } catch { setStatus("Không thể mở lại đúng khung hình lỗi."); }
+    } catch { if (!run.signal.aborted && lifecycle.isCurrent(run)) setStatus("Không thể mở lại đúng khung hình lỗi."); }
+    finally { if (lifecycle.end(run)) setBusy(false); }
   }
 
   return <div className={styles.shell}>
