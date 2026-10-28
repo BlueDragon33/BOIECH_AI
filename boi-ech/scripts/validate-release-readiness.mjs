@@ -31,7 +31,6 @@ function walk(directory) {
 }
 
 const productionWorkflow = read(".github/workflows/deploy-cloudflare.yml");
-const previewWorkflow = read(".github/workflows/deploy-boi-ech-preview.yml");
 const validationWorkflow = read(".github/workflows/validate-boi-ech-pr.yml");
 const previewCiWorkflow = read(".github/workflows/boi-ech-cloudflare-preview-ci.yml");
 const teacherShell = read("boi-ech/app/teacher-role-shell.tsx");
@@ -50,7 +49,8 @@ const phoneUniquenessMigration = read("boi-ech/drizzle/0007_even_joshua_kane.sql
 requireMatch(productionWorkflow, /workflow_dispatch:/, "production deployment must remain manual");
 forbidMatch(productionWorkflow, /\bpush\s*:/, "production deployment must not run on push");
 requireMatch(productionWorkflow, /DEPLOY_PRODUCTION/, "production deployment must require explicit confirmation");
-requireMatch(previewWorkflow, /workflow_dispatch:/, "preview deployment must remain explicitly triggered");
+requireMatch(previewCiWorkflow, /workflow_dispatch:/, "preview deployment must remain explicitly triggered");
+forbidMatch(previewCiWorkflow, /\b(?:push|pull_request)\s*:/, "preview deployment must not run automatically");
 requireMatch(validationWorkflow, /npm run lint[\s\S]*npm test/, "PR validation must lint and test Bơi ếch");
 requireMatch(previewCiWorkflow, /npm run lint[\s\S]*npm test/, "preview CI must preserve regressions before build");
 

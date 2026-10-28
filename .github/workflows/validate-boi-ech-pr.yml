@@ -1,4 +1,4 @@
-name: BOIECH_AI Development Fast CI
+name: BOIECH_AI Validation CI
 
 on:
   push:
@@ -11,18 +11,20 @@ permissions:
   contents: read
 
 concurrency:
-  group: boiech-fast-${{ github.ref }}
+  group: boiech-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  fast-check:
+  validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: boi-ech/package-lock.json
       - name: Fast repository sanity
         shell: bash
         run: |
@@ -33,3 +35,22 @@ jobs:
           node --check boi-ech/scripts/prepare-cloudflare-preview.mjs
           node --check boi-ech/scripts/validate-cloudflare-preview.mjs
           node -e "JSON.parse(require('fs').readFileSync('boi-ech/package.json','utf8'))"
+      - name: Install locked dependencies
+        working-directory: boi-ech
+        timeout-minutes: 5
+        run: npm ci --no-audit --no-fund
+      - name: Audit release boundaries
+        working-directory: boi-ech
+        run: npm run validate:release
+      - name: Lint application
+        working-directory: boi-ech
+        timeout-minutes: 2
+        run: npm run lint
+      - name: Typecheck application
+        working-directory: boi-ech
+        timeout-minutes: 2
+        run: npx --no-install tsc --noEmit --incremental false
+      - name: Build verified artifact and run regressions
+        working-directory: boi-ech
+        timeout-minutes: 6
+        run: npm test
