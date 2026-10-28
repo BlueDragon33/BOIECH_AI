@@ -568,10 +568,21 @@ test("supports installable offline learning without offline answer submission", 
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const serviceWorker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
   const manifest = JSON.parse(await readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"));
+  const { APP_SHELL: appShell } = await readConstants("../public/sw.js", ts.ScriptKind.JS);
   const course = await readFile(new URL("../app/api/course/route.ts", import.meta.url), "utf8");
 
   assert.equal(manifest.display, "standalone");
-  assert.equal(manifest.icons.some((icon) => icon.sizes === "512x512"), true);
+  for (const size of [192, 512]) {
+    const icon = manifest.icons.find((entry) => entry.sizes === `${size}x${size}` && entry.type === "image/png");
+    assert.ok(icon, `installable manifest must provide a ${size}px PNG icon`);
+    assert.match(icon.src, /^\/[^?#]+$/);
+    const png = await readFile(new URL(`../public${icon.src}`, import.meta.url));
+    assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", `${icon.src} must be a real PNG`);
+    assert.equal(png.toString("ascii", 12, 16), "IHDR");
+    assert.equal(png.readUInt32BE(16), size, `${icon.src} width must match the manifest`);
+    assert.equal(png.readUInt32BE(20), size, `${icon.src} height must match the manifest`);
+    assert.ok(appShell.includes(icon.src), `${icon.src} must be available offline`);
+  }
   assert.match(page, /indexedDB\.open\("boi-ech-doc-lap", 4\)/);
   assert.match(page, /enqueueOfflineAction/);
   assert.match(page, /existingRequest\.result/);

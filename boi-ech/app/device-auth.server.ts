@@ -219,7 +219,10 @@ export async function getCourseDatabase() {
     database.prepare(
       "CREATE UNIQUE INDEX IF NOT EXISTS device_access_phone_unique ON device_access(phone)",
     ),
-  ]);
+  ]).catch((error) => {
+    deviceSchemaReady = null;
+    throw error;
+  });
   await deviceSchemaReady;
   deviceRuntimeSchemaReady ??= (async () => {
     const [accessInfo, profileInfo] = await Promise.all([
@@ -243,7 +246,10 @@ export async function getCourseDatabase() {
     await database.prepare(
       "CREATE INDEX IF NOT EXISTS device_access_type_status_idx ON device_access(device_type, status, last_seen_at)",
     ).run();
-  })();
+  })().catch((error) => {
+    deviceRuntimeSchemaReady = null;
+    throw error;
+  });
   await deviceRuntimeSchemaReady;
   return database;
 }
@@ -410,7 +416,7 @@ async function hashLegacyToken(token: string) {
   return sha256(token);
 }
 
-export async function registerDevice(publicKey: unknown, legacyToken: unknown, autoApprove = false) {
+export async function registerDevice(publicKey: unknown, legacyToken: unknown, autoApprove = false, newDeviceLabel: string | null = null) {
   const normalizedKey = publicKeyShape(publicKey);
   if (!autoApprove) await importVerificationKey(normalizedKey);
   const serializedKey = canonicalPublicKey(normalizedKey);
@@ -452,8 +458,8 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
   await database.batch([
     database.prepare(
       `INSERT INTO device_access
-        (device_id, display_code, public_key_jwk, status, migrated_from_user_key, approved_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+        (device_id, display_code, public_key_jwk, status, migrated_from_user_key, approved_at, label)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       deviceId,
       displayCode,
@@ -461,6 +467,7 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
       status,
       legacy?.user_key ?? null,
       status === "approved" ? new Date().toISOString() : null,
+      newDeviceLabel,
     ),
     database.prepare(
       `INSERT INTO device_profiles (device_id, completed_json, scores_json)
@@ -477,7 +484,7 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
     deviceTypeOverride: null,
     platform: null,
     browser: null,
-    label: null,
+    label: newDeviceLabel,
     learnerName: null,
     learnerFamilyName: null,
     learnerGivenName: null,
@@ -648,7 +655,7 @@ function normalizePhone(value: unknown) {
   return normalized.startsWith("+84") ? `0${normalized.slice(3)}` : normalized;
 }
 
-export async function saveDeviceRegistration(payload: Record<string, unknown>, skipSignatureCheck = false) {
+export async function saveDeviceRegistration(payload: Record<string, unknown>, skipSignatureCheck = false, manualReviewLabel: string | null = null) {
   const device = await verifyDeviceIdentityRequest(payload, skipSignatureCheck);
   const { learnerFamilyName, learnerGivenName, learnerName } = normalizeRegistrationName(payload);
   const { personRole, personCode } = normalizePersonIdentity(payload.personRole, payload.personCode);
@@ -670,7 +677,7 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
   }
   const current = await database.prepare(
     `SELECT learner_name, learner_family_name, learner_given_name, person_role, person_code, class_name, phone,
-            registration_submitted_at, status, payment_status
+            registration_submitted_at, status, payment_status, label
        FROM device_access WHERE device_id = ?`,
   ).bind(device.deviceId).first<{
     learner_name: string | null;
@@ -683,10 +690,12 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
     registration_submitted_at: string | null;
     status: DeviceStatus;
     payment_status: PaymentStatus;
+    label: string | null;
   }>();
   const automation = await getAccessAutomationSettings();
   const shouldAutoConfirm = automation.enabled
     && current?.status !== "blocked"
+    && (!manualReviewLabel || current?.label !== manualReviewLabel)
     && current?.payment_status === "unassigned";
   let autoConfirmed = false;
   const changed = !current

@@ -296,8 +296,10 @@ async function attachActivity<T extends ReturnType<typeof view>>(devices: T[], d
   });
 }
 
-async function attachVideoAnalyses<T extends ReturnType<typeof view>>(devices: T[]) {
-  if (devices.length === 0) return devices;
+async function attachVideoAnalyses<T extends ReturnType<typeof view>>(
+  devices: T[],
+): Promise<Array<T & { videoAnalysis: ReturnType<typeof videoAnalysisSummary> | null }>> {
+  if (devices.length === 0) return [];
   const database = await getCourseDatabase();
   const ids = devices.map((device) => device.deviceId);
   const placeholders = ids.map(() => "?").join(", ");

@@ -1,10 +1,6 @@
 name: Diagnose Boi Automation Persistence
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/diagnose-boi-automation.yml"
   workflow_dispatch:
 
 permissions:
@@ -29,14 +25,23 @@ jobs:
         working-directory: boi-ech
         run: npm ci --no-audit --no-fund
 
-      - name: Read current automation row
+      - name: Read device schema without personal records
         working-directory: boi-ech
         run: |
           set -euo pipefail
-          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command             "SELECT id, auto_confirm_new_devices, default_access_days, default_device_limit, updated_by, updated_at FROM access_automation_settings WHERE id='global';"
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command \
+            "SELECT name, type, pk FROM pragma_table_info('device_access'); SELECT name, type FROM pragma_table_info('access_automation_settings'); SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='device_access';"
 
-      - name: Read recent automation writes
+      - name: Read current automation policy
         working-directory: boi-ech
         run: |
           set -euo pipefail
-          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command             "SELECT id, actor, detail_json, created_at FROM course_audit_log WHERE action='access_automation_updated' ORDER BY id DESC LIMIT 12;"
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command \
+            "SELECT auto_confirm_new_devices, default_access_days, default_device_limit, updated_at FROM access_automation_settings WHERE id='global';"
+
+      - name: Read aggregate device diagnostics
+        working-directory: boi-ech
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command \
+            "SELECT COUNT(*) AS total_devices, SUM(CASE WHEN person_code='DEV-LOCAL' OR phone='0000000000' THEN 1 ELSE 0 END) AS standalone_identity_count, SUM(CASE WHEN registration_submitted_at IS NULL THEN 1 ELSE 0 END) AS unsubmitted_count FROM device_access; SELECT COUNT(*) AS policy_write_count, MAX(created_at) AS latest_policy_write_at FROM course_audit_log WHERE action='access_automation_updated';"

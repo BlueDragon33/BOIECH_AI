@@ -9,7 +9,7 @@ const composer = fs.readFileSync(new URL("../app/phan-tich-video/video-analyzer.
 test("camera guidance samples a bounded local preflight and restores playback", () => {
   assert.match(panel, /const sampleCount = 12/);
   assert.match(panel, /capturePlaybackState\(video\)/);
-  assert.match(panel, /restorePlaybackState\(video, playbackState, seek\)/);
+  assert.match(panel, /restorePlaybackState\(video, playbackState,/);
   assert.match(panel, /assessCameraGuidance\(samples, effectiveView\)/);
   assert.match(panel, /data-camera-guidance-local-only/);
   assert.match(composer, /<CameraGuidancePanel \/>/);

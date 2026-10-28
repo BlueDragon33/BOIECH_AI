@@ -14,8 +14,11 @@ export const dynamic = "force-dynamic";
 export const ADDITIONAL_ACCOUNT_REVIEW_TOKEN = "boi-ech-additional-account-manual-review-v1";
 export const ADDITIONAL_ACCOUNT_REVIEW_LABEL = "Tài khoản bổ sung · chờ quản trị duyệt";
 
-function standaloneDevelopmentMode() {
-  return String(process.env.BOI_ECH_ACCESS_MODE || "standalone").trim().toLowerCase() !== "managed";
+function standaloneDevelopmentMode(request: Request) {
+  const hostname = new URL(request.url).hostname;
+  const local = ["terminal.local", "localhost", "127.0.0.1", "[::1]"].includes(hostname);
+  // An omitted or stale build variable must never grant production authority.
+  return local && String(process.env.BOI_ECH_ACCESS_MODE || "standalone").trim().toLowerCase() === "standalone";
 }
 
 async function ensureStandaloneDevice(deviceId: string) {
@@ -29,9 +32,9 @@ async function ensureStandaloneDevice(deviceId: string) {
             learner_family_name = COALESCE(NULLIF(learner_family_name, ''), 'Local'),
             learner_given_name = COALESCE(NULLIF(learner_given_name, ''), 'Người học'),
             person_role = COALESCE(NULLIF(person_role, ''), 'learner'),
-            person_code = COALESCE(NULLIF(person_code, ''), 'DEV-LOCAL'),
+            person_code = COALESCE(NULLIF(person_code, ''), ?),
             class_name = COALESCE(NULLIF(class_name, ''), 'Standalone'),
-            phone = COALESCE(NULLIF(phone, ''), '0000000000'),
+            phone = COALESCE(NULLIF(phone, ''), ?),
             registration_submitted_at = COALESCE(registration_submitted_at, ?),
             approved_at = COALESCE(approved_at, ?),
             blocked_at = NULL,
@@ -39,33 +42,8 @@ async function ensureStandaloneDevice(deviceId: string) {
             auto_confirmed_at = COALESCE(auto_confirmed_at, ?),
             updated_at = CURRENT_TIMESTAMP
       WHERE device_id = ?`,
-  ).bind(now, now, now, deviceId).run();
+  ).bind(`DEV-LOCAL-${deviceId}`, `local:${deviceId}`, now, now, now, deviceId).run();
   return (await getPublicDeviceState(deviceId))!;
-}
-
-function pendingReviewDevice<T extends {
-  status: string;
-  accessGroup: string;
-  paymentStatus: string;
-  accessExpiresAt: string | null;
-  accessExpired: boolean;
-  accessExpiringSoon: boolean;
-  accessDaysRemaining: number | null;
-  personalEditEnabled: boolean;
-  autoConfirmedAt: string | null;
-}>(device: T) {
-  return {
-    ...device,
-    status: "pending" as const,
-    accessGroup: "unassigned" as const,
-    paymentStatus: "unassigned" as const,
-    accessExpiresAt: null,
-    accessExpired: false,
-    accessExpiringSoon: false,
-    accessDaysRemaining: null,
-    personalEditEnabled: false,
-    autoConfirmedAt: null,
-  };
 }
 
 export async function POST(request: Request) {
@@ -73,24 +51,18 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as Record<string, unknown>;
     const action = typeof payload.action === "string" ? payload.action : "";
     if (action === "register") {
-      const hostname = new URL(request.url).hostname;
-      const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      const standalone = standaloneDevelopmentMode();
-      const autoApprove = standalone || previewRequest;
-      let device = await registerDevice(payload.publicKey, payload.legacyToken, autoApprove);
-      if (standalone) device = await ensureStandaloneDevice(device.deviceId);
+      const standalone = standaloneDevelopmentMode(request);
+      const autoApprove = standalone;
       const additionalAccount = payload.legacyToken === ADDITIONAL_ACCOUNT_REVIEW_TOKEN;
-      if (additionalAccount && !previewRequest && !standalone) {
-        const database = await getCourseDatabase();
-        await database.prepare(
-          `UPDATE device_access
-              SET label = ?, status = 'pending', access_group = 'unassigned', payment_status = 'unassigned',
-                  approved_at = NULL, blocked_at = NULL, personal_edit_enabled = 0,
-                  auto_confirmed_at = NULL, access_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-            WHERE device_id = ?`,
-        ).bind(ADDITIONAL_ACCOUNT_REVIEW_LABEL, device.deviceId).run();
-        device = { ...pendingReviewDevice(device), label: ADDITIONAL_ACCOUNT_REVIEW_LABEL };
-      }
+      // The review marker initializes new identities only. Public registration
+      // must never reset an existing owner's approval, block, payment, or expiry.
+      let device = await registerDevice(
+        payload.publicKey,
+        additionalAccount ? undefined : payload.legacyToken,
+        autoApprove,
+        additionalAccount && !standalone ? ADDITIONAL_ACCOUNT_REVIEW_LABEL : null,
+      );
+      if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
       device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
@@ -102,29 +74,14 @@ export async function POST(request: Request) {
       );
     }
     if (action === "save-registration") {
-      const hostname = new URL(request.url).hostname;
-      const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      const standalone = standaloneDevelopmentMode();
-      let device = await saveDeviceRegistration(payload, standalone || previewRequest);
+      const standalone = standaloneDevelopmentMode(request);
+      let device = await saveDeviceRegistration(payload, standalone, ADDITIONAL_ACCOUNT_REVIEW_LABEL);
       if (standalone) device = await ensureStandaloneDevice(device.deviceId);
-      if (!standalone && !previewRequest && device.label === ADDITIONAL_ACCOUNT_REVIEW_LABEL) {
-        const database = await getCourseDatabase();
-        await database.prepare(
-          `UPDATE device_access
-              SET status = 'pending', access_group = 'unassigned', payment_status = 'unassigned',
-                  approved_at = NULL, blocked_at = NULL, personal_edit_enabled = 0,
-                  auto_confirmed_at = NULL, access_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
-            WHERE device_id = ?`,
-        ).bind(device.deviceId).run();
-        device = pendingReviewDevice(device);
-      }
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     if (action === "presence") {
-      const hostname = new URL(request.url).hostname;
-      const previewRequest = hostname === "terminal.local" || hostname === "localhost";
-      const standalone = standaloneDevelopmentMode();
-      let device = await verifyDeviceIdentityRequest(payload, standalone || previewRequest);
+      const standalone = standaloneDevelopmentMode(request);
+      let device = await verifyDeviceIdentityRequest(payload, standalone);
       if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
       device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;

@@ -6,6 +6,8 @@ import { assessCameraGuidance } from "./camera-guidance-core.mjs";
 import { compareRetakeGuidance } from "./camera-retake-comparison.mjs";
 import { setCameraProfile, SharedCameraProfileStatus, useCameraProfile } from "./camera-profile-session";
 import { capturePlaybackState, restorePlaybackState } from "./video-playback-state.mjs";
+import { seekVideoFrame } from "./video-analysis-run.mjs";
+import { useVideoAnalysisRun } from "./use-video-analysis-run";
 import styles from "./video-analyzer.module.css";
 
 const AI_CACHE = "boi-ech-pose-ai-v1";
@@ -96,69 +98,72 @@ function selectedLegacyView(root?: ParentNode | null): CameraView | "" {
   return active.textContent?.toLowerCase().includes("ngang") ? "side" : "rear";
 }
 
-function seek(video: HTMLVideoElement, seconds: number) {
-  const target = Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.01));
-  if (Math.abs(video.currentTime - target) < 0.001) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    const cleanup = () => {
-      window.clearTimeout(timer);
-      video.removeEventListener("seeked", done);
-    };
-    const done = () => { cleanup(); resolve(); };
-    const timer = window.setTimeout(() => { cleanup(); reject(new Error("Không đọc được mốc video để kiểm tra khung quay.")); }, 5000);
-    video.addEventListener("seeked", done, { once: true });
-    try { video.currentTime = target; } catch (error) { cleanup(); reject(error); }
-  });
+function seek(video: HTMLVideoElement, seconds: number, signal?: AbortSignal) {
+  return seekVideoFrame(video, seconds, signal);
 }
 
-async function cachedAsset(url: string) {
+async function cachedAsset(url: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   if (!("caches" in window)) {
-    const response = await fetch(url, { mode: "cors" });
+    const response = await fetch(url, { mode: "cors", signal });
     if (!response.ok) throw new Error("Không tải được tài nguyên AI kiểm tra khung quay.");
     return response;
   }
   const cache = await caches.open(AI_CACHE);
   const cached = await cache.match(url);
+  signal?.throwIfAborted();
   if (cached) return cached;
   if (!navigator.onLine) throw new Error("Bộ AI chưa được lưu đủ trên máy. Hãy tải AI offline khi có mạng rồi thử lại.");
-  const response = await fetch(url, { mode: "cors", cache: "no-store" });
+  const response = await fetch(url, { mode: "cors", cache: "no-store", signal });
   if (!response.ok) throw new Error(`Không tải được tài nguyên AI (${response.status}).`);
   await cache.put(url, response.clone());
   return response;
 }
 
-async function createLandmarker() {
-  const [bundle, loader, wasm, model] = await Promise.all([
-    cachedAsset(BUNDLE_URL), cachedAsset(WASM_LOADER_URL), cachedAsset(WASM_BINARY_URL), cachedAsset(MODEL_URL),
-  ]);
-  const bundleUrl = URL.createObjectURL(new Blob([await bundle.text()], { type: "text/javascript" }));
-  const loaderUrl = URL.createObjectURL(new Blob([await loader.text()], { type: "text/javascript" }));
-  const wasmUrl = URL.createObjectURL(await wasm.blob());
-  const importModule = new Function("url", "return import(url)") as (url: string) => Promise<Record<string, unknown>>;
-  const vision = await importModule(bundleUrl) as {
-    PoseLandmarker?: { createFromOptions: (fileset: Record<string, string>, options: Record<string, unknown>) => Promise<PoseLandmarker> };
+async function createLandmarker(signal?: AbortSignal) {
+  const objectUrls: string[] = [];
+  let landmarker: PoseLandmarker | undefined;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    try { landmarker?.close?.(); }
+    finally { objectUrls.forEach((url) => URL.revokeObjectURL(url)); }
   };
-  if (!vision.PoseLandmarker) throw new Error("Không khởi tạo được AI kiểm tra khung quay.");
-  const landmarker = await vision.PoseLandmarker.createFromOptions(
-    { wasmLoaderPath: loaderUrl, wasmBinaryPath: wasmUrl },
-    {
-      baseOptions: { modelAssetBuffer: new Uint8Array(await model.arrayBuffer()), delegate: "CPU" },
-      runningMode: "VIDEO",
-      numPoses: 1,
-      minPoseDetectionConfidence: 0.45,
-      minPosePresenceConfidence: 0.45,
-      minTrackingConfidence: 0.45,
-    },
-  );
-  return {
-    landmarker,
-    dispose: () => {
-      landmarker.close?.();
-      URL.revokeObjectURL(bundleUrl);
-      URL.revokeObjectURL(loaderUrl);
-      URL.revokeObjectURL(wasmUrl);
-    },
-  };
+  try {
+    const [bundle, loader, wasm, model] = await Promise.all([
+      cachedAsset(BUNDLE_URL, signal), cachedAsset(WASM_LOADER_URL, signal), cachedAsset(WASM_BINARY_URL, signal), cachedAsset(MODEL_URL, signal),
+    ]);
+    const bundleUrl = URL.createObjectURL(new Blob([await bundle.text()], { type: "text/javascript" }));
+    objectUrls.push(bundleUrl);
+    const loaderUrl = URL.createObjectURL(new Blob([await loader.text()], { type: "text/javascript" }));
+    objectUrls.push(loaderUrl);
+    const wasmUrl = URL.createObjectURL(await wasm.blob());
+    objectUrls.push(wasmUrl);
+    const importModule = new Function("url", "return import(url)") as (url: string) => Promise<Record<string, unknown>>;
+    const vision = await importModule(bundleUrl) as {
+      PoseLandmarker?: { createFromOptions: (fileset: Record<string, string>, options: Record<string, unknown>) => Promise<PoseLandmarker> };
+    };
+    if (!vision.PoseLandmarker) throw new Error("Không khởi tạo được AI kiểm tra khung quay.");
+    const modelAssetBuffer = new Uint8Array(await model.arrayBuffer());
+    signal?.throwIfAborted();
+    landmarker = await vision.PoseLandmarker.createFromOptions(
+      { wasmLoaderPath: loaderUrl, wasmBinaryPath: wasmUrl },
+      {
+        baseOptions: { modelAssetBuffer, delegate: "CPU" },
+        runningMode: "VIDEO",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.45,
+        minPosePresenceConfidence: 0.45,
+        minTrackingConfidence: 0.45,
+      },
+    );
+    signal?.throwIfAborted();
+    return { landmarker, dispose };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
 }
 
 function guidanceSample(points: Point[] | undefined, time: number): GuidanceSample {
@@ -192,6 +197,7 @@ function signedPoints(value: number) {
 }
 
 export default function CameraGuidancePanel() {
+  const lifecycle = useVideoAnalysisRun();
   const view = useCameraProfile();
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [hasVideo, setHasVideo] = useState(false);
@@ -246,14 +252,17 @@ export default function CameraGuidancePanel() {
   async function jumpToGuidanceMoment(time: number) {
     const video = learnerVideo();
     if (!video) return;
+    const run = lifecycle.begin(video);
     video.pause();
     try {
-      await seek(video, time);
+      await seek(video, time, run.signal);
+      run.check();
       video.scrollIntoView({ behavior: "smooth", block: "center" });
       setStatus(`Đang xem mốc ${time.toFixed(1)}s cần chỉnh khi quay lại.`);
     } catch {
-      setStatus("Không thể mở mốc cần xem trên video hiện tại.");
+      if (!run.signal.aborted && lifecycle.isCurrent(run)) setStatus("Không thể mở mốc cần xem trên video hiện tại.");
     }
+    finally { if (lifecycle.end(run)) setBusy(false); }
   }
 
   async function runGuidance() {
@@ -271,6 +280,7 @@ export default function CameraGuidancePanel() {
     }
     if (effectiveView !== view) setCameraProfile(effectiveView);
     const source = videoSource(video);
+    const run = lifecycle.begin(video);
     const playbackState = capturePlaybackState(video);
     video.pause();
     setBusy(true);
@@ -278,20 +288,21 @@ export default function CameraGuidancePanel() {
     setComparison(null);
     setProgress(0);
     setStatus("Đang kiểm tra nhanh khung quay trên thiết bị…");
-    let dispose = () => undefined;
     try {
-      const pose = await createLandmarker();
-      dispose = pose.dispose;
+      const pose = await run.acquire(createLandmarker(run.signal));
+      run.check();
       const sampleCount = 12;
       const samples: GuidanceSample[] = [];
       for (let index = 0; index < sampleCount; index += 1) {
         const ratio = index / (sampleCount - 1);
         const time = Math.min(video.duration - 0.01, Math.max(0, (video.duration - 0.02) * ratio));
-        await seek(video, time);
+        await seek(video, time, run.signal);
+        run.check();
         const points = pose.landmarker.detectForVideo(video, index * 250 + 1).landmarks?.[0];
         samples.push(guidanceSample(points, time));
         setProgress(Math.round((index + 1) / sampleCount * 100));
-        if (index % 3 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        run.check();
       }
       const next = assessCameraGuidance(samples, effectiveView) as GuidanceReport;
       const history = runHistoryRef.current;
@@ -307,11 +318,10 @@ export default function CameraGuidancePanel() {
           ? "Khung quay dùng được nhưng còn điểm cần lưu ý trước khi phân tích."
           : "Khung quay chưa đủ tốt; nên quay lại trước khi chạy phân tích đầy đủ.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Không thể kiểm tra khung quay.");
+      if (!run.signal.aborted && lifecycle.isCurrent(run)) setStatus(error instanceof Error ? error.message : "Không thể kiểm tra khung quay.");
     } finally {
-      try { dispose(); } catch { /* luôn ưu tiên khôi phục video */ }
-      await restorePlaybackState(video, playbackState, seek);
-      setBusy(false);
+      if (!run.signal.aborted && lifecycle.isCurrent(run)) await restorePlaybackState(video, playbackState, (target: HTMLVideoElement, time: number) => seek(target, time, run.signal), run.signal);
+      if (lifecycle.end(run)) setBusy(false);
     }
   }
 

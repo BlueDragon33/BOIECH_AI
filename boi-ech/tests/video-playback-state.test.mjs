@@ -77,3 +77,17 @@ test("falls back to direct currentTime restoration when seek rejects", async () 
   assert.equal(video.currentTime, 3);
   assert.deepEqual(result, { restored: true, resumed: false });
 });
+
+test("navigation during playback restoration cannot resume the canceled video", async () => {
+  const video = fakeVideo({ paused: false });
+  const snapshot = capturePlaybackState(video);
+  const controller = new AbortController();
+  video.currentTime = 10;
+  const result = await restorePlaybackState(video, snapshot, async () => {
+    controller.abort();
+    throw new DOMException("canceled", "AbortError");
+  }, controller.signal);
+  assert.equal(video.currentTime, 10);
+  assert.equal(video.playCalls, 0);
+  assert.deepEqual(result, { restored: false, resumed: false });
+});

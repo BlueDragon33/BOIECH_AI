@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import MediaPipeConsentGate from "./privacy-consent";
+import { cancelVideoAnalysisRuns } from "./video-analysis-run.mjs";
 
 const VideoAnalyzer = dynamic(() => import("./video-analyzer"), {
   ssr: false,
@@ -28,7 +29,7 @@ export default function LocalVideoAnalysisPage() {
     <main data-video-analysis-v37>
       <div className="video-analysis-topbar-v37">
         <div className="video-analysis-topbar-inner-v37">
-          <Link href={returnHref} className="video-analysis-back-v37">← Quay lại Bơi ếch AI</Link>
+          <Link href={returnHref} onClick={cancelVideoAnalysisRuns} className="video-analysis-back-v37">← Quay lại Bơi ếch AI</Link>
           <div className="video-analysis-topbar-state-v37"><i/>Xử lý video cục bộ · không tải video gốc lên máy chủ</div>
         </div>
       </div>

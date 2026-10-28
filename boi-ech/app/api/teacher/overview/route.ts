@@ -109,10 +109,11 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     const title = (item as Record<string, unknown>).title;
     return typeof title === "string" ? title.slice(0, 120) : "";
   }).filter(Boolean);
+  const captureQuality: "good" | "review" = quality.level === "good" ? "good" : "review";
   return {
     score: Math.max(0, Math.min(100, Math.round(Number(source.score) || 0))),
     confidence: Math.max(0, Math.min(100, Math.round(Number(source.confidence) || 0))),
-    captureQuality: quality.level === "good" ? "good" : "review",
+    captureQuality,
     poseCoverage: Math.max(0, Math.min(100, Math.round(Number(quality.poseCoverage) || 0))),
     averageVisibility: Math.max(0, Math.min(100, Math.round(Number(quality.averageVisibility) || 0))),
     cameraView: source.cameraView === "side" ? "side" : "rear",

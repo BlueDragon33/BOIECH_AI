@@ -36,15 +36,13 @@ test("logout opens a local account chooser instead of deleting prior account dat
   assert.match(css, /\.multi-account-overlay/);
 });
 
-test("additional accounts are forced back to pending for explicit admin approval", () => {
+test("new additional accounts request explicit admin review without resetting existing identities", () => {
   assert.match(switcher, /boi-ech-additional-account-manual-review-v1/);
   assert.match(route, /ADDITIONAL_ACCOUNT_REVIEW_TOKEN/);
   assert.match(route, /Tài khoản bổ sung · chờ quản trị duyệt/);
-  assert.match(route, /status = 'pending'/);
-  assert.match(route, /access_group = 'unassigned'/);
-  assert.match(route, /payment_status = 'unassigned'/);
-  assert.match(route, /personal_edit_enabled = 0/);
-  assert.match(route, /device\.label === ADDITIONAL_ACCOUNT_REVIEW_LABEL/);
+  assert.match(route, /additionalAccount && !standalone \? ADDITIONAL_ACCOUNT_REVIEW_LABEL : null/);
+  assert.match(route, /saveDeviceRegistration\(payload, standalone, ADDITIONAL_ACCOUNT_REVIEW_LABEL\)/);
+  assert.doesNotMatch(route, /SET label = \?, status = 'pending'/);
 });
 
 test("root layout mounts the multi-account controller exactly once", () => {
