@@ -45,3 +45,10 @@ jobs:
           set -euo pipefail
           npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command \
             "SELECT COUNT(*) AS total_devices, SUM(CASE WHEN person_code='DEV-LOCAL' OR phone='0000000000' THEN 1 ELSE 0 END) AS standalone_identity_count, SUM(CASE WHEN registration_submitted_at IS NULL THEN 1 ELSE 0 END) AS unsubmitted_count FROM device_access; SELECT COUNT(*) AS policy_write_count, MAX(created_at) AS latest_policy_write_at FROM course_audit_log WHERE action='access_automation_updated';"
+
+      - name: Read aggregate teacher access diagnostics
+        working-directory: boi-ech
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command \
+            "SELECT COUNT(*) AS teacher_total, SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) AS approved_count, SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending_count, SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) AS blocked_count, SUM(CASE WHEN access_expires_at IS NOT NULL AND datetime(access_expires_at)<=CURRENT_TIMESTAMP THEN 1 ELSE 0 END) AS expired_count, SUM(CASE WHEN registration_submitted_at IS NULL THEN 1 ELSE 0 END) AS unsubmitted_count, SUM(CASE WHEN COALESCE(trim(class_name),'')='' THEN 1 ELSE 0 END) AS missing_class_count FROM device_access WHERE person_role='teacher'; SELECT name FROM sqlite_master WHERE type='table' AND name IN ('course_activity_events','learner_self_assessments','course_content_versions');"
