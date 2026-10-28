@@ -52,6 +52,7 @@ export function summarizeGroundTruth(frames, labelsByTime) {
   }
   mistakes.sort((a, b) => b.count - a.count || a.aiPhase.localeCompare(b.aiPhase));
 
+  /** @type {Record<string, { annotated: number; correct: number; recall: number; metrics: Record<"armFlexion" | "kneeFlexion" | "wristSpread" | "ankleSpread", { min: number; max: number; avg: number }> }>} */
   const phaseMetrics = {};
   for (const phase of SCORED_PHASES) {
     const rows = annotations.filter((item) => item.truthPhase === phase);

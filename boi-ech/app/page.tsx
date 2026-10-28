@@ -1060,7 +1060,7 @@ export default function Home() {
       setNetworkOnline(navigator.onLine);
       void refreshPendingSyncCount();
     }, 0);
-    let detachServiceWorkerListener = () => undefined;
+    let detachServiceWorkerListener: () => void = () => undefined;
     if ("serviceWorker" in navigator) {
       const hadActiveWorker = Boolean(navigator.serviceWorker.controller);
       let reloadingForUpdate = false;
