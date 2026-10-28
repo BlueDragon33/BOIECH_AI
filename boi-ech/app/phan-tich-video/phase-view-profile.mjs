@@ -1,5 +1,6 @@
 const PHASES = ["pull", "breath", "leg-recovery", "kick", "glide"];
 
+/** @type {ReadonlyArray<{ value: "" | "side" | "rear" | "front-oblique"; label: string }>} */
 export const ANALYSIS_VIEW_OPTIONS = Object.freeze([
   { value: "", label: "Chưa chọn góc quay" },
   { value: "side", label: "Ngang thân (side)" },
@@ -78,6 +79,7 @@ export function assessCycleByView(cycle, view) {
     };
   }
 
+  /** @type {Record<string, { reliability: number; reliabilityPercent: number; score: number; usable: boolean }>} */
   const phaseEvidence = {};
   const trusted = [];
   for (const phase of PHASES) {

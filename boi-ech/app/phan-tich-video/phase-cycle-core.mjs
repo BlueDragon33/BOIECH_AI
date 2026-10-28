@@ -64,6 +64,9 @@ function phaseDuration(segment) {
   return Math.max(1 / SAMPLE_FPS, segment.end - segment.start + 1 / SAMPLE_FPS);
 }
 
+/**
+ * @param {{ armFlexion: number; kneeFlexion: number; wristSpread: number; ankleSpread: number; previousKneeFlexion?: number | null }} metrics
+ */
 export function classifyPhase({ armFlexion, kneeFlexion, wristSpread, ankleSpread, previousKneeFlexion = null }) {
   const kickVelocity = previousKneeFlexion === null ? 0 : previousKneeFlexion - kneeFlexion;
   const t = PHASE_THRESHOLDS;
@@ -181,7 +184,9 @@ function buildCycleQuality(smoothed, cycleSeed, index) {
   const end = selectedSegments.at(-1).end;
   const cycleFrames = smoothed.filter((frame) => frame.time >= start - 1e-6 && frame.time <= end + 1e-6);
   const calibration = summarizeCalibration(cycleFrames);
+  /** @type {Record<string, number>} */
   const phaseScores = {};
+  /** @type {Record<string, number>} */
   const phaseStarts = {};
 
   for (const segment of selectedSegments) {

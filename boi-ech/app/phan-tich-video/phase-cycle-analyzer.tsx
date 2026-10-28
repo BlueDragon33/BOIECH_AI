@@ -305,7 +305,7 @@ export default function PhaseCycleAnalyzer() {
         await seek(video, time, run.signal);
         run.check();
         const points = pose.landmarker.detectForVideo(video, index * 200 + 1).landmarks?.[0];
-        const metric = points ? phaseMetrics(time, points, previousKneeFlexion) : null;
+        const metric: PhaseFrame | null = points ? phaseMetrics(time, points, previousKneeFlexion) : null;
         if (metric) {
           frames.push(metric);
           previousKneeFlexion = metric.kneeFlexion;

@@ -69,3 +69,34 @@ bypassed. Approval for that specific test is required before attempting it again
 Keep this candidate in Draft. No merge, production promotion, database migration,
 device approval or constitutional ratification has been performed. Resume from
 this candidate and the recorded baselines; do not restart the repository audit.
+
+## 28 October 2026 — latest checkpoint
+
+This section supersedes the earlier permission and test blockers. Owner granted
+MediaPipe telemetry testing and continued scoped repairs. A real 12-second local
+fixture loaded; MediaPipe initialized and clicking home reached `/` in about
+757 ms (tool-observed action, not an instrumented paint percentile). The HTTP
+preview also reported a vinext WebCrypto/RSC fallback error. Authenticated/mobile
+production acceptance remains UNVERIFIED. A workspace reset lost the second
+longer test outcome; it is not counted as PASS.
+
+The exact type and release/PWA patches were recovered onto dedicated branches.
+Prior separate evidence: strict typecheck and verified build passed; canonical
+release checks passed 464 direct tests, readiness and lint. Fresh integrated CI
+is still required. Validation CI now installs pinned dependencies and runs
+readiness/lint/typecheck/build/tests. No skip-CI marker is used. Policy adoption
+and dependency-budget versions now declare effective 1.3.0; all existing
+MIGRATION_REQUIRED blockers remain. No overall compliance or1.4 ratification.
+
+New report: BE-C516-2612-6AAD-DBDF waits for grouping. The actual
+https://boi-ech.boiech-ai.workers.dev/ reproduced the device-service interruption.
+Verified code facts: additional accounts are explicitly forced to manual review;
+automation is evaluated on save-registration with blocked/payment/quota checks;
+updating the automation setting alone does not reconsider already-pending
+registrations. The authenticated production policy, target device/audit record
+and Cloudflare/D1 exception log were unavailable. The exact device-specific
+cause remains UNVERIFIED. No authorization bypass or blanket device approval.
+
+Production is unchanged. Keep PR102 Draft until fresh CI and the authentication
+incident are resolved. Site/GitHub R2 binding reconciliation remains pending.
+Resume from this checkpoint without repeating the full repository audit.

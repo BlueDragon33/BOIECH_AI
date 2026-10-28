@@ -25,7 +25,7 @@ export function assessCalibrationCoverage(frames, labelsByTime, options = {}) {
   const labels = labelsByTime && typeof labelsByTime === "object" ? labelsByTime : {};
   const completeCycles = Math.max(0, Number(options.completeCycles) || 0);
   const view = typeof options.view === "string" ? options.view : "";
-  const counts = Object.fromEntries(PHASES.map((phase) => [phase, 0]));
+  const counts = { pull: 0, breath: 0, "leg-recovery": 0, kick: 0, glide: 0 };
   const annotatedTimes = [];
 
   for (const frame of safeFrames) {
