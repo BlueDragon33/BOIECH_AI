@@ -239,6 +239,7 @@ export default function TeacherRoleShell() {
     let timer = 0;
     let disposed = false;
     let resolvingCredential = false;
+    let fallbackIdentity: { shell: HTMLElement; personCode: string; deviceId: string } | null = null;
     let dashboardNode: HTMLElement | null = null;
     let navNode: HTMLElement | null = null;
     let searchNode: HTMLElement | null = null;
@@ -258,6 +259,7 @@ export default function TeacherRoleShell() {
         loadedDeviceRef.current = "";
         deviceIdRef.current = "";
         setWorkspaceDeviceId("");
+        fallbackIdentity = null;
         setOverview(null);
         setLoading(false);
         delete document.body.dataset.teacherRoleUi;
@@ -294,7 +296,10 @@ export default function TeacherRoleShell() {
       const title = document.querySelector<HTMLElement>(".learner-chip")?.getAttribute("title") ?? "";
       const code = title.includes("·") ? title.split("·").slice(1).join("·").trim() : "";
       const candidate = code && /^[a-f0-9]{64}$/i.test(code) ? code : "";
-      const nextDeviceId = shell.getAttribute("data-device-id") || candidate;
+      const explicitDeviceId = shell.getAttribute("data-device-id") || candidate;
+      if (explicitDeviceId) fallbackIdentity = null;
+      const cachedDeviceId = fallbackIdentity?.shell === shell && fallbackIdentity.personCode === code ? fallbackIdentity.deviceId : "";
+      const nextDeviceId = explicitDeviceId || cachedDeviceId;
       if (deviceIdRef.current && nextDeviceId && deviceIdRef.current !== nextDeviceId) {
         setTab("overview");
         setSelectedClass("");
@@ -312,7 +317,9 @@ export default function TeacherRoleShell() {
           const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
           if (disposed || !shell.isConnected || document.querySelector(".app-shell") !== shell || (shell.dataset.personRole && shell.dataset.personRole !== "teacher")) return;
           if (shell.getAttribute("data-device-id")) { schedule(); return; }
-          deviceIdRef.current = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
+          const resolvedDeviceId = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
+          fallbackIdentity = { shell, personCode: code, deviceId: resolvedDeviceId };
+          deviceIdRef.current = resolvedDeviceId;
           setWorkspaceDeviceId(deviceIdRef.current);
           if (attemptedDeviceRef.current !== deviceIdRef.current) refresh();
         }).catch(() => undefined).finally(() => { resolvingCredential = false; });

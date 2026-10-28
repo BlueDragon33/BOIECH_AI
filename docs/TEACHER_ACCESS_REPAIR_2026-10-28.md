@@ -23,6 +23,7 @@ Actual TeacherRoleShell lifecycle regressions reproduced these faults:
 - Credential/signing/HTTP work had no deadline; stale identity responses could win.
 - An owned-portal filter matched the active flag on body and hid identity changes.
 
+Resolved fallback identities remain stable across unrelated DOM changes.
 The fix separates stable DOM hosts from request state, bounds the entire load to
 15 seconds with cancellation, deduplicates active refreshes, retains actionable
 errors for explicit retry, and ignores stale responses. Device changes reset
@@ -32,8 +33,8 @@ work; backend signature, role, class, approval and expiry checks stay in force.
 
 ## Validation and release
 
-Eight lifecycle tests execute actual component/effect code with controlled hooks,
-DOM records, network completions and timers; one of them also executes
+Nine lifecycle tests execute actual component/effect code with controlled hooks,
+DOM records, network completions and timers; one also executes
 the actual dashboard drawer/draft state across identity changes. Four initial
 load lifecycle tests and the drawer/draft key test failed before their fixes.
 Three integration tests run actual client signing, P-256 server verification,

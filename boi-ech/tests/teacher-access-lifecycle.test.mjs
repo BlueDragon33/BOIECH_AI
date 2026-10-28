@@ -5,12 +5,12 @@ import ts from "typescript";
 
 // Run the actual component and its effects. Controlled network promises preserve
 // the separate render/network tasks which expose the loading/effect retry loop.
-async function fixture() {
+async function fixture(credential = null) {
   const path = new URL("../app/teacher-role-shell.tsx", import.meta.url);
   const source = ts.createSourceFile(path.pathname, await readFile(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const declarations = source.statements.filter(node => ts.isFunctionDeclaration(node) && ["TeacherRoleShell", "createTeacherOverviewLoader"].includes(node.name?.text));
   const { outputText } = ts.transpileModule(declarations.map(node => node.getText(source).replace("export default ", "")).join("\n"), { compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 } });
-  const slots = [], effects = [], timers = new Map(), listeners = new Map(), observers = new Set(), requests = [];
+  const slots = [], effects = [], timers = new Map(), listeners = new Map(), observers = new Set(), requests = [], keys = [];
   let cursor = 0, dirty = true, tree, now = 0, timerId = 0, mountCount = 0;
   const changed = (a, b) => !a || a.length !== b.length || a.some((value, index) => !Object.is(value, b[index]));
   function useState(initial) {
@@ -49,7 +49,7 @@ async function fixture() {
     disconnect() { this.active = false; }
   }
   const shell = new Element(), main = new Element(), sidebar = new Element(), topbar = new Element(), brand = new Element(), chip = new Element();
-  shell.dataset = { personRole: "teacher", deviceId: "a".repeat(64) };
+  shell.dataset = { personRole: "teacher", deviceId: credential ? "" : "a".repeat(64) };
   main.parent = shell; sidebar.parent = shell; topbar.parent = main; brand.parent = sidebar;
   shell.queries = { ".main-area": main, ".sidebar": sidebar };
   main.queries = { ":scope > .topbar": topbar };
@@ -71,13 +71,16 @@ async function fixture() {
     removeEventListener(name, callback) { if (listeners.get(name) === callback) listeners.delete(name); },
   };
   const load = (deviceId, signal) => new Promise((resolve, reject) => requests.push({ deviceId, signal, resolve, reject }));
+  const hashing = new Set();
+  const cryptoFacade = { subtle: { digest(...args) { const pending = crypto.subtle.digest(...args); hashing.add(pending); pending.finally(() => hashing.delete(pending)); return pending; } } };
   const React = { Fragment: "fragment", createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
-  const render = new Function("useState", "useRef", "useMemo", "useEffect", "React", "createPortal", "window", "document", "MutationObserver", "Element", "text", "loadTeacherOverview", "saveTeacherAction", "readStoredDeviceCredential", "TeacherNavigation", "TeacherSearch", "TeacherDashboard", `${outputText}; return TeacherRoleShell;`)(useState, useRef, useMemo, useEffect, React, (child, mount) => ({ type: "portal", children: [child], mount }), window, document, MutationObserver, Element, node => node?.textContent ?? "", load, async () => {}, async () => null, "nav", "search", "dashboard");
+  const render = new Function("useState", "useRef", "useMemo", "useEffect", "React", "createPortal", "window", "document", "MutationObserver", "Element", "text", "loadTeacherOverview", "saveTeacherAction", "readStoredDeviceCredential", "TeacherNavigation", "TeacherSearch", "TeacherDashboard", "crypto", `${outputText}; return TeacherRoleShell;`)(useState, useRef, useMemo, useEffect, React, (child, mount) => ({ type: "portal", children: [child], mount }), window, document, MutationObserver, Element, node => node?.textContent ?? "", load, async () => {}, async () => credential, "nav", "search", "dashboard", cryptoFacade);
   function find(node, type) { if (!node) return null; if (node.type === type) return node; for (const child of node.children ?? []) { const found = find(child, type); if (found) return found; } return null; }
   async function settle() {
     for (let iteration = 0; iteration < 40; iteration++) {
       for (let turn = 0; turn < 8; turn++) await Promise.resolve();
-      if (dirty) { dirty = false; cursor = 0; tree = render(); while (effects.length) effects.shift()(); continue; }
+      if (hashing.size) { await Promise.all([...hashing]); continue; }
+      if (dirty) { dirty = false; cursor = 0; tree = render(); keys.push(find(tree, "dashboard")?.props.key); while (effects.length) effects.shift()(); continue; }
       const due = [...timers].filter(([, timer]) => timer.at <= now);
       if (!due.length) return;
       for (const [id, timer] of due) { timers.delete(id); timer.callback(); }
@@ -85,12 +88,12 @@ async function fixture() {
     assert.fail("teacher effects must settle without repeated rendering or network retries");
   }
   return {
-    requests, shell, settle,
+    requests, shell, settle, keys,
     get timerCount() { return timers.size; },
     get mounts() { return mountCount; },
     get dashboard() { return find(tree, "dashboard")?.props; },
     refresh() { listeners.get("boi-ech:teacher-refresh")?.(); },
-    mutate() { notify(shell, "data-device-id"); },
+    mutate(attribute = "data-device-id") { notify(shell, attribute); },
     async tick(ms) { now += ms; await settle(); },
     cleanup() { for (const slot of slots) slot?.cleanup?.(); },
   };
@@ -110,6 +113,20 @@ test("teacher overview failure settles to an actionable error instead of automat
     f.refresh(); await f.settle(); assert.equal(f.requests.length, 2);
     f.requests[1].resolve(overview("Giảng viên A")); await f.settle();
     assert.equal(f.dashboard.overview.teacher.name, "Giảng viên A");
+  } finally { f.cleanup(); }
+});
+
+test("stored-credential identity keeps dashboard state stable across unrelated DOM changes", async () => {
+  const f = await fixture({ publicKey: { kty: "EC", crv: "P-256", x: "A".repeat(43), y: "B".repeat(43) } });
+  try {
+    await f.settle();
+    assert.equal(f.requests.length, 1);
+    f.requests[0].resolve(overview("Giảng viên A")); await f.settle();
+    const key = f.dashboard.key;
+    const from = f.keys.length;
+    f.mutate("class"); await f.settle();
+    assert.ok(f.keys.slice(from).every(next => next === key), "ordinary mutations must not temporarily clear the resolved credential key");
+    assert.equal(f.requests.length, 1);
   } finally { f.cleanup(); }
 });
 
