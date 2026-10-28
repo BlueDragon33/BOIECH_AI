@@ -56,6 +56,10 @@ export default function PreflightEnforcementPanel() {
     let host: HTMLElement | null = null;
 
     const update = () => {
+      // React can detach this subtree before passive-effect cleanup. Recreating
+      // a disconnected portal here would trigger this observer forever and
+      // starve the main thread, preventing navigation and cleanup from finishing.
+      if (!root.isConnected) return;
       const nextSource = videoSource(learnerVideo(root));
       if (nextSource !== sourceRef.current) {
         sourceRef.current = nextSource;
