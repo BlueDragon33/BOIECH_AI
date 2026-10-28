@@ -24,8 +24,8 @@ function text(node: Element | null | undefined) { return (node?.textContent ?? "
 function base64Url(bytes: Uint8Array) { let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
 function openDb(): Promise<IDBDatabase> { return new Promise((resolve, reject) => { const request = indexedDB.open("boi-ech-doc-lap", 4); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
 async function readStoredDeviceCredential() { const db = await openDb(); return new Promise<StoredDeviceCredential | undefined>((resolve, reject) => { const request = db.transaction("thiet-bi", "readonly").objectStore("thiet-bi").get("chinh"); request.onsuccess = () => resolve(request.result as StoredDeviceCredential | undefined); request.onerror = () => reject(request.error); }); }
-async function signedTeacherProof(credential: StoredDeviceCredential, deviceId: string) { const response = await fetch("/api/device", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId }) }); const data = await response.json() as { challenge?: string; error?: string }; if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể xác thực thiết bị Giảng viên."); const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`); const signature = credential.privateKey && crypto.subtle ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message) : crypto.getRandomValues(new Uint8Array(64)).buffer; return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) }; }
-async function loadTeacherOverview(deviceId: string) { const credential = await readStoredDeviceCredential(); if (!credential) throw new Error("Không tìm thấy khóa thiết bị Giảng viên."); const proof = await signedTeacherProof(credential, deviceId); const response = await fetch("/api/teacher/overview", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(proof) }); const data = await response.json() as TeacherOverview & { error?: string }; if (!response.ok) throw new Error(data.error ?? "Không thể tải bảng giám sát."); return data; }
+async function signedTeacherProof(credential: StoredDeviceCredential, deviceId: string, signal?: AbortSignal) { const response = await fetch("/api/device", { method: "POST", credentials: "same-origin", cache: "no-store", signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "challenge", deviceId }) }); const data = await response.json() as { challenge?: string; error?: string }; if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể xác thực thiết bị Giảng viên."); const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`); const signature = credential.privateKey && crypto.subtle ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message) : crypto.getRandomValues(new Uint8Array(64)).buffer; return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) }; }
+async function loadTeacherOverview(deviceId: string, signal?: AbortSignal) { const credential = await readStoredDeviceCredential(); signal?.throwIfAborted(); if (!credential) throw new Error("Không tìm thấy khóa thiết bị Giảng viên."); const proof = await signedTeacherProof(credential, deviceId, signal); const response = await fetch("/api/teacher/overview", { method: "POST", credentials: "same-origin", cache: "no-store", signal, headers: { "content-type": "application/json" }, body: JSON.stringify(proof) }); const data = await response.json() as TeacherOverview & { error?: string }; if (!response.ok) throw new Error(data.error ?? "Không thể tải bảng giám sát."); return data; }
 
 async function saveTeacherAction(deviceId: string, draft: TeacherActionDraft, payload: { note: string; title?: string; lessonNumber?: string; reviewStatus?: "reviewed" | "follow-up"; dueAt?: string }) {
   const credential = await readStoredDeviceCredential();
@@ -172,7 +172,48 @@ function TeacherDashboard({ overview, loading, error, tab, setTab, selectedClass
 
 export default function TeacherRoleShell() {
   const [active, setActive] = useState(false); const [tab, setTab] = useState<TeacherTab>("overview"); const [selectedClass, setSelectedClass] = useState(() => typeof window === "undefined" ? "" : window.sessionStorage.getItem("boi-ech-teacher-selected-class-v31") ?? ""); const [overview, setOverview] = useState<TeacherOverview | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [query, setQuery] = useState(""); const [dashboardMount, setDashboardMount] = useState<HTMLElement | null>(null); const [navMount, setNavMount] = useState<HTMLElement | null>(null); const [searchMount, setSearchMount] = useState<HTMLElement | null>(null); const deviceIdRef = useRef(""); const loadedDeviceRef = useRef("");
-  const refresh = useMemo(() => () => { const deviceId = deviceIdRef.current; if (!deviceId) return; setLoading(true); setError(""); loadTeacherOverview(deviceId).then((data) => { loadedDeviceRef.current = deviceId; setOverview(data); }).catch((caught) => setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu Giảng viên.")).finally(() => setLoading(false)); }, []);
+  const attemptedDeviceRef = useRef("");
+  const [workspaceDeviceId, setWorkspaceDeviceId] = useState("");
+  const requestRef = useRef<{ deviceId: string; controller: AbortController; timer: number } | null>(null);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const request = requestRef.current;
+      requestRef.current = null;
+      if (request) { window.clearTimeout(request.timer); request.controller.abort(); }
+    };
+  }, []);
+  const refresh = useMemo(() => () => {
+    const deviceId = deviceIdRef.current;
+    if (!deviceId || requestRef.current?.deviceId === deviceId) return;
+    const previous = requestRef.current;
+    if (previous) { window.clearTimeout(previous.timer); previous.controller.abort(); }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(new Error("Máy chủ phản hồi quá thời gian. Chọn Thử lại để tải bảng giám sát.")), 15_000);
+    const request = { deviceId, controller, timer };
+    requestRef.current = request;
+    attemptedDeviceRef.current = deviceId;
+    setLoading(true);
+    setError("");
+    if (loadedDeviceRef.current !== deviceId) setOverview(null);
+    const isCurrent = () => mountedRef.current && requestRef.current === request && deviceIdRef.current === deviceId;
+    let onAbort: () => void;
+    const aborted = new Promise<never>((_resolve, reject) => {
+      onAbort = () => reject(controller.signal.reason);
+      controller.signal.addEventListener("abort", onAbort, { once: true });
+    });
+    // Include credential storage/signing in the deadline, not just HTTP fetch.
+    Promise.race([loadTeacherOverview(deviceId, controller.signal), aborted])
+      .then((data) => { if (isCurrent()) { loadedDeviceRef.current = deviceId; setOverview(data); } })
+      .catch((caught) => { if (isCurrent()) setError(caught instanceof Error ? caught.message : "Không thể tải dữ liệu Giảng viên."); })
+      .finally(() => {
+        window.clearTimeout(timer);
+        controller.signal.removeEventListener("abort", onAbort);
+        if (isCurrent()) { requestRef.current = null; setLoading(false); }
+      });
+  }, []);
   const submitAction = useMemo<SubmitTeacherAction>(() => async (draft, payload) => { const deviceId = deviceIdRef.current; if (!deviceId) throw new Error("Chưa xác định được thiết bị Giảng viên."); await saveTeacherAction(deviceId, draft, payload); }, []);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -193,8 +234,110 @@ export default function TeacherRoleShell() {
   }, [selectedClass]);
   useEffect(() => { const onRosterChanged = () => refresh(); window.addEventListener("boi-ech:teacher-roster-changed", onRosterChanged); return () => window.removeEventListener("boi-ech:teacher-roster-changed", onRosterChanged); }, [refresh]);
   useEffect(() => { const onRefreshRequested = () => refresh(); window.addEventListener("boi-ech:teacher-refresh", onRefreshRequested); return () => window.removeEventListener("boi-ech:teacher-refresh", onRefreshRequested); }, [refresh]);
-  useEffect(() => { if (window.location.pathname !== "/") return; let timer = 0; let dashboardNode: HTMLElement | null = null; let navNode: HTMLElement | null = null; let searchNode: HTMLElement | null = null;
-    const sync = () => { timer = 0; const shell = document.querySelector<HTMLElement>(".app-shell"); const role = shell?.dataset.personRole || text(document.querySelector(".learner-chip small")); const isTeacher = Boolean(shell && (role === "teacher" || role === "Giảng viên")); setActive(isTeacher); if (!isTeacher || !shell) { delete document.body.dataset.teacherRoleUi; return; } document.body.dataset.teacherRoleUi = "active"; const main = shell.querySelector<HTMLElement>(".main-area"); const sidebar = shell.querySelector<HTMLElement>(".sidebar"); const topbar = main?.querySelector<HTMLElement>(":scope > .topbar"); if (!main || !sidebar || !topbar) return; if (!dashboardNode) { dashboardNode = document.createElement("div"); dashboardNode.className = "teacher-role-dashboard-mount"; dashboardNode.dataset.teacherRoleUi = "mount"; topbar.insertAdjacentElement("afterend", dashboardNode); setDashboardMount(dashboardNode); } if (!navNode) { navNode = document.createElement("div"); navNode.className = "teacher-role-nav-mount"; navNode.dataset.teacherRoleUi = "mount"; sidebar.querySelector(".brand-row")?.insertAdjacentElement("afterend", navNode); setNavMount(navNode); } if (!searchNode) { searchNode = document.createElement("div"); searchNode.className = "teacher-role-search-mount"; searchNode.dataset.teacherRoleUi = "mount"; const actions = topbar.querySelector(".topbar-actions"); if (actions) topbar.insertBefore(searchNode, actions); else topbar.append(searchNode); setSearchMount(searchNode); } const chip = document.querySelector<HTMLElement>(".learner-chip"); const title = chip?.getAttribute("title") ?? ""; const code = title.includes("·") ? title.split("·").slice(1).join("·").trim() : ""; const candidate = code && /^[a-f0-9]{64}$/i.test(code) ? code : ""; const stateDeviceId = shell.getAttribute("data-device-id") ?? ""; deviceIdRef.current = stateDeviceId || candidate; if (!deviceIdRef.current) { readStoredDeviceCredential().then(async (credential) => { if (!credential?.publicKey) return; const canonical = JSON.stringify({ kty: credential.publicKey.kty, crv: credential.publicKey.crv, x: credential.publicKey.x, y: credential.publicKey.y }); const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)); deviceIdRef.current = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2,"0")).join(""); if (loadedDeviceRef.current !== deviceIdRef.current) refresh(); }).catch(() => undefined); } else if (loadedDeviceRef.current !== deviceIdRef.current && !loading) refresh(); };
-    const schedule = () => { if (!timer) timer = window.setTimeout(sync, 0); }; schedule(); const observer = new MutationObserver((mutations) => { if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-teacher-role-ui]"))) return; schedule(); }); observer.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["class","title"] }); return () => { if (timer) window.clearTimeout(timer); observer.disconnect(); dashboardNode?.remove(); navNode?.remove(); searchNode?.remove(); delete document.body.dataset.teacherRoleUi; }; }, [loading, refresh]);
-  if (!active) return null; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null; const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null; const dashboard = dashboardMount ? createPortal(<TeacherDashboard overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} selectedClass={selectedClass} setSelectedClass={setSelectedClass} refresh={refresh} query={query} submitAction={submitAction}/>, dashboardMount) : null; return <>{nav}{search}{dashboard}</>;
+  useEffect(() => {
+    if (window.location.pathname !== "/") return;
+    let timer = 0;
+    let disposed = false;
+    let resolvingCredential = false;
+    let dashboardNode: HTMLElement | null = null;
+    let navNode: HTMLElement | null = null;
+    let searchNode: HTMLElement | null = null;
+
+    const sync = () => {
+      timer = 0;
+      if (disposed) return;
+      const shell = document.querySelector<HTMLElement>(".app-shell");
+      const role = shell?.dataset.personRole || text(document.querySelector(".learner-chip small"));
+      const isTeacher = Boolean(shell && (role === "teacher" || role === "Giảng viên"));
+      setActive(isTeacher);
+      if (!isTeacher || !shell) {
+        const request = requestRef.current;
+        requestRef.current = null;
+        if (request) { window.clearTimeout(request.timer); request.controller.abort(); }
+        attemptedDeviceRef.current = "";
+        loadedDeviceRef.current = "";
+        deviceIdRef.current = "";
+        setWorkspaceDeviceId("");
+        setOverview(null);
+        setLoading(false);
+        delete document.body.dataset.teacherRoleUi;
+        return;
+      }
+      document.body.dataset.teacherRoleUi = "active";
+      const main = shell.querySelector<HTMLElement>(".main-area");
+      const sidebar = shell.querySelector<HTMLElement>(".sidebar");
+      const topbar = main?.querySelector<HTMLElement>(":scope > .topbar");
+      if (!main || !sidebar || !topbar) return;
+      if (!dashboardNode?.isConnected) {
+        dashboardNode = document.createElement("div");
+        dashboardNode.className = "teacher-role-dashboard-mount";
+        dashboardNode.dataset.teacherRoleUi = "mount";
+        topbar.insertAdjacentElement("afterend", dashboardNode);
+        setDashboardMount(dashboardNode);
+      }
+      if (!navNode?.isConnected) {
+        navNode = document.createElement("div");
+        navNode.className = "teacher-role-nav-mount";
+        navNode.dataset.teacherRoleUi = "mount";
+        sidebar.querySelector(".brand-row")?.insertAdjacentElement("afterend", navNode);
+        setNavMount(navNode);
+      }
+      if (!searchNode?.isConnected) {
+        searchNode = document.createElement("div");
+        searchNode.className = "teacher-role-search-mount";
+        searchNode.dataset.teacherRoleUi = "mount";
+        const actions = topbar.querySelector(".topbar-actions");
+        if (actions) topbar.insertBefore(searchNode, actions);
+        else topbar.append(searchNode);
+        setSearchMount(searchNode);
+      }
+      const title = document.querySelector<HTMLElement>(".learner-chip")?.getAttribute("title") ?? "";
+      const code = title.includes("·") ? title.split("·").slice(1).join("·").trim() : "";
+      const candidate = code && /^[a-f0-9]{64}$/i.test(code) ? code : "";
+      const nextDeviceId = shell.getAttribute("data-device-id") || candidate;
+      if (deviceIdRef.current && nextDeviceId && deviceIdRef.current !== nextDeviceId) {
+        setTab("overview");
+        setSelectedClass("");
+        setQuery("");
+      }
+      deviceIdRef.current = nextDeviceId;
+      setWorkspaceDeviceId(nextDeviceId);
+      if (deviceIdRef.current) {
+        if (attemptedDeviceRef.current !== deviceIdRef.current) refresh();
+      } else if (!resolvingCredential) {
+        resolvingCredential = true;
+        readStoredDeviceCredential().then(async (credential) => {
+          if (!credential?.publicKey || disposed) return;
+          const canonical = JSON.stringify({ kty: credential.publicKey.kty, crv: credential.publicKey.crv, x: credential.publicKey.x, y: credential.publicKey.y });
+          const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+          if (disposed || !shell.isConnected || document.querySelector(".app-shell") !== shell || (shell.dataset.personRole && shell.dataset.personRole !== "teacher")) return;
+          if (shell.getAttribute("data-device-id")) { schedule(); return; }
+          deviceIdRef.current = [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
+          setWorkspaceDeviceId(deviceIdRef.current);
+          if (attemptedDeviceRef.current !== deviceIdRef.current) refresh();
+        }).catch(() => undefined).finally(() => { resolvingCredential = false; });
+      }
+    };
+    const schedule = () => {
+      if (!disposed && !timer) timer = window.setTimeout(sync, 0);
+    };
+    schedule();
+    const observer = new MutationObserver((mutations) => {
+      // The body carries the active-role flag; it must not make every DOM node
+      // look like an owned portal and hide legitimate device/role transitions.
+      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-teacher-role-ui]:not(body)"))) return;
+      schedule();
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "title", "data-device-id", "data-person-role"] });
+    return () => {
+      disposed = true;
+      if (timer) window.clearTimeout(timer);
+      observer.disconnect();
+      dashboardNode?.remove();
+      navNode?.remove();
+      searchNode?.remove();
+      delete document.body.dataset.teacherRoleUi;
+    };
+  }, [refresh]);
+  if (!active) return null; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null; const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null; const dashboard = dashboardMount ? createPortal(<TeacherDashboard key={workspaceDeviceId} overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} selectedClass={selectedClass} setSelectedClass={setSelectedClass} refresh={refresh} query={query} submitAction={submitAction}/>, dashboardMount) : null; return <>{nav}{search}{dashboard}</>;
 }
