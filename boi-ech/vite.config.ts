@@ -19,6 +19,8 @@ const localVars = [
   if (value) values[key] = value;
   return values;
 }, {});
+// Include the gate in the generated Worker config, not only the migration config.
+localVars.BOI_ECH_ACCESS_MODE = process.env.BOI_ECH_ACCESS_MODE || "managed";
 
 const localBindingConfig = {
   main: "./worker/index.ts",

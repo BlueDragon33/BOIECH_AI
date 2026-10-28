@@ -1,6 +1,23 @@
 # Shared Development / Release Policy
 
-## Default now: Development Live Mode
+## Current owner direction: managed Cloudflare production
+
+The owner requested one official Cloudflare deployment and reliable managed
+device approval on 2026-10-28. For Bơi ếch this supersedes the development defaults
+below: remote origins always use signed device identity and the existing approval
+policy. Production builds carry `BOI_ECH_ACCESS_MODE=managed` in the generated
+Worker artifact. Do not revert production to standalone after this repair.
+
+`deploy-cloudflare.yml` is the single production publishing workflow. It requires
+`DEPLOY_PRODUCTION`, release checks, the verified production D1 binding, and live
+device authentication smoke checks. The former main-push development publisher
+is retired; pushing or merging code does not itself authorize publication.
+
+Standalone execution remains available for local hosts with standalone mode.
+Local sample identities must be unique per browser key. No existing learner,
+payment, block, expiry, or automation settings are reset by this repair.
+
+## Historical Development Live Mode defaults
 
 This repository is in the shared BlueDragon33 Development Live Mode.
 
@@ -37,6 +54,6 @@ At release time:
 6. Deploy using the protected Release/Production workflow.
 7. Run post-deploy smoke/read-back checks.
 8. Record the release revision/version.
-9. Return to Development Live Mode unless instructed otherwise.
+9. Retain the owner-selected managed Cloudflare production mode for Bơi ếch.
 
 The Release workflow must remain available even while Development Live Mode is the default.

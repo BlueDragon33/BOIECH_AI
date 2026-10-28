@@ -4,7 +4,7 @@
   "compatibility_date": "2026-08-26",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "BOI_ECH_ACCESS_MODE": "standalone"
+    "BOI_ECH_ACCESS_MODE": "managed"
   },
   "d1_databases": [
     {

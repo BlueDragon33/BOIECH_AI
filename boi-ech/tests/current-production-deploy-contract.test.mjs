@@ -3,6 +3,16 @@ import fs from "node:fs";
 import test from "node:test";
 
 const manual = fs.readFileSync(new URL("../../.github/workflows/deploy-cloudflare.yml", import.meta.url), "utf8");
+const legacy = fs.readFileSync(new URL("../../.github/workflows/live-development-deploy.yml", import.meta.url), "utf8");
+const vite = fs.readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
+
+test("production artifacts carry managed mode and deploy verifies device authentication", () => {
+  assert.match(vite, /localVars\.BOI_ECH_ACCESS_MODE = process\.env\.BOI_ECH_ACCESS_MODE \|\| "managed"/);
+  assert.match(manual, /BOI_ECH_ACCESS_MODE: managed/);
+  assert.match(manual, /vars\?\.BOI_ECH_ACCESS_MODE !== 'managed'/);
+  assert.match(manual, /node scripts\/verify-device-auth-live\.mjs/);
+  assert.doesNotMatch(legacy, /\bpush\s*:|wrangler deploy|CLOUDFLARE_API_TOKEN/);
+});
 
 test("manual production build uses the proven production D1 binding path", () => {
   assert.match(manual, /workflow_dispatch:/);
