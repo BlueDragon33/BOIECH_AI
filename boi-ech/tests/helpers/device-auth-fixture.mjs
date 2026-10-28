@@ -39,7 +39,7 @@ export function fixture(mode, migrated = false) {
     .replace(/import \{ getChatGPTUser \} from "\.\/chatgpt-auth";/, "")
     .replace('await import("cloudflare:workers")', "testWorkers")
     .replace(/\bexport\s+/g, "");
-  const authNames = ["DeviceAccessError", "createDeviceChallenge", "deviceErrorResponse", "getCourseDatabase", "getPublicDeviceState", "registerDevice", "saveDeviceRegistration", "verifyDeviceIdentityRequest", "verifyDeviceRequest"];
+  const authNames = ["DeviceAccessError", "accessExpiryAfterDays", "getAccessAutomationSettings", "normalizeAccessExpiry", "createDeviceChallenge", "deviceErrorResponse", "getCourseDatabase", "getPublicDeviceState", "registerDevice", "saveDeviceRegistration", "verifyDeviceIdentityRequest", "verifyDeviceRequest"];
   const auth = new Function("testWorkers", "getChatGPTUser", `${authSource}; return {${authNames.join(",")}};`)({ env: { DB: database } }, async () => null);
   const routeSource = stripTypeScriptTypes(fs.readFileSync(new URL("../../app/api/device/route.ts", import.meta.url), "utf8"))
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*"[^"]+";/g, "")
