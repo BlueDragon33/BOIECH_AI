@@ -3,6 +3,7 @@ import { COURSE_LESSON_NUMBERS } from "../../../course-content.server";
 import { LESSON_PARTS, courseProgressKey, normalizeCompletedProgress } from "../../../course-logic";
 import {
   accessExpiryAfterDays,
+  DeviceAccessError,
   deviceErrorResponse,
   getAccessAutomationSettings,
   getCourseDatabase,
@@ -499,6 +500,16 @@ export async function POST(request: Request) {
     }>();
     if (!current) return respond({ error: "Không tìm thấy thiết bị." }, 404);
 
+    if (payload.expectedStatus !== undefined || payload.expectedPaymentStatus !== undefined || payload.expectedAccessGroup !== undefined) {
+      if (!["pending", "approved", "blocked"].includes(String(payload.expectedStatus))
+        || typeof payload.expectedPaymentStatus !== "string" || typeof payload.expectedAccessGroup !== "string") {
+        return respond({ error: "Cần đầy đủ trạng thái dự kiến để thay đổi quyền.", code: "INVALID_EXPECTED_STATE" }, 400);
+      }
+      if (payload.expectedStatus !== current.status || payload.expectedPaymentStatus !== current.payment_status || payload.expectedAccessGroup !== current.access_group) {
+        return respond({ error: "Trạng thái thiết bị đã thay đổi. Hãy đồng bộ lại.", code: "DEVICE_STATE_CONFLICT" }, 409);
+      }
+    }
+
     if (action === "delete-spam-device") {
       if (role !== "owner") {
         return respond({ error: "Chỉ Chủ hệ thống mới được xóa vĩnh viễn thiết bị rác." }, 403);
@@ -570,6 +581,18 @@ export async function POST(request: Request) {
       });
     }
 
+    // Compare-and-swap at the owning database protects central decisions.
+    const snapshotGuard = " AND status = ? AND payment_status = ? AND access_group = ? AND payment_proof_key IS ? AND access_expires_at IS ?";
+    const snapshotValues = [current.status, current.payment_status, current.access_group, current.payment_proof_key, current.access_expires_at];
+    function guardedUpdate(sql: string, values: unknown[]) {
+      return database.prepare(sql + snapshotGuard).bind(...values, ...snapshotValues);
+    }
+    async function updateDevice(sql: string, ...values: unknown[]) {
+      const result = await guardedUpdate(sql, values).run();
+      if (result.meta.changes !== 1) throw new DeviceAccessError("Trạng thái thiết bị đã thay đổi. Hãy đồng bộ lại.", 409, "DEVICE_STATE_CONFLICT");
+      return result;
+    }
+
     const registrationComplete = Boolean(current.learner_name?.trim() && current.person_role && current.person_code?.trim() && current.class_name?.trim() && current.phone?.trim() && current.registration_submitted_at);
     if (["grant-free", "require-payment", "verify-payment"].includes(action) && !registrationComplete) {
       return respond({ error: "Thiết bị chưa gửi đủ vai trò, mã định danh, họ tên, lớp và số điện thoại." }, 409);
@@ -582,26 +605,28 @@ export async function POST(request: Request) {
         return respond({ error: "Tài khoản đã xác minh thanh toán, không thể chuyển ngược sang miễn phí." }, 409);
       }
       const automation = await getAccessAutomationSettings();
-      await database.prepare(
+      await updateDevice(
         `UPDATE device_access SET status = 'approved', access_group = 'free', payment_status = 'free_approved',
                 approved_at = CURRENT_TIMESTAMP, blocked_at = NULL, payment_verified_at = NULL,
                 payment_rejected_at = NULL, payment_review_note = NULL,
                 access_expires_at = COALESCE(access_expires_at, ?), updated_at = CURRENT_TIMESTAMP
           WHERE device_id = ?`,
-      ).bind(accessExpiryAfterDays(automation.defaultAccessDays), deviceId).run();
+        accessExpiryAfterDays(automation.defaultAccessDays), deviceId
+      );
       auditAction = "learning_device_free_approved";
     } else if (action === "require-payment") {
       if (current.access_group !== "unassigned") {
         return respond({ error: "Thiết bị đã được phân nhóm; không thể tự đổi luồng thanh toán." }, 409);
       }
-      await database.prepare(
+      await updateDevice(
         `UPDATE device_access SET status = 'pending', access_group = 'paid',
                 payment_status = CASE WHEN payment_proof_key IS NULL THEN 'awaiting_payment' ELSE 'proof_submitted' END,
                 approved_at = NULL, blocked_at = NULL, payment_verified_at = NULL,
                 personal_edit_enabled = 0, auto_confirmed_at = NULL, access_expires_at = NULL,
                 payment_rejected_at = NULL, payment_review_note = NULL, updated_at = CURRENT_TIMESTAMP
           WHERE device_id = ?`,
-      ).bind(deviceId).run();
+        deviceId
+      );
       auditAction = "learning_device_payment_required";
     } else if (action === "verify-payment") {
       if (current.access_group !== "paid" || current.payment_status !== "proof_submitted" || !current.payment_proof_key) {
@@ -612,12 +637,13 @@ export async function POST(request: Request) {
       if (!Number.isInteger(paidAccessDays) || paidAccessDays < 1 || paidAccessDays > 365) {
         return respond({ error: "Thời hạn tài khoản trả phí phải từ 1 đến 365 ngày." }, 400);
       }
-      await database.prepare(
+      await updateDevice(
         `UPDATE device_access SET status = 'approved', access_group = 'paid', payment_status = 'paid_verified',
                 approved_at = CURRENT_TIMESTAMP, payment_verified_at = CURRENT_TIMESTAMP, blocked_at = NULL,
                 access_expires_at = ?, payment_rejected_at = NULL, payment_review_note = NULL, updated_at = CURRENT_TIMESTAMP
           WHERE device_id = ?`,
-      ).bind(accessExpiryAfterDays(paidAccessDays), deviceId).run();
+        accessExpiryAfterDays(paidAccessDays), deviceId
+      );
       await database.prepare(
         `UPDATE payment_reviews SET status = 'verified', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
                 review_note = NULL
@@ -632,22 +658,24 @@ export async function POST(request: Request) {
       const note = typeof payload.note === "string" ? payload.note.trim().slice(0, 500) : "";
       if (note.length < 5) return respond({ error: "Hãy ghi rõ lý do để người học biết cần sửa gì." }, 400);
       const previousProofKey = current.payment_proof_key;
-      await database.batch([
-        database.prepare(
+      const rejected = await database.batch([
+        guardedUpdate(
           `UPDATE device_access SET status = 'pending', payment_status = 'awaiting_payment',
                   payment_proof_key = NULL, payment_proof_name = NULL,
                   payment_proof_content_type = NULL, payment_proof_size = NULL,
                   payment_submitted_at = NULL, payment_verified_at = NULL,
                   payment_rejected_at = CURRENT_TIMESTAMP, payment_review_note = ?,
                   updated_at = CURRENT_TIMESTAMP WHERE device_id = ?`,
-        ).bind(note, deviceId),
+          [note, deviceId],
+        ),
         database.prepare(
           `UPDATE payment_reviews SET status = 'rejected', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
                   review_note = ?
-            WHERE id = (SELECT id FROM payment_reviews WHERE device_id = ? AND status = 'submitted'
+            WHERE changes() = 1 AND id = (SELECT id FROM payment_reviews WHERE device_id = ? AND status = 'submitted'
                          AND proof_key = ? ORDER BY submitted_at DESC LIMIT 1)`,
         ).bind(actor, note, deviceId, previousProofKey),
       ]);
+      if (rejected[0].meta.changes !== 1) throw new DeviceAccessError("Trạng thái thiết bị đã thay đổi. Hãy đồng bộ lại.", 409, "DEVICE_STATE_CONFLICT");
       const bucket = await paymentBucket();
       if (bucket) await bucket.delete(previousProofKey).catch(() => undefined);
       auditAction = "learning_device_payment_rejected";
@@ -663,19 +691,21 @@ export async function POST(request: Request) {
       const automation = await getAccessAutomationSettings();
       if (enabled) {
         const keepPaid = current.payment_status === "paid_verified";
-        await database.prepare(
-          `UPDATE device_access SET status = 'approved',
+        await updateDevice(
+        `UPDATE device_access SET status = 'approved',
                   access_group = CASE WHEN ? THEN access_group ELSE 'free' END,
                   payment_status = CASE WHEN ? THEN payment_status ELSE 'free_approved' END,
                   personal_edit_enabled = 1, auto_confirmed_at = CURRENT_TIMESTAMP,
                   access_expires_at = ?, approved_at = CURRENT_TIMESTAMP, blocked_at = NULL,
                   updated_at = CURRENT_TIMESTAMP WHERE device_id = ?`,
-        ).bind(keepPaid ? 1 : 0, keepPaid ? 1 : 0, accessExpiryAfterDays(automation.defaultAccessDays), deviceId).run();
+        keepPaid ? 1 : 0, keepPaid ? 1 : 0, accessExpiryAfterDays(automation.defaultAccessDays), deviceId
+      );
         auditAction = "learning_device_personal_edit_enabled";
       } else {
-        await database.prepare(
-          "UPDATE device_access SET personal_edit_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
-        ).bind(deviceId).run();
+        await updateDevice(
+        "UPDATE device_access SET personal_edit_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
+        deviceId
+      );
         auditAction = "learning_device_personal_edit_disabled";
       }
     } else if (action === "renew-access") {
@@ -686,26 +716,33 @@ export async function POST(request: Request) {
       }
       const automation = await getAccessAutomationSettings();
       const keepPaid = current.payment_status === "paid_verified";
-      await database.prepare(
+      await updateDevice(
         `UPDATE device_access SET status = 'approved',
                 access_group = CASE WHEN ? THEN access_group ELSE 'free' END,
                 payment_status = CASE WHEN ? THEN payment_status ELSE 'free_approved' END,
                 access_expires_at = ?, approved_at = CURRENT_TIMESTAMP, blocked_at = NULL,
                 updated_at = CURRENT_TIMESTAMP WHERE device_id = ?`,
-      ).bind(keepPaid ? 1 : 0, keepPaid ? 1 : 0, accessExpiryAfterDays(automation.defaultAccessDays), deviceId).run();
+        keepPaid ? 1 : 0, keepPaid ? 1 : 0, accessExpiryAfterDays(automation.defaultAccessDays), deviceId
+      );
       auditAction = "learning_device_access_renewed";
     } else if (action === "block") {
-      await database.prepare(
-        "UPDATE device_access SET status = 'blocked', blocked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
-      ).bind(deviceId).run();
+      const changed = await updateDevice(
+        `UPDATE device_access SET status = 'blocked', blocked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+          WHERE device_id = ? AND status = ? AND payment_status = ? AND access_group = ?`,
+        deviceId, current.status, current.payment_status, current.access_group
+      );
+      if (changed.meta.changes !== 1) return respond({ error: "Trạng thái thiết bị đã thay đổi. Hãy đồng bộ lại.", code: "DEVICE_STATE_CONFLICT" }, 409);
       auditAction = "learning_device_block";
     } else if (action === "unblock") {
+      if (current.status !== "blocked") return respond({ error: "Thiết bị không còn bị khóa.", code: "DEVICE_STATE_CONFLICT" }, 409);
       const canOpen = current.payment_status === "free_approved" || current.payment_status === "paid_verified";
-      await database.prepare(
+      const changed = await updateDevice(
         `UPDATE device_access SET status = ?, blocked_at = NULL,
                 approved_at = CASE WHEN ? = 'approved' THEN CURRENT_TIMESTAMP ELSE approved_at END,
-                updated_at = CURRENT_TIMESTAMP WHERE device_id = ?`,
-      ).bind(canOpen ? "approved" : "pending", canOpen ? "approved" : "pending", deviceId).run();
+                updated_at = CURRENT_TIMESTAMP WHERE device_id = ? AND status = ? AND payment_status = ? AND access_group = ?`,
+        canOpen ? "approved" : "pending", canOpen ? "approved" : "pending", deviceId, current.status, current.payment_status, current.access_group
+      );
+      if (changed.meta.changes !== 1) return respond({ error: "Trạng thái thiết bị đã thay đổi. Hãy đồng bộ lại.", code: "DEVICE_STATE_CONFLICT" }, 409);
       auditAction = "learning_device_unblocked";
     } else if (action === "profile") {
       const learnerFamilyName = normalizedNamePart(payload.learnerFamilyName, 60);
@@ -720,10 +757,11 @@ export async function POST(request: Request) {
       const storedGivenName = usesSplitName ? learnerGivenName : current.learner_given_name;
       const label = typeof payload.label === "string" ? payload.label.trim().slice(0, 80) : "";
       const accessExpiresAt = normalizeAccessExpiry(payload.accessExpiresAt);
-      await database.prepare(
+      await updateDevice(
         `UPDATE device_access SET learner_name = ?, learner_family_name = ?, learner_given_name = ?,
                 label = ?, access_expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?`,
-      ).bind(learnerName || null, storedFamilyName || null, storedGivenName || null, label || null, accessExpiresAt, deviceId).run();
+        learnerName || null, storedFamilyName || null, storedGivenName || null, label || null, accessExpiresAt, deviceId
+      );
       auditAction = "learning_device_profile";
     } else if (action === "reset-progress") {
       await database.prepare(
