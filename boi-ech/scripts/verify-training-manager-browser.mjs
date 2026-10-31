@@ -22,7 +22,7 @@ async function person(role,code,given){
  const {device}=await post({action:"register",publicKey});
  const {challenge}=await post({action:"challenge",deviceId:device.deviceId});
  const signature=Buffer.from(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key.privateKey,new TextEncoder().encode("boi-ech:"+device.deviceId+":"+challenge))).toString("base64url");
- const saved=await post({action:"save-registration",deviceId:device.deviceId,challenge,signature,personRole:role,personCode:code,learnerFamilyName:"QA",learnerGivenName:given,className:"Chờ phân công",phone:"0900000001"});
+ const saved=await post({action:"save-registration",deviceId:device.deviceId,challenge,signature,personRole:role,personCode:code,learnerFamilyName:"QA",learnerGivenName:given,className:"Chờ phân công",phone:({QATEACHER:"0900000002",QALEARNER1:"0900000003",QALEARNER2:"0900000004"})[code]});
  return saved.device;
 }
 let browser,page;
