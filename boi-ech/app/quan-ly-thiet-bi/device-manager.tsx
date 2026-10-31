@@ -8,7 +8,7 @@ type Device = {
   deviceId: string; deviceCode: string; status: "pending" | "approved" | "blocked";
   deviceType: DeviceType; detectedDeviceType: DeviceType; deviceTypeOverride: DeviceType | null;
   platform: string | null; browser: string | null; label: string | null;
-  learnerName: string | null; personRole: "learner" | "teacher" | null; className: string | null; teacherClasses: string[]; phone: string | null; registrationComplete: boolean;
+  learnerName: string | null; personRole: "learner" | "manager" | "teacher" | null; className: string | null; teacherClasses: string[]; phone: string | null; registrationComplete: boolean;
   createdAt: string; lastSeenAt: string; completedLessons: number; completedSteps: number;
 };
 type DeviceResponse = { devices?: Device[]; error?: string };
@@ -117,7 +117,7 @@ export default function DeviceManager() {
               <small>Ngăn cách nhiều lớp bằng dấu chấm phẩy hoặc xuống dòng.</small>
             </label> : null}
           </div>
-          <dl><div><dt>Thiết bị hiệu lực</dt><dd>{typeLabels[device.deviceType]} · {device.platform || "Nền tảng chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}</dd></div><div><dt>Nguồn phân loại</dt><dd>{device.deviceTypeOverride ? "Quản trị ghi đè" : `Tự động · ${typeLabels[device.detectedDeviceType]}`}</dd></div><div><dt>Vai trò</dt><dd>{device.personRole === "teacher" ? "Giảng viên" : "Học viên"}</dd></div><div><dt>Người dùng</dt><dd>{device.learnerName || "Chưa gửi"}</dd></div><div><dt>Lớp / SĐT</dt><dd>{device.className || "—"} · {device.phone || "—"}</dd></div><div><dt>Yêu cầu lúc</dt><dd>{formatDate(device.createdAt)}</dd></div><div><dt>Hoạt động gần nhất</dt><dd>{formatDate(device.lastSeenAt)}</dd></div><div><dt>Tiến độ</dt><dd>{device.completedLessons}/8 bài · {device.completedSteps} mốc</dd></div></dl>
+          <dl><div><dt>Thiết bị hiệu lực</dt><dd>{typeLabels[device.deviceType]} · {device.platform || "Nền tảng chưa rõ"} · {device.browser || "Trình duyệt chưa rõ"}</dd></div><div><dt>Nguồn phân loại</dt><dd>{device.deviceTypeOverride ? "Quản trị ghi đè" : `Tự động · ${typeLabels[device.detectedDeviceType]}`}</dd></div><div><dt>Vai trò</dt><dd>{device.personRole === "manager" ? "Cán bộ quản lý" : device.personRole === "teacher" ? "Giảng viên" : "Học viên"}</dd></div><div><dt>Người dùng</dt><dd>{device.learnerName || "Chưa gửi"}</dd></div><div><dt>Lớp / SĐT</dt><dd>{device.className || "—"} · {device.phone || "—"}</dd></div><div><dt>Yêu cầu lúc</dt><dd>{formatDate(device.createdAt)}</dd></div><div><dt>Hoạt động gần nhất</dt><dd>{formatDate(device.lastSeenAt)}</dd></div><div><dt>Tiến độ</dt><dd>{device.completedLessons}/8 bài · {device.completedSteps} mốc</dd></div></dl>
         </div>
         <div className="device-admin-actions"><button onClick={() => void act("label", device.deviceId)}>Lưu tên</button><button onClick={() => void act("device-type", device.deviceId)}>Lưu phân loại</button>{device.personRole === "teacher" ? <button onClick={() => void act("teacher-classes", device.deviceId)}>Lưu lớp phụ trách</button> : null}{device.status !== "approved" ? <button className="approve" disabled={!device.registrationComplete} onClick={() => void act("approve", device.deviceId)}>Cấp quyền miễn phí</button> : null}{device.status !== "blocked" ? <button className="block" onClick={() => void act("block", device.deviceId)}>Khóa thiết bị</button> : null}</div>
       </article>)}
