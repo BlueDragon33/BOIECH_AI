@@ -99,7 +99,7 @@ try{
  const {device:manager}=await savedResponse.json();assert.equal(manager.personRole,"manager");assert.equal(manager.managementEnabled,false);
  checks.push("Actual browser registration: exact role order; manager registration grants no management permission.");
  await person("teacher","QATEACHER","Teacher");
- await person("learner","QALEARNER1","Learner1");await person("learner","QALEARNER2","Learner2");
+ await person("learner","QALEARNER1","LearnerOne");await person("learner","QALEARNER2","LearnerTwo");
  sql("UPDATE device_access SET status='approved',access_group='free',payment_status='free',access_expires_at='2035-01-01T00:00:00Z' WHERE person_code IN ('QAMANAGER','QATEACHER','QALEARNER1','QALEARNER2');");
  await enter();
  await expect(page.getByRole("status")).toContainText("Owner",{timeout:30000});
@@ -121,7 +121,7 @@ try{
  let board=await resource("Lớp học","+ Thêm lớp","QA A",2);
  assert.equal(board.resources.find(x=>x.kind==="class").remaining,2);
  await nav.getByRole("button",{name:"Nhân sự",exact:true}).click();
- for(const name of ["QA Teacher","QA Learner1","QA Learner2"]){
+ for(const name of ["QA Teacher","QA LearnerOne","QA LearnerTwo"]){
   const card=page.getByRole("article").filter({has:page.getByRole("heading",{name,exact:true})});
   await card.getByRole("button",{name:name==="QA Teacher"?"Phân công lớp":"Phân lớp",exact:true}).click();
   await page.getByRole("checkbox",{name:/QA A/}).check();
