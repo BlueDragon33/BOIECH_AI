@@ -40,8 +40,9 @@ async function mutate(action,operation,status=200){
  return value.board||value;
 }
 async function select(label,text){
- const field=page.getByLabel(label,{exact:true});
- const option=field.getByRole("option").filter({hasText:text}).first();
+ const field=page.locator("label").filter({hasText:new RegExp("^\\s*"+label)}).locator("select");
+ await expect(field).toHaveCount(1);
+ const option=field.locator("option").filter({hasText:text}).first();
  const value=await option.getAttribute("value");assert.ok(value);await field.selectOption(value);
 }
 async function photograph(name,contrast=true){
@@ -142,7 +143,7 @@ try{
  await expect(page.getByRole("alert")).toContainText("Trùng lịch");await expect(page.getByLabel("Tên buổi học",{exact:true})).toHaveValue("QA Overlap");
  await photograph("conflict-draft-mobile");await page.getByRole("button",{name:"Hủy chỉnh sửa",exact:true}).click();
  const card=page.getByRole("article").filter({has:page.getByRole("heading",{name:"QA Session",exact:true})});
- await card.getByRole("button",{name:"Đổi lịch / trạng thái",exact:true}).click();await page.getByLabel("Trạng thái",{exact:true}).selectOption("cancelled");
+ await card.getByRole("button",{name:"Đổi lịch / trạng thái",exact:true}).click();await select("Trạng thái","Đã hủy");
  board=await mutate("save-session",()=>page.getByRole("button",{name:"Lưu và xác minh",exact:true}).click());
  assert.equal(board.summary.freeRooms,1);assert.equal(board.summary.occupiedRooms,0);
  checks.push("Real local backend: scheduled room occupied; overlap returns 409 with retained draft; cancelling returns the room to available.");
@@ -160,5 +161,5 @@ try{
  checks.push("Six actual rendered manager views at desktop/mobile widths and both system color schemes: no horizontal overflow; final computed/composited text contrast checked including all five labeled state colors.");
  fs.writeFileSync("qa-artifacts/training-local-preview-report.json",JSON.stringify({schema:"training-manager.local-worker-acceptance/v1",sourceRevision:process.env.GITHUB_SHA,passed:true,checks,samples,physicalIOS:"not-performed",realCloudflareD1:"not-performed",humanOwnerMFA:"not-performed",scope:"Built application Worker, isolated local D1, real signed APIs and actual rendered UI; no provider credential or production data."},null,2));
  console.log(JSON.stringify({passed:true,checks:checks.length,renderedSamples:samples.length,productionWrites:false}));
-}catch(error){if(page)await page.screenshot({path:"qa-artifacts/failure.png",fullPage:true}).catch(()=>{});console.error(error);process.exitCode=1;}
+}catch(error){if(page){await page.screenshot({path:"qa-artifacts/failure.png",fullPage:true}).catch(()=>{});const visibleText=await page.locator("body").innerText().catch(()=>"");const selects=await page.locator("select").evaluateAll(xs=>xs.map(x=>({label:x.closest("label")?.textContent,options:[...x.options].map(o=>({text:o.text,value:o.value}))}))).catch(()=>[]);fs.writeFileSync("qa-artifacts/failure-report.json",JSON.stringify({error:error.message,checks,visibleText:visibleText.slice(0,7000),selects,errors,samples},null,2));}console.error(error);process.exitCode=1;}
 finally{if(browser)await browser.close();server.kill("SIGTERM");fs.closeSync(output);}
