@@ -3,7 +3,9 @@
 /* Ảnh đã được tối ưu sẵn thành WebP cục bộ; giữ URL do máy chủ cấp. */
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import ManagerWorkspace from "./manager-workspace";
+import { RegistrationRoles } from "./registration-roles";
 import AiLearningHub, { type AiApiResponse } from "./ai-learning-hub";
 import LocalContentStudio from "./local-content-studio";
 import OfflineStudyCoach, { type OfflineStudyStats } from "./offline-study-coach";
@@ -390,7 +392,8 @@ type DeviceAccessState = {
   learnerName: string | null;
   learnerFamilyName: string | null;
   learnerGivenName: string | null;
-  personRole: "learner" | "teacher" | null;
+  personRole: "learner" | "manager" | "teacher" | null;
+  managementEnabled: boolean;
   personCode: string | null;
   className: string | null;
   phone: string | null;
@@ -420,7 +423,7 @@ type CourseCertificate = {
 type LearnerRegistrationFields = {
   learnerFamilyName: string;
   learnerGivenName: string;
-  personRole: "learner" | "teacher";
+  personRole: "learner" | "manager" | "teacher";
   personCode: string;
   className: string;
   phone: string;
@@ -540,9 +543,10 @@ async function registerDeviceCredential(credential: StoredDeviceCredential) {
   return data.device;
 }
 
-async function signedDeviceProof(credential: StoredDeviceCredential, device: DeviceAccessState) {
+async function signedDeviceProof(credential: StoredDeviceCredential, device: Pick<DeviceAccessState, "deviceId">, signal?: AbortSignal) {
   const challengeResponse = await fetch("/api/device", {
     method: "POST",
+    signal,
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "challenge", deviceId: device.deviceId }),
@@ -709,7 +713,7 @@ function DeviceGate({
   const legacyName = splitLegacyLearnerName(device?.learnerName);
   const [learnerFamilyName, setLearnerFamilyName] = useState(device?.learnerFamilyName ?? legacyName.learnerFamilyName);
   const [learnerGivenName, setLearnerGivenName] = useState(device?.learnerGivenName ?? legacyName.learnerGivenName);
-  const [personRole, setPersonRole] = useState<"learner" | "teacher">(device?.personRole === "teacher" ? "teacher" : "learner");
+  const [personRole, setPersonRole] = useState<"learner" | "manager" | "teacher">(device?.personRole === "manager" ? "manager" : device?.personRole === "teacher" ? "teacher" : "learner");
   const [personCode, setPersonCode] = useState(device?.personCode ?? "");
   const [className, setClassName] = useState(device?.className ?? "");
   const [phone, setPhone] = useState(device?.phone ?? "");
@@ -730,7 +734,7 @@ function DeviceGate({
     const knownName = splitLegacyLearnerName(device.learnerName);
     setLearnerFamilyName(device.learnerFamilyName ?? knownName.learnerFamilyName);
     setLearnerGivenName(device.learnerGivenName ?? knownName.learnerGivenName);
-    setPersonRole(device.personRole === "teacher" ? "teacher" : "learner");
+    setPersonRole(device.personRole === "manager" ? "manager" : device.personRole === "teacher" ? "teacher" : "learner");
     setPersonCode(device.personCode ?? "");
     setClassName(device.className ?? "");
     setPhone(device.phone ?? "");
@@ -774,24 +778,24 @@ function DeviceGate({
         <span className={`device-gate-status ${blocked ? "blocked" : expired ? "expired" : pending ? "pending" : "checking"}`}>
           {blocked ? "Thiết bị đã bị khóa" : expired ? "Quyền học đã hết hạn" : needsRegistration ? "Nhập thông tin người học" : readyToLearn ? "Thông tin đã được lưu" : paymentRequested ? "Bước 2 · Thanh toán" : pending ? "Đang chờ phân nhóm" : "Đang xác thực thiết bị"}
         </span>
-        <h1>{blocked ? "Website chưa thể mở trên thiết bị này." : expired ? "Tài khoản cần được quản trị viên gia hạn." : needsRegistration ? "Nhập thông tin người học." : readyToLearn ? `Sẵn sàng vào học, ${device?.learnerGivenName ?? "học viên"}.` : proofSubmitted ? "Ảnh chuyển khoản đã gửi." : paymentRequested ? "Tài khoản học tập: 50.000đ." : pending ? "Thông tin đã gửi tới Trung tâm quản trị." : "Đang kiểm tra quyền truy cập…"}</h1>
+        <h1>{blocked ? "Website chưa thể mở trên thiết bị này." : expired ? "Tài khoản cần được quản trị viên gia hạn." : needsRegistration ? "Đăng ký thông tin sử dụng." : readyToLearn ? `Sẵn sàng ${device?.personRole === "manager" ? "vào khu điều phối" : "vào học"}, ${device?.learnerGivenName ?? "bạn"}.` : proofSubmitted ? "Ảnh chuyển khoản đã gửi." : paymentRequested ? "Tài khoản học tập: 50.000đ." : pending ? "Thông tin đã gửi tới Trung tâm quản trị." : "Đang kiểm tra quyền truy cập…"}</h1>
         <p>{blocked ? "Liên hệ quản trị viên nếu cần mở lại quyền học." : expired ? `Quyền học hết hạn lúc ${device?.accessExpiresAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(device.accessExpiresAt)) : "—"}. Tiến độ đã lưu được giữ nguyên.` : needsRegistration ? "Thông tin được dùng để cá nhân hóa bài học, lưu tiến độ và cấp chứng chỉ hoàn thành." : readyToLearn ? "Thông tin đã được xác nhận. Thời gian và tiến độ học được tự động ghi nhận để đồng bộ với giảng viên." : proofSubmitted ? "Trung tâm sẽ kiểm tra ảnh. Ngay khi xác minh, tài khoản trên thiết bị này sẽ tự động mở." : paymentRequested ? "Quét mã QR MB, chuyển đúng 50.000đ rồi gửi ảnh chuyển khoản để Trung tâm xác minh." : pending ? "Quản trị viên sẽ chọn tài khoản miễn phí hoặc yêu cầu trả phí. Trang tự kiểm tra kết quả mà không cần nhập lại." : error || "Thiết bị đang ký thử thách bảo mật do máy chủ gửi."}</p>
         {device?.deviceCode ? (
           <div className="device-code-box"><span>Mã thiết bị</span><strong>{device.deviceCode}</strong><button onClick={() => void copyCode()}>{copied ? "Đã sao chép" : "Sao chép mã"}</button></div>
         ) : null}
         {needsRegistration ? (
           <form className="device-registration-form" onSubmit={(event) => void submitRegistration(event)}>
-            <fieldset className="person-role-field"><legend>Vai trò sử dụng</legend><div><label className={personRole === "learner" ? "selected" : ""}><input type="radio" name="person-role" value="learner" checked={personRole === "learner"} onChange={() => { setPersonRole("learner"); setPersonCode(""); }} /><span><b>Học viên</b><small>Học, làm bài và nhận chứng chỉ</small></span></label><label className={personRole === "teacher" ? "selected" : ""}><input type="radio" name="person-role" value="teacher" checked={personRole === "teacher"} onChange={() => { setPersonRole("teacher"); setPersonCode(""); }} /><span><b>Giảng viên</b><small>Có thể xin quyền chỉnh sửa bài giảng</small></span></label></div></fieldset>
+            <RegistrationRoles value={personRole} onChange={value => { setPersonRole(value); setPersonCode(""); }}/>
             <label><span>Họ</span><input value={learnerFamilyName} onChange={(event) => setLearnerFamilyName(event.target.value)} autoComplete="family-name" placeholder="Ví dụ: Nguyễn Đình" maxLength={60} required /></label>
             <label><span>Tên</span><input value={learnerGivenName} onChange={(event) => setLearnerGivenName(event.target.value)} autoComplete="given-name" placeholder="Ví dụ: Nam" maxLength={60} required /></label>
-            <label><span>{personRole === "teacher" ? "Số hiệu SQ/QNCN" : "Mã số học viên"}</span><input value={personCode} onChange={(event) => setPersonCode(event.target.value.toUpperCase())} autoComplete="off" placeholder={personRole === "teacher" ? "Ví dụ: SQ123456" : "Ví dụ: HV2026001"} maxLength={32} required /></label>
-            <label><span>{personRole === "teacher" ? "Lớp / đơn vị phụ trách" : "Lớp"}</span><input value={className} onChange={(event) => setClassName(event.target.value)} placeholder={personRole === "teacher" ? "Ví dụ: Đại đội 1" : "Ví dụ: 7A1"} maxLength={50} required /></label>
+            <label><span>{personRole !== "learner" ? "Số hiệu cán bộ / SQ / QNCN" : "Mã số học viên"}</span><input value={personCode} onChange={(event) => setPersonCode(event.target.value.toUpperCase())} autoComplete="off" placeholder={personRole === "teacher" ? "Ví dụ: SQ123456" : "Ví dụ: HV2026001"} maxLength={32} required /></label>
+            <label><span>{personRole === "manager" ? "Đơn vị công tác" : personRole === "teacher" ? "Lớp / đơn vị phụ trách" : "Lớp"}</span><input value={className} onChange={(event) => setClassName(event.target.value)} placeholder={personRole === "teacher" ? "Ví dụ: Đại đội 1" : "Ví dụ: 7A1"} maxLength={50} required /></label>
             <label><span>Số điện thoại</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="Ví dụ: 0912345678" maxLength={14} required /></label>
             <label className="device-code-field"><span>Mã thiết bị</span><input value={device?.deviceCode ?? ""} readOnly /></label>
-            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu và mở bài học…" : "Lưu thông tin & vào học"}</button>
+            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu thông tin…" : personRole === "manager" ? "Lưu thông tin & mở điều phối" : "Lưu thông tin & vào học"}</button>
           </form>
         ) : null}
-        {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>Vào học <span>→</span></button> : null}
+        {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>{device?.personRole === "manager" ? "Vào khu điều phối" : "Vào học"} <span>→</span></button> : null}
         {paymentRequested ? (
           <form className="device-payment-form" onSubmit={(event) => void submitPayment(event)}>
             {device?.paymentReviewNote ? <div className="payment-rejection" role="alert"><strong>Ảnh trước chưa được chấp nhận</strong><p>{device.paymentReviewNote}</p><small>Hãy kiểm tra lại thông tin chuyển khoản rồi gửi ảnh mới.</small></div> : null}
@@ -1180,7 +1184,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!hasEnteredLearning || !deviceCredential || deviceAccess?.status !== "approved" || deviceAccess.accessExpired) return;
+    if (deviceAccess?.personRole === "manager" || !hasEnteredLearning || !deviceCredential || deviceAccess?.status !== "approved" || deviceAccess.accessExpired) return;
     const credential = deviceCredential;
     const access = deviceAccess;
     const recordMinute = () => {
@@ -1250,7 +1254,7 @@ export default function Home() {
   }, [deviceAccess?.learnerGivenName, studyStats.lastReminderAt, studyStats.lastStudyAt, studyStats.reminderEnabled, studyStats.reminderMinutes]);
 
   useEffect(() => {
-    if (!ready || !hasEnteredLearning || !deviceCredential || deviceAccess?.status !== "approved") return;
+    if (deviceAccess?.personRole === "manager" || !ready || !hasEnteredLearning || !deviceCredential || deviceAccess?.status !== "approved") return;
     let cancelled = false;
     postCourse(deviceCredential, deviceAccess, {
       action: "bootstrap",
@@ -1732,6 +1736,12 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  const managerDeviceId = deviceAccess?.deviceId;
+  const managerProof = useCallback((signal?: AbortSignal) => {
+    if (!deviceCredential || !managerDeviceId) return Promise.reject(new Error("Không tìm thấy khóa thiết bị cán bộ quản lý."));
+    return signedDeviceProof(deviceCredential, { deviceId: managerDeviceId }, signal);
+  }, [deviceCredential, managerDeviceId]);
+
   if (!ready || deviceAccess?.status !== "approved" || !deviceAccess.registrationComplete || deviceAccess.accessExpired || !hasEnteredLearning) {
     return (
       <><DeviceGate
@@ -1745,6 +1755,8 @@ export default function Home() {
         />{installPrompt ? <InstallAppButton install={() => void installWebApp()} /> : null}</>
     );
   }
+
+  if (deviceAccess.personRole === "manager") return <ManagerWorkspace key={`${deviceAccess.deviceId}:${deviceAccess.managementEnabled ? 1 : 0}`} deviceId={deviceAccess.deviceId} getProof={managerProof}/>;
 
   return (
     <div
