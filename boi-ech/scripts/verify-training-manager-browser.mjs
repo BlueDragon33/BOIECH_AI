@@ -29,8 +29,8 @@ let browser,page;
 async function enter(){
  await page.reload({waitUntil:"domcontentloaded"});
  const button=page.getByRole("button",{name:/^Vào khu điều phối/});
- await button.waitFor({state:"visible",timeout:60000});
- await button.click();
+ await button.or(page.getByRole("heading",{name:"Cán bộ quản lý",exact:true})).first().waitFor({state:"visible",timeout:60000});
+ if(await button.isVisible()) await button.click();
 }
 async function mutate(action,operation,status=200){
  const wait=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/training-management"&&r.request().method()==="POST"&&r.request().postDataJSON()?.action===action,{timeout:30000});
