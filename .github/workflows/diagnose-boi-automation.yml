@@ -72,3 +72,38 @@ jobs:
       - name: Read Boi deployed Worker versions
         working-directory: boi-ech
         run: npx wrangler deployments list --name boi-ech --json --config wrangler.d1.jsonc
+
+      - name: Inspect database inventory and Worker bindings without data or secret values
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID.trim();
+          if(!/^[a-f0-9]{32}$/i.test(account)) throw new Error('Account identifier invalid');
+          const headers={authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN};
+          const get=async path=>{
+            const response=await fetch('https://api.cloudflare.com/client/v4/accounts/'+account+path,{headers,signal:AbortSignal.timeout(20000)});
+            if(!response.ok) throw new Error('Read-only Cloudflare API HTTP '+response.status);
+            const value=await response.json();
+            if(value.success!==true) throw new Error('Read-only API did not confirm success');
+            return value;
+          };
+          const raw=execFileSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','d1','list','--json','--config','wrangler.d1.jsonc'],{encoding:'utf8',timeout:60000});
+          const databases=JSON.parse(raw);
+          const scripts=await get('/workers/scripts');
+          if(!Array.isArray(databases)||!Array.isArray(scripts.result)) throw new Error('Inventory shape invalid');
+          const bindings=await Promise.allSettled(scripts.result.map(async worker=>{
+            const value=await get('/workers/scripts/'+encodeURIComponent(worker.id)+'/settings');
+            if(!Array.isArray(value.result?.bindings)) throw new Error('Worker bindings unavailable');
+            return {worker:worker.id,databases:value.result.bindings.filter(x=>x.type==='d1').map(x=>({binding:x.name,id:x.id}))};
+          }));
+          const bound=new Map();
+          const failures=[];
+          bindings.forEach((result,i)=>{
+            if(result.status==='rejected') failures.push(scripts.result[i].id);
+            else for(const database of result.value.databases){if(!bound.has(database.id)) bound.set(database.id,[]); bound.get(database.id).push(result.value.worker);}
+          });
+          const complete=failures.length===0&&!(scripts.result_info?.total_pages>1);
+          console.log('DATABASE_CAPACITY_REVIEW='+JSON.stringify({total:databases.length,workerBindingInventoryComplete:complete,unreadableWorkers:failures,databases:databases.map(x=>({name:x.name,uuid:x.uuid,numTables:x.num_tables,sizeBytes:x.file_size,workers:bound.get(x.uuid)||[]})),noDataExported:true,noDeletionAttempted:true}));
+          NODE
