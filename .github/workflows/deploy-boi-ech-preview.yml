@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "DEPLOY_PREVIEW — isolated training-manager acceptance only"
+        description: "VERIFY_LOCAL_PREVIEW — built Worker and isolated local D1 acceptance"
         required: true
         type: string
 
@@ -12,82 +12,60 @@ permissions:
   contents: read
 
 concurrency:
-  group: boi-ech-cloudflare-preview
+  group: training-local-worker-acceptance
   cancel-in-progress: false
 
 jobs:
-  deploy-preview:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'BlueDragon33' && inputs.confirm == 'DEPLOY_PREVIEW' }}
+  local-preview-acceptance:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'BlueDragon33' && inputs.confirm == 'VERIFY_LOCAL_PREVIEW' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    environment: boi-ech-production
+    timeout-minutes: 18
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BOI_ECH_ACCESS_MODE: managed
+      LOCAL_CONTROL_PLANE: "true"
+      APPLICATION_MANAGEMENT_ORIGIN: http://127.0.0.1:4173
       WRANGLER_SEND_METRICS: "false"
-      APPLICATION_MANAGEMENT_PREVIEW_ORIGIN: https://application-management-preview.boiech-ai.workers.dev
+      TZ: Europe/Moscow
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22.13.0"
-      - name: Install locked dependencies
+      - name: Install locked application dependencies
         working-directory: boi-ech
         run: npm ci --no-audit --no-fund
-      - name: Resolve and provision preview-only storage
+      - name: Create ephemeral loopback-only test fixture
         working-directory: boi-ech
         shell: bash
         run: |
           node --input-type=module <<'NODE'
+          import crypto from 'node:crypto';
           import fs from 'node:fs';
-          import { execFileSync } from 'node:child_process';
-          const env={...process.env,CLOUDFLARE_ACCOUNT_ID:process.env.CLOUDFLARE_ACCOUNT_ID.trim()};
-          const run=(...args)=>execFileSync(process.execPath,['node_modules/wrangler/bin/wrangler.js',...args,'--config','wrangler.d1.jsonc'],{env,encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});
-          const list=()=>JSON.parse(run('d1','list','--json'));
-          const production=JSON.parse(fs.readFileSync('wrangler.d1.jsonc','utf8')).d1_databases.find(item=>item.binding==='DB');
-          let databases=list();
-          if(!Array.isArray(databases)||databases.filter(item=>item.name==='boi-ech-db'&&item.uuid===production.database_id).length!==1) throw new Error('Production identity guard failed; no storage mutation attempted');
-          let matches=databases.filter(item=>item.name==='boi-ech-preview-db');
-          if(matches.length===0) { run('d1','create','boi-ech-preview-db','--update-config=false'); matches=list().filter(item=>item.name==='boi-ech-preview-db'); }
-          if(matches.length!==1||matches[0].uuid===production.database_id||!/^[-a-f0-9]{36}$/i.test(matches[0].uuid)) throw new Error('Isolated preview database guard failed');
-          const previewId=matches[0].uuid;
-          const buckets=run('r2','bucket','list');
-          if(!buckets.includes('boi-ech-preview-payments')) run('r2','bucket','create','boi-ech-preview-payments','--update-config=false');
-          fs.appendFileSync(process.env.GITHUB_ENV,'BOI_ECH_PREVIEW_D1_DATABASE_ID='+previewId+'\nBOI_ECH_PRODUCTION_D1_DATABASE_ID='+production.database_id+'\n');
-          console.log('Preview storage ready; production data was not changed. Preview D1='+previewId);
+          const value=crypto.randomBytes(32).toString('base64url');
+          console.log('::add-mask::'+value);
+          fs.appendFileSync(process.env.GITHUB_ENV,'CONTROL_SERVICE_SECRET='+value+'\n');
           NODE
-      - name: Verify application regressions
+      - name: Build verified Worker and run all application regressions
         working-directory: boi-ech
         run: npm test
-      - name: Package isolated preview
+      - name: Apply migrations to isolated local D1 only
         working-directory: boi-ech
-        run: npm run cloudflare:preview:prepare
-      - name: Apply preview migrations only
+        run: npx wrangler d1 migrations apply boi-ech-local --local --config wrangler.local.jsonc --persist-to .training-qa-state
+      - name: Install pinned browser QA runtime
         working-directory: boi-ech
-        run: npx wrangler d1 migrations apply boi-ech-preview-db --remote --config wrangler.cloudflare.preview.jsonc
-      - name: Build preview
-        working-directory: boi-ech
-        run: CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH=wrangler.cloudflare.preview.jsonc npm run build
-      - name: Verify generated preview identity and bindings
-        working-directory: boi-ech
-        run: npm run cloudflare:artifact:check
-      - name: Deploy isolated preview artifact
-        working-directory: boi-ech
-        shell: bash
         run: |
-          set -euo pipefail
-          npx wrangler deploy 2>&1 | tee /tmp/boi-training-preview-deploy.log
-          ORIGIN="$(sed -nE 's/.*(https:\/\/[^[:space:]]+\.workers\.dev).*/\1/p' /tmp/boi-training-preview-deploy.log | tail -1)"
-          test -n "$ORIGIN"
-          echo "BOI_ECH_PREVIEW_ORIGIN=$ORIGIN" >> "$GITHUB_ENV"
-      - name: Verify signed new-device authentication on isolated preview
+          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Verify actual rendered registration and manager workflows
         working-directory: boi-ech
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const source=fs.readFileSync('scripts/verify-device-auth-live.mjs','utf8');
-          if(!source.includes('assert.equal(origin, "https://boi-ech.boiech-ai.workers.dev"')) throw new Error('Production probe source changed');
-          fs.writeFileSync('/tmp/verify-training-preview-device-auth.mjs',source.replaceAll('https://boi-ech.boiech-ai.workers.dev','https://boi-ech-preview.boiech-ai.workers.dev').replace('canonical production origin','isolated preview origin'),{mode:0o600});
-          NODE
-          node /tmp/verify-training-preview-device-auth.mjs "$BOI_ECH_PREVIEW_ORIGIN"
+        run: node scripts/verify-training-manager-browser.mjs
+      - name: Save sanitized local preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-manager-local-worker-acceptance
+          path: |
+            boi-ech/qa-artifacts/*.png
+            boi-ech/qa-artifacts/*report.json
+          if-no-files-found: ignore
+          retention-days: 7
