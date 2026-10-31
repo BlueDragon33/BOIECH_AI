@@ -41,6 +41,7 @@ export const deviceAccess = sqliteTable("device_access", {
   paymentReviewNote: text("payment_review_note"),
   accessExpiresAt: text("access_expires_at"),
   personalEditEnabled: integer("personal_edit_enabled").notNull().default(0),
+  managementEnabled: integer("management_enabled").notNull().default(0),
   autoConfirmedAt: text("auto_confirmed_at"),
   migratedFromUserKey: text("migrated_from_user_key"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -273,3 +274,17 @@ export const courseCertificates = sqliteTable("course_certificates", {
   uniqueIndex("course_certificates_device_unique").on(table.deviceId),
   index("course_certificates_issued_idx").on(table.issuedAt),
 ]);
+
+// Training allocation uses the same signed people registry; no shadow roster.
+export const trainingResources = sqliteTable("training_resources", {
+ id:text("id").primaryKey(),kind:text("kind").notNull(),name:text("name").notNull(),parentId:text("parent_id"),
+ capacity:integer("capacity").notNull(),requiredTeachers:integer("required_teachers").notNull().default(1),status:text("status").notNull(),
+ version:integer("version").notNull().default(1),updatedAt:text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+},table=>[uniqueIndex("training_resource_kind_name").on(table.kind,table.name)]);
+export const trainingSessions = sqliteTable("training_sessions", {
+ id:text("id").primaryKey(),title:text("title").notNull(),classId:text("class_id").notNull().references(()=>trainingResources.id),roomId:text("room_id").notNull().references(()=>trainingResources.id),
+ teacherId:text("teacher_id").notNull().references(()=>deviceAccess.deviceId),startsAt:text("starts_at").notNull(),endsAt:text("ends_at").notNull(),status:text("status").notNull(),version:integer("version").notNull().default(1),updatedAt:text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+},table=>[index("training_sessions_interval").on(table.status,table.startsAt,table.endsAt)]);
+export const trainingCommands = sqliteTable("training_commands", {
+ commandId:text("command_id").primaryKey(),actorId:text("actor_id").notNull(),payloadJson:text("payload_json").notNull(),createdAt:text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

@@ -22,7 +22,7 @@ type AdminDeviceRow = {
   learner_name: string | null;
   learner_family_name: string | null;
   learner_given_name: string | null;
-  person_role: "learner" | "teacher" | null;
+  person_role: "learner" | "manager" | "teacher" | null;
   class_name: string | null;
   phone: string | null;
   registration_submitted_at: string | null;
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     const database = await getCourseDatabase();
     const exists = await database.prepare(
       "SELECT device_id, learner_name, person_role, class_name, phone, registration_submitted_at FROM device_access WHERE device_id = ?",
-    ).bind(deviceId).first<{ device_id: string; learner_name: string | null; person_role: "learner" | "teacher" | null; class_name: string | null; phone: string | null; registration_submitted_at: string | null }>();
+    ).bind(deviceId).first<{ device_id: string; learner_name: string | null; person_role: "learner" | "manager" | "teacher" | null; class_name: string | null; phone: string | null; registration_submitted_at: string | null }>();
     if (!exists) throw new DeviceAccessError("Không tìm thấy thiết bị.", 404, "DEVICE_NOT_FOUND");
 
     if (action === "approve") {

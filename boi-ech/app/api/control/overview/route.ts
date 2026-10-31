@@ -38,7 +38,7 @@ type Row = {
   learner_name: string | null;
   learner_family_name: string | null;
   learner_given_name: string | null;
-  person_role: "learner" | "teacher" | null;
+  person_role: "learner" | "manager" | "teacher" | null;
   person_code: string | null;
   class_name: string | null;
   phone: string | null;
@@ -52,6 +52,7 @@ type Row = {
   payment_review_note: string | null;
   access_expires_at: string | null;
   personal_edit_enabled: number | null;
+  management_enabled: number | null;
   auto_confirmed_at: string | null;
   created_at: string;
   approved_at: string | null;
@@ -224,6 +225,8 @@ function view(row: Row) {
     accessExpiringSoon,
     accessDaysRemaining,
     personalEditEnabled: row.personal_edit_enabled === 1 && !accessExpired,
+    managementConfigured: row.management_enabled === 1,
+    managementEnabled: row.management_enabled === 1 && row.person_role === "manager" && row.status === "approved" && !accessExpired,
     personalEditConfigured: row.personal_edit_enabled === 1,
     autoConfirmedAt: row.auto_confirmed_at,
     createdAt: row.created_at,
@@ -330,7 +333,7 @@ async function rows(displayCodes?: string[], activityDayCount = 30) {
             d.phone, d.registration_submitted_at, d.access_group, d.payment_status,
             d.payment_proof_key, d.payment_submitted_at, d.payment_verified_at,
             d.payment_rejected_at, d.payment_review_note,
-            d.access_expires_at, d.personal_edit_enabled, d.auto_confirmed_at,
+            d.access_expires_at, d.personal_edit_enabled, d.management_enabled, d.auto_confirmed_at,
             d.created_at, d.approved_at, d.blocked_at, d.last_seen_at,
             p.completed_json, p.scores_json, p.attempts_json, p.total_active_seconds,
             p.last_activity_at, p.last_lesson, p.last_part
@@ -485,7 +488,7 @@ export async function POST(request: Request) {
       learner_name: string | null;
       learner_family_name: string | null;
       learner_given_name: string | null;
-      person_role: "learner" | "teacher" | null;
+      person_role: "learner" | "manager" | "teacher" | null;
       person_code: string | null;
       class_name: string | null;
       phone: string | null;

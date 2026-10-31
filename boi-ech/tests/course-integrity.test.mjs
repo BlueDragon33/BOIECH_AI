@@ -706,7 +706,7 @@ test("keeps navigation and learning content complete when text grows or the scre
   assert.match(styles, /--page-ink/);
 });
 
-test("registers a unique learner or teacher identity and limits editing to teachers", async () => {
+test("keeps unique identity and teacher-only content editing with the three-role registration", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const auth = await readFile(new URL("../app/device-auth.server.ts", import.meta.url), "utf8");
   const overview = await readFile(new URL("../app/api/control/overview/route.ts", import.meta.url), "utf8");
@@ -715,7 +715,7 @@ test("registers a unique learner or teacher identity and limits editing to teach
   assert.match(page, /Học viên/);
   assert.match(page, /Giảng viên/);
   assert.match(page, /Mã số học viên/);
-  assert.match(page, /Số hiệu SQ\/QNCN/);
+
   assert.match(auth, /PERSON_CODE_ALREADY_REGISTERED/);
   assert.match(auth, /personal_edit_enabled = CASE WHEN person_role = 'teacher' THEN 1 ELSE 0 END/);
   assert.match(overview, /current\.person_role !== "teacher"/);

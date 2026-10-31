@@ -3,7 +3,7 @@ import { getChatGPTUser } from "./chatgpt-auth";
 export type DeviceStatus = "pending" | "approved" | "blocked";
 export type AccessGroup = "unassigned" | "free" | "paid";
 export type PaymentStatus = "unassigned" | "awaiting_payment" | "proof_submitted" | "free_approved" | "paid_verified";
-export type PersonRole = "learner" | "teacher";
+export type PersonRole = "learner" | "manager" | "teacher";
 export type DeviceType = "desktop" | "phone" | "tablet";
 
 type DeviceAccessRow = {
@@ -36,6 +36,7 @@ type DeviceAccessRow = {
   payment_review_note?: string | null;
   access_expires_at?: string | null;
   personal_edit_enabled?: number | null;
+  management_enabled?: number | null;
   auto_confirmed_at?: string | null;
   created_at: string;
   approved_at: string | null;
@@ -63,6 +64,7 @@ export type PublicDeviceState = {
   learnerFamilyName: string | null;
   learnerGivenName: string | null;
   personRole: PersonRole | null;
+  managementEnabled: boolean;
   personCode: string | null;
   className: string | null;
   phone: string | null;
@@ -144,6 +146,7 @@ export async function getCourseDatabase() {
         payment_review_note TEXT,
         access_expires_at TEXT,
         personal_edit_enabled INTEGER NOT NULL DEFAULT 0,
+        management_enabled INTEGER NOT NULL DEFAULT 0,
         auto_confirmed_at TEXT,
         migrated_from_user_key TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -232,6 +235,7 @@ export async function getCourseDatabase() {
     const accessColumns = new Set((accessInfo.results ?? []).map((column) => column.name));
     const profileColumns = new Set((profileInfo.results ?? []).map((column) => column.name));
     const repairs = [];
+    if (!accessColumns.has("management_enabled")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN management_enabled INTEGER NOT NULL DEFAULT 0"));
     if (!accessColumns.has("device_type")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type TEXT NOT NULL DEFAULT 'desktop'"));
     if (!accessColumns.has("device_type_override")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN device_type_override TEXT"));
     if (!accessColumns.has("platform")) repairs.push(database.prepare("ALTER TABLE device_access ADD COLUMN platform TEXT"));
@@ -243,6 +247,9 @@ export async function getCourseDatabase() {
     if (!profileColumns.has("last_lesson")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN last_lesson TEXT"));
     if (!profileColumns.has("last_part")) repairs.push(database.prepare("ALTER TABLE device_profiles ADD COLUMN last_part TEXT"));
     if (repairs.length) await database.batch(repairs);
+    await database.prepare(`CREATE TRIGGER IF NOT EXISTS management_identity_guard AFTER UPDATE OF person_role,person_code ON device_access
+      WHEN NEW.person_role IS NOT OLD.person_role OR NEW.person_code IS NOT OLD.person_code
+      BEGIN UPDATE device_access SET management_enabled=0 WHERE device_id=NEW.device_id; END`).run();
     await database.prepare(
       "CREATE INDEX IF NOT EXISTS device_access_type_status_idx ON device_access(device_type, status, last_seen_at)",
     ).run();
@@ -312,7 +319,7 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
   const learnerFamilyName = row.learner_family_name?.trim()
     || (legacyParts.length > 1 ? legacyParts.slice(0, -1).join(" ") : null);
   const learnerName = [learnerFamilyName, learnerGivenName].filter(Boolean).join(" ") || legacyName;
-  const personRole = row.person_role === "learner" || row.person_role === "teacher" ? row.person_role : null;
+  const personRole = row.person_role === "learner" || row.person_role === "manager" || row.person_role === "teacher" ? row.person_role : null;
   const personCode = row.person_code?.trim() || null;
   const className = row.class_name?.trim() || null;
   const phone = row.phone?.trim() || null;
@@ -341,6 +348,7 @@ function publicState(row: DeviceAccessRow): PublicDeviceState {
     learnerFamilyName,
     learnerGivenName,
     personRole,
+    managementEnabled: row.management_enabled === 1 && personRole === "manager" && row.status === "approved" && !accessExpired,
     personCode,
     className,
     phone,
@@ -365,7 +373,7 @@ const deviceColumns = `device_id, display_code, public_key_jwk, status, device_t
   class_name, phone, registration_submitted_at, access_group, payment_status,
   payment_proof_key, payment_proof_name, payment_proof_content_type, payment_proof_size,
   payment_submitted_at, payment_verified_at, payment_rejected_at, payment_review_note,
-  access_expires_at, personal_edit_enabled, auto_confirmed_at, created_at,
+  access_expires_at, personal_edit_enabled, management_enabled, auto_confirmed_at, created_at,
   approved_at, blocked_at, last_seen_at`;
 
 export async function getPublicDeviceState(deviceId: string): Promise<PublicDeviceState | null> {
@@ -489,6 +497,7 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
     learnerFamilyName: null,
     learnerGivenName: null,
     personRole: null,
+    managementEnabled: false,
     personCode: null,
     className: null,
     phone: null,
@@ -628,8 +637,8 @@ function normalizeClassName(value: unknown) {
 }
 
 function normalizePersonIdentity(roleValue: unknown, codeValue: unknown) {
-  if (roleValue !== "learner" && roleValue !== "teacher") {
-    throw new DeviceAccessError("Hãy chọn Học viên hoặc Giảng viên.", 400, "INVALID_PERSON_ROLE");
+  if (roleValue !== "learner" && roleValue !== "manager" && roleValue !== "teacher") {
+    throw new DeviceAccessError("Hãy chọn Học viên, Cán bộ quản lý hoặc Giảng viên.", 400, "INVALID_PERSON_ROLE");
   }
   const personRole: PersonRole = roleValue;
   const personCode = typeof codeValue === "string"
@@ -698,6 +707,7 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
     && (!manualReviewLabel || current?.label !== manualReviewLabel)
     && current?.payment_status === "unassigned";
   let autoConfirmed = false;
+  let autoDeferReason = "device_limit_reached";
   const changed = !current
     || current.learner_name !== learnerName
     || current.learner_family_name !== learnerFamilyName
@@ -713,10 +723,12 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
          registration_submitted_at = COALESCE(registration_submitted_at, CURRENT_TIMESTAMP),
          access_group = CASE WHEN status = 'approved' AND access_group = 'unassigned' THEN 'free' ELSE access_group END,
          payment_status = CASE WHEN status = 'approved' AND payment_status = 'unassigned' THEN 'free_approved' ELSE payment_status END,
-         personal_edit_enabled = CASE WHEN ? = 'teacher' THEN personal_edit_enabled ELSE 0 END
+         personal_edit_enabled = CASE WHEN ? = 'teacher' THEN personal_edit_enabled ELSE 0 END,
+         management_enabled = CASE WHEN person_role = ? AND person_code = ? THEN management_enabled ELSE 0 END
        WHERE device_id = ?`,
-    ).bind(learnerName, learnerFamilyName, learnerGivenName, personRole, personCode, className, phone, personRole, device.deviceId).run();
+    ).bind(learnerName, learnerFamilyName, learnerGivenName, personRole, personCode, className, phone, personRole, personRole, personCode, device.deviceId).run();
     if (shouldAutoConfirm) {
+      try {
       const confirmation = await database.prepare(
         `UPDATE device_access SET status = 'approved', access_group = 'free', payment_status = 'free_approved',
                 approved_at = CURRENT_TIMESTAMP, blocked_at = NULL,
@@ -736,6 +748,10 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
         automation.defaultDeviceLimit,
       ).run();
       autoConfirmed = Number(confirmation.meta.changes) === 1;
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes("TRAINING_CAPACITY")) throw error;
+        autoDeferReason = "class_capacity_reached";
+      }
     }
   } catch (error) {
     if (error instanceof Error && /device_access\.phone|device_access_phone_unique/i.test(error.message)) {
@@ -758,7 +774,7 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
   } else if (shouldAutoConfirm && changed) {
     await database.prepare(
       "INSERT INTO course_audit_log (actor, action, target, detail_json) VALUES (?, 'learning_device_auto_confirmation_deferred', ?, ?)",
-    ).bind("automation", device.deviceId, JSON.stringify({ reason: "device_limit_reached", deviceLimit: automation.defaultDeviceLimit })).run();
+    ).bind("automation", device.deviceId, JSON.stringify({ reason: autoDeferReason, deviceLimit: automation.defaultDeviceLimit })).run();
   }
   const updated = await database.prepare(`SELECT ${deviceColumns} FROM device_access WHERE device_id = ?`)
     .bind(device.deviceId).first<DeviceAccessRow>();
@@ -788,6 +804,9 @@ export async function requireDeviceAdmin() {
 }
 
 export function deviceErrorResponse(error: unknown) {
+  if (error instanceof Error && error.message.includes("TRAINING_CAPACITY")) {
+    error = new DeviceAccessError("Lớp hoặc phòng đã đủ sức chứa. Điều chỉnh phân lớp/sức chứa trước khi duyệt hoặc gia hạn.", 409, "TRAINING_CAPACITY");
+  }
   if (error instanceof DeviceAccessError) {
     return Response.json(
       { error: error.message, code: error.code, device: error.device },
