@@ -52,3 +52,23 @@ jobs:
           set -euo pipefail
           npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command \
             "SELECT COUNT(*) AS teacher_total, SUM(CASE WHEN status='approved' THEN 1 ELSE 0 END) AS approved_count, SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending_count, SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) AS blocked_count, SUM(CASE WHEN access_expires_at IS NOT NULL AND datetime(access_expires_at)<=CURRENT_TIMESTAMP THEN 1 ELSE 0 END) AS expired_count, SUM(CASE WHEN registration_submitted_at IS NULL THEN 1 ELSE 0 END) AS unsubmitted_count, SUM(CASE WHEN COALESCE(trim(class_name),'')='' THEN 1 ELSE 0 END) AS missing_class_count FROM device_access WHERE person_role='teacher'; SELECT name FROM sqlite_master WHERE type='table' AND name IN ('course_activity_events','learner_self_assessments','course_content_versions');"
+
+      - name: Read existing release and preview database identifiers
+        working-directory: boi-ech
+        run: |
+          set -euo pipefail
+          npx wrangler d1 list --config wrangler.d1.jsonc --json | node --input-type=module -e '
+            let raw=""; for await(const part of process.stdin) raw+=part;
+            const allowed=new Set(["boi-ech-db","boi-ech-preview-db","application-management-production-db","application-management-preview-db"]);
+            const rows=JSON.parse(raw);
+            if(!Array.isArray(rows)) throw new Error("Unexpected database inventory");
+            console.log("RELEASE_DATABASE_INVENTORY="+JSON.stringify(rows.filter(row=>allowed.has(row.name)).map(row=>({name:row.name,uuid:row.uuid}))));
+          '
+
+      - name: Read Boi rollback bookmark
+        working-directory: boi-ech
+        run: npx wrangler d1 time-travel info boi-ech-db --json --config wrangler.d1.jsonc
+
+      - name: Read Boi deployed Worker versions
+        working-directory: boi-ech
+        run: npx wrangler deployments list --name boi-ech --json --config wrangler.d1.jsonc
