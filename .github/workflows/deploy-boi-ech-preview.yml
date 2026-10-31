@@ -82,4 +82,12 @@ jobs:
           echo "BOI_ECH_PREVIEW_ORIGIN=$ORIGIN" >> "$GITHUB_ENV"
       - name: Verify signed new-device authentication on isolated preview
         working-directory: boi-ech
-        run: node scripts/verify-device-auth-live.mjs "$BOI_ECH_PREVIEW_ORIGIN"
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source=fs.readFileSync('scripts/verify-device-auth-live.mjs','utf8');
+          if(!source.includes('assert.equal(origin, "https://boi-ech.boiech-ai.workers.dev"')) throw new Error('Production probe source changed');
+          fs.writeFileSync('/tmp/verify-training-preview-device-auth.mjs',source.replaceAll('https://boi-ech.boiech-ai.workers.dev','https://boi-ech-preview.boiech-ai.workers.dev').replace('canonical production origin','isolated preview origin'),{mode:0o600});
+          NODE
+          node /tmp/verify-training-preview-device-auth.mjs "$BOI_ECH_PREVIEW_ORIGIN"
