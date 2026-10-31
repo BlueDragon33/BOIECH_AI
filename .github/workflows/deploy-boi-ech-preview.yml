@@ -1,6 +1,8 @@
 name: Boi Ech Cloudflare Preview Deploy
 
 on:
+  push:
+    branches: [ops/training-release-readiness-20261031]
   workflow_dispatch:
     inputs:
       confirm:
@@ -13,11 +15,11 @@ permissions:
 
 concurrency:
   group: training-local-worker-acceptance
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   local-preview-acceptance:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.actor == 'BlueDragon33' && inputs.confirm == 'VERIFY_LOCAL_PREVIEW' }}
+    if: ${{ github.actor == 'BlueDragon33' && github.ref == 'refs/heads/ops/training-release-readiness-20261031' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'VERIFY_LOCAL_PREVIEW')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     env:
