@@ -46,3 +46,9 @@ BEFORE INSERT ON manager_device_assignments BEGIN
   ), CASE WHEN NEW.person_role='learner' THEN 50 ELSE 5 END)
   THEN RAISE(ABORT,'MANAGER_APPROVAL_QUOTA_REACHED') END;
 END;
+--> statement-breakpoint
+-- New two-tier review is opt-in at release, not an implicit blanket approval.
+-- Do not change existing approved/paid/blocked accounts or delete prior policy history.
+UPDATE access_automation_settings SET auto_confirm_new_devices=0,
+  updated_by='system:manager-tier-transition',updated_at=CURRENT_TIMESTAMP
+  WHERE id='global' AND auto_confirm_new_devices<>0;
