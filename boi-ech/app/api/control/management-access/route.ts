@@ -68,7 +68,10 @@ export async function POST(request:Request){
       const [approved,audited]=await db.batch([
         db.prepare(`UPDATE device_access SET status='approved',access_group='free',payment_status='free_approved',
           management_enabled=1,approved_at=CURRENT_TIMESTAMP,blocked_at=NULL,
-          access_expires_at=COALESCE(access_expires_at,?),updated_at=CURRENT_TIMESTAMP
+          access_expires_at=CASE
+            WHEN access_expires_at IS NULL OR datetime(access_expires_at)<=CURRENT_TIMESTAMP
+              THEN ? ELSE access_expires_at END,
+          updated_at=CURRENT_TIMESTAMP
           WHERE device_id=? AND person_role='manager' AND person_code=? AND status='pending'
             AND payment_status='unassigned' AND registration_submitted_at IS NOT NULL
             AND learner_name IS NOT NULL AND trim(learner_name)!=''
