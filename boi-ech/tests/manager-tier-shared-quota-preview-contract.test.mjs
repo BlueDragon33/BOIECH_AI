@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-const read=(p)=>readFileSync(p,"utf8");
-const sql=read("boi-ech/drizzle/0017_manager_approval_quota.sql");
-const service=read("boi-ech/app/manager-device-review.server.ts");
-const grant=read("boi-ech/app/api/control/management-access/route.ts");
-const panel=read("boi-ech/app/manager-approval-panel.tsx");
-const workspace=read("boi-ech/app/manager-workspace.tsx");
-const api=read("boi-ech/app/api/manager/device-approvals/route.ts");
+const read=(p)=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+const sql=read("drizzle/0017_manager_approval_quota.sql");
+const service=read("app/manager-device-review.server.ts");
+const grant=read("app/api/control/management-access/route.ts");
+const panel=read("app/manager-approval-panel.tsx");
+const workspace=read("app/manager-workspace.tsx");
+const api=read("app/api/manager/device-approvals/route.ts");
 test("manager-tier uses ONE shared 50 learner / 5 teacher quota, not per-manager limits",()=>{
  assert.match(sql,/scope TEXT PRIMARY KEY NOT NULL CHECK\(scope='manager-tier'\)/);
  assert.match(sql,/VALUES\('manager-tier',50,5,'system:default'\)/);
@@ -44,8 +44,8 @@ test("preview reads only literal fixture; its buttons cannot call mutation API",
 });
 test("blanket auto-approval is disabled for migration into manager-tier review",()=>{
  assert.match(sql,/UPDATE access_automation_settings SET auto_confirm_new_devices=0/);
- const control=read("boi-ech/app/api/control/overview/route.ts");
+ const control=read("app/api/control/overview/route.ts");
  assert.match(control,/MANAGER_REVIEW_POLICY_ACTIVE/);
- const auth=read("boi-ech/app/device-auth.server.ts");
+ const auth=read("app/device-auth.server.ts");
  assert.match(auth,/enabled: row\?\.auto_confirm_new_devices === 1/);
 });
