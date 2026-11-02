@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from "reac
 import {createTrainingClient,type TrainingProof,type TrainingWindow} from "./training-client";
 import {classKey,classNames,type ResourceKind,type ResourceStatus,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession} from "./training-types";
 import styles from "./manager-workspace.module.css";
+import ManagerApprovalPanel from "./manager-approval-panel";
 type Tab="overview"|"schedule"|"people"|ResourceKind;
 type Write=(payload:Record<string,unknown>)=>Promise<boolean>;
 const tabs:{id:Tab;label:string}[]=[{id:"overview",label:"Tổng quan"},{id:"schedule",label:"Xếp lịch"},{id:"people",label:"Nhân sự"},{id:"class",label:"Lớp học"},{id:"room",label:"Phòng học"},{id:"building",label:"Tòa học"}];
@@ -57,5 +58,5 @@ export default function ManagerWorkspace({deviceId,getProof}:{deviceId:string;ge
  useEffect(()=>{const controller=new AbortController();queueMicrotask(()=>{if(!controller.signal.aborted)void refresh(controller.signal);});return()=>controller.abort();},[refresh]);
  async function command(payload:Record<string,unknown>){if(lock.current)return false;lock.current=true;setBusy(true);setNotice("");setNoticeError(false);try{const range=payload.action==="save-session"?{from:String(payload.startsAt),to:String(payload.endsAt)}:window;const next=await client.mutate(payload,range);setBoard(next);if(range.from!==window.from||range.to!==window.to)setWindow(range);setNotice("Đã lưu và đọc lại dữ liệu điều phối.");return true;}catch(error){setNoticeError(true);setNotice(error instanceof Error?error.message:"Chưa xác minh được thay đổi. Bản nháp được giữ nguyên.");return false;}finally{lock.current=false;setBusy(false);}}
  if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button></main>;
- return <div data-device-id={deviceId} data-person-role="manager"><TrainingDashboard board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindow(next);}}/></div>;
+ return <div data-device-id={deviceId} data-person-role="manager"><ManagerApprovalPanel getProof={getProof}/><TrainingDashboard board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindow(next);}}/></div>;
 }
