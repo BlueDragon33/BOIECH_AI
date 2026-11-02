@@ -18,10 +18,10 @@ export async function managerReviewBoard(actor: PublicDeviceState) {
   requireManager(actor);
   const db = await getCourseDatabase();
   const [limits, usage, queued] = await Promise.all([
-    db.prepare("SELECT learner_limit, teacher_limit FROM manager_approval_limits WHERE manager_device_id=?")
-      .bind(actor.deviceId).first<LimitRow>(),
+    db.prepare("SELECT learner_limit, teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'")
+      .first<LimitRow>(),
     db.prepare(`SELECT person_role, COUNT(*) AS used FROM manager_device_assignments
-      WHERE manager_device_id=? GROUP BY person_role`).bind(actor.deviceId).all<UsageRow>(),
+      GROUP BY person_role`).all<UsageRow>(),
     db.prepare(`SELECT d.device_id,d.display_code,d.person_role,d.learner_name,d.person_code,
       d.class_name,d.status,d.registration_submitted_at,a.manager_device_id
       FROM device_access d LEFT JOIN manager_device_assignments a ON a.target_device_id=d.device_id
@@ -36,6 +36,7 @@ export async function managerReviewBoard(actor: PublicDeviceState) {
     throw new DeviceAccessError("Có quá nhiều hồ sơ. Hãy thu hẹp hàng chờ trước khi quản lý.",413,"MANAGER_QUEUE_LIMIT");
   }
   const used = Object.fromEntries((usage.results ?? []).map(row=>[row.person_role,Number(row.used)]));
+  // Shared quotas across ALL managers. Only the assignment owner may block.
   const quotas = {
     learner: {limit: limits?.learner_limit ?? MANAGER_DEFAULT_LEARNER_LIMIT, used: used.learner ?? 0},
     teacher: {limit: limits?.teacher_limit ?? MANAGER_DEFAULT_TEACHER_LIMIT, used: used.teacher ?? 0},
