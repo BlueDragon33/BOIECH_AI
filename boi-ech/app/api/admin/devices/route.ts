@@ -126,6 +126,7 @@ async function listDevices() {
             p.last_activity_at, p.last_lesson, p.last_part
        FROM device_access d
        LEFT JOIN device_profiles p ON p.device_id = d.device_id
+      WHERE d.person_role = 'manager'
       ORDER BY CASE d.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
                d.last_seen_at DESC
       LIMIT 200`,
@@ -156,6 +157,14 @@ export async function POST(request: Request) {
       "SELECT device_id, learner_name, person_role, class_name, phone, registration_submitted_at FROM device_access WHERE device_id = ?",
     ).bind(deviceId).first<{ device_id: string; learner_name: string | null; person_role: "learner" | "manager" | "teacher" | null; class_name: string | null; phone: string | null; registration_submitted_at: string | null }>();
     if (!exists) throw new DeviceAccessError("Không tìm thấy thiết bị.", 404, "DEVICE_NOT_FOUND");
+    // Legacy admin-email API is not a second authority over learner/teacher
+    // approvals, blocks, profile edits, reset or role changes.
+    if (exists.person_role !== "manager") {
+      throw new DeviceAccessError(
+        "Quản trị viên trung tâm chỉ quản lý thiết bị cán bộ quản lý. Học viên và giảng viên do cán bộ Bơi Ếch xét duyệt.",
+        403, "MANAGER_ONLY_CENTRAL_REVIEW",
+      );
+    }
 
     if (action === "approve") {
       if (exists.person_role === "learner" || exists.person_role === "teacher") {
