@@ -401,7 +401,7 @@ export async function getAccessAutomationSettings(): Promise<AccessAutomationSet
   const defaultDeviceLimit = Math.max(1, Math.min(1_000, Number(row?.default_device_limit) || 20));
   const activeAutoFreeDeviceCount = Math.max(0, Number(usage?.active_count) || 0);
   return {
-    enabled: row?.auto_confirm_new_devices !== 0,
+    enabled: row?.auto_confirm_new_devices === 1,
     defaultAccessDays: Math.max(1, Math.min(365, Number(row?.default_access_days) || 60)),
     defaultDeviceLimit,
     activeAutoFreeDeviceCount,
