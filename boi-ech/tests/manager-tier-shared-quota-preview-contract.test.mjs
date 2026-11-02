@@ -64,3 +64,23 @@ test("manager write and audit are one D1 batch with separate readback",()=>{
  assert.match(service,/MANAGER_REVIEW_READBACK_MISMATCH/);
  assert.doesNotMatch(service,/await db\.prepare\(`INSERT INTO course_audit_log/);
 });
+
+test("Owner-only manager account approval is atomic, pending-only and independently read back",()=>{
+ assert.match(grant,/payload\.action==="approve-manager"/);
+ assert.match(grant,/payload\.expectedStatus!=="pending"/);
+ assert.match(grant,/person_role='manager' AND person_code=\?/);
+ assert.match(grant,/payment_status='unassigned'/);
+ assert.match(grant,/const \[approved,audited\]=await db\.batch\(\[/);
+ assert.match(grant,/training_manager_approved/);
+ assert.match(grant,/SELECT \?,'training_manager_approved',\?,\? WHERE changes\(\)=1/);
+ assert.match(grant,/MANAGER_APPROVE_READBACK_FAILED/);
+});
+test("Owner quota changes and manager permissions use D1 compare-and-swap",()=>{
+ assert.match(grant,/expectedLearnerLimit/);
+ assert.match(grant,/expectedTeacherLimit/);
+ assert.match(grant,/MANAGER_TIER_CAS_CONFLICT/);
+ assert.match(grant,/expectedManagementEnabled/);
+ assert.match(grant,/AND management_enabled=\?/);
+ assert.match(grant,/MANAGEMENT_GRANT_CONFLICT/);
+ assert.match(grant,/MANAGER_TIER_D1_MISSING/);
+});
