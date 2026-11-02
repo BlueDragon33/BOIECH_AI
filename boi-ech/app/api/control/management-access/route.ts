@@ -20,6 +20,19 @@ export async function POST(request:Request){
       return controlResponse({learnerLimit:limits?.learner_limit??DEFAULT_LEARNER_LIMIT,
         teacherLimit:limits?.teacher_limit??DEFAULT_TEACHER_LIMIT,scope:"manager-tier"},200,request);
     }
+    if(payload.action==="get-manager-grant"){
+      if(typeof payload.deviceId!=="string"||!/^[a-f0-9]{64}$/.test(payload.deviceId)
+        ||typeof payload.expectedPersonCode!=="string")
+        throw new DeviceAccessError("Thông tin cán bộ không hợp lệ.",400,"INVALID_MANAGEMENT_GRANT");
+      const row=await db.prepare(`SELECT management_enabled,status,access_expires_at FROM device_access
+        WHERE device_id=? AND person_role='manager' AND person_code=? AND registration_submitted_at IS NOT NULL`)
+        .bind(payload.deviceId,payload.expectedPersonCode)
+        .first<{management_enabled:number;status:string;access_expires_at:string|null}>();
+      if(!row)throw new DeviceAccessError("Không tìm thấy cán bộ quản lý.",404,"MANAGER_NOT_FOUND");
+      const active=row.status==="approved"&&(!row.access_expires_at||Date.parse(row.access_expires_at)>Date.now());
+      return controlResponse({managementEnabled:row.management_enabled===1&&active,
+        accountApproved:active,deviceId:payload.deviceId},200,request);
+    }
     if(payload.action==="set-tier-limits"){
       const learnerLimit=bounds(payload.learnerLimit,5000,"Hạn mức học viên");
       const teacherLimit=bounds(payload.teacherLimit,500,"Hạn mức giảng viên");
