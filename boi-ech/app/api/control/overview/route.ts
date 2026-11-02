@@ -425,6 +425,7 @@ export async function POST(request: Request) {
 
     if (action === "update-automation") {
       const enabled = payload.enabled === true;
+      if (enabled) return respond({ error: "Chế độ duyệt tự động đã chuyển sang xét duyệt hai cấp. Cán bộ quản lý phải duyệt học viên và giảng viên.", code: "MANAGER_REVIEW_POLICY_ACTIVE" }, 409);
       const defaultAccessDays = Math.floor(Number(payload.defaultAccessDays));
       const defaultDeviceLimit = Math.floor(Number(payload.defaultDeviceLimit));
       if (!Number.isFinite(defaultAccessDays) || defaultAccessDays < 1 || defaultAccessDays > 365) {
