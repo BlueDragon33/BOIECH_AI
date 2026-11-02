@@ -792,7 +792,7 @@ function DeviceGate({
             <label><span>{personRole === "manager" ? "Đơn vị công tác" : personRole === "teacher" ? "Lớp / đơn vị phụ trách" : "Lớp"}</span><input value={className} onChange={(event) => setClassName(event.target.value)} placeholder={personRole === "teacher" ? "Ví dụ: Đại đội 1" : "Ví dụ: 7A1"} maxLength={50} required /></label>
             <label><span>Số điện thoại</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="Ví dụ: 0912345678" maxLength={14} required /></label>
             <label className="device-code-field"><span>Mã thiết bị</span><input value={device?.deviceCode ?? ""} readOnly /></label>
-            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu thông tin…" : personRole === "manager" ? "Lưu thông tin & mở điều phối" : "Lưu thông tin & vào học"}</button>
+            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu thông tin…" : personRole === "manager" ? "Gửi đăng ký Cán bộ quản lý · chờ Chủ hệ thống duyệt" : "Lưu thông tin & vào học"}</button>
           </form>
         ) : null}
         {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>{device?.personRole === "manager" ? "Vào khu điều phối" : "Vào học"} <span>→</span></button> : null}
