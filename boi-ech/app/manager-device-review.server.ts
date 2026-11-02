@@ -73,10 +73,19 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
   if (!target || !["learner","teacher"].includes(target.person_role)) {
     throw new DeviceAccessError("Chỉ cán bộ quản lý được xét duyệt thiết bị học viên và giảng viên.",403,"MANAGER_TARGET_ROLE_FORBIDDEN");
   }
+  // Status and audit must commit as one owning-client D1 transaction.
+  // changes() binds the audit row to a successful immediately preceding write.
+  const audit = () => db.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json)
+    SELECT ?,?,?,? WHERE changes()=1`).bind(
+    actor.deviceCode,
+    action==="approve"?"manager_device_approved":"manager_device_blocked",
+    deviceId,JSON.stringify({managerDeviceId:actor.deviceId,role:target.person_role}),
+  );
   if (action==="block") {
     if (target.manager_device_id!==actor.deviceId || target.status!=="approved")
       throw new DeviceAccessError("Chỉ có thể khóa thiết bị đang được chính bạn quản lý.",403,"MANAGER_SCOPE_FORBIDDEN");
-    const update=await db.prepare(`UPDATE device_access SET status='blocked',
+    const [update, auditWrite]=await db.batch([
+      db.prepare(`UPDATE device_access SET status='blocked',
         blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       WHERE device_id=? AND status='approved' AND person_role IN ('learner','teacher')
         AND EXISTS(SELECT 1 FROM manager_device_assignments
@@ -85,8 +94,11 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
           WHERE m.device_id=? AND m.person_role='manager' AND m.management_enabled=1
             AND m.status='approved' AND m.registration_submitted_at IS NOT NULL
             AND (m.access_expires_at IS NULL OR datetime(m.access_expires_at)>CURRENT_TIMESTAMP))`)
-      .bind(deviceId,deviceId,actor.deviceId,actor.deviceId).run();
-    if (Number(update.meta.changes)!==1) throw new DeviceAccessError("Thiết bị vừa thay đổi; đồng bộ lại.",409,"MANAGER_REVIEW_CONFLICT");
+      .bind(deviceId,deviceId,actor.deviceId,actor.deviceId),
+      audit(),
+    ]);
+    if (Number(update.meta.changes)!==1 || Number(auditWrite.meta.changes)!==1)
+      throw new DeviceAccessError("Thiết bị vừa thay đổi; đồng bộ lại.",409,"MANAGER_REVIEW_CONFLICT");
   } else {
     if(target.status!=="pending" || target.payment_status!=="unassigned"
       || !target.registration_submitted_at || target.manager_device_id) {
@@ -108,13 +120,12 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
           AND EXISTS(SELECT 1 FROM manager_device_assignments
             WHERE target_device_id=? AND manager_device_id=?)`)
         .bind(accessExpiresAt,deviceId,target.person_role,deviceId,actor.deviceId),
+      audit(),
     ]);
-    if (Number(results[0].meta.changes)!==1 || Number(results[1].meta.changes)!==1)
+    if (Number(results[0].meta.changes)!==1 || Number(results[1].meta.changes)!==1
+      || Number(results[2].meta.changes)!==1)
       throw new DeviceAccessError("Xung đột khi cấp quyền, không xác minh được cập nhật.",409,"MANAGER_REVIEW_CONFLICT");
   }
-  await db.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json)
-    VALUES(?,?,?,?)`).bind(actor.deviceCode,action==="approve"?"manager_device_approved":"manager_device_blocked",
-    deviceId,JSON.stringify({managerDeviceId:actor.deviceId,role:target.person_role})).run();
   // Separate readback. Do not mark applied on mutation response alone.
   const current=await db.prepare(`SELECT d.status,a.manager_device_id FROM device_access d
     JOIN manager_device_assignments a ON a.target_device_id=d.device_id WHERE d.device_id=?`)
