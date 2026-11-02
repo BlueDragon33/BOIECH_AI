@@ -44,10 +44,32 @@ BEFORE INSERT ON manager_device_assignments BEGIN
   ) THEN RAISE(ABORT,'MANAGER_TARGET_NOT_ELIGIBLE') END;
   SELECT CASE WHEN (
     SELECT COUNT(*) FROM manager_device_assignments a
-      WHERE a.person_role=NEW.person_role
+      JOIN device_access d ON d.device_id=a.target_device_id
+      WHERE a.person_role=NEW.person_role AND d.status='approved'
+        AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
   ) >= COALESCE((
     SELECT CASE WHEN NEW.person_role='learner' THEN learner_limit ELSE teacher_limit END
     FROM manager_approval_limits WHERE scope='manager-tier'
+  ), CASE WHEN NEW.person_role='learner' THEN 50 ELSE 5 END)
+  THEN RAISE(ABORT,'MANAGER_APPROVAL_QUOTA_REACHED') END;
+END;
+--> statement-breakpoint
+-- Status re-activation must respect the same shared manager-tier capacity.
+CREATE TRIGGER IF NOT EXISTS manager_assignment_reactivate_guard
+BEFORE UPDATE OF status ON device_access
+WHEN NEW.status='approved' AND OLD.status!='approved'
+  AND EXISTS(SELECT 1 FROM manager_device_assignments
+             WHERE target_device_id=NEW.device_id)
+BEGIN
+  SELECT CASE WHEN (
+    SELECT COUNT(*) FROM manager_device_assignments a
+      JOIN device_access d ON d.device_id=a.target_device_id
+      WHERE a.person_role=NEW.person_role AND a.target_device_id<>NEW.device_id
+        AND d.status='approved'
+        AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+  ) >= COALESCE((
+    SELECT CASE WHEN NEW.person_role='learner' THEN learner_limit ELSE teacher_limit END
+      FROM manager_approval_limits WHERE scope='manager-tier'
   ), CASE WHEN NEW.person_role='learner' THEN 50 ELSE 5 END)
   THEN RAISE(ABORT,'MANAGER_APPROVAL_QUOTA_REACHED') END;
 END;
