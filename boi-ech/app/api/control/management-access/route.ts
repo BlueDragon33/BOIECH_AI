@@ -1,5 +1,5 @@
 import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../control-auth.server";
-import { DeviceAccessError, deviceErrorResponse, getCourseDatabase, getPublicDeviceState } from "../../../device-auth.server";
+import { accessExpiryAfterDays, DeviceAccessError, deviceErrorResponse, getAccessAutomationSettings, getCourseDatabase, getPublicDeviceState } from "../../../device-auth.server";
 export const dynamic="force-dynamic";
 export function OPTIONS(request:Request){return controlPreflight(request);}
 const DEFAULT_LEARNER_LIMIT=50,DEFAULT_TEACHER_LIMIT=5;
@@ -50,6 +50,35 @@ export async function POST(request:Request){
       if(result?.learner_limit!==learnerLimit||result?.teacher_limit!==teacherLimit)
         throw new DeviceAccessError("Hạn mức lưu chưa khớp GET D1 độc lập.",503,"MANAGER_TIER_LIMIT_READBACK_FAILED");
       return controlResponse({learnerLimit,teacherLimit,scope:"manager-tier"},200,request);
+    }
+    if(payload.action==="approve-manager"){
+      if(typeof payload.deviceId!=="string"||!/^[a-f0-9]{64}$/.test(payload.deviceId)
+        ||typeof payload.expectedPersonCode!=="string"||!payload.expectedPersonCode.trim()
+        ||payload.expectedStatus!=="pending")
+        throw new DeviceAccessError("Thiếu hồ sơ cán bộ hoặc trạng thái pending để duyệt.",400,"MANAGER_APPROVE_INVALID");
+      const automation=await getAccessAutomationSettings();
+      // One owning-D1 transaction: CAS approval + grant + audit. A concurrent
+      // Owner or manager cannot silently approve an already changed profile.
+      const [approved,audited]=await db.batch([
+        db.prepare(`UPDATE device_access SET status='approved',access_group='free',payment_status='free_approved',
+          management_enabled=1,approved_at=CURRENT_TIMESTAMP,blocked_at=NULL,
+          access_expires_at=COALESCE(access_expires_at,?),updated_at=CURRENT_TIMESTAMP
+          WHERE device_id=? AND person_role='manager' AND person_code=? AND status='pending'
+            AND payment_status='unassigned' AND registration_submitted_at IS NOT NULL
+            AND learner_name IS NOT NULL AND trim(learner_name)!=''
+            AND class_name IS NOT NULL AND trim(class_name)!=''
+            AND phone IS NOT NULL AND trim(phone)!=''`)
+          .bind(accessExpiryAfterDays(automation.defaultAccessDays),payload.deviceId,payload.expectedPersonCode),
+        db.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json)
+          SELECT ?,'training_manager_approved',?,? WHERE changes()=1`)
+          .bind(actor,payload.deviceId,JSON.stringify({source:"app-manager-owner",managerTier:true}))
+      ]);
+      if(Number(approved.meta.changes)!==1 || Number(audited.meta.changes)!==1)
+        throw new DeviceAccessError("Hồ sơ đã đổi hoặc thiếu thông tin, cần đọc lại D1.",409,"MANAGER_APPROVE_CONFLICT");
+      const current=await getPublicDeviceState(payload.deviceId);
+      if(current?.status!=="approved"||!current.managementEnabled)
+        throw new DeviceAccessError("D1 chưa xác minh được tài khoản cán bộ đã duyệt.",503,"MANAGER_APPROVE_READBACK_FAILED");
+      return controlResponse({deviceId:payload.deviceId,accountApproved:true,managementEnabled:true},200,request);
     }
     if(payload.action!==undefined && payload.action!=="grant-manager")
       throw new DeviceAccessError("Thao tác cấp độ quản lý không hợp lệ.",400,"MANAGER_ACTION_INVALID");
