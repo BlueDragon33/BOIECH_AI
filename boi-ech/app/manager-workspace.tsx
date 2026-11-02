@@ -63,6 +63,6 @@ export default function ManagerWorkspace({deviceId,getProof}:{deviceId:string;ge
    <button type="button" onClick={()=>setPreviewOnly(false)}>Thoát xem thử</button></header>
    <ManagerApprovalPanel previewOnly/>
  </main>;
- if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button></main>;
+ if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button><button type="button" onClick={()=>setPreviewOnly(true)}>Xem thử không cần cấp quyền · dữ liệu mẫu</button></main>;
  return <div data-device-id={deviceId} data-person-role="manager"><button type="button" onClick={()=>setPreviewOnly(true)} disabled={busy}>Xem thử giao diện · không thay đổi dữ liệu</button><ManagerApprovalPanel getProof={getProof}/><TrainingDashboard board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindow(next);}}/></div>;
 }
