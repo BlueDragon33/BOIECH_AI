@@ -97,16 +97,21 @@ export async function POST(request:Request){
       .bind(payload.deviceId,payload.expectedPersonCode).first<{device_id:string;management_enabled:number}>();
     if(!selected||(selected.management_enabled===1)!==payload.expectedManagementEnabled)
       throw new DeviceAccessError("Quyền cán bộ đã thay đổi. Đồng bộ lại D1.",409,"MANAGEMENT_GRANT_CONFLICT");
-    const update=await db.prepare(`UPDATE device_access SET management_enabled=?,updated_at=CURRENT_TIMESTAMP
+    // Mutate permission and append audit within the same owning-D1 batch.
+    const [update,audit]=await db.batch([
+      db.prepare(`UPDATE device_access SET management_enabled=?,updated_at=CURRENT_TIMESTAMP
        WHERE device_id=? AND person_role='manager' AND person_code=? AND registration_submitted_at IS NOT NULL
         AND management_enabled=?
         AND (?=0 OR (status='approved' AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP)))`)
       .bind(payload.enabled?1:0,payload.deviceId,payload.expectedPersonCode,
-        payload.expectedManagementEnabled?1:0,payload.enabled?1:0).run();
-    if(Number(update.meta.changes)!==1)
+        payload.expectedManagementEnabled?1:0,payload.enabled?1:0),
+      db.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json)
+        SELECT ?,'training_manager_permission',?,? WHERE changes()=1`)
+      .bind(actor,payload.deviceId,JSON.stringify({enabled:payload.enabled,
+        expectedManagementEnabled:payload.expectedManagementEnabled}))
+    ]);
+    if(Number(update.meta.changes)!==1||Number(audit.meta.changes)!==1)
       throw new DeviceAccessError("Trạng thái cán bộ đã thay đổi. Đồng bộ và thử lại.",409,"MANAGEMENT_GRANT_CONFLICT");
-    await db.prepare("INSERT INTO course_audit_log(actor,action,target,detail_json) VALUES (?,'training_manager_permission',?,?)")
-      .bind(actor,payload.deviceId,JSON.stringify({enabled:payload.enabled})).run();
     const device=await getPublicDeviceState(payload.deviceId);
     if(device?.managementEnabled!==payload.enabled)
       throw new DeviceAccessError("Quyền quản lý chưa khớp GET D1.",503,"MANAGEMENT_GRANT_READBACK_FAILED");
