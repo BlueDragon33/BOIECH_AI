@@ -158,6 +158,11 @@ export async function POST(request: Request) {
     if (!exists) throw new DeviceAccessError("Không tìm thấy thiết bị.", 404, "DEVICE_NOT_FOUND");
 
     if (action === "approve") {
+      if (exists.person_role === "learner" || exists.person_role === "teacher") {
+        // Legacy admin-email endpoint cannot bypass manager P-256 proof,
+        // global tier quota, ownership and D1 audit.
+        throw new DeviceAccessError("Học viên và giảng viên phải được duyệt bởi Cán bộ quản lý có quyền, trong khu điều phối Bơi Ếch.",403,"MANAGER_APPROVAL_REQUIRED");
+      }
       if (!exists.learner_name?.trim() || !exists.class_name?.trim() || !exists.phone?.trim() || !exists.registration_submitted_at) {
         throw new DeviceAccessError("Thiết bị chưa gửi đủ Họ tên, Lớp và Số điện thoại.", 409, "REGISTRATION_REQUIRED");
       }
