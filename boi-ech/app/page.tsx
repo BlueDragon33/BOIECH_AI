@@ -796,6 +796,7 @@ function DeviceGate({
           </form>
         ) : null}
         {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>{device?.personRole === "manager" ? "Vào khu điều phối" : "Vào học"} <span>→</span></button> : null}
+        <p><a href="/xem-thu-can-bo-quan-ly">Xem thử chế độ Cán bộ quản lý (chỉ xem, không tác động dữ liệu thực)</a></p>
         {paymentRequested ? (
           <form className="device-payment-form" onSubmit={(event) => void submitPayment(event)}>
             {device?.paymentReviewNote ? <div className="payment-rejection" role="alert"><strong>Ảnh trước chưa được chấp nhận</strong><p>{device.paymentReviewNote}</p><small>Hãy kiểm tra lại thông tin chuyển khoản rồi gửi ảnh mới.</small></div> : null}
