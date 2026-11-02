@@ -49,3 +49,18 @@ test("blanket auto-approval is disabled for migration into manager-tier review",
  const auth=read("app/device-auth.server.ts");
  assert.match(auth,/enabled: row\?\.auto_confirm_new_devices === 1/);
 });
+
+test("legacy admin endpoints cannot bypass manager-only approval",()=>{
+ const admin=read("app/api/admin/devices/route.ts");
+ const overview=read("app/api/control/overview/route.ts");
+ assert.match(admin,/WHERE d\.person_role = 'manager'/);
+ assert.match(admin,/if \(exists\.person_role !== "manager"\)/);
+ assert.match(overview,/if \(current\.person_role !== "manager"\)/);
+});
+test("manager write and audit are one D1 batch with separate readback",()=>{
+ assert.match(service,/const \[update, auditWrite\]=await db\.batch\(\[/);
+ assert.match(service,/const results=await db\.batch\(\[/);
+ assert.match(service,/SELECT \?,\?,\?,\? WHERE changes\(\)=1/);
+ assert.match(service,/MANAGER_REVIEW_READBACK_MISMATCH/);
+ assert.doesNotMatch(service,/await db\.prepare\(`INSERT INTO course_audit_log/);
+});
