@@ -18,7 +18,7 @@ test("manager-tier uses ONE shared 50 learner / 5 teacher quota, not per-manager
  assert.match(service,/Shared quotas across ALL managers/);
 });
 test("only owner may grant manager authority or edit shared tier limits",()=>{
- assert.match(grant,/role !== "owner"/);
+ assert.match(grant,/role\s*!==\s*"owner"/);
  assert.match(grant,/set-tier-limits/);
  assert.match(grant,/get-tier-limits/);
  assert.match(grant,/management_enabled/);
