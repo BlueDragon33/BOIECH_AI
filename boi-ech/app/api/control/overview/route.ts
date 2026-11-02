@@ -453,6 +453,11 @@ export async function POST(request: Request) {
     const deviceId = typeof payload.deviceId === "string" ? payload.deviceId : "";
     if (!/^[a-f0-9]{64}$/.test(deviceId)) return respond({ error: "Mã thiết bị không hợp lệ." }, 400);
 
+    // The central control plane may no longer restore/delete ordinary
+    // learner/teacher device identities. Only manager account decisions remain.
+    if (action === "restore-deleted-device" || action === "delete-spam-device") {
+      return respond({error:"Quản trị trung tâm chỉ xử lý tài khoản cán bộ quản lý; khôi phục/xóa thiết bị học tập thuộc Bơi Ếch.",code:"MANAGER_ONLY_CENTRAL_REVIEW"},403);
+    }
     if (action === "restore-deleted-device") {
       if (role !== "owner") {
         return respond({ error: "Chỉ Chủ hệ thống mới được cho phép thiết bị đã xóa đăng ký lại." }, 403);
@@ -502,6 +507,12 @@ export async function POST(request: Request) {
       migrated_from_user_key: string | null;
     }>();
     if (!current) return respond({ error: "Không tìm thấy thiết bị." }, 404);
+    if (current.person_role !== "manager") {
+      return respond({error:"App-Manager chỉ xét duyệt tài khoản cán bộ quản lý. Học viên và giảng viên do cán bộ Bơi Ếch quản lý.",code:"MANAGER_ONLY_CENTRAL_REVIEW"},403);
+    }
+    if (role !== "owner") {
+      return respond({error:"Chỉ Chủ hệ thống được thay đổi quyền tài khoản cán bộ quản lý.",code:"OWNER_REQUIRED"},403);
+    }
 
     if (payload.expectedStatus !== undefined || payload.expectedPaymentStatus !== undefined || payload.expectedAccessGroup !== undefined) {
       if (!["pending", "approved", "blocked"].includes(String(payload.expectedStatus))
