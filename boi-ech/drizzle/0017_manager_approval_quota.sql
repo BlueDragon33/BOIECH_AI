@@ -1,11 +1,16 @@
 -- Blueprint OS 1.3.0. Additive, no grants or backfill; no existing user is assigned automatically.
+-- Shared quota for the manager tier, NOT multiplied by manager count.
 CREATE TABLE IF NOT EXISTS manager_approval_limits (
-  manager_device_id TEXT PRIMARY KEY NOT NULL REFERENCES device_access(device_id) ON DELETE CASCADE,
+  scope TEXT PRIMARY KEY NOT NULL CHECK(scope='manager-tier'),
   learner_limit INTEGER NOT NULL DEFAULT 50 CHECK(learner_limit BETWEEN 0 AND 5000),
   teacher_limit INTEGER NOT NULL DEFAULT 5 CHECK(teacher_limit BETWEEN 0 AND 500),
   updated_by TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+--> statement-breakpoint
+INSERT INTO manager_approval_limits(scope,learner_limit,teacher_limit,updated_by)
+VALUES('manager-tier',50,5,'system:default')
+ON CONFLICT(scope) DO NOTHING;
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS manager_device_assignments (
   target_device_id TEXT PRIMARY KEY NOT NULL REFERENCES device_access(device_id) ON DELETE CASCADE,
@@ -38,11 +43,11 @@ BEFORE INSERT ON manager_device_assignments BEGIN
       AND d.registration_submitted_at IS NOT NULL
   ) THEN RAISE(ABORT,'MANAGER_TARGET_NOT_ELIGIBLE') END;
   SELECT CASE WHEN (
-    SELECT COUNT(*) FROM manager_device_assignments a WHERE a.manager_device_id=NEW.manager_device_id
-      AND a.person_role=NEW.person_role
+    SELECT COUNT(*) FROM manager_device_assignments a
+      WHERE a.person_role=NEW.person_role
   ) >= COALESCE((
     SELECT CASE WHEN NEW.person_role='learner' THEN learner_limit ELSE teacher_limit END
-    FROM manager_approval_limits WHERE manager_device_id=NEW.manager_device_id
+    FROM manager_approval_limits WHERE scope='manager-tier'
   ), CASE WHEN NEW.person_role='learner' THEN 50 ELSE 5 END)
   THEN RAISE(ABORT,'MANAGER_APPROVAL_QUOTA_REACHED') END;
 END;
