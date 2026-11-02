@@ -84,3 +84,11 @@ test("Owner quota changes and manager permissions use D1 compare-and-swap",()=>{
  assert.match(grant,/MANAGEMENT_GRANT_CONFLICT/);
  assert.match(grant,/MANAGER_TIER_D1_MISSING/);
 });
+
+test("Owner approval renews expired pending manager access before independent readback",()=>{
+ assert.match(grant,/payload\.action==="approve-manager"/);
+ assert.match(grant,/access_expires_at=CASE\s+WHEN access_expires_at IS NULL OR datetime\(access_expires_at\)<=CURRENT_TIMESTAMP/);
+ assert.match(grant,/THEN \? ELSE access_expires_at END/);
+ assert.match(grant,/status='pending'/);
+ assert.match(grant,/MANAGER_APPROVE_READBACK_FAILED/);
+});
