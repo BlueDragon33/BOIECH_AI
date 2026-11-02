@@ -80,8 +80,12 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
         blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       WHERE device_id=? AND status='approved' AND person_role IN ('learner','teacher')
         AND EXISTS(SELECT 1 FROM manager_device_assignments
-          WHERE target_device_id=? AND manager_device_id=?)`)
-      .bind(deviceId,deviceId,actor.deviceId).run();
+          WHERE target_device_id=? AND manager_device_id=?)
+        AND EXISTS(SELECT 1 FROM device_access m
+          WHERE m.device_id=? AND m.person_role='manager' AND m.management_enabled=1
+            AND m.status='approved' AND m.registration_submitted_at IS NOT NULL
+            AND (m.access_expires_at IS NULL OR datetime(m.access_expires_at)>CURRENT_TIMESTAMP))`)
+      .bind(deviceId,deviceId,actor.deviceId,actor.deviceId).run();
     if (Number(update.meta.changes)!==1) throw new DeviceAccessError("Thiết bị vừa thay đổi; đồng bộ lại.",409,"MANAGER_REVIEW_CONFLICT");
   } else {
     if(target.status!=="pending" || target.payment_status!=="unassigned"
