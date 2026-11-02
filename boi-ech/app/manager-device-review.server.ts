@@ -1,4 +1,4 @@
-import { DeviceAccessError, getCourseDatabase, type PublicDeviceState } from "./device-auth.server";
+import { accessExpiryAfterDays, DeviceAccessError, getAccessAutomationSettings, getCourseDatabase, type PublicDeviceState } from "./device-auth.server";
 import { requireManager } from "./training-management.server";
 
 export const MANAGER_DEFAULT_LEARNER_LIMIT = 50;
@@ -20,8 +20,10 @@ export async function managerReviewBoard(actor: PublicDeviceState) {
   const [limits, usage, queued] = await Promise.all([
     db.prepare("SELECT learner_limit, teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'")
       .first<LimitRow>(),
-    db.prepare(`SELECT person_role, COUNT(*) AS used FROM manager_device_assignments
-      GROUP BY person_role`).all<UsageRow>(),
+    db.prepare(`SELECT a.person_role, COUNT(*) AS used FROM manager_device_assignments a
+      JOIN device_access d ON d.device_id=a.target_device_id
+      WHERE d.status='approved' AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      GROUP BY a.person_role`).all<UsageRow>(),
     db.prepare(`SELECT d.device_id,d.display_code,d.person_role,d.learner_name,d.person_code,
       d.class_name,d.status,d.registration_submitted_at,a.manager_device_id
       FROM device_access d LEFT JOIN manager_device_assignments a ON a.target_device_id=d.device_id
@@ -86,6 +88,8 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
       || !target.registration_submitted_at || target.manager_device_id) {
       throw new DeviceAccessError("Thiết bị không còn chờ duyệt hoặc đang thuộc cán bộ khác.",409,"MANAGER_REVIEW_CONFLICT");
     }
+    const automation=await getAccessAutomationSettings();
+    const accessExpiresAt=accessExpiryAfterDays(automation.defaultAccessDays);
     // D1 batch is one transaction. The migration trigger validates active
     // manager grant, complete target, unique assignment and quota at INSERT.
     const results=await db.batch([
@@ -93,12 +97,13 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
         VALUES(?,?,?)`).bind(deviceId,actor.deviceId,target.person_role),
       db.prepare(`UPDATE device_access SET status='approved',access_group='free',
           payment_status='free_approved',approved_at=CURRENT_TIMESTAMP,
-          blocked_at=NULL,updated_at=CURRENT_TIMESTAMP
+          blocked_at=NULL,access_expires_at=COALESCE(access_expires_at,?),
+          updated_at=CURRENT_TIMESTAMP
         WHERE device_id=? AND status='pending' AND payment_status='unassigned'
           AND person_role=? AND registration_submitted_at IS NOT NULL
           AND EXISTS(SELECT 1 FROM manager_device_assignments
             WHERE target_device_id=? AND manager_device_id=?)`)
-        .bind(deviceId,target.person_role,deviceId,actor.deviceId),
+        .bind(accessExpiresAt,deviceId,target.person_role,deviceId,actor.deviceId),
     ]);
     if (Number(results[0].meta.changes)!==1 || Number(results[1].meta.changes)!==1)
       throw new DeviceAccessError("Xung đột khi cấp quyền, không xác minh được cập nhật.",409,"MANAGER_REVIEW_CONFLICT");
