@@ -30,8 +30,11 @@ export async function POST(request:Request){
         .bind(payload.deviceId,payload.expectedPersonCode)
         .first<{management_enabled:number;status:string;access_expires_at:string|null}>();
       if(!row)throw new DeviceAccessError("Không tìm thấy cán bộ quản lý.",404,"MANAGER_NOT_FOUND");
+      if(row.management_enabled!==0&&row.management_enabled!==1)
+        throw new DeviceAccessError("D1 trả trạng thái quyền cán bộ không hợp lệ.",503,"MANAGER_GRANT_D1_INVALID");
       const active=row.status==="approved"&&(!row.access_expires_at||Date.parse(row.access_expires_at)>Date.now());
-      return controlResponse({managementEnabled:row.management_enabled===1&&active,
+      return controlResponse({managementConfigured:row.management_enabled===1,
+        managementEnabled:row.management_enabled===1&&active,
         accountApproved:active,deviceId:payload.deviceId},200,request);
     }
     if(payload.action==="set-tier-limits"){
@@ -115,9 +118,19 @@ export async function POST(request:Request){
     ]);
     if(Number(update.meta.changes)!==1||Number(audit.meta.changes)!==1)
       throw new DeviceAccessError("Trạng thái cán bộ đã thay đổi. Đồng bộ và thử lại.",409,"MANAGEMENT_GRANT_CONFLICT");
+    // Fresh D1 SELECT must verify the persisted bit; effective access alone
+    // is false both before and after revoking an expired/blocked manager.
+    const persisted=await db.prepare(`SELECT management_enabled FROM device_access
+      WHERE device_id=? AND person_role='manager' AND person_code=? AND registration_submitted_at IS NOT NULL`)
+      .bind(payload.deviceId,payload.expectedPersonCode)
+      .first<{management_enabled:number}>();
+    if(!persisted||(persisted.management_enabled!==0&&persisted.management_enabled!==1)
+      ||(persisted.management_enabled===1)!==payload.enabled)
+      throw new DeviceAccessError("Quyền cán bộ đã lưu chưa khớp D1 độc lập.",503,"MANAGEMENT_GRANT_READBACK_FAILED");
     const device=await getPublicDeviceState(payload.deviceId);
     if(device?.managementEnabled!==payload.enabled)
-      throw new DeviceAccessError("Quyền quản lý chưa khớp GET D1.",503,"MANAGEMENT_GRANT_READBACK_FAILED");
-    return controlResponse({device,managementEnabled:device.managementEnabled},200,request);
+      throw new DeviceAccessError("Quyền quản lý có hiệu lực chưa khớp D1.",503,"MANAGEMENT_GRANT_READBACK_FAILED");
+    return controlResponse({device,managementConfigured:persisted.management_enabled===1,
+      managementEnabled:device.managementEnabled},200,request);
   }catch(error){return withControlCors(request,deviceErrorResponse(error));}
 }
