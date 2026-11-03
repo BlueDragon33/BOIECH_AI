@@ -92,3 +92,20 @@ test("Owner approval renews expired pending manager access before independent re
  assert.match(grant,/status='pending'/);
  assert.match(grant,/MANAGER_APPROVE_READBACK_FAILED/);
 });
+
+test("Owner read independently exposes raw persisted manager grant and effective access",()=>{
+ assert.match(grant,/payload\.action==="get-manager-grant"/);
+ assert.match(grant,/SELECT management_enabled,status,access_expires_at FROM device_access/);
+ assert.match(grant,/managementConfigured:row\.management_enabled===1/);
+ assert.match(grant,/managementEnabled:row\.management_enabled===1&&active/);
+ assert.match(grant,/MANAGER_GRANT_D1_INVALID/);
+});
+test("Owner grant\/revoke verifies raw persisted manager grant via a fresh scoped D1 SELECT",()=>{
+ assert.match(grant,/const persisted=await db\.prepare\(`SELECT management_enabled FROM device_access/);
+ assert.match(grant,/person_role='manager' AND person_code=\? AND registration_submitted_at IS NOT NULL/);
+ assert.match(grant,/\.bind\(payload\.deviceId,payload\.expectedPersonCode\)/);
+ assert.match(grant,/persisted\.management_enabled===1\)!==payload\.enabled/);
+ assert.match(grant,/if\(!persisted\|\|/);
+ assert.match(grant,/managementConfigured:persisted\.management_enabled===1/);
+ assert.match(grant,/MANAGEMENT_GRANT_READBACK_FAILED/);
+});
