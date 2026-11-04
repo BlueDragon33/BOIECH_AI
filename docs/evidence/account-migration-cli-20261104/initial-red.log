@@ -1,0 +1,100 @@
+✖ offline rehearsal accepts D1-style WITHOUT ROWID tables and preserves the source (1047.2846ms)
+✖ offline rehearsal fingerprints full-width SQLite integers and binary legacy values (1089.030458ms)
+✔ offline rehearsal detects a legacy value type change during backfill (2704.027693ms)
+✖ offline rehearsal refuses an existing foreign-key violation (2566.630911ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 1
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7589.408646
+
+✖ failing tests:
+
+test at tests/account-migration-cli.test.mjs:41:1
+✖ offline rehearsal accepts D1-style WITHOUT ROWID tables and preserves the source (1047.2846ms)
+  AssertionError [ERR_ASSERTION]: file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:17
+   function fingerprints(){return Object.fromEntries(legacyTables.map(name=>{const rows=sqlite.prepare('SELECT * FROM "'+name.replaceAll('"','""')+'" ORDER BY rowid').iterate();const hash=createHash('sha256');let count=0;for(const row of rows){hash.update(JSON.stringify(row));count++}return [name,{count,hash:hash.digest('hex')}]}))}
+                                                                                               ^
+  
+  Error: no such column: rowid
+      at file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:17:94
+      at Array.map (<anonymous>)
+      at fingerprints (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:17:65)
+      at file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:18:15 {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+  
+  Node.js v24.22.1
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/account-migration-cli.test.mjs:46:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/account-migration-cli.test.mjs:56:1
+✖ offline rehearsal fingerprints full-width SQLite integers and binary legacy values (1089.030458ms)
+  AssertionError [ERR_ASSERTION]: file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:17
+   function fingerprints(){return Object.fromEntries(legacyTables.map(name=>{const rows=sqlite.prepare('SELECT * FROM "'+name.replaceAll('"','""')+'" ORDER BY rowid').iterate();const hash=createHash('sha256');let count=0;for(const row of rows){hash.update(JSON.stringify(row));count++}return [name,{count,hash:hash.digest('hex')}]}))}
+                                                                                                                                                                                                                                       ^
+  
+  RangeError: Value is too large to be represented as a JavaScript number: 9223372036854775807
+      at file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:17:230
+      at Array.map (<anonymous>)
+      at fingerprints (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:17:65)
+      at file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/account-migration.mjs:18:15 {
+    code: 'ERR_OUT_OF_RANGE'
+  }
+  
+  Node.js v24.22.1
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/account-migration-cli.test.mjs:61:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/account-migration-cli.test.mjs:82:1
+✖ offline rehearsal refuses an existing foreign-key violation (2566.630911ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/account-migration-cli.test.mjs:88:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }

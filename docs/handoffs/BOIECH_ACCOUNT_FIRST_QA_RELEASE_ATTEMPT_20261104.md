@@ -1,5 +1,7 @@
 # Account-first P0 — independent engineering QA and publication attempt
 
+Latest offline rehearsal follow-up: [snapshot CLI preservation correction and new evidence](BOIECH_ACCOUNT_FIRST_SNAPSHOT_CLI_REPAIR_20261104.md). Application/DDL/config bytes remain unchanged; release acceptance is still blocked.
+
 Blueprint OS 1.3.0. **REVIEW BLOCKED; CI PENDING; global D1 10/10 BLOCKED; default account flag OFF.** The latest Owner request asks to complete publication. Publication intent does not attest unfinished QA or confer independent reviewer approval.
 
 Initial exact pair: BOIECH `276c296929d2a6d8ce8e417b3bb6f0ab2f355137`, Central `b50878d2878bf51444d033064ce9d9cb4e56a3e0`. Both heads were re-read unchanged from GitHub before corrections. Their prior source-only local results were not treated as release acceptance.

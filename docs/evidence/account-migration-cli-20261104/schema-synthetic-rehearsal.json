@@ -1,0 +1,19 @@
+{
+  "mode": "LOCAL_SNAPSHOT_DRY_RUN",
+  "node": "v24.22.1",
+  "report": {
+    "eligible": 3,
+    "conflicts": []
+  },
+  "mappedAccounts": 3,
+  "legacyTables": 27,
+  "legacyRowsUnchanged": true,
+  "idempotent": true,
+  "reopenReadback": true,
+  "integrityCheck": true,
+  "foreignKeyCheck": true,
+  "sourceUnmodified": true,
+  "rollback": "delete disposable clone; source snapshot unchanged",
+  "fixture": "captured live schema with synthetic data only",
+  "sourceSha256BeforeAndAfter": "e3e566a86cdd20c231f3291138aaaf26a889482db46223a388b54ab0dc378412"
+}

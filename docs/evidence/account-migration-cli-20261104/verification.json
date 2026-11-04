@@ -1,0 +1,75 @@
+{
+  "baseBoiHead": "040898b77b7ede9541e5f0c616656a5aa3ef20a4",
+  "baseConsumerHead": "9ccedcdc9d47d0848516f30450a721e60789a879",
+  "node": "v24.22.1",
+  "changes": "offline rehearsal utility and its real CLI regression tests only; application/DDL/config bytes unchanged",
+  "checks": {
+    "buildAndArtifact": {
+      "exitCode": 0,
+      "log": "build.log"
+    },
+    "fullNode": {
+      "exitCode": 0,
+      "tests": 582,
+      "pass": 582,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "log": "full-node.log"
+    },
+    "newCliTests": {
+      "tests": 8,
+      "pass": 8,
+      "realChildProcess": true,
+      "originalSnapshotByteIdentical": true
+    },
+    "typecheck": {
+      "command": "tsc --noEmit --incremental false",
+      "exitCode": 0
+    },
+    "changedFileLint": {
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0
+    },
+    "nodeSyntax": {
+      "exitCode": 0
+    },
+    "gitDiffCheck": {
+      "exitCode": 0
+    }
+  },
+  "redEvidence": {
+    "initial": "WITHOUT ROWID, int64 and preexisting FK violation failed against base; initial-red.log",
+    "reviewFindings": "nonfinite REAL, undecodable TEXT and signed-zero mutations independently reproduced as false success before serialization corrections"
+  },
+  "scopedReview": {
+    "kind": "separate-context read-only engineering review",
+    "scope": [
+      "boi-ech/scripts/account-migration.mjs",
+      "boi-ech/tests/account-migration-cli.test.mjs"
+    ],
+    "result": "no remaining Critical/Important findings after corrections",
+    "syntheticOnly": true,
+    "productAcceptance": false
+  },
+  "cloudflare": {
+    "deploymentPath": ".github/workflows/deploy-cloudflare.yml -> Wrangler; credentials remain in GitHub environment",
+    "hostedActionsInvoked": false,
+    "wranglerWhoami": "not authenticated",
+    "tokenOrCookieExtracted": false,
+    "realSqlBackupCreated": false,
+    "productionWrites": false,
+    "deployed": false
+  },
+  "gates": {
+    "review": "BLOCKED",
+    "ci": "PENDING",
+    "globalD1": "10/10 BLOCKED",
+    "accountFirstFlag": "OFF"
+  },
+  "fileSha256": {
+    "boi-ech/scripts/account-migration.mjs": "56135a3d25d7f12ee35ada53ea535c2e7f45f4e2a508c60e39fec0f2b301a27a",
+    "boi-ech/tests/account-migration-cli.test.mjs": "5d665731b95d44397f89d52abd986b8c1d48602abe62938d5b4cc99523f3ae4d"
+  }
+}
