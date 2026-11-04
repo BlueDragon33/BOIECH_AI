@@ -185,13 +185,22 @@ function view(row: Row) {
   );
   const scoreTotal = COURSE_LESSON_NUMBERS.reduce((total, lesson) => total + Math.max(0, Math.min(10, scores[lesson] ?? 0)), 0);
   const lastPresenceAt = row.last_seen_at;
-  const lastPresenceTime = Date.parse(lastPresenceAt);
+  // D1 CURRENT_TIMESTAMP is UTC without an explicit offset; parse it as UTC.
+  const lastPresenceTime = Date.parse(
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(lastPresenceAt)
+      ? lastPresenceAt.replace(" ", "T") + "Z" : lastPresenceAt,
+  );
+  const now = Date.now();
+  const presenceExpired = Number.isFinite(lastPresenceTime)
+    && lastPresenceTime + DEVICE_PRESENCE_TIMEOUT_MS <= now;
   const active = row.status !== "blocked"
     && Number.isFinite(lastPresenceTime)
-    && Date.now() - lastPresenceTime <= DEVICE_PRESENCE_TIMEOUT_MS;
-  const offlineSinceAt = active || !Number.isFinite(lastPresenceTime)
-    ? null
-    : new Date(lastPresenceTime + DEVICE_PRESENCE_TIMEOUT_MS).toISOString();
+    && lastPresenceTime <= now && !presenceExpired;
+  // A blocked account with a *recent* heartbeat is not proof that the
+  // device actually went offline. Never publish a future offline timestamp.
+  const offlineSinceAt = presenceExpired
+    ? new Date(lastPresenceTime + DEVICE_PRESENCE_TIMEOUT_MS).toISOString()
+    : null;
   const registrationComplete = Boolean(row.learner_name?.trim() && row.person_role && row.person_code?.trim() && row.class_name?.trim() && row.phone?.trim() && row.registration_submitted_at);
   const expiryTime = row.access_expires_at ? Date.parse(row.access_expires_at) : Number.NaN;
   const accessExpired = Number.isFinite(expiryTime) && expiryTime <= Date.now();
