@@ -111,6 +111,7 @@ test("Owner grant\/revoke verifies raw persisted manager grant via a fresh scope
 });
 
 test("registration timestamp and heartbeat evidence are exposed without inventing online duration",()=>{
+ const overview=read("app/api/control/overview/route.ts");
  assert.match(overview,/registrationSubmittedAt: row\.registration_submitted_at/);
  assert.match(overview,/lastPresenceAt,\s*offlineSinceAt,/);
  assert.match(overview,/const lastPresenceAt = row\.last_seen_at/);
