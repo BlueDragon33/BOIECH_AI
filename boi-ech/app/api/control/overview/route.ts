@@ -230,6 +230,7 @@ function view(row: Row) {
     personalEditConfigured: row.personal_edit_enabled === 1,
     autoConfirmedAt: row.auto_confirmed_at,
     createdAt: row.created_at,
+    registrationSubmittedAt: row.registration_submitted_at,
     approvedAt: row.approved_at,
     blockedAt: row.blocked_at,
     lastSeenAt: row.last_seen_at,
