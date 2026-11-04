@@ -1,0 +1,22 @@
+{
+  "authority": "SOURCE_ONLY_ENGINEERING_CANDIDATE",
+  "review": "BLOCKED",
+  "ci": "PENDING",
+  "globalD1": "10/10 BLOCKED",
+  "featureFlag": "BOI_ECH_ACCOUNT_FIRST default OFF",
+  "boiImplementation": "fbf70057a232e3c1f6115311afc0385e80e6dbb6",
+  "boiFollowupScope": "handoff/evidence documents only; boi-ech application source unchanged",
+  "centralImplementation": "b50878d2878bf51444d033064ce9d9cb4e56a3e0",
+  "centralTree": "c29a9468681bccfc218f7210da43c4ea7c5cc953",
+  "centralEvidence": "https://github.com/BlueDragon33/Application-Management/blob/b50878d2878bf51444d033064ce9d9cb4e56a3e0/docs/evidence/account-first-consumer-repair-20261104/verification.json",
+  "centralFinalNode": {"tests": 833, "pass": 833, "fail": 0, "skipped": 0},
+  "centralFullNpmTest": {"tests": 832, "pass": 832, "fail": 0, "typecheckExit": 0, "buildExit": 0},
+  "centralLint": {"exitCode": 0, "errors": 0, "warnings": 38},
+  "sourceIntegration": "PASS; synthetic platform bindings, in-process HTTP, real signatures/routes/service/CAS/SQL, SQLite only",
+  "realBrowser": "NOT_RUN",
+  "targetRuntime20260826": "NOT_RUN",
+  "liveD1": "NOT_RUN",
+  "independentHumanAcceptance": "BLOCKED",
+  "actionsRunsObservedBeforeHandoff": 0,
+  "spend": "ZERO-SPEND; no hosted Actions, deploy, approval, merge, ratification or Production"
+}
