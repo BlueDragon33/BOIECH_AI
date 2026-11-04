@@ -1,0 +1,50 @@
+[
+  {
+    "path": ".github/workflows/deploy-boi-ech-preview.yml",
+    "sha256": "89c023ca161d9de69c949aa3684aa02c40a3715c1cb554e30bf254ec942ea0d3"
+  },
+  {
+    "path": "boi-ech/app/api/teacher/roster/route.ts",
+    "sha256": "27331388bf533a38adf9a8ae73e21693af70f392904d310339d46e56b07aea25"
+  },
+  {
+    "path": "boi-ech/app/device-auth.server.ts",
+    "sha256": "6089cc29da5a269acd226e7f7f02e1623c21b9c2ec76748bb9e74a9142fee525"
+  },
+  {
+    "path": "boi-ech/app/teacher-roster-manager.tsx",
+    "sha256": "a27b41b1f6777fa21dd1284283aaef55e0e26a9d6a0ab6296c40b6519d0a7d18"
+  },
+  {
+    "path": "boi-ech/tests/account-legacy-boundary.test.mjs",
+    "sha256": "535eac1bddd710562ac4093b5b8e7df80a075985a6fc31a6f5bc32522ef9b33f"
+  },
+  {
+    "path": "boi-ech/tests/account-teacher-roster-ui.test.mjs",
+    "sha256": "aa398984f15daa392a139c628b27ae456e2ae25c913eb05e452cd1b38294bc32"
+  },
+  {
+    "path": "boi-ech/tests/helpers/account-stack.mjs",
+    "sha256": "e4a6264b2188c2eeeb9d899f1f3a9e2e6ce2eddeeb5bece5444b5a3e67f1aed4"
+  },
+  {
+    "path": "boi-ech/tests/preview-release-gate.test.mjs",
+    "sha256": "5199841993fec9d7a79bf9fa2a249f94467e5fcf47001d5a6804e20418e9799c"
+  },
+  {
+    "path": "boi-ech/tests/teacher-roster-idempotency-v14.test.mjs",
+    "sha256": "a8b4aca6dfde8dea4e8d7008f30c9c6767ec56e18652802b98206d775960a341"
+  },
+  {
+    "path": "docs/handoffs/BOIECH_ACCOUNT_FIRST_P0_CONSUMER_ADMISSION_20261104.md",
+    "sha256": "f840be77115b5253a2312449fde2471bdf1b370b3dc9fad7ea5789ce603c77fa"
+  },
+  {
+    "path": "docs/handoffs/BOIECH_ACCOUNT_FIRST_P0_REVIEWER_HANDOFF_20261104.md",
+    "sha256": "e291f055ed512283c7ec77a7172cbeffc560a430cc58fbafc5aa59dfcb4314dc"
+  },
+  {
+    "path": "docs/handoffs/BOIECH_ACCOUNT_FIRST_QA_RELEASE_ATTEMPT_20261104.md",
+    "sha256": "5e7318e4a172910a521cc376ecf86cc981b96ff51a8e3f370e3a7a5506d49abf"
+  }
+]

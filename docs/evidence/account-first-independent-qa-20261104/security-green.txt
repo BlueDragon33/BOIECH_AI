@@ -1,0 +1,13 @@
+✔ account-mode teacher cannot approve past shared quota or mutate account approval via legacy roster (665.753568ms)
+✔ pre-proof challenges on both HTTP endpoints reveal no profile on success or blocked errors (330.642091ms)
+✔ flag OFF preserves the legacy challenge response contract (304.407274ms)
+✔ actual repository Preview release gate accepts the explicit protected deployment workflow (57.591835ms)
+✔ Preview gate rejects removal of confirmation or generated artifact verification (130.630295ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1603.626246

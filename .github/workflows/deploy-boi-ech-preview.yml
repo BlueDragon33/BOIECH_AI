@@ -2,6 +2,11 @@ name: Boi Ech Cloudflare Preview Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY_PREVIEW to deploy the isolated Preview"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -24,6 +29,17 @@ jobs:
       BOI_ECH_PREVIEW_ORIGIN: ${{ vars.BOI_ECH_PREVIEW_ORIGIN }}
 
     steps:
+      - name: Require explicit preview confirmation
+        shell: bash
+        env:
+          PREVIEW_CONFIRMATION: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "$PREVIEW_CONFIRMATION" != "DEPLOY_PREVIEW" ]]; then
+            echo '::error::Deployment cancelled. Enter DEPLOY_PREVIEW exactly.'
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -69,7 +85,9 @@ jobs:
       - name: Deploy preview
         if: steps.config.outputs.ready == 'true'
         working-directory: boi-ech
-        run: npx wrangler deploy
+        run: |
+          npm run cloudflare:artifact:check
+          npx wrangler deploy
 
       - name: Quick availability check
         if: steps.config.outputs.ready == 'true' && env.BOI_ECH_PREVIEW_ORIGIN != ''

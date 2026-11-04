@@ -17,6 +17,7 @@ type RosterItem = {
   lastSeenAt: string;
 };
 type RosterResponse = {
+  canManage?: boolean;
   roster: RosterItem[];
   counts: { pending: number; approved: number; blocked: number };
   syncedAt: string;
@@ -161,6 +162,7 @@ function RosterPanel({
   syncedAt,
   onSync,
   onAction,
+  canManage,
 }: {
   roster: RosterItem[];
   counts: RosterResponse["counts"];
@@ -169,6 +171,7 @@ function RosterPanel({
   syncedAt: string | null;
   onSync: () => void;
   onAction: (action: "approve" | "remove", item: RosterItem) => void;
+  canManage: boolean;
 }) {
   const [filter, setFilter] = useState<"all" | RosterStatus>("all");
   const [query, setQuery] = useState("");
@@ -187,7 +190,7 @@ function RosterPanel({
         <div>
           <span>QUẢN LÝ HỌC VIÊN</span>
           <h2>Đồng bộ & quyền lớp phụ trách</h2>
-          <p>Giảng viên chỉ phê duyệt hoặc loại học viên thuộc đúng lớp của mình. “Loại” là khóa có thể khôi phục, không xóa dữ liệu.</p>
+          <p>{canManage ? "Giảng viên chỉ phê duyệt hoặc loại học viên thuộc đúng lớp của mình. “Loại” là khóa có thể khôi phục, không xóa dữ liệu." : "Giảng viên theo dõi học viên thuộc lớp phụ trách. Cán bộ quản lý xét duyệt và quản lý quyền truy cập tài khoản."}</p>
         </div>
         <button type="button" onClick={onSync} disabled={loading}>{loading ? "Đang đồng bộ…" : "Đồng bộ dữ liệu"}</button>
       </header>
@@ -222,7 +225,7 @@ function RosterPanel({
                 <td><span className={`teacher-roster-status ${item.status}`}>{statusLabel(item.status)}</span></td>
                 <td>{shortTime(item.lastSeenAt)}</td>
                 <td>
-                  {item.status === "pending" ? (
+                  {!canManage ? <span>Cán bộ quản lý xét duyệt</span> : item.status === "pending" ? (
                     <button type="button" className="approve" disabled={loading || !item.registrationComplete} onClick={() => onAction("approve", item)}>
                       {item.registrationComplete ? "Phê duyệt" : "Thiếu hồ sơ"}
                     </button>
@@ -312,6 +315,7 @@ export default function TeacherRosterManager() {
   };
 
   const mutate = async (action: "approve" | "remove", item: RosterItem) => {
+    if (data.canManage === false) return;
     if (document.body.dataset.teacherRoleUi !== "active") return;
     if (action === "remove") {
       const confirmed = window.confirm(`Loại ${item.name} khỏi lớp? Học viên sẽ bị khóa truy cập nhưng có thể được khôi phục sau.`);
@@ -470,6 +474,7 @@ export default function TeacherRosterManager() {
       syncedAt={data.syncedAt || null}
       onSync={() => { setChangedCount(0); void syncRoster("manual"); }}
       onAction={(action, item) => void mutate(action, item)}
+      canManage={data.canManage !== false}
     />,
     panelMount,
   ) : null;

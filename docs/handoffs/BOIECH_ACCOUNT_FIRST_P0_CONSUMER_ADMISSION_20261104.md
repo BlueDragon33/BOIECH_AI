@@ -1,5 +1,6 @@
 # Account-first P0 — consumer source admission follow-up
 
+Latest QA follow-up: [independent findings, corrected source and publication blockers](BOIECH_ACCOUNT_FIRST_QA_RELEASE_ATTEMPT_20261104.md). The earlier source pins/results below are historical; they are not acceptance of the corrected source.
 Blueprint OS 1.3.0. **SOURCE ONLY; REVIEW BLOCKED; CI PENDING; global D1 10/10 BLOCKED.** `BOI_ECH_ACCOUNT_FIRST` default OFF. No Actions, PR event, merge/rebase, approval, ratification, deploy or Production access.
 
 ## Exact source pair

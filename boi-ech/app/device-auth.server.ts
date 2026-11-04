@@ -541,7 +541,7 @@ export async function createDeviceChallenge(deviceId: unknown, accountClaim = fa
   if (!row) throw new DeviceAccessError("Thiết bị chưa được đăng ký.", 404, "DEVICE_NOT_REGISTERED");
   const device = publicState(row);
   if (row.status === "blocked" && !accountClaim) {
-    throw new DeviceAccessError("Quyền truy cập của thiết bị này đã bị khóa.", 403, "DEVICE_BLOCKED", device);
+    throw new DeviceAccessError("Quyền truy cập của thiết bị này đã bị khóa.", 403, "DEVICE_BLOCKED", accountFirstRuntimeEnabled ? undefined : device);
   }
   const nonce = base64Url(crypto.getRandomValues(new Uint8Array(32)));
   const expiresAt = Date.now() + 2 * 60 * 1000;
@@ -559,7 +559,9 @@ export async function createDeviceChallenge(deviceId: unknown, accountClaim = fa
           )`,
     ).bind(deviceId, deviceId),
   ]);
-  return { challenge: nonce, expiresAt, device };
+  // Nonce issuance precedes key proof. In account mode it cannot be a second,
+  // unaudited profile endpoint for callers who know a legacy storage identifier.
+  return accountFirstRuntimeEnabled ? { challenge: nonce, expiresAt } : { challenge: nonce, expiresAt, device };
 }
 
 export async function verifyDeviceIdentityRequest(payload: Record<string, unknown>, skipSignatureCheck = false, originalLegacyProofOnly = false) {

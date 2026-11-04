@@ -1,5 +1,6 @@
 # Account-first P0 — source reviewer handoff
 
+Latest QA follow-up: [independent findings, corrected source and publication blockers](BOIECH_ACCOUNT_FIRST_QA_RELEASE_ATTEMPT_20261104.md). The earlier source pins/results below are historical; they are not acceptance of the corrected source.
 Blueprint OS 1.3.0. SOURCE-ONLY ENGINEERING CANDIDATE. **REVIEW BLOCKED; CI PENDING; global D1 10/10 BLOCKED.** No release approval is implied by local checks.
 
 ## Source and authority

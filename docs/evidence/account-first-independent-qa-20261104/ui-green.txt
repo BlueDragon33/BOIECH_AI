@@ -1,0 +1,12 @@
+✔ account-mode roster renders class data and manager instruction without approval/removal controls (110.429031ms)
+✔ legacy roster retains approve/remove/restore controls when server permits them (32.5592ms)
+✔ duplicate teacher roster mutations are no-ops (0.915943ms)
+✔ idempotency guard runs before mutation and audit writes (0.246614ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 444.204559
