@@ -1,0 +1,34 @@
+// Offline snapshot rehearsal only. No network, no source DB writes and no production/apply mode.
+import {DatabaseSync, backup} from 'node:sqlite';
+import {createRequire} from 'node:module';
+import {createHash} from 'node:crypto';
+import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import ts from 'typescript';
+const supplied=process.argv.slice(2);
+if(supplied.length!==2||supplied[0]!=='--database'||/^[a-z]+:\/\//i.test(supplied[1]))throw new Error('Usage: node scripts/account-migration.mjs --database LOCAL_OFFLINE_SNAPSHOT.sqlite');
+if(typeof backup!=='function')throw new Error('This rehearsal requires a Node runtime with node:sqlite backup support. Source remains unchanged.');
+const source=new DatabaseSync(resolve(supplied[1]),{readOnly:true});
+const directory=mkdtempSync(join(tmpdir(),'boiech-account-rehearsal-'));const path=join(directory,'clone.sqlite');let sqlite;
+try{
+ await backup(source,path);source.close();sqlite=new DatabaseSync(path);sqlite.exec('PRAGMA foreign_keys=ON');
+ const legacyTables=sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'account%' ORDER BY name").all().map(r=>r.name);
+ function fingerprints(){return Object.fromEntries(legacyTables.map(name=>{const rows=sqlite.prepare('SELECT * FROM "'+name.replaceAll('"','""')+'" ORDER BY rowid').iterate();const hash=createHash('sha256');let count=0;for(const row of rows){hash.update(JSON.stringify(row));count++}return [name,{count,hash:hash.digest('hex')}]}))}
+ const before=fingerprints();
+ sqlite.exec(readFileSync(new URL('../drizzle/0018_account_first.sql',import.meta.url),'utf8'));
+ function prepare(sql){let args=[];return {bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)??null},async all(){return {results:sqlite.prepare(sql).all(...args)}},async run(){return {meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}},execute(){return {meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}}}}
+ const db={prepare,async batch(queries){sqlite.exec('BEGIN IMMEDIATE');try{const result=queries.map(q=>q.execute());sqlite.exec('COMMIT');return result}catch(error){sqlite.exec('ROLLBACK');throw error}}};
+ const loaded={exports:{}};const code=ts.transpileModule(readFileSync(new URL('../app/account-core.server.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ new Function('require','module','exports',code)(createRequire(import.meta.url),loaded,loaded.exports);
+ const service=new loaded.exports.AccountService(db);const report=await service.migrationReport();
+ if(report.conflicts.length){process.stdout.write(JSON.stringify({mode:'LOCAL_SNAPSHOT_DRY_RUN',node:process.version,report,applied:false})+'\n');process.exitCode=2;}
+ else{
+  await service.backfill();const count=sqlite.prepare('SELECT count(*) AS count FROM accounts').get().count;
+  await service.backfill();if(sqlite.prepare('SELECT count(*) AS count FROM accounts').get().count!==count)throw new Error('BACKFILL_NOT_IDEMPOTENT');
+  const after=fingerprints();if(JSON.stringify(before)!==JSON.stringify(after))throw new Error('LEGACY_DATA_CHANGED');
+  sqlite.close();sqlite=new DatabaseSync(path,{readOnly:true});
+  if(sqlite.prepare('SELECT count(*) AS count FROM accounts').get().count!==count)throw new Error('REOPEN_READBACK_FAILED');
+  process.stdout.write(JSON.stringify({mode:'LOCAL_SNAPSHOT_DRY_RUN',node:process.version,report,mappedAccounts:count,legacyTables:legacyTables.length,legacyRowsUnchanged:true,idempotent:true,reopenReadback:true,sourceUnmodified:true,rollback:'delete disposable clone; source snapshot unchanged'})+'\n');
+ }
+}finally{if(sqlite)sqlite.close();try{source.close()}catch{}rmSync(directory,{recursive:true,force:true})}

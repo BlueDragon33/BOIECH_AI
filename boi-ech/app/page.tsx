@@ -170,7 +170,7 @@ function Icon({ name }: { name: SectionId | "menu" | "close" }) {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("boi-ech-doc-lap", 4);
+    const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap", 4);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("tien-do")) {
         request.result.createObjectStore("tien-do");

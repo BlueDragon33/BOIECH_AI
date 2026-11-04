@@ -16,11 +16,16 @@ export function api(f, endpoint = 'training-management', role = 'owner', onClass
   }
   return load(path.join(root,'api',endpoint,'route.ts'));
 }
-export async function person(f, role, index, className='A') {
+export async function person(f, role, index, className='A', approved=true) {
   const key = await identity();
   const {device} = await f.post({action:'register',publicKey:key.publicKey});
   const saved = await f.post({action:'save-registration',...await proof(f,key,device.deviceId),learnerFamilyName:'Kiểm',learnerGivenName:'Thử',personRole:role,personCode:'TEST'+index,className,phone:'090000'+String(index).padStart(4,'0')});
   assert.equal(saved.status,200,JSON.stringify(saved));
+  // Training fixtures explicitly seed approved people; registration approval is covered by its own suite.
+  if (approved && (role === 'learner' || role === 'teacher')) {
+    f.sqlite.prepare("UPDATE device_access SET status='approved',access_group='free',payment_status='free_approved' WHERE device_id=?").run(saved.device.deviceId);
+    saved.device=await f.auth.getPublicDeviceState(saved.device.deviceId);
+  }
   return {key,device:saved.device};
 }
 export async function setup() {
@@ -33,7 +38,11 @@ export async function setup() {
   }};
 }
 export async function grant(f) {
-  const response=await api(f,'control/management-access').POST(new Request('https://boi-ech.boiech-ai.workers.dev/api/control/management-access',{method:'POST',body:JSON.stringify({deviceId:f.manager.device.deviceId,expectedPersonCode:'TEST101',enabled:true})}));
+  const current=await f.auth.getPublicDeviceState(f.manager.device.deviceId);
+  const payload=current.status==='pending'
+    ? {action:'approve-manager',deviceId:current.deviceId,expectedPersonCode:'TEST101',expectedStatus:'pending'}
+    : {action:'grant-manager',deviceId:current.deviceId,expectedPersonCode:'TEST101',enabled:true,expectedManagementEnabled:current.managementEnabled};
+  const response=await api(f,'control/management-access').POST(new Request('https://boi-ech.boiech-ai.workers.dev/api/control/management-access',{method:'POST',body:JSON.stringify(payload)}));
   assert.equal(response.status,200,await response.clone().text());
 }
 export async function resources(f) {

@@ -52,9 +52,9 @@ const EMPTY_META: AccountMeta = {
   status: "Đã lưu trên thiết bị",
 };
 
-function openAccountDb() {
+function openAccountDb(databaseName = DB_NAME) {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(databaseName, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains("tien-do")) db.createObjectStore("tien-do");
@@ -104,8 +104,8 @@ async function canonicalDeviceId(credential: StoredDeviceCredential) {
   return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
 }
 
-async function readKeyedValues(storeName: string) {
-  const db = await openAccountDb();
+async function readKeyedValues(storeName: string, databaseName = DB_NAME) {
+  const db = await openAccountDb(databaseName);
   const store = db.transaction(storeName, "readonly").objectStore(storeName);
   return new Promise<KeyedValue[]>((resolve, reject) => {
     const values: KeyedValue[] = [];
@@ -120,17 +120,17 @@ async function readKeyedValues(storeName: string) {
   });
 }
 
-async function snapshotLocalState(): Promise<LocalAccountState> {
-  const db = await openAccountDb();
+async function snapshotLocalState(databaseName = DB_NAME): Promise<LocalAccountState> {
+  const db = await openAccountDb(databaseName);
   const progress = await requestValue(db.transaction("tien-do", "readonly").objectStore("tien-do").get("bai-03"));
   const offlineActions = await requestValue(db.transaction("dong-bo", "readonly").objectStore("dong-bo").getAll());
   const studyStats = await requestValue(db.transaction("thong-ke-hoc", "readonly").objectStore("thong-ke-hoc").get("current"));
-  const personalContent = await readKeyedValues("ban-rieng");
+  const personalContent = await readKeyedValues("ban-rieng", databaseName);
   return { progress, offlineActions, personalContent, studyStats };
 }
 
-async function restoreLocalState(state: LocalAccountState) {
-  const db = await openAccountDb();
+async function restoreLocalState(state: LocalAccountState, databaseName = DB_NAME) {
+  const db = await openAccountDb(databaseName);
   const transaction = db.transaction(["tien-do", "dong-bo", "ban-rieng", "thong-ke-hoc"], "readwrite");
   const progress = transaction.objectStore("tien-do");
   const offline = transaction.objectStore("dong-bo");
@@ -264,7 +264,7 @@ export default function MultiAccountSwitcher() {
   }
 
   useEffect(() => {
-    if (window.location.pathname !== "/") return;
+    if (window.location.pathname !== "/" || document.documentElement.dataset.accountFirst === "true") return;
     let timer = 0;
     const sync = () => {
       window.clearTimeout(timer);
@@ -363,4 +363,73 @@ export default function MultiAccountSwitcher() {
       ) : null}
     </>
   );
+}
+
+// Portable account mode reuses the established local-state vault. It never stores credentials/passwords.
+async function portableValue(key: string, value?: unknown) {
+  // Separate database: restoreLocalState clears ban-rieng, so metadata must never live there.
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open("boiech-portable-local-v1", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("states");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return new Promise<unknown>((resolve, reject) => {
+    const tx = db.transaction("states", value === undefined ? "readonly" : "readwrite");
+    const request = value === undefined ? tx.objectStore("states").get(key) : tx.objectStore("states").put(value, key);
+    tx.oncomplete = () => resolve(value === undefined ? request.result : value);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error("Kho tài khoản cục bộ chưa lưu được."));
+  }).finally(() => db.close());
+}
+export async function preparePortableAccount(accountId: string | null, claim = false) {
+  if (accountId !== null && !/^acc_[a-f0-9]{64}$/.test(accountId)) throw new Error("Mã tài khoản không hợp lệ.");
+  const existingScope = document.documentElement.dataset.accountLocalDatabase;
+  const requestedScope = accountId ? DB_NAME + ":" + accountId : DB_NAME + ":signed-out";
+  if (existingScope && existingScope !== DB_NAME + ":signed-out" && existingScope !== requestedScope)
+    throw new Error("ACCOUNT_DOCUMENT_RELOAD_REQUIRED");
+  // Each tab keeps its own namespace. Concurrent tabs never swap a shared progress/queue store.
+  const databaseName = accountId ? DB_NAME + ":" + accountId : DB_NAME + ":signed-out";
+  if (accountId && claim && !await portableValue("portable:initialized:" + accountId)) {
+    if (!navigator.locks) throw new Error("Trình duyệt chưa hỗ trợ chuyển hồ sơ cũ an toàn. Dữ liệu gốc vẫn được giữ.");
+    await navigator.locks.request("boiech-legacy-account-claim", async () => {
+      if (await portableValue("portable:initialized:" + accountId)) return;
+      const snapshot = await snapshotLocalState(DB_NAME);
+      await restoreLocalState(snapshot, databaseName);
+      await portableValue("portable:initialized:" + accountId, true);
+      const videoOwner = await portableValue("portable:legacy-video-owner");
+      if (!videoOwner || videoOwner === accountId) {
+        await portableValue("portable:legacy-video-owner", accountId);
+        await portableValue("portable:video:" + accountId, VIDEO_DB);
+      }
+    });
+  }
+  if (accountId) {
+    // Direct routes (including video analysis) must have a complete store and signing credential before children mount.
+    let credential = await readActiveCredential();
+    if (!credential?.privateKey) { credential = await generateCredential(); await writeActiveCredential(credential); }
+    const profileDb = await openAccountDb(databaseName);
+    const tx = profileDb.transaction(DEVICE_STORE, "readwrite");
+    tx.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
+    await transactionDone(tx); profileDb.close();
+  }
+  const videoScope = accountId ? await portableValue("portable:video:" + accountId) : null;
+  document.documentElement.dataset.accountLocalDatabase = databaseName;
+  document.documentElement.dataset.accountVideoDatabase = typeof videoScope === "string" ? videoScope : VIDEO_DB + ":" + (accountId ?? "signed-out");
+}
+export async function portableCredential(withProof = false) {
+  let credential = await readActiveCredential();
+  if (!credential?.privateKey || !credential.publicKey) {
+    credential = await generateCredential();
+    if (!credential.privateKey) throw new Error("Cần trình duyệt hỗ trợ Web Crypto để đăng nhập an toàn.");
+    await writeActiveCredential(credential);
+  }
+  if (!withProof) return { publicKey: credential.publicKey };
+  const deviceId = await canonicalDeviceId(credential);
+  const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "legacy-challenge", deviceId }) });
+  const data = await response.json() as { challenge?: string; error?: string };
+  if (!response.ok || !data.challenge) throw new Error(data.error ?? "Cần mở đúng trình duyệt đã đăng ký để chuyển tài khoản.");
+  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey!, new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`));
+  let binary = ""; new Uint8Array(signature).forEach(byte => { binary += String.fromCharCode(byte); });
+  return { publicKey: credential.publicKey, deviceId, challenge: data.challenge, signature: btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "") };
 }

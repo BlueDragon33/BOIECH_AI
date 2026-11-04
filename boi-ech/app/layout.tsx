@@ -1,3 +1,5 @@
+import AccountGate from "./account-gate";
+import { accountConfiguration } from "./account-runtime.server";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -70,16 +72,18 @@ export const viewport = {
   themeColor: "#0c6f75",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { enabled } = await accountConfiguration();
   return (
     <html lang="vi">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <AccountGate enabled={enabled}>
         {children}
         <StudentRoleShell />
         <StudentTeacherInbox />
@@ -89,6 +93,7 @@ export default function RootLayout({
         <MultiAccountSwitcher />
         <TeacherDashboardBlueprint />
         <TeacherRosterManager />
+        </AccountGate>
       </body>
     </html>
   );

@@ -36,7 +36,7 @@ function base64Url(bytes: Uint8Array) {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("boi-ech-doc-lap", 4);
+    const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap", 4);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });

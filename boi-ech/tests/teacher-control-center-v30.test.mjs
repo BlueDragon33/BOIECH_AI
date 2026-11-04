@@ -18,7 +18,7 @@ const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "u
 
 test("V30 supports multiple admin-assigned classes without broadening teacher access", () => {
   assert.match(admin, /action === "teacher-classes"/);
-  assert.match(admin, /exists\.person_role !== "teacher"/);
+  assert.match(admin, /exists\.person_role !== "manager"/);
   assert.match(admin, /normalizeTeacherClasses\(payload\.teacherClasses\)/);
   assert.match(admin, /teacher_classes_updated/);
   assert.match(deviceManager, /Lớp Giảng viên phụ trách/);

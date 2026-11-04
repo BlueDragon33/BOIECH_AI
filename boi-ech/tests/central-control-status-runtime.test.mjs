@@ -30,7 +30,7 @@ async function setup() {
   const f = fixture("managed", true);
   const key = await identity();
   const { device } = await f.post({ action: "register", publicKey: key.publicKey });
-  f.sqlite.prepare("UPDATE device_access SET status='blocked', payment_status='paid_verified', access_group='paid', access_expires_at='2000-01-01T00:00:00Z' WHERE device_id=?").run(device.deviceId);
+  f.sqlite.prepare("UPDATE device_access SET person_role='manager', status='blocked', payment_status='paid_verified', access_group='paid', access_expires_at='2000-01-01T00:00:00Z' WHERE device_id=?").run(device.deviceId);
   return { ...f, deviceId: device.deviceId, api: api(f) };
 }
 
@@ -84,7 +84,7 @@ test("confirmed unblock preserves expired paid record without automatic renewal"
 test("competing free and paid classifications cannot both commit the same central snapshot", async () => {
   const f = await setup();
   try {
-    f.sqlite.prepare("UPDATE device_access SET status='pending', payment_status='unassigned', access_group='unassigned', learner_name='Test Teacher', person_role='teacher', person_code='SQTEST', class_name='A', phone='0900000099', registration_submitted_at=CURRENT_TIMESTAMP, access_expires_at=NULL WHERE device_id=?").run(f.deviceId);
+    f.sqlite.prepare("UPDATE device_access SET status='pending', payment_status='unassigned', access_group='unassigned', learner_name='Test Teacher', person_role='manager', person_code='SQTEST', class_name='A', phone='0900000099', registration_submitted_at=CURRENT_TIMESTAMP, access_expires_at=NULL WHERE device_id=?").run(f.deviceId);
     const snapshot = { expectedStatus: "pending", expectedPaymentStatus: "unassigned", expectedAccessGroup: "unassigned" };
     const results = await Promise.all([post(f, { action: "grant-free", ...snapshot }), post(f, { action: "require-payment", ...snapshot })]);
     assert.deepEqual(results.map(result => result.status).sort(), [200, 409]);

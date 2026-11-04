@@ -117,7 +117,7 @@ function assessCaptureQuality(frames: Metric[], sampleCount: number): CaptureQua
 
 function openLocalDb() {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(VIDEO_DB, 1);
+    const request = indexedDB.open(document.documentElement.dataset.accountVideoDatabase || VIDEO_DB, 1);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("analyses")) request.result.createObjectStore("analyses", { keyPath: "id" });
       if (!request.result.objectStoreNames.contains("pending")) request.result.createObjectStore("pending", { keyPath: "id" });
@@ -397,7 +397,7 @@ function snapshot(video: HTMLVideoElement, metric: Metric, error: AnalysisError)
 
 async function readCredential() {
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open("boi-ech-doc-lap");
+    const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap");
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
   if (!db.objectStoreNames.contains("thiet-bi")) return null;

@@ -1,5 +1,5 @@
 import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../control-auth.server";
-import { accessExpiryAfterDays, DeviceAccessError, deviceErrorResponse, getAccessAutomationSettings, getCourseDatabase, getPublicDeviceState } from "../../../device-auth.server";
+import { accessExpiryAfterDays, DeviceAccessError, deviceErrorResponse, getAccessAutomationSettings, getCourseDatabase, getPublicDeviceState, isAccountFirstEnabled } from "../../../device-auth.server";
 export const dynamic="force-dynamic";
 export function OPTIONS(request:Request){return controlPreflight(request);}
 const DEFAULT_LEARNER_LIMIT=50,DEFAULT_TEACHER_LIMIT=5;
@@ -14,6 +14,7 @@ export async function POST(request:Request){
     if(role!=="owner")return controlResponse({error:"Chỉ Owner được cấp quyền cán bộ quản lý hoặc sửa hạn mức cấp độ."},403,request);
     const payload=await request.json() as Record<string,unknown>;
     const db=await getCourseDatabase();
+    if(await isAccountFirstEnabled() && !["get-tier-limits","set-tier-limits"].includes(String(payload.action))) throw new DeviceAccessError("Dùng hợp đồng Owner theo tài khoản.",409,"ACCOUNT_CONTROL_REQUIRED");
     if(payload.action==="get-tier-limits"){
       const limits=await db.prepare("SELECT learner_limit,teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'")
         .first<{learner_limit:number;teacher_limit:number}>();

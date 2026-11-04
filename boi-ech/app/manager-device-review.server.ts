@@ -16,6 +16,10 @@ type UsageRow = { person_role: ApprovalRole; used: number };
 
 export async function managerReviewBoard(actor: PublicDeviceState) {
   requireManager(actor);
+  if (actor.accountId) {
+    const runtime = await import("./account-runtime.server");
+    return (await runtime.accountService()).reviewBoard(await runtime.accountCookieToken());
+  }
   const db = await getCourseDatabase();
   const [limits, usage, queued] = await Promise.all([
     db.prepare("SELECT learner_limit, teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'")
@@ -58,6 +62,16 @@ export async function managerReviewBoard(actor: PublicDeviceState) {
 
 export async function managerReviewCommand(actor: PublicDeviceState, payload: Record<string,unknown>) {
   requireManager(actor);
+  if (actor.accountId) {
+    const runtime = await import("./account-runtime.server");
+    const service = await runtime.accountService(), token = await runtime.accountCookieToken();
+    const db = await getCourseDatabase();
+    const target = await db.prepare("SELECT account_id FROM accounts WHERE storage_device_id=?")
+      .bind(payload.targetDeviceId).first<{account_id:string}>();
+    if (!target) throw new DeviceAccessError("Không tìm thấy tài khoản đã ánh xạ.",404,"ACCOUNT_NOT_FOUND");
+    await service.review(token,target.account_id,String(payload.action));
+    return service.reviewBoard(token);
+  }
   const action = payload.action;
   const deviceId = payload.targetDeviceId;
   if ((action!=="approve" && action!=="block") || typeof deviceId!=="string"

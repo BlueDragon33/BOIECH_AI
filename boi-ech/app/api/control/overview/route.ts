@@ -7,6 +7,7 @@ import {
   deviceErrorResponse,
   getAccessAutomationSettings,
   getCourseDatabase,
+  isAccountFirstEnabled,
   normalizeAccessExpiry,
 } from "../../../device-auth.server";
 
@@ -398,6 +399,7 @@ async function deletedDeviceRows() {
 export async function GET(request: Request) {
   try {
     const { role } = await requireControlService(request);
+    if(await isAccountFirstEnabled()) throw new DeviceAccessError("Luồng tài khoản chỉ cung cấp trạng thái quản trị qua /api/control/accounts; hồ sơ cá nhân thuộc Bơi Ếch.",409,"ACCOUNT_CONTROL_REQUIRED");
     const searchParams = new URL(request.url).searchParams;
     const deviceCodePattern = /^BE-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/;
     const suppliedCode = searchParams.get("deviceCode");
@@ -426,6 +428,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { actor, role } = await requireControlService(request);
+    if(await isAccountFirstEnabled() && role!=="owner") throw new DeviceAccessError("Thao tác tương thích tài khoản cần Owner đã xác thực.",403,"OWNER_REQUIRED");
     if (!["publisher", "owner"].includes(role)) return controlResponse({ error: "Không có quyền quản lý thiết bị học." }, 403, request);
     const respond = (data: unknown, status = 200) => controlResponse(data, status, request);
     const payload = (await request.json()) as Record<string, unknown>;
@@ -707,7 +710,7 @@ export async function POST(request: Request) {
     } else if (action === "toggle-personal-edit") {
       if (!registrationComplete) return respond({ error: "Thiết bị chưa nhập đủ thông tin người học." }, 409);
       const enabled = payload.enabled === true;
-      if (enabled && current.person_role !== "teacher") {
+      if (enabled) {
         return respond({ error: "Quyền sửa nội dung chỉ cấp cho hồ sơ Giảng viên." }, 409);
       }
       if (enabled && current.access_group === "paid" && current.payment_status !== "paid_verified") {

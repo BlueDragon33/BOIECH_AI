@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {useState} from "react";
 import ManagerApprovalPanel from "../manager-approval-panel";
 import {TrainingDashboard} from "../manager-workspace";
@@ -36,7 +37,7 @@ export default function ManagerRolePreviewPage(){
   const [tab,setTab]=useState<Tab>("overview");
   const [notice,setNotice]=useState("");
   return <main style={{maxWidth:1080,margin:"0 auto",padding:20,fontFamily:"system-ui,sans-serif"}}>
-    <p><a href="/">← Trở về Bơi Ếch</a></p>
+    <p><Link href="/">← Trở về Bơi Ếch</Link></p>
     <h1>Xem thử cấp Cán bộ quản lý</h1>
     <p><strong>Chế độ mô phỏng tách biệt:</strong> không dùng phiên đăng nhập, không gọi API/D1,
       không phê duyệt, không sửa lịch hoặc dữ liệu thực. Mọi số liệu dưới đây là dữ liệu mẫu.</p>
