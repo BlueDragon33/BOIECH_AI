@@ -116,6 +116,10 @@ test("registration timestamp and heartbeat evidence are exposed without inventin
  assert.match(overview,/lastPresenceAt,\s*offlineSinceAt,/);
  assert.match(overview,/const lastPresenceAt = row\.last_seen_at/);
  assert.match(overview,/new Date\(lastPresenceTime \+ DEVICE_PRESENCE_TIMEOUT_MS\)\.toISOString\(\)/);
- assert.match(overview,/active \|\| !Number\.isFinite\(lastPresenceTime\)/);
+ assert.match(overview,/lastPresenceTime \+ DEVICE_PRESENCE_TIMEOUT_MS <= now/);
+ assert.match(overview,/lastPresenceTime <= now && !presenceExpired/);
+ assert.match(overview,/lastPresenceAt\.replace\(" ", "T"\) \+ "Z"/);
+ assert.match(overview,/const offlineSinceAt = presenceExpired/);
+ assert.doesNotMatch(overview,/const offlineSinceAt = active \|\|/);
  assert.doesNotMatch(overview,/totalOnlineSessionSeconds:|onlineSinceAt: row\.created_at/);
 });
