@@ -109,3 +109,12 @@ test("Owner grant\/revoke verifies raw persisted manager grant via a fresh scope
  assert.match(grant,/managementConfigured:persisted\.management_enabled===1/);
  assert.match(grant,/MANAGEMENT_GRANT_READBACK_FAILED/);
 });
+
+test("registration timestamp and heartbeat evidence are exposed without inventing online duration",()=>{
+ assert.match(overview,/registrationSubmittedAt: row\.registration_submitted_at/);
+ assert.match(overview,/lastPresenceAt,\s*offlineSinceAt,/);
+ assert.match(overview,/const lastPresenceAt = row\.last_seen_at/);
+ assert.match(overview,/new Date\(lastPresenceTime \+ DEVICE_PRESENCE_TIMEOUT_MS\)\.toISOString\(\)/);
+ assert.match(overview,/active \|\| !Number\.isFinite\(lastPresenceTime\)/);
+ assert.doesNotMatch(overview,/totalOnlineSessionSeconds:|onlineSinceAt: row\.created_at/);
+});
