@@ -1,0 +1,114 @@
+TAP version 13
+# Subtest: preview refuses absent, wrong and script-shaped confirmation inputs
+not ok 1 - preview refuses absent, wrong and script-shaped confirmation inputs
+  ---
+  duration_ms: 0.667478
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:18:1'
+  failureType: 'testCodeFailure'
+  error: 'a real confirmation guard must run before deployment work'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  operator: '=='
+  stack: |-
+    confirmationStep (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:13:9)
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:19:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: preview accepts only the explicit confirmation before checkout and credentials
+not ok 2 - preview accepts only the explicit confirmation before checkout and credentials
+  ---
+  duration_ms: 0.109245
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:27:1'
+  failureType: 'testCodeFailure'
+  error: 'a real confirmation guard must run before deployment work'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  operator: '=='
+  stack: |-
+    confirmationStep (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:13:9)
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:28:13)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: invalid generated preview artifact stops the workflow before publish
+not ok 3 - invalid generated preview artifact stops the workflow before publish
+  ---
+  duration_ms: 7.689342
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:52:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    the generated-artifact check must reject this build
+    
+    0 !== 55
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 55
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:54:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: successful generated-artifact check precedes the preview publisher
+not ok 4 - successful generated-artifact check precedes the preview publisher
+  ---
+  duration_ms: 7.125348
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:58:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'npm run build',
+    -   'npm run cloudflare:artifact:check',
+        'npx wrangler deploy'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'npm run build'
+    1: 'npm run cloudflare:artifact:check'
+    2: 'npx wrangler deploy'
+  actual:
+    0: 'npm run build'
+    1: 'npx wrangler deploy'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/preview-deployment-guards.test.mjs:61:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 0
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 56.554584

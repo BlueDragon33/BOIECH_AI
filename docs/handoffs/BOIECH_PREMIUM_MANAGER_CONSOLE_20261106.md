@@ -82,3 +82,17 @@ The preceding unexecuted-test statements describe the earlier Chat handoff. Work
 Full results and logs: `docs/evidence/premium-manager-20261106/ACCEPTANCE.md`.
 
 **One Next Action:** authorize an isolated HTTPS Preview acceptance environment and a narrow repair of the existing Preview workflow guards, then complete signed acceptance and independent review before requesting exact-SHA release approval.
+
+## Approved Preview package — guard repair and final code review
+
+Owner approved the preceding package. Fresh remote/local baseline remained `93f295dd1d1127b2fae1bc73ab1e1f8c2362e56d`.
+
+- Added the explicit manual `DEPLOY_PREVIEW` input/check and generated-artifact verification before the publisher. No hosted workflow was dispatched.
+- Node 22.16.0: 4/4 guard regressions, 564/564 full build/tests, TypeScript, lint (0 errors / 3 existing warnings), Preview validator, release audit and artifact validator all passed.
+- Independent final source review completed: no outstanding Critical/Important findings; 41/41 focused tests independently passed. One Minor recommendation remains: include dates in overview rows for multi-day/overnight windows; full Schedule/details already show dates.
+- Local verified code commit: `49b8336b16d759febe690d1fd58211217f6984f3`. No application/backend/auth/schema/dependency or Production workflow change in this package.
+- HTTPS deployment/manager acceptance is still **BLOCKED**: Wrangler reports unauthenticated and no Cloudflare Preview runtime connection/origin or approved manager session is exposed. Historical successful local-loopback CI is not live HTTPS proof.
+
+Current evidence: `docs/evidence/premium-manager-20261106/HTTPS_PREVIEW_FOLLOWUP.md`.
+
+**One Next Action:** configure the Cloudflare Preview connection in the execution environment, then complete real signed manager acceptance. The package is already authorized; do not request the same permission again. Production remains subject to final exact-SHA approval.

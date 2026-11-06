@@ -1,0 +1,6 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> boi-ech@0.1.0 validate:cloudflare-preview
+> node scripts/validate-cloudflare-preview.mjs
+
+Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, fail-closed production D1 guard, generated preview D1/R2 artifact verified.

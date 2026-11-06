@@ -1,5 +1,7 @@
 # Premium Manager Console — Work acceptance evidence
 
+**Follow-up:** the Owner-approved Preview guard repair and independent review are complete; full regressions are now 564/564. Live HTTPS acceptance remains blocked by unavailable Cloudflare runtime authentication/configuration. See `HTTPS_PREVIEW_FOLLOWUP.md` for the current status. The evidence below records the preceding checkpoint.
+
 **Overall: BLOCKED for release.** Local source verification succeeded; authenticated HTTPS acceptance, the Cloudflare Preview gate, complete independent review and Owner release approval remain open.
 
 ## Provenance
