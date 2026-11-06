@@ -157,3 +157,12 @@ test("manager workspace carries selected building into existing new-room editor"
  const values=render().filter(node=>node.type==="select").map(node=>node.props.value);
  assert.ok(values.includes("building-1"),"selected building must prefill existing room editor");
 });
+
+test("a room alerts on overlapping training sessions, not adjacent distinct classes",()=>{
+ const b=board();
+ assert.equal(roomNeedsAttention(b,"room-1"),false,"adjacent classes do not collide");
+ b.sessions[1]={...b.sessions[1],startsAt:"2030-05-03T08:30:00.000Z"};
+ assert.equal(roomNeedsAttention(b,"room-1"),true,"overlap requires management attention");
+ b.sessions[1]={...b.sessions[1],status:"cancelled"};
+ assert.equal(roomNeedsAttention(b,"room-1"),false,"cancelled conflicts must not alert");
+});
