@@ -39,6 +39,8 @@ export function roomNeedsAttention(board:TrainingBoard,roomId:string):boolean {
  if(!room)return false;
  if(room.status!=="active"||room.state==="inactive")return true;
  const roomSessions=sessionsInWindow(board).filter(session=>session.roomId===roomId);
+ // Scheduled uses of one physical room must not overlap, even for different classes.
+ if(roomSessions.some((session,index)=>index>0&&Date.parse(session.startsAt)<Date.parse(roomSessions[index-1].endsAt)))return true;
  return roomSessions.some(session=>{
   const klass=board.resources.find(resource=>resource.kind==="class"&&resource.id===session.classId);
   return !klass||klass.status!=="active"||klass.state==="overloaded"||klass.missingTeachers>0;
@@ -73,7 +75,8 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
  const teacherCount=board.people.filter(person=>person.role==="teacher").length;
  const learnerCount=board.people.filter(person=>person.role==="learner").length;
  const urgentClasses=classes.filter(resource=>resource.status==="active"&&(resource.state==="overloaded"||resource.missingTeachers>0));
- const occupiedRoomIds=new Set(activeSessions.map(session=>session.roomId));
+ const knownRoomIds=new Set(rooms.map(room=>room.id));
+ const occupiedRoomIds=new Set(activeSessions.filter(session=>knownRoomIds.has(session.roomId)).map(session=>session.roomId));
  const relevantRoomCount=rooms.filter(resource=>resource.status==="active").length;
  const metrics=[
   {label:"Học viên",value:learnerCount,icon:"people",destination:"people" as Destination,note:"Hồ sơ trong hệ thống"},
@@ -127,7 +130,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
       return <button type="button" className={styles.roomNode} data-selected={selectedRoom?.id===room.id} key={room.id} aria-pressed={selectedRoom?.id===room.id} onClick={()=>selectRoom(room.id)}>
        <span className={styles.roomNodeHead}><AppIcon name="room"/><strong>{room.name}</strong></span>
        <small>{room.status!=="active"?"Tạm ngừng / lưu trữ":sessions.length?String(new Set(sessions.map(s=>s.classId)).size)+" lớp · "+sessions.length+" ca":"Chưa có ca"}</small>
-       <span className={styles.roomNodeState}>{stateText[room.state]}</span>
+       <span className={styles.roomNodeState} data-alert={roomNeedsAttention(board,room.id)}>{roomNeedsAttention(board,room.id)?"Cần xử lý":stateText[room.state]}</span>
       </button>;
      })}
      {!filteredRooms.length?<div className={styles.emptyCompact}>{buildingRooms.length?"Không có phòng theo bộ lọc này.":"Tòa chưa có phòng. Hãy tạo phòng trước khi xếp lịch."}</div>:null}
