@@ -8,13 +8,14 @@ import React from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 
 const nativeRequire=createRequire(import.meta.url);
-function load(entry){
+function load(entry,react=React){
  const cache=new Map();
  function read(filename){
   if(cache.has(filename))return cache.get(filename).exports;
   const record={exports:{}};cache.set(filename,record);
   const output=ts.transpileModule(fs.readFileSync(filename,"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   new Function("require","module","exports",output)(name=>{
+   if(name==="react")return react;
    if(name.endsWith(".css"))return {__esModule:true,default:new Proxy({},{get:(_,key)=>String(key)})};
    if(!name.startsWith("."))return nativeRequire(name);
    const base=path.resolve(path.dirname(filename),name);
@@ -103,4 +104,32 @@ test("free-room filter requires valid window, active parent, and no booking",()=
  b.resources=b.resources.map(r=>r.id==="room-1"?{...r,state:"inactive"}:r);
  assert.equal(roomHasNoBookings(b,"room-1"),false);
  assert.equal(roomHasNoBookings(b,"unknown-room"),false);
+});
+
+function elements(node){if(Array.isArray(node))return node.flatMap(elements);if(!node||typeof node!=="object")return [];return [node,...elements(node.props?.children)];}
+function contentText(node){if(Array.isArray(node))return node.map(contentText).join("");if(node==null)return "";return typeof node==="object"?contentText(node.props?.children):String(node);}
+function hookHarness(props){
+ const state=[];let cursor=0;
+ const hooks={...React,useState(initial){const slot=cursor++;if(!(slot in state))state[slot]=typeof initial==="function"?initial():initial;return [state[slot],next=>{state[slot]=typeof next==="function"?next(state[slot]):next;}] }};
+ const Component=load("app/manager-command-center.tsx",hooks).default;
+ return ()=>{cursor=0;return elements(Component(props));};
+}
+test("contextual room creation uses the selected building without changing access commands",()=>{
+ const creations=[];const b=board();
+ const render=hookHarness({board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:(...args)=>creations.push(args),onCreateSession:()=>{}});
+ const addRoom=render().find(node=>node.type==="button"&&contentText(node).includes("＋ Phòng"));
+ assert.ok(addRoom);addRoom.props.onClick();
+ assert.deepEqual(creations,[["room","building-1"]]);
+});
+test("new session inherits selected room and the selected class even with two classes",()=>{
+ const sessions=[];
+ const render=hookHarness({board:board(),busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:(...args)=>sessions.push(args)});
+ let tree=render();
+ const addCa=()=>tree.find(node=>node.type==="button"&&contentText(node).includes("＋ Thêm ca"));
+ assert.ok(addCa());addCa().props.onClick();
+ assert.deepEqual(sessions.pop(),["room-1","class-a"]);
+ const second=tree.find(node=>node.type==="button"&&contentText(node).includes("Ca tiếp theo"));
+ assert.ok(second);second.props.onClick();
+ tree=render();addCa().props.onClick();
+ assert.deepEqual(sessions.pop(),["room-1","class-b"]);
 });
