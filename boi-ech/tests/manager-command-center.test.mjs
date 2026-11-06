@@ -166,3 +166,19 @@ test("a room alerts on overlapping training sessions, not adjacent distinct clas
  b.sessions[1]={...b.sessions[1],status:"cancelled"};
  assert.equal(roomNeedsAttention(b,"room-1"),false,"cancelled conflicts must not alert");
 });
+
+test("review shortcut narrows manager people list without triggering privileged mutations",()=>{
+ const props=workspaceProps();
+ let writes=0;
+ props.setTab=next=>{props.tab=next;};
+ props.onCommand=async()=>{writes++;return false;};
+ const render=workspaceHarness(props);
+ const center=render().find(node=>typeof node.type==="function"&&node.type.name==="ManagerCommandCenter");
+ assert.ok(center);
+ center.props.onNavigate("review");
+ assert.equal(props.tab,"people");
+ const cards=render().filter(node=>node.type==="article");
+ assert.equal(cards.length,1);
+ assert.ok(contentText(cards[0]).includes("Hồ sơ đang chờ"));
+ assert.equal(writes,0);
+});
