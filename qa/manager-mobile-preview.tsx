@@ -24,8 +24,17 @@ const fixture:TrainingBoard={
  summary:{freeRooms:1,occupiedRooms:1,missingLearners:6,missingTeachers:1,unassignedLearners:1,unassignedTeachers:0},
 };
 for(let i=2;i<=24;i++)fixture.people.push({id:`sample-a-${i}`,name:`Học viên mẫu A${String(i).padStart(2,"0")}`,code:`DEMO-A-${i}`,role:"learner",className:"Lớp Bơi ếch 01",status:"approved",expired:false,registered:true,bookingCount:1});
-for(let i=1;i<=24;i++)fixture.people.push({id:`sample-b-${i}`,name:`Học viên mẫu B${String(i).padStart(2,"0")}`,code:`DEMO-B-${i}`,role:"learner",className:"Lớp Bơi ếch 02",status:"approved",expired:false,registered:true,bookingCount:0});
-fixture.people.push({id:"teacher-two",name:"Giảng viên mẫu 02",code:"DEMO-GV-02",role:"teacher",className:"Lớp Bơi ếch 02",status:"approved",expired:false,registered:true,bookingCount:0});
+for(let i=1;i<=24;i++)fixture.people.push({id:`sample-b-${i}`,name:`Học viên mẫu B${String(i).padStart(2,"0")}`,code:`DEMO-B-${i}`,role:"learner",className:"Lớp Bơi ếch 02",status:"approved",expired:false,registered:true,bookingCount:1});
+fixture.people.push({id:"teacher-two",name:"Giảng viên mẫu 02",code:"DEMO-GV-02",role:"teacher",className:"Lớp Bơi ếch 02",status:"approved",expired:false,registered:true,bookingCount:1});
+fixture.sessions.push({id:"session-two",title:"Phối hợp tay chân",classId:"class-two",roomId:"room-one",teacherId:"teacher-two",startsAt:"2030-06-01T07:00:00Z",endsAt:"2030-06-01T07:45:00Z",status:"scheduled",version:1});
+fixture.resources.find(r=>r.id==="room-one")!.bookingCount=2;
+fixture.resources.find(r=>r.id==="building")!.bookingCount=2;
+fixture.resources.find(r=>r.id==="class-two")!.bookingCount=1;
+const scenario=new URLSearchParams(window.location.search).get("scenario");
+if(scenario==="empty"){
+ fixture.resources=[];fixture.people=[];fixture.sessions=[];
+ fixture.summary={freeRooms:0,occupiedRooms:0,missingLearners:0,missingTeachers:0,unassignedLearners:0,unassignedTeachers:0};
+}
 function Preview(){
  const [tab,setTab]=useState<Parameters<typeof TrainingDashboard>[0]["tab"]>("overview");
  const [appearance,setAppearance]=useState<DisplayPreferences>(defaultDisplay);

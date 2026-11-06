@@ -1,0 +1,232 @@
+TAP version 13
+# Subtest: room contains two scheduled classes in separate time slots, not cancelled or out-of-window
+ok 1 - room contains two scheduled classes in separate time slots, not cancelled or out-of-window
+  ---
+  duration_ms: 2.326719
+  type: 'test'
+  ...
+# Subtest: exactly touching the time-window edge does not count as a booking
+ok 2 - exactly touching the time-window edge does not count as a booking
+  ---
+  duration_ms: 0.451465
+  type: 'test'
+  ...
+# Subtest: invalid time window does not invent occupied rooms or assigned classes
+ok 3 - invalid time window does not invent occupied rooms or assigned classes
+  ---
+  duration_ms: 0.215758
+  type: 'test'
+  ...
+# Subtest: manager UI renders real hierarchy, multiple room classes and the pending queue
+ok 4 - manager UI renders real hierarchy, multiple room classes and the pending queue
+  ---
+  duration_ms: 46.671209
+  type: 'test'
+  ...
+# Subtest: empty building state offers real setup instead of showing fake map data
+ok 5 - empty building state offers real setup instead of showing fake map data
+  ---
+  duration_ms: 7.80867
+  type: 'test'
+  ...
+# Subtest: attention filter includes scheduled teacher shortages and overflow, not unrelated classes
+ok 6 - attention filter includes scheduled teacher shortages and overflow, not unrelated classes
+  ---
+  duration_ms: 0.46817
+  type: 'test'
+  ...
+# Subtest: attention filter includes inactive rooms, inactive scheduled classes and broken references
+ok 7 - attention filter includes inactive rooms, inactive scheduled classes and broken references
+  ---
+  duration_ms: 0.36001
+  type: 'test'
+  ...
+# Subtest: free-room filter requires valid window, active parent, and no booking
+ok 8 - free-room filter requires valid window, active parent, and no booking
+  ---
+  duration_ms: 0.446878
+  type: 'test'
+  ...
+# Subtest: contextual room creation uses the selected building without changing access commands
+ok 9 - contextual room creation uses the selected building without changing access commands
+  ---
+  duration_ms: 88.473192
+  type: 'test'
+  ...
+# Subtest: new session inherits selected room and the selected class even with two classes
+ok 10 - new session inherits selected room and the selected class even with two classes
+  ---
+  duration_ms: 86.795629
+  type: 'test'
+  ...
+# Subtest: manager workspace carries selected room and class into existing session editor
+ok 11 - manager workspace carries selected room and class into existing session editor
+  ---
+  duration_ms: 172.710972
+  type: 'test'
+  ...
+# Subtest: manager workspace carries selected building into existing new-room editor
+ok 12 - manager workspace carries selected building into existing new-room editor
+  ---
+  duration_ms: 125.175709
+  type: 'test'
+  ...
+# Subtest: a room alerts on overlapping training sessions, not adjacent distinct classes
+ok 13 - a room alerts on overlapping training sessions, not adjacent distinct classes
+  ---
+  duration_ms: 0.307814
+  type: 'test'
+  ...
+# Subtest: review shortcut narrows manager people list without triggering privileged mutations
+ok 14 - review shortcut narrows manager people list without triggering privileged mutations
+  ---
+  duration_ms: 114.630646
+  type: 'test'
+  ...
+# Subtest: room sessions use chronological instants across timezone offsets without false conflicts
+ok 15 - room sessions use chronological instants across timezone offsets without false conflicts
+  ---
+  duration_ms: 0.255246
+  type: 'test'
+  ...
+# Subtest: free rooms require an existing active building even when room state is stale
+ok 16 - free rooms require an existing active building even when room state is stale
+  ---
+  duration_ms: 0.21042
+  type: 'test'
+  ...
+# Subtest: booked rooms flag an ineligible assigned coach even when the class has enough other staff
+ok 17 - booked rooms flag an ineligible assigned coach even when the class has enough other staff
+  ---
+  duration_ms: 0.442692
+  type: 'test'
+  ...
+# Subtest: room bar merges bookings, clips the selected window and ignores cancellation
+ok 18 - room bar merges bookings, clips the selected window and ignores cancellation
+  ---
+  duration_ms: 121.772543
+  type: 'test'
+  ...
+# Subtest: room bar leaves an unbooked room empty and does not count adjacent outside sessions
+ok 19 - room bar leaves an unbooked room empty and does not count adjacent outside sessions
+  ---
+  duration_ms: 44.795955
+  type: 'test'
+  ...
+# Subtest: invalid room window is explicitly unverified rather than reported free
+ok 20 - invalid room window is explicitly unverified rather than reported free
+  ---
+  duration_ms: 49.002815
+  type: 'test'
+  ...
+# Subtest: room occupancy supports valid intervals before the Unix epoch
+ok 21 - room occupancy supports valid intervals before the Unix epoch
+  ---
+  duration_ms: 27.877219
+  type: 'test'
+  ...
+# Subtest: blocked and expired people never become available because they have no booking
+ok 22 - blocked and expired people never become available because they have no booking
+  ---
+  duration_ms: 32.012113
+  type: 'test'
+  ...
+# Subtest: readiness distinguishes a missing class from a retained inactive class assignment
+ok 23 - readiness distinguishes a missing class from a retained inactive class assignment
+  ---
+  duration_ms: 28.990981
+  type: 'test'
+  ...
+# Subtest: validity stage remains distinct from pending or blocked approval
+ok 24 - validity stage remains distinct from pending or blocked approval
+  ---
+  duration_ms: 35.135988
+  type: 'test'
+  ...
+# Subtest: class bars expose actual overflow and missing teachers with valid accessible ranges
+ok 25 - class bars expose actual overflow and missing teachers with valid accessible ranges
+  ---
+  duration_ms: 28.933426
+  type: 'test'
+  ...
+# Subtest: person status strip names all registration stages without inventing learning progress
+ok 26 - person status strip names all registration stages without inventing learning progress
+  ---
+  duration_ms: 21.628057
+  type: 'test'
+  ...
+# Subtest: display preferences reject malformed or unsupported persisted settings
+ok 27 - display preferences reject malformed or unsupported persisted settings
+  ---
+  duration_ms: 20.966703
+  type: 'test'
+  ...
+# Subtest: phone home launcher and bottom navigation reach rooms and settings without mutations
+ok 28 - phone home launcher and bottom navigation reach rooms and settings without mutations
+  ---
+  duration_ms: 199.932915
+  type: 'test'
+  ...
+# Subtest: settings changes display preferences without emitting a training mutation
+ok 29 - settings changes display preferences without emitting a training mutation
+  ---
+  duration_ms: 146.202432
+  type: 'test'
+  ...
+# Subtest: the schedule time window can be collapsed and reopened
+ok 30 - the schedule time window can be collapsed and reopened
+  ---
+  duration_ms: 113.088323
+  type: 'test'
+  ...
+# Subtest: availability filter excludes unassigned and inactive-class people
+ok 31 - availability filter excludes unassigned and inactive-class people
+  ---
+  duration_ms: 79.677968
+  type: 'test'
+  ...
+# Subtest: setup offers the first active class after a building exists
+ok 32 - setup offers the first active class after a building exists
+  ---
+  duration_ms: 65.857589
+  type: 'test'
+  ...
+# Subtest: replacing inactive memberships requires an explicit confirmation and keeps the CAS source
+ok 33 - replacing inactive memberships requires an explicit confirmation and keeps the CAS source
+  ---
+  duration_ms: 106.794522
+  type: 'test'
+  ...
+# Subtest: class detail uses canonical memberships and current source sessions, omitting unrelated fields
+ok 34 - class detail uses canonical memberships and current source sessions, omitting unrelated fields
+  ---
+  duration_ms: 36.703307
+  type: 'test'
+  ...
+# Subtest: editing a resource keeps its optimistic version and preserves a rejected draft
+ok 35 - editing a resource keeps its optimistic version and preserves a rejected draft
+  ---
+  duration_ms: 118.083135
+  type: 'test'
+  ...
+# Subtest: busy resource details prevent closing the modal during an in-flight operation
+ok 36 - busy resource details prevent closing the modal during an in-flight operation
+  ---
+  duration_ms: 27.370401
+  type: 'test'
+  ...
+# Subtest: read-only review details retain records without assignment or schedule-edit controls
+ok 37 - read-only review details retain records without assignment or schedule-edit controls
+  ---
+  duration_ms: 28.011977
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1844.56301

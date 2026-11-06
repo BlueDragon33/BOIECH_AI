@@ -1,0 +1,315 @@
+TAP version 13
+# Subtest: room contains two scheduled classes in separate time slots, not cancelled or out-of-window
+ok 1 - room contains two scheduled classes in separate time slots, not cancelled or out-of-window
+  ---
+  duration_ms: 10.71279
+  type: 'test'
+  ...
+# Subtest: exactly touching the time-window edge does not count as a booking
+ok 2 - exactly touching the time-window edge does not count as a booking
+  ---
+  duration_ms: 0.209328
+  type: 'test'
+  ...
+# Subtest: invalid time window does not invent occupied rooms or assigned classes
+ok 3 - invalid time window does not invent occupied rooms or assigned classes
+  ---
+  duration_ms: 0.125525
+  type: 'test'
+  ...
+# Subtest: manager UI renders real hierarchy, multiple room classes and the pending queue
+ok 4 - manager UI renders real hierarchy, multiple room classes and the pending queue
+  ---
+  duration_ms: 28.777015
+  type: 'test'
+  ...
+# Subtest: empty building state offers real setup instead of showing fake map data
+ok 5 - empty building state offers real setup instead of showing fake map data
+  ---
+  duration_ms: 5.840178
+  type: 'test'
+  ...
+# Subtest: attention filter includes scheduled teacher shortages and overflow, not unrelated classes
+ok 6 - attention filter includes scheduled teacher shortages and overflow, not unrelated classes
+  ---
+  duration_ms: 0.328254
+  type: 'test'
+  ...
+# Subtest: attention filter includes inactive rooms, inactive scheduled classes and broken references
+ok 7 - attention filter includes inactive rooms, inactive scheduled classes and broken references
+  ---
+  duration_ms: 0.23115
+  type: 'test'
+  ...
+# Subtest: free-room filter requires valid window, active parent, and no booking
+ok 8 - free-room filter requires valid window, active parent, and no booking
+  ---
+  duration_ms: 0.472396
+  type: 'test'
+  ...
+# Subtest: contextual room creation uses the selected building without changing access commands
+ok 9 - contextual room creation uses the selected building without changing access commands
+  ---
+  duration_ms: 84.742163
+  type: 'test'
+  ...
+# Subtest: new session inherits selected room and the selected class even with two classes
+ok 10 - new session inherits selected room and the selected class even with two classes
+  ---
+  duration_ms: 78.133367
+  type: 'test'
+  ...
+# Subtest: manager workspace carries selected room and class into existing session editor
+ok 11 - manager workspace carries selected room and class into existing session editor
+  ---
+  duration_ms: 151.292394
+  type: 'test'
+  ...
+# Subtest: manager workspace carries selected building into existing new-room editor
+ok 12 - manager workspace carries selected building into existing new-room editor
+  ---
+  duration_ms: 106.877559
+  type: 'test'
+  ...
+# Subtest: a room alerts on overlapping training sessions, not adjacent distinct classes
+ok 13 - a room alerts on overlapping training sessions, not adjacent distinct classes
+  ---
+  duration_ms: 0.268706
+  type: 'test'
+  ...
+# Subtest: review shortcut narrows manager people list without triggering privileged mutations
+ok 14 - review shortcut narrows manager people list without triggering privileged mutations
+  ---
+  duration_ms: 108.099365
+  type: 'test'
+  ...
+# Subtest: room sessions use chronological instants across timezone offsets without false conflicts
+not ok 15 - room sessions use chronological instants across timezone offsets without false conflicts
+  ---
+  duration_ms: 1.376108
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-command-center.test.mjs:186:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   'two',
+        'one',
+    -   'two'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'one'
+    1: 'two'
+  actual:
+    0: 'two'
+    1: 'one'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-command-center.test.mjs:192:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: free rooms require an existing active building even when room state is stale
+not ok 16 - free rooms require an existing active building even when room state is stale
+  ---
+  duration_ms: 0.328725
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-command-center.test.mjs:196:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    unavailable
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-command-center.test.mjs:200:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: booked rooms flag an ineligible assigned coach even when the class has enough other staff
+not ok 17 - booked rooms flag an ineligible assigned coach even when the class has enough other staff
+  ---
+  duration_ms: 0.217821
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-command-center.test.mjs:205:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"expired":true}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-command-center.test.mjs:210:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: room bar merges bookings, clips the selected window and ignores cancellation
+ok 18 - room bar merges bookings, clips the selected window and ignores cancellation
+  ---
+  duration_ms: 125.38279
+  type: 'test'
+  ...
+# Subtest: room bar leaves an unbooked room empty and does not count adjacent outside sessions
+ok 19 - room bar leaves an unbooked room empty and does not count adjacent outside sessions
+  ---
+  duration_ms: 41.055703
+  type: 'test'
+  ...
+# Subtest: invalid room window is explicitly unverified rather than reported free
+ok 20 - invalid room window is explicitly unverified rather than reported free
+  ---
+  duration_ms: 35.322322
+  type: 'test'
+  ...
+# Subtest: room occupancy supports valid intervals before the Unix epoch
+ok 21 - room occupancy supports valid intervals before the Unix epoch
+  ---
+  duration_ms: 23.081355
+  type: 'test'
+  ...
+# Subtest: blocked and expired people never become available because they have no booking
+ok 22 - blocked and expired people never become available because they have no booking
+  ---
+  duration_ms: 26.147389
+  type: 'test'
+  ...
+# Subtest: readiness distinguishes a missing class from a retained inactive class assignment
+ok 23 - readiness distinguishes a missing class from a retained inactive class assignment
+  ---
+  duration_ms: 20.082035
+  type: 'test'
+  ...
+# Subtest: validity stage remains distinct from pending or blocked approval
+ok 24 - validity stage remains distinct from pending or blocked approval
+  ---
+  duration_ms: 31.919792
+  type: 'test'
+  ...
+# Subtest: class bars expose actual overflow and missing teachers with valid accessible ranges
+ok 25 - class bars expose actual overflow and missing teachers with valid accessible ranges
+  ---
+  duration_ms: 26.072448
+  type: 'test'
+  ...
+# Subtest: person status strip names all registration stages without inventing learning progress
+ok 26 - person status strip names all registration stages without inventing learning progress
+  ---
+  duration_ms: 15.280843
+  type: 'test'
+  ...
+# Subtest: display preferences reject malformed or unsupported persisted settings
+ok 27 - display preferences reject malformed or unsupported persisted settings
+  ---
+  duration_ms: 14.394797
+  type: 'test'
+  ...
+# Subtest: phone home launcher and bottom navigation reach rooms and settings without mutations
+ok 28 - phone home launcher and bottom navigation reach rooms and settings without mutations
+  ---
+  duration_ms: 176.148524
+  type: 'test'
+  ...
+# Subtest: settings changes display preferences without emitting a training mutation
+ok 29 - settings changes display preferences without emitting a training mutation
+  ---
+  duration_ms: 112.572513
+  type: 'test'
+  ...
+# Subtest: the schedule time window can be collapsed and reopened
+ok 30 - the schedule time window can be collapsed and reopened
+  ---
+  duration_ms: 96.131481
+  type: 'test'
+  ...
+# Subtest: availability filter excludes unassigned and inactive-class people
+ok 31 - availability filter excludes unassigned and inactive-class people
+  ---
+  duration_ms: 73.52518
+  type: 'test'
+  ...
+# Subtest: setup offers the first active class after a building exists
+ok 32 - setup offers the first active class after a building exists
+  ---
+  duration_ms: 78.302837
+  type: 'test'
+  ...
+# Subtest: replacing inactive memberships requires an explicit confirmation and keeps the CAS source
+ok 33 - replacing inactive memberships requires an explicit confirmation and keeps the CAS source
+  ---
+  duration_ms: 97.998663
+  type: 'test'
+  ...
+# Subtest: class detail uses canonical memberships and current source sessions, omitting unrelated fields
+ok 34 - class detail uses canonical memberships and current source sessions, omitting unrelated fields
+  ---
+  duration_ms: 28.06786
+  type: 'test'
+  ...
+# Subtest: editing a resource keeps its optimistic version and preserves a rejected draft
+ok 35 - editing a resource keeps its optimistic version and preserves a rejected draft
+  ---
+  duration_ms: 77.233206
+  type: 'test'
+  ...
+# Subtest: busy resource details prevent closing the modal during an in-flight operation
+not ok 36 - busy resource details prevent closing the modal during an in-flight operation
+  ---
+  duration_ms: 22.915605
+  type: 'test'
+  location: '/workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-mobile-console.test.mjs:168:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /<button[^>]*disabled=""[^>]*aria-label="Đóng chi tiết"/. Input:
+    
+    '<dialog class="sheet" aria-label="A"><div class="sheetHandle" aria-hidden="true"></div><header class="sheetHeader"><h2>A</h2><button type="button" class="closeButton" aria-label="Đóng chi tiết">×</button></header><div class="sheetBody"><fieldset class="detailFieldset" disabled=""><span class="badge" data-tone="overloaded">Quá sức chứa</span><div class="statusBars" aria-label="Trạng thái lớp A"><div class="metric" data-tone="overloaded"><div class="metricHeading"><span>Học viên</span><strong>3 / 2</strong></div><div class="track" role="progressbar" aria-label="Học viên" aria-valuemin="0" aria-valuemax="2" aria-valuenow="2" aria-valuetext="3 / 2. Vượt 1 học viên"><i style="width:100%"></i></div><span class="metricDetail">Vượt 1 học viên</span></div><div class="metric" data-tone="missing"><div class="metricHeading"><span>Giảng viên</span><strong>0 / 1</strong></div><div class="track" role="progressbar" aria-label="Giảng viên" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-valuetext="0 / 1. Thiếu 1 giảng viên"><i style="width:0%"></i></div><span class="metricDetail">Thiếu 1 giảng viên</span></div></div><p>Sĩ số tính trên hồ sơ đã duyệt, còn hạn.</p><button type="button" class="primaryButton">Thiết lập lớp</button><section class="detailSection"><h3>Nhân sự trong lớp · 2</h3><div class="detailRow"><div><strong>Học viên mẫu</strong><small>Học viên · Sẵn sàng xếp lịch</small></div><button type="button">Phân lớp</button></div><div class="detailRow"><div><strong>Giảng viên mẫu</strong><small>Giảng viên · Đã có lịch</small></div><button type="button">Phân lớp</button></div></section><section class="detailSection"><h3>Lịch trong khoảng đang xem · 4</h3><div class="detailRow"><div><strong>Buổi một</strong><small>15:45 1/1/30 → 16:30 1/1/30</small><small>A · P101 · Đã xếp</small></div><button type="button">Đổi lịch</button></div><div class="detailRow"><div><strong>Buổi đã hủy</strong><small>16:00 1/1/30 → 18:00 1/1/30</small><small>A · P101 · Đã hủy</small></div><button type="button">Đổi lịch</button></div><div class="detailRow"><div><strong>Buổi hai</strong><small>16:15 1/1/30 → 17:00 1/1/30</small><small>A · P101 · Đã xếp</small></div><button type="button">Đổi lịch</button></div><div class="detailRow"><div><strong>Buổi ba</strong><small>17:45 1/1/30 → 18:30 1/1/30</small><small>A · P101 · Hoàn thành</small></div><button type="button">Đổi lịch</button></div></section></fieldset></div></dialog>'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: '<dialog class="sheet" aria-label="A"><div class="sheetHandle" aria-hidden="true"></div><header class="sheetHeader"><h2>A</h2><button type="button" class="closeButton" aria-label="Đóng chi tiết">×</button></header><div class="sheetBody"><fieldset class="detailFieldset" disabled=""><span class="badge" data-tone="overloaded">Quá sức chứa</span><div class="statusBars" aria-label="Trạng thái lớp A"><div class="metric" data-tone="overloaded"><div class="metricHeading"><span>Học viên</span><strong>3 / 2</strong></div><div class="track" role="progressbar" aria-label="Học viên" aria-valuemin="0" aria-valuemax="2" aria-valuenow="2" aria-valuetext="3 / 2. Vượt 1 học viên"><i style="width:100%"></i></div><span class="metricDetail">Vượt 1 học viên</span></div><div class="metric" data-tone="missing"><div class="metricHeading"><span>Giảng viên</span><strong>0 / 1</strong></div><div class="track" role="progressbar" aria-label="Giảng viên" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-valuetext="0 / 1. Thiếu 1 giảng viên"><i style="width:0%"></i></div><span class="metricDetail">Thiếu 1 giảng viên</span></div></div><p>Sĩ số tính trên hồ sơ đã duyệt, còn hạn.</p><button type="button" class="primaryButton">Thiết lập lớp</button><section class="detailSection"><h3>Nhân sự trong lớp · 2</h3><div class="detailRow"><div><strong>Học viên mẫu</strong><small>Học viên · Sẵn sàng xếp lịch</small></div><button type="button">Phân lớp</button></div><div class="detailRow"><div><strong>Giảng viên mẫu</strong><small>Giảng viên · Đã có lịch</small></div><button type="button">Phân lớp</button></div></section><section class="detailSection"><h3>Lịch trong khoảng đang xem · 4</h3><div class="detailRow"><div><strong>Buổi một</strong><small>15:45 1/1/30 → 16:30 1/1/30</small><small>A · P101 · Đã xếp</small></div><button type="button">Đổi lịch</button></div><div class="detailRow"><div><strong>Buổi đã hủy</strong><small>16:00 1/1/30 → 18:00 1/1/30</small><small>A · P101 · Đã hủy</small></div><button type="button">Đổi lịch</button></div><div class="detailRow"><div><strong>Buổi hai</strong><small>16:15 1/1/30 → 17:00 1/1/30</small><small>A · P101 · Đã xếp</small></div><button type="button">Đổi lịch</button></div><div class="detailRow"><div><strong>Buổi ba</strong><small>17:45 1/1/30 → 18:30 1/1/30</small><small>A · P101 · Hoàn thành</small></div><button type="button">Đổi lịch</button></div></section></fieldset></div></dialog>'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/tests/manager-mobile-console.test.mjs:171:9)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 32
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1617.797927

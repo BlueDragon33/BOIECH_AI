@@ -67,3 +67,18 @@ The newly added suite defines **14 test cases** including hierarchy mapping, two
 5. If permitted, produce an authenticated preview, obtain Owner visual acceptance and independent review, then seek explicit exact-SHA release approval. Do NOT merge or publish before gates pass, and do not spend hosted CI in ZERO-SPEND mode without a separate cost decision.
 
 **Single Next Action:** Work takes the current integration-branch HEAD, completes source/browser QA and prepares a real authorized preview for final Owner acceptance. If blocked by checkout/runtime/access, report the exact blocker and preserve the candidate; no fake QA PASS.
+
+## Work acceptance checkpoint — local verification completed
+
+The preceding unexecuted-test statements describe the earlier Chat handoff. Work has now checked out `27008e68a5bfef9cd22f94605e3d39e58c4b2766`, installed the unchanged lockfile under Node 22.16.0, and repaired reproducible console defects. Verified code commit: `de6c9462268d9378a753454b396437f2bed8b98b`.
+
+- Full build/regressions **560/560**; focused manager tests **37/37**; TypeScript, lint (0 errors / 3 existing warnings), release audit and artifact validator exit 0.
+- Room filtering verifies the parent building; session sorting uses actual instants; booked coaches are checked for eligibility/membership; busy detail modals honor the operation lock.
+- The pending-profile review list and its details are now read-only, including schedule actions. Normal People management retains its authorized assignment controls. Manager approval/rejection remains **BLOCKED** by the existing backend contract.
+- Existing component fixture inspected at 320/375/768/1440px, including two classes in one room, empty state, filters, themes, large text, failed draft, details and review controls. Preview `http://terminal.local:4173/?width=375` is session-local, uses synthetic data and cannot write; it is not live authenticated acceptance.
+- **Release remains BLOCKED:** existing Cloudflare Preview workflow validator fails; local HTTP lacks `crypto.randomUUID`; no authenticated HTTPS manager Preview is configured; independent review stopped at its usage limit after confirming the read-only-queue issue (now repaired), without a final verdict. Existing sovereignty posture remains MIGRATION_REQUIRED.
+- No schema, authorization, dependency, deployment configuration, Production, new PR or hosted Actions change was made.
+
+Full results and logs: `docs/evidence/premium-manager-20261106/ACCEPTANCE.md`.
+
+**One Next Action:** authorize an isolated HTTPS Preview acceptance environment and a narrow repair of the existing Preview workflow guards, then complete signed acceptance and independent review before requesting exact-SHA release approval.

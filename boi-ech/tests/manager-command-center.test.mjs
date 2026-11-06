@@ -25,8 +25,8 @@ function load(entry,react=React){
  }
  return read(path.resolve(entry));
 }
-const module=load("app/manager-command-center.tsx");
-const {sessionsInWindow,classesInRoom,roomHasNoBookings,roomNeedsAttention}=module;
+const commandCenter=load("app/manager-command-center.tsx");
+const {sessionsInWindow,classesInRoom,roomHasNoBookings,roomNeedsAttention}=commandCenter;
 const resource={id:"class-a",kind:"class",name:"Ếch cơ bản",parentId:null,capacity:20,requiredTeachers:1,status:"active",version:1,learnerCount:10,teacherCount:1,remaining:10,missingTeachers:0,bookingCount:1,state:"available",roomCount:0};
 function board(){
  return {
@@ -58,7 +58,7 @@ test("invalid time window does not invent occupied rooms or assigned classes",()
  assert.deepEqual(classesInRoom(b,"room-1"),[]);
 });
 test("manager UI renders real hierarchy, multiple room classes and the pending queue",()=>{
- const b=board();const markup=renderToStaticMarkup(React.createElement(module.default,{board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:()=>{}}));
+ const b=board();const markup=renderToStaticMarkup(React.createElement(commandCenter.default,{board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:()=>{}}));
  for(const term of ["Tòa B","Hồ 25m","Ếch cơ bản","Ếch nâng cao","HLV An","Ca sáng","Ca tiếp theo","Hồ sơ cần xem","2 lớp"])assert.ok(markup.includes(term),term);
  assert.match(markup,/aria-label="Sơ đồ phân cấp tòa phòng lớp"/);
  assert.match(markup,/aria-pressed="true"/);
@@ -67,7 +67,7 @@ test("manager UI renders real hierarchy, multiple room classes and the pending q
 });
 test("empty building state offers real setup instead of showing fake map data",()=>{
  const b=board();b.resources=[];b.sessions=[];
- const markup=renderToStaticMarkup(React.createElement(module.default,{board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:()=>{}}));
+ const markup=renderToStaticMarkup(React.createElement(commandCenter.default,{board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:()=>{}}));
  assert.ok(markup.includes("Chưa có tòa học"));
  assert.ok(markup.includes("Tạo tòa"));
  assert.ok(!markup.includes("Tòa A"));
@@ -181,4 +181,38 @@ test("review shortcut narrows manager people list without triggering privileged 
  assert.equal(cards.length,1);
  assert.ok(contentText(cards[0]).includes("Hồ sơ đang chờ"));
  assert.equal(writes,0);
+ assert.ok(!elements(cards[0]).some(node=>node.type==="button"&&/Phân (lớp|công)/.test(contentText(node))),"review cards must not offer assignment writes");
+ elements(cards[0]).find(node=>node.type==="button"&&contentText(node)==="Chi tiết").props.onClick();
+ const detail=render().find(node=>typeof node.type==="function"&&node.type.name==="ManagerDetailSheet");
+ assert.equal(detail.props.readOnly,true,"review details must keep the same read-only context");
+});
+
+test("room sessions use chronological instants across timezone offsets without false conflicts",()=>{
+ const b=board();
+ b.sessions=[
+  {...b.sessions[0],startsAt:"2030-05-03T10:00:00+02:00",endsAt:"2030-05-03T11:00:00+02:00"},
+  {...b.sessions[1],startsAt:"2030-05-03T09:30:00Z",endsAt:"2030-05-03T10:30:00Z"},
+ ];
+ assert.deepEqual(sessionsInWindow(b).map(s=>s.id),["one","two"]);
+ assert.equal(roomNeedsAttention(b,"room-1"),false,"disjoint instants must not be flagged as overlapping");
+});
+
+test("free rooms require an existing active building even when room state is stale",()=>{
+ for(const status of ["unavailable","archived","missing"]){
+  const b=board();b.sessions=[];
+  b.resources=status==="missing"?b.resources.filter(r=>r.id!=="building-1"):b.resources.map(r=>r.id==="building-1"?{...r,status}:r);
+  assert.equal(roomHasNoBookings(b,"room-1"),false,status);
+  assert.equal(roomNeedsAttention(b,"room-1"),true,status);
+ }
+});
+
+test("booked rooms flag an ineligible assigned coach even when the class has enough other staff",()=>{
+ for(const change of [{expired:true},{status:"blocked"},{registered:false},{role:"learner"},{className:"Lớp ngoài"}]){
+  const b=board();
+  b.people.push({...b.people[0],id:"other-teacher",name:"HLV khác"});
+  b.people=b.people.map(p=>p.id==="t1"?{...p,...change}:p);
+  assert.equal(roomNeedsAttention(b,"room-1"),true,JSON.stringify(change));
+ }
+ const b=board();b.people=b.people.filter(p=>p.id!=="t1");
+ assert.equal(roomNeedsAttention(b,"room-1"),true,"missing session coach reference");
 });

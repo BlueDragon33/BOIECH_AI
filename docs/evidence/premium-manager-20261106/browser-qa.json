@@ -1,0 +1,67 @@
+{
+  "sourceRevision": "de6c9462268d9378a753454b396437f2bed8b98b",
+  "previewUrl": "http://terminal.local:4173/?width=375",
+  "data": "synthetic fixture, network blocked by CSP",
+  "checks": [
+    {
+      "check": "320px overview",
+      "result": "no horizontal overflow",
+      "viewport": 320,
+      "contentWidth": 305
+    },
+    {
+      "check": "free room filter",
+      "result": "only Phòng 102; no sessions; no class selected"
+    },
+    {
+      "check": "320px room details",
+      "result": "native modal opens; close receives focus; fields stay within viewport"
+    },
+    {
+      "check": "rejected room edit",
+      "result": "draft Phòng 102 QA retained and error announced"
+    },
+    {
+      "check": "create form in HTTP preview",
+      "result": "BLOCKED: crypto.randomUUID unavailable; no production fallback added"
+    },
+    {
+      "check": "375px light theme and large text",
+      "result": "font 18px; no horizontal overflow; source theme changes applied"
+    },
+    {
+      "check": "two classes in one room",
+      "result": "selecting second session changes class focus and opens the correct coach assignment"
+    },
+    {
+      "check": "modal Escape",
+      "result": "closes modal and restores focus to detail opener"
+    },
+    {
+      "check": "read-only review queue and person details",
+      "result": "one pending profile; detail keeps schedule visible; only close button; no assignment or schedule edits"
+    },
+    {
+      "check": "normal People teacher filter",
+      "result": "two coaches and two assignment actions retained"
+    },
+    {
+      "check": "768px overview",
+      "result": "753px content; no horizontal overflow; mobile launcher and dock visible"
+    },
+    {
+      "check": "375px empty board",
+      "result": "zero population; no invented building; real create-building affordance; no horizontal overflow"
+    },
+    {
+      "check": "1440px desktop final",
+      "result": "1425px content; no horizontal overflow; desktop rail and six metrics visible"
+    }
+  ],
+  "unverified": [
+    "authenticated deployed manager/backend acceptance",
+    "new resource/session browser forms require HTTPS crypto.randomUUID",
+    "complete independent review: reviewer hit usage limit",
+    "automated WCAG or physical mobile-device acceptance"
+  ]
+}

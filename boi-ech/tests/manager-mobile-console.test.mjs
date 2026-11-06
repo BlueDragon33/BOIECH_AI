@@ -164,3 +164,18 @@ test('editing a resource keeps its optimistic version and preserves a rejected d
  tree=render();await tree.filter(n=>n.type==='form').at(-1).props.onSubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));
  assert.equal(sent.expectedVersion,7);assert.equal(sent.name,'A sửa');assert.equal(render().find(n=>n.type==='input'&&n.props.maxLength===50).props.value,'A sửa');
 });
+
+test('busy resource details prevent closing the modal during an in-flight operation',()=>{
+ const {ManagerDetailSheet}=load('app/manager-details.tsx');
+ const html=renderToStaticMarkup(React.createElement(ManagerDetailSheet,{target:{kind:'resource',id:'class'},board:board(),busy:true,onClose:()=>{},onEditResource:()=>{},onAssignPerson:()=>{},onEditSession:()=>{}}));
+ assert.match(html,/<button[^>]*disabled=""[^>]*aria-label="Đóng chi tiết"/);
+});
+
+test('read-only review details retain records without assignment or schedule-edit controls',()=>{
+ const {ManagerDetailSheet}=load('app/manager-details.tsx');
+ const b=board();b.people[0]={...b.people[0],status:'pending'};
+ const html=renderToStaticMarkup(React.createElement(ManagerDetailSheet,{target:{kind:'person',id:'learner'},board:b,readOnly:true,onClose:()=>{},onEditResource:()=>{},onAssignPerson:()=>{},onEditSession:()=>{}}));
+ assert.match(html,/Học viên mẫu/);
+ assert.match(html,/Buổi một/);
+ assert.ok(!/>(?:Phân lớp|Phân công lớp|Đổi lịch)<\/button>/.test(html),'the review dialog must not expose writes');
+});

@@ -1,0 +1,16 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> boi-ech@0.1.0 validate:cloudflare-preview
+> node scripts/validate-cloudflare-preview.mjs
+
+file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/scripts/validate-cloudflare-preview.mjs:71
+  if (!previewWorkflow.includes(token)) throw new Error(`Preview workflow thiếu: ${token}`);
+                                              ^
+
+Error: Preview workflow thiếu: DEPLOY_PREVIEW
+    at file:///workspace/scratch/9cddf143289c/BOIECH_AI/boi-ech/scripts/validate-cloudflare-preview.mjs:71:47
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.16.0

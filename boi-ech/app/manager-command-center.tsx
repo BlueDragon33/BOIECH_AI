@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {classKey,classNames,type ResourceKind,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession} from "./training-types";
-import {AppIcon,Badge,ResourceStatusBars,personReadiness,roomOccupancy,stateText} from "./manager-status";
+import {AppIcon,Badge,ResourceStatusBars,eligible,roomOccupancy,stateText} from "./manager-status";
 import type {DetailTarget} from "./manager-details";
 import styles from "./manager-command-center.module.css";
 
@@ -20,16 +20,19 @@ function overlaps(session:TrainingSession,board:TrainingBoard){
  return session.status!=="cancelled"&&[from,to,start,end].every(Number.isFinite)&&to>from&&end>start&&start<to&&end>from;
 }
 export function sessionsInWindow(board:TrainingBoard):TrainingSession[]{
- return board.sessions.filter(session=>overlaps(session,board)).sort((a,b)=>a.startsAt.localeCompare(b.startsAt)||a.id.localeCompare(b.id));
+ return board.sessions.filter(session=>overlaps(session,board)).sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt)||a.id.localeCompare(b.id));
 }
 export function classesInRoom(board:TrainingBoard,roomId:string):TrainingResource[]{
  const ids=new Set(sessionsInWindow(board).filter(session=>session.roomId===roomId).map(session=>session.classId));
  return board.resources.filter(resource=>resource.kind==="class"&&ids.has(resource.id));
 }
 /** A room is free only when its time window is valid and its parent is active. */
+function activeRoom(board:TrainingBoard,room:TrainingResource){
+ return room.status==="active"&&room.state!=="inactive"&&board.resources.some(parent=>parent.kind==="building"&&parent.id===room.parentId&&parent.status==="active");
+}
 export function roomHasNoBookings(board:TrainingBoard,roomId:string):boolean {
  const room=board.resources.find(resource=>resource.kind==="room"&&resource.id===roomId);
- if(!room||room.status!=="active"||room.state==="inactive")return false;
+ if(!room||!activeRoom(board,room))return false;
  const usage=roomOccupancy(roomId,board);
  return usage.valid&&usage.occupiedMinutes===0;
 }
@@ -37,13 +40,14 @@ export function roomHasNoBookings(board:TrainingBoard,roomId:string):boolean {
 export function roomNeedsAttention(board:TrainingBoard,roomId:string,windowSessions?:TrainingSession[]):boolean {
  const room=board.resources.find(resource=>resource.kind==="room"&&resource.id===roomId);
  if(!room)return false;
- if(room.status!=="active"||room.state==="inactive")return true;
+ if(!activeRoom(board,room))return true;
  const roomSessions=(windowSessions??sessionsInWindow(board)).filter(session=>session.roomId===roomId);
  // Scheduled uses of one physical room must not overlap, even for different classes.
  if(roomSessions.some((session,index)=>index>0&&Date.parse(session.startsAt)<Date.parse(roomSessions[index-1].endsAt)))return true;
  return roomSessions.some(session=>{
   const klass=board.resources.find(resource=>resource.kind==="class"&&resource.id===session.classId);
-  return !klass||klass.status!=="active"||klass.state==="overloaded"||klass.missingTeachers>0;
+  const teacher=board.people.find(person=>person.id===session.teacherId);
+  return !klass||klass.status!=="active"||klass.state==="overloaded"||klass.missingTeachers>0||!teacher||teacher.role!=="teacher"||!eligible(teacher)||!classNames(teacher.className).some(name=>classKey(name)===classKey(klass.name));
  });
 }
 function membersOfClass(people:TrainingPerson[],resource:TrainingResource){

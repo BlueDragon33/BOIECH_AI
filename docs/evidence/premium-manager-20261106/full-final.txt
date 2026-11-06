@@ -1,0 +1,3472 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> boi-ech@0.1.0 test
+> npm run build && node --test tests/*.test.mjs
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> boi-ech@0.1.0 build
+> bash scripts/build-verified.sh
+
+Running bounded vinext build...
+
+  vinext build  (Vite 8.0.13)
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+[1/5] analyze client references...
+[2Ktransforming...(node:38) ExperimentalWarning: glob is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✓ 218 modules transformed.
+rendering chunks...
+✓ built in 864ms
+[2/5] analyze server references...
+[2Ktransforming...✓ 124 modules transformed.
+rendering chunks...
+✓ built in 494ms
+[3/5] build rsc environment...
+[2Ktransforming...✓ 224 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 830ms
+[4/5] build client environment...
+[2Ktransforming...✓ 131 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 541ms
+[5/5] build ssr environment...
+[2Ktransforming...✓ 130 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 575ms
+[0m
+  Route (app)
+  ┌ ? /                                   
+  ├ λ /api/admin/devices                  
+  ├ λ /api/ai/mentor                      
+  ├ λ /api/application-management/contract
+  ├ λ /api/certificate                    
+  ├ λ /api/control/ai                     
+  ├ λ /api/control/automation             
+  ├ λ /api/control/content                
+  ├ λ /api/control/management-access      
+  ├ λ /api/control/overview               
+  ├ λ /api/control/payment-proof          
+  ├ λ /api/control/runtime                
+  ├ λ /api/control/status                 
+  ├ λ /api/course                         
+  ├ λ /api/course/teacher-actions         
+  ├ λ /api/course/teacher-actions/reply   
+  ├ λ /api/course/teacher-actions/status  
+  ├ λ /api/device                         
+  ├ λ /api/device/payment-proof           
+  ├ λ /api/editor/content                 
+  ├ λ /api/editor/device                  
+  ├ λ /api/teacher/action                 
+  ├ λ /api/teacher/overview               
+  ├ λ /api/teacher/roster                 
+  ├ λ /api/training-management            
+  ├ λ /api/video-analysis                 
+  ├ ƒ /bien-tap-noi-dung                  
+  ├ ? /bien-tap-suc-khoe-tre              
+  ├ ? /chung-chi                          
+  ├ ? /phan-tich-video                    
+  ├ ƒ /quan-ly-thiet-bi                   
+  └ ? /suc-khoe-tre                       
+
+  λ API  ƒ Dynamic  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+
+Validated Sites artifact: ESM Worker default.fetch and hosting manifest are present.
+TAP version 13
+# Subtest: account switch is visually attached to learner or teacher identity chip
+ok 1 - account switch is visually attached to learner or teacher identity chip
+  ---
+  duration_ms: 1.09856
+  type: 'test'
+  ...
+# Subtest: teacher editor shortcut reuses the live personal editor or permission request
+ok 2 - teacher editor shortcut reuses the live personal editor or permission request
+  ---
+  duration_ms: 0.212653
+  type: 'test'
+  ...
+# Subtest: teacher capability cards are real keyboard-accessible actions
+ok 3 - teacher capability cards are real keyboard-accessible actions
+  ---
+  duration_ms: 0.204672
+  type: 'test'
+  ...
+# Subtest: teacher action bridge is mounted globally with role shells
+ok 4 - teacher action bridge is mounted globally with role shells
+  ---
+  duration_ms: 0.103112
+  type: 'test'
+  ...
+# Subtest: adaptive coach invalidates requests when learner role leaves the surface
+ok 5 - adaptive coach invalidates requests when learner role leaves the surface
+  ---
+  duration_ms: 0.835241
+  type: 'test'
+  ...
+# Subtest: adaptive coach clears previous learner data before loading a different device
+ok 6 - adaptive coach clears previous learner data before loading a different device
+  ---
+  duration_ms: 0.195959
+  type: 'test'
+  ...
+# Subtest: adaptive coach ignores stale responses after an account generation changes
+ok 7 - adaptive coach ignores stale responses after an account generation changes
+  ---
+  duration_ms: 1.413904
+  type: 'test'
+  ...
+# Subtest: manual Adaptive Coach refresh exposes loading feedback without clearing current data
+ok 8 - manual Adaptive Coach refresh exposes loading feedback without clearing current data
+  ---
+  duration_ms: 0.833649
+  type: 'test'
+  ...
+# Subtest: manual refresh feedback reuses the existing duplicate-request guard
+ok 9 - manual refresh feedback reuses the existing duplicate-request guard
+  ---
+  duration_ms: 0.14899
+  type: 'test'
+  ...
+# Subtest: background refresh still preserves the current learner model
+ok 10 - background refresh still preserves the current learner model
+  ---
+  duration_ms: 0.992673
+  type: 'test'
+  ...
+# Subtest: automatic adaptive refresh skips work while the browser is offline
+ok 11 - automatic adaptive refresh skips work while the browser is offline
+  ---
+  duration_ms: 0.920297
+  type: 'test'
+  ...
+# Subtest: adaptive model refreshes when connectivity returns
+ok 12 - adaptive model refreshes when connectivity returns
+  ---
+  duration_ms: 0.14251
+  type: 'test'
+  ...
+# Subtest: network-aware sync keeps the existing V20 request and visibility guards
+ok 13 - network-aware sync keeps the existing V20 request and visibility guards
+  ---
+  duration_ms: 1.537707
+  type: 'test'
+  ...
+# Subtest: initial Adaptive Coach failures surface a recoverable learner-visible error
+ok 14 - initial Adaptive Coach failures surface a recoverable learner-visible error
+  ---
+  duration_ms: 0.944181
+  type: 'test'
+  ...
+# Subtest: retry uses a non-preserving bootstrap so another failure remains visible
+ok 15 - retry uses a non-preserving bootstrap so another failure remains visible
+  ---
+  duration_ms: 0.19674
+  type: 'test'
+  ...
+# Subtest: background refresh failures still preserve the current learner model
+ok 16 - background refresh failures still preserve the current learner model
+  ---
+  duration_ms: 0.186535
+  type: 'test'
+  ...
+# Subtest: account or role changes clear stale bootstrap errors
+ok 17 - account or role changes clear stale bootstrap errors
+  ---
+  duration_ms: 0.176801
+  type: 'test'
+  ...
+# Subtest: recoverable bootstrap state has dedicated compact styling
+ok 18 - recoverable bootstrap state has dedicated compact styling
+  ---
+  duration_ms: 0.173356
+  type: 'test'
+  ...
+# Subtest: preserving refresh failures retain data and surface a stale notice
+ok 19 - preserving refresh failures retain data and surface a stale notice
+  ---
+  duration_ms: 0.933806
+  type: 'test'
+  ...
+# Subtest: stale refresh state is passed only alongside an existing Adaptive Coach
+ok 20 - stale refresh state is passed only alongside an existing Adaptive Coach
+  ---
+  duration_ms: 0.180867
+  type: 'test'
+  ...
+# Subtest: successful refresh clears stale notice state
+ok 21 - successful refresh clears stale notice state
+  ---
+  duration_ms: 0.33928
+  type: 'test'
+  ...
+# Subtest: initial bootstrap failure still clears data and renders the recoverable V22 error
+ok 22 - initial bootstrap failure still clears data and renders the recoverable V22 error
+  ---
+  duration_ms: 0.161898
+  type: 'test'
+  ...
+# Subtest: stale notice has dedicated non-destructive styling
+ok 23 - stale notice has dedicated non-destructive styling
+  ---
+  duration_ms: 0.18983
+  type: 'test'
+  ...
+# Subtest: adaptive coach refreshes conservatively while the learner tab is visible
+ok 24 - adaptive coach refreshes conservatively while the learner tab is visible
+  ---
+  duration_ms: 0.952244
+  type: 'test'
+  ...
+# Subtest: adaptive coach blocks duplicate signed bootstrap requests
+ok 25 - adaptive coach blocks duplicate signed bootstrap requests
+  ---
+  duration_ms: 0.321985
+  type: 'test'
+  ...
+# Subtest: adaptive refresh cannot write a stale learner response
+ok 26 - adaptive refresh cannot write a stale learner response
+  ---
+  duration_ms: 0.154278
+  type: 'test'
+  ...
+# Subtest: transient background refresh failures preserve the current learner model
+ok 27 - transient background refresh failures preserve the current learner model
+  ---
+  duration_ms: 0.106476
+  type: 'test'
+  ...
+# Subtest: admin device type override is stored separately from automatic detection
+ok 28 - admin device type override is stored separately from automatic detection
+  ---
+  duration_ms: 11.271324
+  type: 'test'
+  ...
+# Subtest: admin can select auto desktop phone or tablet without changing BE identity
+ok 29 - admin can select auto desktop phone or tablet without changing BE identity
+  ---
+  duration_ms: 2.385847
+  type: 'test'
+  ...
+# Subtest: presence refreshes detected metadata then re-reads canonical effective classification
+ok 30 - presence refreshes detected metadata then re-reads canonical effective classification
+  ---
+  duration_ms: 1.959017
+  type: 'test'
+  ...
+# Subtest: admin list exposes detected override and effective device types
+ok 31 - admin list exposes detected override and effective device types
+  ---
+  duration_ms: 0.807841
+  type: 'test'
+  ...
+# Subtest: keeps Frog AI grounded in published course content without vision capture
+ok 32 - keeps Frog AI grounded in published course content without vision capture
+  ---
+  duration_ms: 11.989628
+  type: 'test'
+  ...
+# Subtest: protects answer keys and keeps adaptive scoring on the server at eight of ten
+ok 33 - protects answer keys and keeps adaptive scoring on the server at eight of ten
+  ---
+  duration_ms: 2.969637
+  type: 'test'
+  ...
+# Subtest: adds privacy controls, rate limiting, feedback, version logs and zero external model cost
+ok 34 - adds privacy controls, rate limiting, feedback, version logs and zero external model cost
+  ---
+  duration_ms: 1.985337
+  type: 'test'
+  ...
+# Subtest: keeps AI content assistance inside the existing human approval workflow
+ok 35 - keeps AI content assistance inside the existing human approval workflow
+  ---
+  duration_ms: 1.661394
+  type: 'test'
+  ...
+# Subtest: L10 teacher assignments accept an optional bounded due date
+ok 36 - L10 teacher assignments accept an optional bounded due date
+  ---
+  duration_ms: 0.968989
+  type: 'test'
+  ...
+# Subtest: L10 learner assignment status requires signed ownership of the assignment
+ok 37 - L10 learner assignment status requires signed ownership of the assignment
+  ---
+  duration_ms: 0.321724
+  type: 'test'
+  ...
+# Subtest: L10 learner inbox exposes due date and three real status controls
+ok 38 - L10 learner inbox exposes due date and three real status controls
+  ---
+  duration_ms: 0.207686
+  type: 'test'
+  ...
+# Subtest: L10 teacher overview builds a real assignment schedule inside the authorized teacher class set
+ok 39 - L10 teacher overview builds a real assignment schedule inside the authorized teacher class set
+  ---
+  duration_ms: 0.214626
+  type: 'test'
+  ...
+# Subtest: L10 replaces the simulated schedule with assignment data
+ok 40 - L10 replaces the simulated schedule with assignment data
+  ---
+  duration_ms: 0.218252
+  type: 'test'
+  ...
+# Subtest: L10 styles load after L9
+ok 41 - L10 styles load after L9
+  ---
+  duration_ms: 0.189509
+  type: 'test'
+  ...
+# Subtest: Boi has an authenticated, read-only automation endpoint
+ok 42 - Boi has an authenticated, read-only automation endpoint
+  ---
+  duration_ms: 1.218006
+  type: 'test'
+  ...
+# Subtest: Boi status advertises the focused automation endpoint
+ok 43 - Boi status advertises the focused automation endpoint
+  ---
+  duration_ms: 0.240986
+  type: 'test'
+  ...
+# Subtest: analyzer preserves left and right pose signals separately for bilateral review
+ok 44 - analyzer preserves left and right pose signals separately for bilateral review
+  ---
+  duration_ms: 0.992673
+  type: 'test'
+  ...
+# Subtest: bilateral panel is view-gated, timestamp-linked and explicitly non-scoring
+ok 45 - bilateral panel is view-gated, timestamp-linked and explicitly non-scoring
+  ---
+  duration_ms: 0.228286
+  type: 'test'
+  ...
+# Subtest: view quality gate suppresses strong bilateral labels when clip evidence is weak
+ok 46 - view quality gate suppresses strong bilateral labels when clip evidence is weak
+  ---
+  duration_ms: 0.245331
+  type: 'test'
+  ...
+# Subtest: bilateral feature and view quality gate remain local-only and cannot alter thresholds or server sync
+ok 47 - bilateral feature and view quality gate remain local-only and cannot alter thresholds or server sync
+  ---
+  duration_ms: 0.476843
+  type: 'test'
+  ...
+# Subtest: coverage gate is visible, shared-view-aware and cannot claim global calibration readiness
+ok 48 - coverage gate is visible, shared-view-aware and cannot claim global calibration readiness
+  ---
+  duration_ms: 5.837324
+  type: 'test'
+  ...
+# Subtest: coverage gate, shared camera profile and advisor remain local-only
+ok 49 - coverage gate, shared camera profile and advisor remain local-only
+  ---
+  duration_ms: 4.023842
+  type: 'test'
+  ...
+# Subtest: camera guidance samples a bounded local preflight and restores playback
+ok 50 - camera guidance samples a bounded local preflight and restores playback
+  ---
+  duration_ms: 1.670312
+  type: 'test'
+  ...
+# Subtest: camera guidance sits immediately before analyze and reuses the existing AI view choice
+ok 51 - camera guidance sits immediately before analyze and reuses the existing AI view choice
+  ---
+  duration_ms: 0.183911
+  type: 'test'
+  ...
+# Subtest: camera guidance reports framing evidence without creating another scoring path
+ok 52 - camera guidance reports framing evidence without creating another scoring path
+  ---
+  duration_ms: 0.133587
+  type: 'test'
+  ...
+# Subtest: guided retake keeps local timestamps and lets the learner inspect exact problem moments
+ok 53 - guided retake keeps local timestamps and lets the learner inspect exact problem moments
+  ---
+  duration_ms: 0.121289
+  type: 'test'
+  ...
+# Subtest: guided retake captures only numeric pose framing evidence, never frames or media
+ok 54 - guided retake captures only numeric pose framing evidence, never frames or media
+  ---
+  duration_ms: 0.275476
+  type: 'test'
+  ...
+# Subtest: camera guidance does not capture images, persist results or call application APIs
+ok 55 - camera guidance does not capture images, persist results or call application APIs
+  ---
+  duration_ms: 0.367792
+  type: 'test'
+  ...
+# Subtest: rear guidance passes only with stable bilateral evidence
+ok 56 - rear guidance passes only with stable bilateral evidence
+  ---
+  duration_ms: 2.357965
+  type: 'test'
+  ...
+# Subtest: rear guidance rejects a persistently obscured side before full analysis
+ok 57 - rear guidance rejects a persistently obscured side before full analysis
+  ---
+  duration_ms: 0.780049
+  type: 'test'
+  ...
+# Subtest: side guidance tolerates a weaker far side when one side stays clear
+ok 58 - side guidance tolerates a weaker far side when one side stays clear
+  ---
+  duration_ms: 0.189599
+  type: 'test'
+  ...
+# Subtest: small or edge-clipped body is surfaced before analysis
+ok 59 - small or edge-clipped body is surfaced before analysis
+  ---
+  duration_ms: 0.349035
+  type: 'test'
+  ...
+# Subtest: pose instability is detected independently of average visibility
+ok 60 - pose instability is detected independently of average visibility
+  ---
+  duration_ms: 0.236559
+  type: 'test'
+  ...
+# Subtest: guided retake keeps the exact worst timestamp and gives a concrete recovery action
+ok 61 - guided retake keeps the exact worst timestamp and gives a concrete recovery action
+  ---
+  duration_ms: 0.338459
+  type: 'test'
+  ...
+# Subtest: guided retake returns at most three distinct problem types
+ok 62 - guided retake returns at most three distinct problem types
+  ---
+  duration_ms: 0.265932
+  type: 'test'
+  ...
+# Subtest: guidance refuses to claim readiness without a declared view
+ok 63 - guidance refuses to claim readiness without a declared view
+  ---
+  duration_ms: 0.136041
+  type: 'test'
+  ...
+# Subtest: camera guidance core stays local-only and non-scoring
+ok 64 - camera guidance core stays local-only and non-scoring
+  ---
+  duration_ms: 0.784295
+  type: 'test'
+  ...
+# Subtest: camera profile is a single session-memory source shared by all analysis panels
+ok 65 - camera profile is a single session-memory source shared by all analysis panels
+  ---
+  duration_ms: 0.836252
+  type: 'test'
+  ...
+# Subtest: only one shared camera selector is rendered for a given cycle state
+ok 66 - only one shared camera selector is rendered for a given cycle state
+  ---
+  duration_ms: 0.168238
+  type: 'test'
+  ...
+# Subtest: shared camera profile remains session-only and has no server or persistence behavior
+ok 67 - shared camera profile remains session-only and has no server or persistence behavior
+  ---
+  duration_ms: 0.221727
+  type: 'test'
+  ...
+# Subtest: coverage, view-aware analysis and bilateral symmetry consume the same view
+ok 68 - coverage, view-aware analysis and bilateral symmetry consume the same view
+  ---
+  duration_ms: 0.117143
+  type: 'test'
+  ...
+# Subtest: retake comparison uses a different local video source with the same camera profile
+ok 69 - retake comparison uses a different local video source with the same camera profile
+  ---
+  duration_ms: 2.140204
+  type: 'test'
+  ...
+# Subtest: retake comparison resets visible results when the local source changes
+ok 70 - retake comparison resets visible results when the local source changes
+  ---
+  duration_ms: 0.16322
+  type: 'test'
+  ...
+# Subtest: retake comparison shows before-after evidence and remaining fixes
+ok 71 - retake comparison shows before-after evidence and remaining fixes
+  ---
+  duration_ms: 0.214757
+  type: 'test'
+  ...
+# Subtest: retake comparison remains RAM-only and cannot change scoring or thresholds
+ok 72 - retake comparison remains RAM-only and cannot change scoring or thresholds
+  ---
+  duration_ms: 0.384046
+  type: 'test'
+  ...
+# Subtest: retake comparison marks a new clip ready and lists resolved checks
+ok 73 - retake comparison marks a new clip ready and lists resolved checks
+  ---
+  duration_ms: 2.616071
+  type: 'test'
+  ...
+# Subtest: retake comparison surfaces regressions instead of always claiming improvement
+ok 74 - retake comparison surfaces regressions instead of always claiming improvement
+  ---
+  duration_ms: 0.307743
+  type: 'test'
+  ...
+# Subtest: small changes remain stable and use percentage-point deltas
+ok 75 - small changes remain stable and use percentage-point deltas
+  ---
+  duration_ms: 0.181597
+  type: 'test'
+  ...
+# Subtest: retake comparison core remains local-only and non-scoring
+ok 76 - retake comparison core remains local-only and non-scoring
+  ---
+  duration_ms: 0.65836
+  type: 'test'
+  ...
+# (node:306) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:306) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# Subtest: owning app rejects stale central status rather than unblocking a changed device
+ok 77 - owning app rejects stale central status rather than unblocking a changed device
+  ---
+  duration_ms: 552.595908
+  type: 'test'
+  ...
+# Subtest: unblock only changes status and keeps paid expiry; concurrent payment change loses compare-and-swap
+ok 78 - unblock only changes status and keeps paid expiry; concurrent payment change loses compare-and-swap
+  ---
+  duration_ms: 172.909759
+  type: 'test'
+  ...
+# Subtest: confirmed unblock preserves expired paid record without automatic renewal
+ok 79 - confirmed unblock preserves expired paid record without automatic renewal
+  ---
+  duration_ms: 140.732179
+  type: 'test'
+  ...
+# Subtest: competing free and paid classifications cannot both commit the same central snapshot
+ok 80 - competing free and paid classifications cannot both commit the same central snapshot
+  ---
+  duration_ms: 144.342322
+  type: 'test'
+  ...
+# Subtest: coaching is wired after cross-module consistency as the final interpretation layer
+ok 81 - coaching is wired after cross-module consistency as the final interpretation layer
+  ---
+  duration_ms: 1.082716
+  type: 'test'
+  ...
+# Subtest: coaching consumes consistency status and unified trust instead of re-running detector logic
+ok 82 - coaching consumes consistency status and unified trust instead of re-running detector logic
+  ---
+  duration_ms: 2.796512
+  type: 'test'
+  ...
+# Subtest: only corroborated usable evidence is rendered as train-first while conflicts stay verify-first
+ok 83 - only corroborated usable evidence is rendered as train-first while conflicts stay verify-first
+  ---
+  duration_ms: 0.238221
+  type: 'test'
+  ...
+# Subtest: reference trust cannot produce a main coaching priority
+ok 84 - reference trust cannot produce a main coaching priority
+  ---
+  duration_ms: 0.166405
+  type: 'test'
+  ...
+# Subtest: coaching marks workflow ordering as non-biomechanical and remains local-only
+ok 85 - coaching marks workflow ordering as non-biomechanical and remains local-only
+  ---
+  duration_ms: 0.343026
+  type: 'test'
+  ...
+# Subtest: corroborated evidence becomes a coaching priority only when trust is usable
+ok 86 - corroborated evidence becomes a coaching priority only when trust is usable
+  ---
+  duration_ms: 2.687121
+  type: 'test'
+  ...
+# Subtest: caution trust can coach a corroborated issue but keeps a caution reason
+ok 87 - caution trust can coach a corroborated issue but keeps a caution reason
+  ---
+  duration_ms: 0.371377
+  type: 'test'
+  ...
+# Subtest: reference trust demotes even corroborated evidence to verify-first
+ok 88 - reference trust demotes even corroborated evidence to verify-first
+  ---
+  duration_ms: 0.215759
+  type: 'test'
+  ...
+# Subtest: conflict and single-source findings are never promoted to the main drill list
+ok 89 - conflict and single-source findings are never promoted to the main drill list
+  ---
+  duration_ms: 0.816033
+  type: 'test'
+  ...
+# Subtest: clear evidence is monitored instead of inventing a corrective drill
+ok 90 - clear evidence is monitored instead of inventing a corrective drill
+  ---
+  duration_ms: 0.250029
+  type: 'test'
+  ...
+# Subtest: equal corroboration uses a stable workflow tie-break rather than pretending to rank biomechanical severity
+ok 91 - equal corroboration uses a stable workflow tie-break rather than pretending to rank biomechanical severity
+  ---
+  duration_ms: 0.706541
+  type: 'test'
+  ...
+# Subtest: coaching core stays local-only, non-persistent and non-scoring
+ok 92 - coaching core stays local-only, non-persistent and non-scoring
+  ---
+  duration_ms: 0.57682
+  type: 'test'
+  ...
+# Subtest: requires the first four parts before a lesson quiz can be submitted
+ok 93 - requires the first four parts before a lesson quiz can be submitted
+  ---
+  duration_ms: 64.97881
+  type: 'test'
+  ...
+# Subtest: keeps completed legacy progress consistent across all five parts
+ok 94 - keeps completed legacy progress consistent across all five parts
+  ---
+  duration_ms: 13.086864
+  type: 'test'
+  ...
+# Subtest: contains eight complete lessons and eighty valid A-D questions
+ok 95 - contains eight complete lessons and eighty valid A-D questions
+  ---
+  duration_ms: 41.402051
+  type: 'test'
+  ...
+# Subtest: keeps answer keys and explanations out of the browser bundle
+ok 96 - keeps answer keys and explanations out of the browser bundle
+  ---
+  duration_ms: 36.686932
+  type: 'test'
+  ...
+# Subtest: never trusts browser progress to unlock a new server profile
+ok 97 - never trusts browser progress to unlock a new server profile
+  ---
+  duration_ms: 1.917657
+  type: 'test'
+  ...
+# Subtest: replaces learner accounts with signed, server-approved device access
+ok 98 - replaces learner accounts with signed, server-approved device access
+  ---
+  duration_ms: 3.309269
+  type: 'test'
+  ...
+# Subtest: keeps device administration separate from the learner route
+ok 99 - keeps device administration separate from the learner route
+  ---
+  duration_ms: 9.713902
+  type: 'test'
+  ...
+# Subtest: keeps scoring and lesson unlock enforcement on the server
+ok 100 - keeps scoring and lesson unlock enforcement on the server
+  ---
+  duration_ms: 2.943991
+  type: 'test'
+  ...
+# Subtest: tracks trustworthy device activity and forty-step course progress
+ok 101 - tracks trustworthy device activity and forty-step course progress
+  ---
+  duration_ms: 5.163237
+  type: 'test'
+  ...
+# Subtest: validates every nested lesson field before content can be published
+ok 102 - validates every nested lesson field before content can be published
+  ---
+  duration_ms: 51.730398
+  type: 'test'
+  ...
+# Subtest: creates immutable numbered drafts and rollback versions
+ok 103 - creates immutable numbered drafts and rollback versions
+  ---
+  duration_ms: 1.445592
+  type: 'test'
+  ...
+# Subtest: records approval history without exposing it to editor-only roles
+ok 104 - records approval history without exposing it to editor-only roles
+  ---
+  duration_ms: 1.821956
+  type: 'test'
+  ...
+# Subtest: accepts only short-lived signed browser tickets from the exact configured control-plane origin
+ok 105 - accepts only short-lived signed browser tickets from the exact configured control-plane origin
+  ---
+  duration_ms: 4.118853
+  type: 'test'
+  ...
+# Subtest: lists pending devices automatically and supports exact BE-code fallback lookup
+ok 106 - lists pending devices automatically and supports exact BE-code fallback lookup
+  ---
+  duration_ms: 1.582063
+  type: 'test'
+  ...
+# Subtest: refreshes only fixed device codes and marks stale devices inactive
+ok 107 - refreshes only fixed device codes and marks stale devices inactive
+  ---
+  duration_ms: 5.366342
+  type: 'test'
+  ...
+# Subtest: edits only a selected lesson section on the Boi Ech site through a two-stage approval flow
+ok 108 - edits only a selected lesson section on the Boi Ech site through a two-stage approval flow
+  ---
+  duration_ms: 2.640934
+  type: 'test'
+  ...
+# Subtest: binds editing permission to the signed-in account and exact laptop
+ok 109 - binds editing permission to the signed-in account and exact laptop
+  ---
+  duration_ms: 6.353428
+  type: 'test'
+  ...
+# Subtest: sends and publishes only the selected edited section
+ok 110 - sends and publishes only the selected edited section
+  ---
+  duration_ms: 1.17342
+  type: 'test'
+  ...
+# Subtest: migrates dedicated content-editor devices and scoped permission metadata
+ok 111 - migrates dedicated content-editor devices and scoped permission metadata
+  ---
+  duration_ms: 0.581818
+  type: 'test'
+  ...
+# Subtest: maps every lesson to teaching and neutral diagnostic visuals
+ok 112 - maps every lesson to teaching and neutral diagnostic visuals
+  ---
+  duration_ms: 1.416929
+  type: 'test'
+  ...
+# Subtest: ships all 128 neutral course visuals referenced by the server
+ok 113 - ships all 128 neutral course visuals referenced by the server
+  ---
+  duration_ms: 35.140177
+  type: 'test'
+  ...
+# Subtest: uses exactly five image-based questions in every lesson
+ok 114 - uses exactly five image-based questions in every lesson
+  ---
+  duration_ms: 0.994987
+  type: 'test'
+  ...
+# Subtest: keeps image answers neutral and never reveals per-question feedback
+ok 115 - keeps image answers neutral and never reveals per-question feedback
+  ---
+  duration_ms: 3.052871
+  type: 'test'
+  ...
+# Subtest: registers unique learner profiles and uses controlled paid or free activation
+ok 116 - registers unique learner profiles and uses controlled paid or free activation
+  ---
+  duration_ms: 19.821484
+  type: 'test'
+  ...
+# Subtest: completes the payment review lifecycle and enforces account expiry
+ok 117 - completes the payment review lifecycle and enforces account expiry
+  ---
+  duration_ms: 5.889883
+  type: 'test'
+  ...
+# Subtest: supports installable offline learning without offline answer submission
+ok 118 - supports installable offline learning without offline answer submission
+  ---
+  duration_ms: 25.603458
+  type: 'test'
+  ...
+# Subtest: limits one-time challenges and optimizes status-only polling
+ok 119 - limits one-time challenges and optimizes status-only polling
+  ---
+  duration_ms: 2.730716
+  type: 'test'
+  ...
+# Subtest: uses five visual questions per lesson and four images per visual option set
+ok 120 - uses five visual questions per lesson and four images per visual option set
+  ---
+  duration_ms: 12.144705
+  type: 'test'
+  ...
+# Subtest: uses an explicit semantic image map instead of assigning generic positions
+ok 121 - uses an explicit semantic image map instead of assigning generic positions
+  ---
+  duration_ms: 2.720791
+  type: 'test'
+  ...
+# Subtest: renders one progress bar in each quiz section
+ok 122 - renders one progress bar in each quiz section
+  ---
+  duration_ms: 1.643072
+  type: 'test'
+  ...
+# Subtest: keeps course visuals and quiz choices usable on narrow screens
+ok 123 - keeps course visuals and quiz choices usable on narrow screens
+  ---
+  duration_ms: 1.416428
+  type: 'test'
+  ...
+# Subtest: keeps navigation and learning content complete when text grows or the screen narrows
+ok 124 - keeps navigation and learning content complete when text grows or the screen narrows
+  ---
+  duration_ms: 11.290736
+  type: 'test'
+  ...
+# Subtest: keeps unique identity and teacher-only content editing with the three-role registration
+ok 125 - keeps unique identity and teacher-only content editing with the three-role registration
+  ---
+  duration_ms: 8.907283
+  type: 'test'
+  ...
+# Subtest: personalizes learner-facing copy with the registered given name
+ok 126 - personalizes learner-facing copy with the registered given name
+  ---
+  duration_ms: 1.510086
+  type: 'test'
+  ...
+# Subtest: lets only the owner permanently remove confirmed spam devices while preserving protected academic records
+ok 127 - lets only the owner permanently remove confirmed spam devices while preserving protected academic records
+  ---
+  duration_ms: 2.458164
+  type: 'test'
+  ...
+# Subtest: enters the course immediately after an approved profile and hides free-day countdowns until expiry
+ok 128 - enters the course immediately after an approved profile and hides free-day countdowns until expiry
+  ---
+  duration_ms: 1.403289
+  type: 'test'
+  ...
+# Subtest: caps automatic free access with configurable defaults of 60 days and 20 devices
+ok 129 - caps automatic free access with configurable defaults of 60 days and 20 devices
+  ---
+  duration_ms: 10.84578
+  type: 'test'
+  ...
+# Subtest: keeps child health and Boi Ech administration isolated
+ok 130 - keeps child health and Boi Ech administration isolated
+  ---
+  duration_ms: 4.464317
+  type: 'test'
+  ...
+# Subtest: cross-module consistency is wired after evidence trace without replacing trust
+ok 131 - cross-module consistency is wired after evidence trace without replacing trust
+  ---
+  duration_ms: 2.322344
+  type: 'test'
+  ...
+# Subtest: consistency compares only matching detector domains
+ok 132 - consistency compares only matching detector domains
+  ---
+  duration_ms: 0.226414
+  type: 'test'
+  ...
+# Subtest: body tilt and wide-knee findings are explicitly left unpaired
+ok 133 - body tilt and wide-knee findings are explicitly left unpaired
+  ---
+  duration_ms: 0.205383
+  type: 'test'
+  ...
+# Subtest: bilateral evidence must pass view quality and evidence confidence before contradicting v1
+ok 134 - bilateral evidence must pass view quality and evidence confidence before contradicting v1
+  ---
+  duration_ms: 0.153907
+  type: 'test'
+  ...
+# Subtest: phase coordination uses usable complete-cycle evidence rather than raw text votes
+ok 135 - phase coordination uses usable complete-cycle evidence rather than raw text votes
+  ---
+  duration_ms: 0.174818
+  type: 'test'
+  ...
+# Subtest: consistency observer ignores its own rendered panel mutations
+ok 136 - consistency observer ignores its own rendered panel mutations
+  ---
+  duration_ms: 0.152395
+  type: 'test'
+  ...
+# Subtest: cross-module consistency remains local-only, non-persistent and non-scoring
+ok 137 - cross-module consistency remains local-only, non-persistent and non-scoring
+  ---
+  duration_ms: 0.37945
+  type: 'test'
+  ...
+# Subtest: two independent arm findings corroborate instead of being added as extra score
+ok 138 - two independent arm findings corroborate instead of being added as extra score
+  ---
+  duration_ms: 2.694242
+  type: 'test'
+  ...
+# Subtest: positive v1 arm finding conflicts with a trusted negative bilateral finding
+ok 139 - positive v1 arm finding conflicts with a trusted negative bilateral finding
+  ---
+  duration_ms: 0.993334
+  type: 'test'
+  ...
+# Subtest: leg asymmetry needs an independent bilateral source before it is considered corroborated
+ok 140 - leg asymmetry needs an independent bilateral source before it is considered corroborated
+  ---
+  duration_ms: 0.362575
+  type: 'test'
+  ...
+# Subtest: coordination compares v1 overlap with the five-phase engine
+ok 141 - coordination compares v1 overlap with the five-phase engine
+  ---
+  duration_ms: 0.137072
+  type: 'test'
+  ...
+# Subtest: two eligible negative detectors are consistent clear evidence rather than a positive claim
+ok 142 - two eligible negative detectors are consistent clear evidence rather than a positive claim
+  ---
+  duration_ms: 0.410655
+  type: 'test'
+  ...
+# Subtest: an ineligible detector cannot create a false conflict
+ok 143 - an ineligible detector cannot create a false conflict
+  ---
+  duration_ms: 0.301424
+  type: 'test'
+  ...
+# Subtest: duplicate records from one module never count as two independent sources
+ok 144 - duplicate records from one module never count as two independent sources
+  ---
+  duration_ms: 2.293301
+  type: 'test'
+  ...
+# Subtest: a conflict outranks corroboration in the overall consistency label
+ok 145 - a conflict outranks corroboration in the overall consistency label
+  ---
+  duration_ms: 0.338018
+  type: 'test'
+  ...
+# Subtest: consistency core stays local-only and cannot change scoring, thresholds or trust
+ok 146 - consistency core stays local-only and cannot change scoring, thresholds or trust
+  ---
+  duration_ms: 0.841701
+  type: 'test'
+  ...
+# Subtest: production artifacts carry managed mode and deploy verifies device authentication
+ok 147 - production artifacts carry managed mode and deploy verifies device authentication
+  ---
+  duration_ms: 1.059472
+  type: 'test'
+  ...
+# Subtest: manual production build uses the proven production D1 binding path
+ok 148 - manual production build uses the proven production D1 binding path
+  ---
+  duration_ms: 0.309035
+  type: 'test'
+  ...
+# Subtest: temporary one-shot production publish artifacts are removed after deployment
+ok 149 - temporary one-shot production publish artifacts are removed after deployment
+  ---
+  duration_ms: 1.563485
+  type: 'test'
+  ...
+# Subtest: current Boi runtime publishes a machine-readable management identity
+ok 150 - current Boi runtime publishes a machine-readable management identity
+  ---
+  duration_ms: 0.893537
+  type: 'test'
+  ...
+# Subtest: legacy V29 one-off production trigger is removed
+ok 151 - legacy V29 one-off production trigger is removed
+  ---
+  duration_ms: 0.304208
+  type: 'test'
+  ...
+# Subtest: only the generic manual production workflow remains authoritative
+ok 152 - only the generic manual production workflow remains authoritative
+  ---
+  duration_ms: 1.501523
+  type: 'test'
+  ...
+# (node:398) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:398) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# Subtest: production registration stays managed for mode unset across two new devices
+ok 153 - production registration stays managed for mode unset across two new devices
+  ---
+  duration_ms: 158.990327
+  type: 'test'
+  ...
+# Subtest: production registration stays managed for mode standalone across two new devices
+ok 154 - production registration stays managed for mode standalone across two new devices
+  ---
+  duration_ms: 26.894577
+  type: 'test'
+  ...
+# Subtest: production registration stays managed for mode managed across two new devices
+ok 155 - production registration stays managed for mode managed across two new devices
+  ---
+  duration_ms: 33.047711
+  type: 'test'
+  ...
+# Subtest: managed registration applies enabled automation only after signed registration within quota
+ok 156 - managed registration applies enabled automation only after signed registration within quota
+  ---
+  duration_ms: 35.996143
+  type: 'test'
+  ...
+# Subtest: schema initialization retries after a temporary database failure
+ok 157 - schema initialization retries after a temporary database failure
+  ---
+  duration_ms: 23.921619
+  type: 'test'
+  ...
+# Subtest: existing blocked, paid, and expired access survives repeat registration
+ok 158 - existing blocked, paid, and expired access survives repeat registration
+  ---
+  duration_ms: 36.329627
+  type: 'test'
+  ...
+# Subtest: two explicit local standalone devices avoid shared identity collisions
+ok 159 - two explicit local standalone devices avoid shared identity collisions
+  ---
+  duration_ms: 20.167172
+  type: 'test'
+  ...
+# Subtest: additional-account token cannot reclassify an existing blocked, paid, or expired identity
+ok 160 - additional-account token cannot reclassify an existing blocked, paid, or expired identity
+  ---
+  duration_ms: 15.29833
+  type: 'test'
+  ...
+# Subtest: new additional accounts await manual review without consuming automation quota or undoing owner approval
+ok 161 - new additional accounts await manual review without consuming automation quota or undoing owner approval
+  ---
+  duration_ms: 17.902239
+  type: 'test'
+  ...
+# Subtest: student shell consumes the synchronized authorized device profile
+ok 162 - student shell consumes the synchronized authorized device profile
+  ---
+  duration_ms: 7.725786
+  type: 'test'
+  ...
+# Subtest: phone learner UX is classification-aware and touch optimized
+ok 163 - phone learner UX is classification-aware and touch optimized
+  ---
+  duration_ms: 7.656831
+  type: 'test'
+  ...
+# Subtest: tablet learner UX uses a medium-density layout from the authorized classification
+ok 164 - tablet learner UX uses a medium-density layout from the authorized classification
+  ---
+  duration_ms: 0.997871
+  type: 'test'
+  ...
+# Subtest: viewport responsive rules remain present as a fallback layer
+ok 165 - viewport responsive rules remain present as a fallback layer
+  ---
+  duration_ms: 1.951677
+  type: 'test'
+  ...
+# Subtest: device classification is synchronized from server metadata into the authorized learner shell
+ok 166 - device classification is synchronized from server metadata into the authorized learner shell
+  ---
+  duration_ms: 10.099716
+  type: 'test'
+  ...
+# Subtest: device classification remains attached to the BE identity rather than viewport-only detection
+ok 167 - device classification remains attached to the BE identity rather than viewport-only detection
+  ---
+  duration_ms: 3.129243
+  type: 'test'
+  ...
+# Subtest: classifies Boi Ech access devices without replacing BE identities
+ok 168 - classifies Boi Ech access devices without replacing BE identities
+  ---
+  duration_ms: 14.06501
+  type: 'test'
+  ...
+# Subtest: production diagnostics are manual, read only, and omit personal records
+ok 169 - production diagnostics are manual, read only, and omit personal records
+  ---
+  duration_ms: 1.052822
+  type: 'test'
+  ...
+# Subtest: evidence traceability is wired after analysis and trust interpretation
+ok 170 - evidence traceability is wired after analysis and trust interpretation
+  ---
+  duration_ms: 2.585391
+  type: 'test'
+  ...
+# Subtest: traceability covers v1 errors, cycle quality, bilateral evidence and threshold advisor
+ok 171 - traceability covers v1 errors, cycle quality, bilateral evidence and threshold advisor
+  ---
+  duration_ms: 0.302285
+  type: 'test'
+  ...
+# Subtest: traceability exposes exact local timestamps and can jump back to learner video
+ok 172 - traceability exposes exact local timestamps and can jump back to learner video
+  ---
+  duration_ms: 0.165353
+  type: 'test'
+  ...
+# Subtest: traceability reads unified trust and explicit quality gates without becoming a gate itself
+ok 173 - traceability reads unified trust and explicit quality gates without becoming a gate itself
+  ---
+  duration_ms: 0.278881
+  type: 'test'
+  ...
+# Subtest: trace UI is idempotent and ignores its own DOM mutations
+ok 174 - trace UI is idempotent and ignores its own DOM mutations
+  ---
+  duration_ms: 0.209088
+  type: 'test'
+  ...
+# Subtest: traceability remains local-only, non-persistent and non-scoring
+ok 175 - traceability remains local-only, non-persistent and non-scoring
+  ---
+  duration_ms: 0.345149
+  type: 'test'
+  ...
+# Subtest: camera trace names the three shared camera profiles without inventing a view
+ok 176 - camera trace names the three shared camera profiles without inventing a view
+  ---
+  duration_ms: 2.345367
+  type: 'test'
+  ...
+# Subtest: parses both clock labels and local second markers
+ok 177 - parses both clock labels and local second markers
+  ---
+  duration_ms: 0.368423
+  type: 'test'
+  ...
+# Subtest: v1 trace exposes observation, reference, confidence and capture gate
+ok 178 - v1 trace exposes observation, reference, confidence and capture gate
+  ---
+  duration_ms: 0.522881
+  type: 'test'
+  ...
+# Subtest: cycle trace keeps numeric evidence while reference trust blocks strong interpretation
+ok 179 - cycle trace keeps numeric evidence while reference trust blocks strong interpretation
+  ---
+  duration_ms: 0.315676
+  type: 'test'
+  ...
+# Subtest: bilateral trace ties asymmetry metrics to its worst local timestamp
+ok 180 - bilateral trace ties asymmetry metrics to its worst local timestamp
+  ---
+  duration_ms: 0.303357
+  type: 'test'
+  ...
+# Subtest: advisor trace shows coverage and both calibration and view gates
+ok 181 - advisor trace shows coverage and both calibration and view gates
+  ---
+  duration_ms: 0.182228
+  type: 'test'
+  ...
+# Subtest: trace signatures change when evidence or gate state changes
+ok 182 - trace signatures change when evidence or gate state changes
+  ---
+  duration_ms: 0.314954
+  type: 'test'
+  ...
+# Subtest: evidence trace core remains local-only and non-scoring
+ok 183 - evidence trace core remains local-only and non-scoring
+  ---
+  duration_ms: 0.569129
+  type: 'test'
+  ...
+# Subtest: learner experience surfaces remain mounted
+ok 184 - learner experience surfaces remain mounted
+  ---
+  duration_ms: 0.980575
+  type: 'test'
+  ...
+# Subtest: learner signed clients require real keys and canonical device ids
+ok 185 - learner signed clients require real keys and canonical device ids
+  ---
+  duration_ms: 0.33294
+  type: 'test'
+  ...
+# Subtest: learner inbox remains signed, learner-only and device-scoped
+ok 186 - learner inbox remains signed, learner-only and device-scoped
+  ---
+  duration_ms: 0.199404
+  type: 'test'
+  ...
+# Subtest: learner replies remain bounded, idempotent and bound to the original action
+ok 187 - learner replies remain bounded, idempotent and bound to the original action
+  ---
+  duration_ms: 0.182389
+  type: 'test'
+  ...
+# Subtest: assignment status updates remain bounded, idempotent and device-bound
+ok 188 - assignment status updates remain bounded, idempotent and device-bound
+  ---
+  duration_ms: 0.2374
+  type: 'test'
+  ...
+# Subtest: learner inbox stays visible-tab synchronized without duplicate signed loads
+ok 189 - learner inbox stays visible-tab synchronized without duplicate signed loads
+  ---
+  duration_ms: 0.187026
+  type: 'test'
+  ...
+# Subtest: learner communication APIs remain media-free
+ok 190 - learner communication APIs remain media-free
+  ---
+  duration_ms: 0.33888
+  type: 'test'
+  ...
+# Subtest: learner inbox refreshes every 60 seconds only while visible
+ok 191 - learner inbox refreshes every 60 seconds only while visible
+  ---
+  duration_ms: 0.715555
+  type: 'test'
+  ...
+# Subtest: learner inbox prevents duplicate signed fetches for the same device
+ok 192 - learner inbox prevents duplicate signed fetches for the same device
+  ---
+  duration_ms: 0.674464
+  type: 'test'
+  ...
+# Subtest: learner inbox rejects stale account responses and preserves data on transient auto-refresh failure
+ok 193 - learner inbox rejects stale account responses and preserves data on transient auto-refresh failure
+  ---
+  duration_ms: 1.651154
+  type: 'test'
+  ...
+# Subtest: L6 mounts adaptive Learner Model on the learner dashboard
+ok 194 - L6 mounts adaptive Learner Model on the learner dashboard
+  ---
+  duration_ms: 1.480583
+  type: 'test'
+  ...
+# Subtest: L6 reuses the existing signed Frog AI bootstrap instead of inventing another model API
+ok 195 - L6 reuses the existing signed Frog AI bootstrap instead of inventing another model API
+  ---
+  duration_ms: 0.44099
+  type: 'test'
+  ...
+# Subtest: L6 keeps adaptive recommendations explainable and user-actionable
+ok 196 - L6 keeps adaptive recommendations explainable and user-actionable
+  ---
+  duration_ms: 0.138755
+  type: 'test'
+  ...
+# Subtest: L6 exposes learner intelligence signals to the teacher overview
+ok 197 - L6 exposes learner intelligence signals to the teacher overview
+  ---
+  duration_ms: 0.157783
+  type: 'test'
+  ...
+# Subtest: L6 does not change scoring or video privacy boundaries
+ok 198 - L6 does not change scoring or video privacy boundaries
+  ---
+  duration_ms: 0.222669
+  type: 'test'
+  ...
+# Subtest: student teacher inbox requires the real learner private key before requesting a challenge
+ok 199 - student teacher inbox requires the real learner private key before requesting a challenge
+  ---
+  duration_ms: 2.386507
+  type: 'test'
+  ...
+# Subtest: student adaptive coach requires the real learner private key before requesting a challenge
+ok 200 - student adaptive coach requires the real learner private key before requesting a challenge
+  ---
+  duration_ms: 0.194336
+  type: 'test'
+  ...
+# Subtest: student teacher inbox accepts only canonical device ids from the DOM
+ok 201 - student teacher inbox accepts only canonical device ids from the DOM
+  ---
+  duration_ms: 0.189049
+  type: 'test'
+  ...
+# Subtest: student adaptive coach accepts only canonical device ids from the DOM
+ok 202 - student adaptive coach accepts only canonical device ids from the DOM
+  ---
+  duration_ms: 0.177913
+  type: 'test'
+  ...
+# Subtest: L7 builds before-intervention-after analytics from bounded learning events
+ok 203 - L7 builds before-intervention-after analytics from bounded learning events
+  ---
+  duration_ms: 4.983376
+  type: 'test'
+  ...
+# Subtest: L7 does not treat weak video evidence as a score-change signal
+ok 204 - L7 does not treat weak video evidence as a score-change signal
+  ---
+  duration_ms: 0.308785
+  type: 'test'
+  ...
+# Subtest: teacher overview scopes analytics to approved learners in the signed teacher class set
+ok 205 - teacher overview scopes analytics to approved learners in the signed teacher class set
+  ---
+  duration_ms: 0.211611
+  type: 'test'
+  ...
+# Subtest: L7 teacher UI shows temporal evidence without claiming causality
+ok 206 - L7 teacher UI shows temporal evidence without claiming causality
+  ---
+  duration_ms: 0.144142
+  type: 'test'
+  ...
+# Subtest: L7 extends reports and CSV while leaving official scoring and media boundaries untouched
+ok 207 - L7 extends reports and CSV while leaving official scoring and media boundaries untouched
+  ---
+  duration_ms: 0.232503
+  type: 'test'
+  ...
+# Subtest: L7 styles load after the V8 visual layer and remain responsive
+ok 208 - L7 styles load after the V8 visual layer and remain responsive
+  ---
+  duration_ms: 0.206454
+  type: 'test'
+  ...
+# Subtest: authorized device profile refreshes when the learner app becomes active
+ok 209 - authorized device profile refreshes when the learner app becomes active
+  ---
+  duration_ms: 7.101077
+  type: 'test'
+  ...
+# Subtest: live device profile listeners are fully cleaned up
+ok 210 - live device profile listeners are fully cleaned up
+  ---
+  duration_ms: 4.547482
+  type: 'test'
+  ...
+# Subtest: student role snapshot observes device-managed shell attributes
+ok 211 - student role snapshot observes device-managed shell attributes
+  ---
+  duration_ms: 1.719605
+  type: 'test'
+  ...
+# Subtest: room contains two scheduled classes in separate time slots, not cancelled or out-of-window
+ok 212 - room contains two scheduled classes in separate time slots, not cancelled or out-of-window
+  ---
+  duration_ms: 1.958587
+  type: 'test'
+  ...
+# Subtest: exactly touching the time-window edge does not count as a booking
+ok 213 - exactly touching the time-window edge does not count as a booking
+  ---
+  duration_ms: 0.337348
+  type: 'test'
+  ...
+# Subtest: invalid time window does not invent occupied rooms or assigned classes
+ok 214 - invalid time window does not invent occupied rooms or assigned classes
+  ---
+  duration_ms: 0.186134
+  type: 'test'
+  ...
+# Subtest: manager UI renders real hierarchy, multiple room classes and the pending queue
+ok 215 - manager UI renders real hierarchy, multiple room classes and the pending queue
+  ---
+  duration_ms: 74.967721
+  type: 'test'
+  ...
+# Subtest: empty building state offers real setup instead of showing fake map data
+ok 216 - empty building state offers real setup instead of showing fake map data
+  ---
+  duration_ms: 9.70242
+  type: 'test'
+  ...
+# Subtest: attention filter includes scheduled teacher shortages and overflow, not unrelated classes
+ok 217 - attention filter includes scheduled teacher shortages and overflow, not unrelated classes
+  ---
+  duration_ms: 0.340372
+  type: 'test'
+  ...
+# Subtest: attention filter includes inactive rooms, inactive scheduled classes and broken references
+ok 218 - attention filter includes inactive rooms, inactive scheduled classes and broken references
+  ---
+  duration_ms: 0.2309
+  type: 'test'
+  ...
+# Subtest: free-room filter requires valid window, active parent, and no booking
+ok 219 - free-room filter requires valid window, active parent, and no booking
+  ---
+  duration_ms: 0.367031
+  type: 'test'
+  ...
+# Subtest: contextual room creation uses the selected building without changing access commands
+ok 220 - contextual room creation uses the selected building without changing access commands
+  ---
+  duration_ms: 120.029681
+  type: 'test'
+  ...
+# Subtest: new session inherits selected room and the selected class even with two classes
+ok 221 - new session inherits selected room and the selected class even with two classes
+  ---
+  duration_ms: 143.722137
+  type: 'test'
+  ...
+# Subtest: manager workspace carries selected room and class into existing session editor
+ok 222 - manager workspace carries selected room and class into existing session editor
+  ---
+  duration_ms: 231.22491
+  type: 'test'
+  ...
+# Subtest: manager workspace carries selected building into existing new-room editor
+ok 223 - manager workspace carries selected building into existing new-room editor
+  ---
+  duration_ms: 139.667524
+  type: 'test'
+  ...
+# Subtest: a room alerts on overlapping training sessions, not adjacent distinct classes
+ok 224 - a room alerts on overlapping training sessions, not adjacent distinct classes
+  ---
+  duration_ms: 0.296958
+  type: 'test'
+  ...
+# Subtest: review shortcut narrows manager people list without triggering privileged mutations
+ok 225 - review shortcut narrows manager people list without triggering privileged mutations
+  ---
+  duration_ms: 169.623884
+  type: 'test'
+  ...
+# Subtest: room sessions use chronological instants across timezone offsets without false conflicts
+ok 226 - room sessions use chronological instants across timezone offsets without false conflicts
+  ---
+  duration_ms: 0.233314
+  type: 'test'
+  ...
+# Subtest: free rooms require an existing active building even when room state is stale
+ok 227 - free rooms require an existing active building even when room state is stale
+  ---
+  duration_ms: 0.183451
+  type: 'test'
+  ...
+# Subtest: booked rooms flag an ineligible assigned coach even when the class has enough other staff
+ok 228 - booked rooms flag an ineligible assigned coach even when the class has enough other staff
+  ---
+  duration_ms: 0.453829
+  type: 'test'
+  ...
+# Subtest: room bar merges bookings, clips the selected window and ignores cancellation
+ok 229 - room bar merges bookings, clips the selected window and ignores cancellation
+  ---
+  duration_ms: 163.51212
+  type: 'test'
+  ...
+# Subtest: room bar leaves an unbooked room empty and does not count adjacent outside sessions
+ok 230 - room bar leaves an unbooked room empty and does not count adjacent outside sessions
+  ---
+  duration_ms: 108.679708
+  type: 'test'
+  ...
+# Subtest: invalid room window is explicitly unverified rather than reported free
+ok 231 - invalid room window is explicitly unverified rather than reported free
+  ---
+  duration_ms: 49.948891
+  type: 'test'
+  ...
+# Subtest: room occupancy supports valid intervals before the Unix epoch
+ok 232 - room occupancy supports valid intervals before the Unix epoch
+  ---
+  duration_ms: 29.699456
+  type: 'test'
+  ...
+# Subtest: blocked and expired people never become available because they have no booking
+ok 233 - blocked and expired people never become available because they have no booking
+  ---
+  duration_ms: 41.640392
+  type: 'test'
+  ...
+# Subtest: readiness distinguishes a missing class from a retained inactive class assignment
+ok 234 - readiness distinguishes a missing class from a retained inactive class assignment
+  ---
+  duration_ms: 48.610236
+  type: 'test'
+  ...
+# Subtest: validity stage remains distinct from pending or blocked approval
+ok 235 - validity stage remains distinct from pending or blocked approval
+  ---
+  duration_ms: 91.779051
+  type: 'test'
+  ...
+# Subtest: class bars expose actual overflow and missing teachers with valid accessible ranges
+ok 236 - class bars expose actual overflow and missing teachers with valid accessible ranges
+  ---
+  duration_ms: 40.414954
+  type: 'test'
+  ...
+# Subtest: person status strip names all registration stages without inventing learning progress
+ok 237 - person status strip names all registration stages without inventing learning progress
+  ---
+  duration_ms: 64.512732
+  type: 'test'
+  ...
+# Subtest: display preferences reject malformed or unsupported persisted settings
+ok 238 - display preferences reject malformed or unsupported persisted settings
+  ---
+  duration_ms: 44.74599
+  type: 'test'
+  ...
+# Subtest: phone home launcher and bottom navigation reach rooms and settings without mutations
+ok 239 - phone home launcher and bottom navigation reach rooms and settings without mutations
+  ---
+  duration_ms: 309.471229
+  type: 'test'
+  ...
+# Subtest: settings changes display preferences without emitting a training mutation
+ok 240 - settings changes display preferences without emitting a training mutation
+  ---
+  duration_ms: 260.397965
+  type: 'test'
+  ...
+# Subtest: the schedule time window can be collapsed and reopened
+ok 241 - the schedule time window can be collapsed and reopened
+  ---
+  duration_ms: 231.515317
+  type: 'test'
+  ...
+# Subtest: availability filter excludes unassigned and inactive-class people
+ok 242 - availability filter excludes unassigned and inactive-class people
+  ---
+  duration_ms: 147.483839
+  type: 'test'
+  ...
+# Subtest: setup offers the first active class after a building exists
+ok 243 - setup offers the first active class after a building exists
+  ---
+  duration_ms: 112.472576
+  type: 'test'
+  ...
+# Subtest: replacing inactive memberships requires an explicit confirmation and keeps the CAS source
+ok 244 - replacing inactive memberships requires an explicit confirmation and keeps the CAS source
+  ---
+  duration_ms: 216.101122
+  type: 'test'
+  ...
+# Subtest: class detail uses canonical memberships and current source sessions, omitting unrelated fields
+ok 245 - class detail uses canonical memberships and current source sessions, omitting unrelated fields
+  ---
+  duration_ms: 59.387602
+  type: 'test'
+  ...
+# Subtest: editing a resource keeps its optimistic version and preserves a rejected draft
+ok 246 - editing a resource keeps its optimistic version and preserves a rejected draft
+  ---
+  duration_ms: 243.166334
+  type: 'test'
+  ...
+# Subtest: busy resource details prevent closing the modal during an in-flight operation
+ok 247 - busy resource details prevent closing the modal during an in-flight operation
+  ---
+  duration_ms: 77.057608
+  type: 'test'
+  ...
+# Subtest: read-only review details retain records without assignment or schedule-edit controls
+ok 248 - read-only review details retain records without assignment or schedule-edit controls
+  ---
+  duration_ms: 64.527199
+  type: 'test'
+  ...
+# Subtest: same browser can keep multiple signed account credentials without replacing server identity
+ok 249 - same browser can keep multiple signed account credentials without replacing server identity
+  ---
+  duration_ms: 4.49701
+  type: 'test'
+  ...
+# Subtest: account switching snapshots local progress and offline state per account
+ok 250 - account switching snapshots local progress and offline state per account
+  ---
+  duration_ms: 0.35949
+  type: 'test'
+  ...
+# Subtest: logout opens a local account chooser instead of deleting prior account data
+ok 251 - logout opens a local account chooser instead of deleting prior account data
+  ---
+  duration_ms: 0.135811
+  type: 'test'
+  ...
+# Subtest: new additional accounts request explicit admin review without resetting existing identities
+ok 252 - new additional accounts request explicit admin review without resetting existing identities
+  ---
+  duration_ms: 0.10853
+  type: 'test'
+  ...
+# Subtest: root layout mounts the multi-account controller exactly once
+ok 253 - root layout mounts the multi-account controller exactly once
+  ---
+  duration_ms: 0.128109
+  type: 'test'
+  ...
+# Subtest: multi-account control is attached to learner and teacher identity chips
+ok 254 - multi-account control is attached to learner and teacher identity chips
+  ---
+  duration_ms: 0.887709
+  type: 'test'
+  ...
+# Subtest: role dashboards no longer pin the account switch as a fixed floating button
+ok 255 - role dashboards no longer pin the account switch as a fixed floating button
+  ---
+  duration_ms: 0.207036
+  type: 'test'
+  ...
+# Subtest: visible account control still opens switching and new registration flow
+ok 256 - visible account control still opens switching and new registration flow
+  ---
+  duration_ms: 0.201066
+  type: 'test'
+  ...
+# Subtest: additional registration still requires manual review
+ok 257 - additional registration still requires manual review
+  ---
+  duration_ms: 0.151253
+  type: 'test'
+  ...
+# Subtest: auto-confirms complete new profiles as free and limits local editing to teachers
+ok 258 - auto-confirms complete new profiles as free and limits local editing to teachers
+  ---
+  duration_ms: 6.891381
+  type: 'test'
+  ...
+# Subtest: keeps personal lesson edits local and outside every publish workflow
+ok 259 - keeps personal lesson edits local and outside every publish workflow
+  ---
+  duration_ms: 3.208721
+  type: 'test'
+  ...
+# Subtest: records active offline study idempotently and syncs it when connectivity returns
+ok 260 - records active offline study idempotently and syncs it when connectivity returns
+  ---
+  duration_ms: 3.220918
+  type: 'test'
+  ...
+# Subtest: issues only server-verified completion certificates without exposing phone numbers
+ok 261 - issues only server-verified completion certificates without exposing phone numbers
+  ---
+  duration_ms: 1.725724
+  type: 'test'
+  ...
+# Subtest: explains automatic learning telemetry instead of collecting it covertly
+ok 262 - explains automatic learning telemetry instead of collecting it covertly
+  ---
+  duration_ms: 2.15734
+  type: 'test'
+  ...
+# Subtest: verified payment opens paid access with a bounded term and an audit trail
+ok 263 - verified payment opens paid access with a bounded term and an audit trail
+  ---
+  duration_ms: 1.666887
+  type: 'test'
+  ...
+# Subtest: V36 manual free or paid classification is the safe default
+ok 264 - V36 manual free or paid classification is the safe default
+  ---
+  duration_ms: 0.754472
+  type: 'test'
+  ...
+# Subtest: V36 renewal cannot convert unfinished paid access into free access
+ok 265 - V36 renewal cannot convert unfinished paid access into free access
+  ---
+  duration_ms: 0.124193
+  type: 'test'
+  ...
+# Subtest: V36 personal edit cannot bypass pending paid verification
+ok 266 - V36 personal edit cannot bypass pending paid verification
+  ---
+  duration_ms: 0.109
+  type: 'test'
+  ...
+# Subtest: rear view accepts a balanced bilateral cycle with strong evidence
+ok 267 - rear view accepts a balanced bilateral cycle with strong evidence
+  ---
+  duration_ms: 2.470242
+  type: 'test'
+  ...
+# Subtest: rear view flags meaningful knee asymmetry and separated kick peaks
+ok 268 - rear view flags meaningful knee asymmetry and separated kick peaks
+  ---
+  duration_ms: 0.401191
+  type: 'test'
+  ...
+# Subtest: side view never makes a strong bilateral conclusion from the same asymmetry
+ok 269 - side view never makes a strong bilateral conclusion from the same asymmetry
+  ---
+  duration_ms: 0.279392
+  type: 'test'
+  ...
+# Subtest: low visibility on either side suppresses rear-view symmetry conclusions
+ok 270 - low visibility on either side suppresses rear-view symmetry conclusions
+  ---
+  duration_ms: 0.229929
+  type: 'test'
+  ...
+# Subtest: bilateral symmetry core is local-only and contains no persistence/server behavior
+ok 271 - bilateral symmetry core is local-only and contains no persistence/server behavior
+  ---
+  duration_ms: 0.619874
+  type: 'test'
+  ...
+# Subtest: passes a balanced single-clip calibration set with cycles, temporal coverage and view
+ok 272 - passes a balanced single-clip calibration set with cycles, temporal coverage and view
+  ---
+  duration_ms: 3.128051
+  type: 'test'
+  ...
+# Subtest: rejects phase imbalance even when total annotation count is high
+ok 273 - rejects phase imbalance even when total annotation count is high
+  ---
+  duration_ms: 0.773421
+  type: 'test'
+  ...
+# Subtest: requires every phase, at least two complete cycles and a declared view
+ok 274 - requires every phase, at least two complete cycles and a declared view
+  ---
+  duration_ms: 0.623279
+  type: 'test'
+  ...
+# Subtest: coverage gate stays local and contains no persistence or server behavior
+ok 275 - coverage gate stays local and contains no persistence or server behavior
+  ---
+  duration_ms: 8.189243
+  type: 'test'
+  ...
+# Subtest: classifies representative breaststroke phase metrics
+ok 276 - classifies representative breaststroke phase metrics
+  ---
+  duration_ms: 2.225571
+  type: 'test'
+  ...
+# Subtest: recognizes two complete ordered breaststroke cycles
+ok 277 - recognizes two complete ordered breaststroke cycles
+  ---
+  duration_ms: 2.499926
+  type: 'test'
+  ...
+# Subtest: does not claim a complete cycle when a phase is missing
+ok 278 - does not claim a complete cycle when a phase is missing
+  ---
+  duration_ms: 0.21007
+  type: 'test'
+  ...
+# Subtest: penalizes out-of-order phase noise instead of silently scoring it perfect
+ok 279 - penalizes out-of-order phase noise instead of silently scoring it perfect
+  ---
+  duration_ms: 0.42735
+  type: 'test'
+  ...
+# Subtest: warns when arm and leg recovery overlap for too long
+ok 280 - warns when arm and leg recovery overlap for too long
+  ---
+  duration_ms: 0.49453
+  type: 'test'
+  ...
+# Subtest: summarizes local calibration metrics without changing phase thresholds
+ok 281 - summarizes local calibration metrics without changing phase thresholds
+  ---
+  duration_ms: 0.382304
+  type: 'test'
+  ...
+# Subtest: scores each complete cycle independently and identifies a weaker cycle
+ok 282 - scores each complete cycle independently and identifies a weaker cycle
+  ---
+  duration_ms: 0.621336
+  type: 'test'
+  ...
+# Subtest: cycle quality keeps exact local timestamps for phase review
+ok 283 - cycle quality keeps exact local timestamps for phase review
+  ---
+  duration_ms: 1.217525
+  type: 'test'
+  ...
+# Subtest: ground truth keeps AI prediction separate and measures corrections
+ok 284 - ground truth keeps AI prediction separate and measures corrections
+  ---
+  duration_ms: 2.201516
+  type: 'test'
+  ...
+# Subtest: ground truth reports phase recall and observed metric ranges
+ok 285 - ground truth reports phase recall and observed metric ranges
+  ---
+  duration_ms: 1.464479
+  type: 'test'
+  ...
+# Subtest: ground truth ignores missing or unsupported labels
+ok 286 - ground truth ignores missing or unsupported labels
+  ---
+  duration_ms: 0.256769
+  type: 'test'
+  ...
+# Subtest: simulates annotated ground truth without mutating engine thresholds
+ok 287 - simulates annotated ground truth without mutating engine thresholds
+  ---
+  duration_ms: 2.019568
+  type: 'test'
+  ...
+# Subtest: requires a minimum amount of ground truth before suggesting thresholds
+ok 288 - requires a minimum amount of ground truth before suggesting thresholds
+  ---
+  duration_ms: 0.544293
+  type: 'test'
+  ...
+# Subtest: proposes a pull threshold adjustment only as a preview
+ok 289 - proposes a pull threshold adjustment only as a preview
+  ---
+  duration_ms: 3.5544
+  type: 'test'
+  ...
+# Subtest: advisor does not emit server or persistence behavior
+ok 290 - advisor does not emit server or persistence behavior
+  ---
+  duration_ms: 12.29068
+  type: 'test'
+  ...
+# Subtest: view-aware analysis consumes the shared camera profile and keeps canonical cycle quality separate
+ok 291 - view-aware analysis consumes the shared camera profile and keeps canonical cycle quality separate
+  ---
+  duration_ms: 10.059932
+  type: 'test'
+  ...
+# Subtest: view profiles and shared camera session stay local-only and cannot alter thresholds or server sync
+ok 292 - view profiles and shared camera session stay local-only and cannot alter thresholds or server sync
+  ---
+  duration_ms: 2.185823
+  type: 'test'
+  ...
+# Subtest: defines the same three explicit camera views used by calibration
+ok 293 - defines the same three explicit camera views used by calibration
+  ---
+  duration_ms: 2.015702
+  type: 'test'
+  ...
+# Subtest: rear view trusts leg phases but limits breath conclusions
+ok 294 - rear view trusts leg phases but limits breath conclusions
+  ---
+  duration_ms: 1.936585
+  type: 'test'
+  ...
+# Subtest: side view keeps breath and glide as high-confidence evidence
+ok 295 - side view keeps breath and glide as high-confidence evidence
+  ---
+  duration_ms: 0.288234
+  type: 'test'
+  ...
+# Subtest: view-aware score never mutates the original cycle quality
+ok 296 - view-aware score never mutates the original cycle quality
+  ---
+  duration_ms: 0.621426
+  type: 'test'
+  ...
+# Subtest: no selected view produces no view-specific conclusion
+ok 297 - no selected view produces no view-specific conclusion
+  ---
+  duration_ms: 0.263448
+  type: 'test'
+  ...
+# Subtest: profile copy states the rear-view limitation explicitly
+ok 298 - profile copy states the rear-view limitation explicitly
+  ---
+  duration_ms: 0.194196
+  type: 'test'
+  ...
+# Subtest: rear view opens strong conclusions only with stable bilateral evidence
+ok 299 - rear view opens strong conclusions only with stable bilateral evidence
+  ---
+  duration_ms: 2.839085
+  type: 'test'
+  ...
+# Subtest: rear view blocks strong conclusions when one side is persistently obscured
+ok 300 - rear view blocks strong conclusions when one side is persistently obscured
+  ---
+  duration_ms: 0.387091
+  type: 'test'
+  ...
+# Subtest: side view can remain usable when the far side is less visible
+ok 301 - side view can remain usable when the far side is less visible
+  ---
+  duration_ms: 0.420991
+  type: 'test'
+  ...
+# Subtest: unstable or discontinuous pose blocks the gate even with a declared view
+ok 302 - unstable or discontinuous pose blocks the gate even with a declared view
+  ---
+  duration_ms: 0.270399
+  type: 'test'
+  ...
+# Subtest: no selected camera profile never produces a strong view-quality conclusion
+ok 303 - no selected camera profile never produces a strong view-quality conclusion
+  ---
+  duration_ms: 0.252242
+  type: 'test'
+  ...
+# Subtest: view quality core remains local-only and non-scoring
+ok 304 - view quality core remains local-only and non-scoring
+  ---
+  duration_ms: 0.73918
+  type: 'test'
+  ...
+# Subtest: preflight enforcement is wired beside camera guidance without changing the scoring engine
+ok 305 - preflight enforcement is wired beside camera guidance without changing the scoring engine
+  ---
+  duration_ms: 3.927841
+  type: 'test'
+  ...
+# Subtest: soft lock only reacts to the explicit retry label and intercepts the main analyze action
+ok 306 - soft lock only reacts to the explicit retry label and intercepts the main analyze action
+  ---
+  duration_ms: 4.970077
+  type: 'test'
+  ...
+# Subtest: override is bound to the current local video source and is cleared on source change
+ok 307 - override is bound to the current local video source and is cleared on source change
+  ---
+  duration_ms: 0.208748
+  type: 'test'
+  ...
+# Subtest: an overridden retry analysis is visibly marked as low-input-quality
+ok 308 - an overridden retry analysis is visibly marked as low-input-quality
+  ---
+  duration_ms: 0.160096
+  type: 'test'
+  ...
+# Subtest: preflight enforcement remains RAM and DOM only
+ok 309 - preflight enforcement remains RAM and DOM only
+  ---
+  duration_ms: 0.300513
+  type: 'test'
+  ...
+# Subtest: L11 exposes an automated release-readiness gate
+ok 310 - L11 exposes an automated release-readiness gate
+  ---
+  duration_ms: 0.663519
+  type: 'test'
+  ...
+# Subtest: L11 keeps production deployment manual and explicitly confirmed
+ok 311 - L11 keeps production deployment manual and explicitly confirmed
+  ---
+  duration_ms: 0.220065
+  type: 'test'
+  ...
+# Subtest: L11 release audit protects signed role and class boundaries
+ok 312 - L11 release audit protects signed role and class boundaries
+  ---
+  duration_ms: 0.219493
+  type: 'test'
+  ...
+# Subtest: L11 treats teacher core surfaces as real workflows, not placeholders
+ok 313 - L11 treats teacher core surfaces as real workflows, not placeholders
+  ---
+  duration_ms: 0.368453
+  type: 'test'
+  ...
+# Subtest: L11 CI invokes the readiness audit before release-like builds
+ok 314 - L11 CI invokes the readiness audit before release-like builds
+  ---
+  duration_ms: 0.155029
+  type: 'test'
+  ...
+# Subtest: renders development preview metadata
+ok 315 - renders development preview metadata
+  ---
+  duration_ms: 239.844893
+  type: 'test'
+  ...
+# Subtest: role typography override loads after learner and teacher shell styles
+ok 316 - role typography override loads after learner and teacher shell styles
+  ---
+  duration_ms: 0.803304
+  type: 'test'
+  ...
+# Subtest: role dashboards use Vietnamese-safe offline font stacks
+ok 317 - role dashboards use Vietnamese-safe offline font stacks
+  ---
+  duration_ms: 0.310237
+  type: 'test'
+  ...
+# Subtest: teacher hero Vietnamese copy remains NFC-normalized and tracking-safe
+ok 318 - teacher hero Vietnamese copy remains NFC-normalized and tracking-safe
+  ---
+  duration_ms: 1.442857
+  type: 'test'
+  ...
+# Subtest: role typography has no network font dependency
+ok 319 - role typography has no network font dependency
+  ---
+  duration_ms: 0.286873
+  type: 'test'
+  ...
+# Subtest: L12 keeps Drizzle device classification schema in parity with migration 0015
+ok 320 - L12 keeps Drizzle device classification schema in parity with migration 0015
+  ---
+  duration_ms: 0.966936
+  type: 'test'
+  ...
+# Subtest: L12 fresh database bootstrap contains classification columns
+ok 321 - L12 fresh database bootstrap contains classification columns
+  ---
+  duration_ms: 0.166686
+  type: 'test'
+  ...
+# Subtest: L12 repairs classification columns for older local databases before metadata writes
+ok 322 - L12 repairs classification columns for older local databases before metadata writes
+  ---
+  duration_ms: 0.253183
+  type: 'test'
+  ...
+# Subtest: L12 keeps fresh and legacy device_profiles aligned with progress migration
+ok 323 - L12 keeps fresh and legacy device_profiles aligned with progress migration
+  ---
+  duration_ms: 0.254375
+  type: 'test'
+  ...
+# Subtest: L12 fresh device bootstrap preserves phone uniqueness
+ok 324 - L12 fresh device bootstrap preserves phone uniqueness
+  ---
+  duration_ms: 0.241886
+  type: 'test'
+  ...
+# Subtest: L12 assignment status events are bounded and same-state updates are no-ops
+ok 325 - L12 assignment status events are bounded and same-state updates are no-ops
+  ---
+  duration_ms: 0.15583
+  type: 'test'
+  ...
+# Subtest: L12 release gate permanently checks schema parity and status-event bounds
+ok 326 - L12 release gate permanently checks schema parity and status-event bounds
+  ---
+  duration_ms: 0.184773
+  type: 'test'
+  ...
+# Subtest: L8 suggestions are deterministic and evidence-based
+ok 327 - L8 suggestions are deterministic and evidence-based
+  ---
+  duration_ms: 2.469621
+  type: 'test'
+  ...
+# Subtest: L8 never auto-sends an intervention
+ok 328 - L8 never auto-sends an intervention
+  ---
+  duration_ms: 0.308575
+  type: 'test'
+  ...
+# Subtest: L8 exposes suggestions only inside the signed teacher overview
+ok 329 - L8 exposes suggestions only inside the signed teacher overview
+  ---
+  duration_ms: 0.270509
+  type: 'test'
+  ...
+# Subtest: L8 suggestion UI creates editable drafts
+ok 330 - L8 suggestion UI creates editable drafts
+  ---
+  duration_ms: 0.184052
+  type: 'test'
+  ...
+# Subtest: L8 styles load after L7 analytics
+ok 331 - L8 styles load after L7 analytics
+  ---
+  duration_ms: 0.198502
+  type: 'test'
+  ...
+# Subtest: learner dashboard activates only for the registered learner role
+ok 332 - learner dashboard activates only for the registered learner role
+  ---
+  duration_ms: 2.334982
+  type: 'test'
+  ...
+# Subtest: student navigation reuses existing course controls instead of bypassing progression logic
+ok 333 - student navigation reuses existing course controls instead of bypassing progression logic
+  ---
+  duration_ms: 0.257961
+  type: 'test'
+  ...
+# Subtest: video analysis entry uses the canonical local-first workspace
+ok 334 - video analysis entry uses the canonical local-first workspace
+  ---
+  duration_ms: 1.210966
+  type: 'test'
+  ...
+# Subtest: student role shell exposes learner capabilities without teacher or admin controls
+ok 335 - student role shell exposes learner capabilities without teacher or admin controls
+  ---
+  duration_ms: 0.273913
+  type: 'test'
+  ...
+# Subtest: root layout mounts the role adapter once and keeps styling isolated
+ok 336 - root layout mounts the role adapter once and keeps styling isolated
+  ---
+  duration_ms: 0.303938
+  type: 'test'
+  ...
+# Subtest: teacher overview failure settles to an actionable error instead of automatic retry
+ok 337 - teacher overview failure settles to an actionable error instead of automatic retry
+  ---
+  duration_ms: 239.261408
+  type: 'test'
+  ...
+# Subtest: stored-credential identity keeps dashboard state stable across unrelated DOM changes
+ok 338 - stored-credential identity keeps dashboard state stable across unrelated DOM changes
+  ---
+  duration_ms: 114.621608
+  type: 'test'
+  ...
+# Subtest: teacher request loading and completion do not remove or recreate portal mounts
+ok 339 - teacher request loading and completion do not remove or recreate portal mounts
+  ---
+  duration_ms: 86.708857
+  type: 'test'
+  ...
+# Subtest: a pending teacher request is bounded and can be retried explicitly
+ok 340 - a pending teacher request is bounded and can be retried explicitly
+  ---
+  duration_ms: 95.049523
+  type: 'test'
+  ...
+# Subtest: switching teacher identity cancels old work and ignores late old results
+ok 341 - switching teacher identity cancels old work and ignores late old results
+  ---
+  duration_ms: 105.121722
+  type: 'test'
+  ...
+# Subtest: refresh clicks during an active request do not create duplicate signed requests
+ok 342 - refresh clicks during an active request do not create duplicate signed requests
+  ---
+  duration_ms: 46.366168
+  type: 'test'
+  ...
+# Subtest: unmount aborts pending work and clears its deadline
+ok 343 - unmount aborts pending work and clears its deadline
+  ---
+  duration_ms: 50.386938
+  type: 'test'
+  ...
+# Subtest: late results from a timed out request cannot overwrite an explicit retry
+ok 344 - late results from a timed out request cannot overwrite an explicit retry
+  ---
+  duration_ms: 47.968861
+  type: 'test'
+  ...
+# Subtest: switching teachers removes the actual dashboard learner drawer and action draft
+ok 345 - switching teachers removes the actual dashboard learner drawer and action draft
+  ---
+  duration_ms: 157.319094
+  type: 'test'
+  ...
+# Subtest: V33 class actions carry the selected class into tasks and reports
+ok 346 - V33 class actions carry the selected class into tasks and reports
+  ---
+  duration_ms: 2.390565
+  type: 'test'
+  ...
+# Subtest: V33 exposes an explicit all-classes or one-class scope selector
+ok 347 - V33 exposes an explicit all-classes or one-class scope selector
+  ---
+  duration_ms: 0.239282
+  type: 'test'
+  ...
+# Subtest: V33 tasks and reports operate on scoped learners instead of silently mixing classes
+ok 348 - V33 tasks and reports operate on scoped learners instead of silently mixing classes
+  ---
+  duration_ms: 0.207706
+  type: 'test'
+  ...
+# Subtest: V33 content editor keeps the active work scope on the return path
+ok 349 - V33 content editor keeps the active work scope on the return path
+  ---
+  duration_ms: 0.596399
+  type: 'test'
+  ...
+# Subtest: V33 only accepts an authorized class name as the effective work scope
+ok 350 - V33 only accepts an authorized class name as the effective work scope
+  ---
+  duration_ms: 0.194266
+  type: 'test'
+  ...
+# Subtest: V33 scope control follows the modern teacher design and loads after V32
+ok 351 - V33 scope control follows the modern teacher design and loads after V32
+  ---
+  duration_ms: 2.497803
+  type: 'test'
+  ...
+# Subtest: V31 scopes quick alerts to the selected class
+ok 352 - V31 scopes quick alerts to the selected class
+  ---
+  duration_ms: 0.923352
+  type: 'test'
+  ...
+# Subtest: V31 keeps selected class outside the class-tab component
+ok 353 - V31 keeps selected class outside the class-tab component
+  ---
+  duration_ms: 0.417866
+  type: 'test'
+  ...
+# Subtest: V31 persists selected class across teacher tab and full-page return flows
+ok 354 - V31 persists selected class across teacher tab and full-page return flows
+  ---
+  duration_ms: 0.353982
+  type: 'test'
+  ...
+# Subtest: V31 propagates class context through editor and video return links
+ok 355 - V31 propagates class context through editor and video return links
+  ---
+  duration_ms: 0.186956
+  type: 'test'
+  ...
+# Subtest: V31 still bounds class query input
+ok 356 - V31 still bounds class query input
+  ---
+  duration_ms: 0.187417
+  type: 'test'
+  ...
+# Subtest: V32 adds multi-class search filter and sort controls
+ok 357 - V32 adds multi-class search filter and sort controls
+  ---
+  duration_ms: 2.460347
+  type: 'test'
+  ...
+# Subtest: V32 triage filters use only derived real class data
+ok 358 - V32 triage filters use only derived real class data
+  ---
+  duration_ms: 0.288946
+  type: 'test'
+  ...
+# Subtest: V32 keeps selected class detail independent from the visible filter set
+ok 359 - V32 keeps selected class detail independent from the visible filter set
+  ---
+  duration_ms: 0.186675
+  type: 'test'
+  ...
+# Subtest: V32 has a clear no-result state and bounded search input
+ok 360 - V32 has a clear no-result state and bounded search input
+  ---
+  duration_ms: 0.215177
+  type: 'test'
+  ...
+# Subtest: V32 design layer loads after V30 and responds down to phone width
+ok 361 - V32 design layer loads after V30 and responds down to phone width
+  ---
+  duration_ms: 0.205022
+  type: 'test'
+  ...
+# Subtest: V30 supports multiple admin-assigned classes without broadening teacher access
+ok 362 - V30 supports multiple admin-assigned classes without broadening teacher access
+  ---
+  duration_ms: 1.185128
+  type: 'test'
+  ...
+# Subtest: V30 class page is a real multi-class control center backed by learner data
+ok 363 - V30 class page is a real multi-class control center backed by learner data
+  ---
+  duration_ms: 4.612811
+  type: 'test'
+  ...
+# Subtest: video analysis is the final teacher navigation item
+ok 364 - video analysis is the final teacher navigation item
+  ---
+  duration_ms: 0.272111
+  type: 'test'
+  ...
+# Subtest: lesson editor uses one canonical functional route instead of clicking hidden legacy UI
+ok 365 - lesson editor uses one canonical functional route instead of clicking hidden legacy UI
+  ---
+  duration_ms: 0.271781
+  type: 'test'
+  ...
+# Subtest: teacher return context survives video and editor flows
+ok 366 - teacher return context survives video and editor flows
+  ---
+  duration_ms: 0.20364
+  type: 'test'
+  ...
+# Subtest: teacher role is structural and legacy learner content is suppressed before adapter styling
+ok 367 - teacher role is structural and legacy learner content is suppressed before adapter styling
+  ---
+  duration_ms: 0.198293
+  type: 'test'
+  ...
+# Subtest: V30 modern design layer loads after V29 and styles all teacher work surfaces
+ok 368 - V30 modern design layer loads after V29 and styles all teacher work surfaces
+  ---
+  duration_ms: 0.130333
+  type: 'test'
+  ...
+# Subtest: teacher actions require signed teacher role and authorized-class learner scope
+ok 369 - teacher actions require signed teacher role and authorized-class learner scope
+  ---
+  duration_ms: 1.107422
+  type: 'test'
+  ...
+# Subtest: teacher actions persist only bounded text supervision events and an audit trail
+ok 370 - teacher actions persist only bounded text supervision events and an audit trail
+  ---
+  duration_ms: 0.358839
+  type: 'test'
+  ...
+# Subtest: learner inbox returns teacher guidance only for the signed learner device
+ok 371 - learner inbox returns teacher guidance only for the signed learner device
+  ---
+  duration_ms: 0.213334
+  type: 'test'
+  ...
+# Subtest: teacher overview exposes latest intervention state without learner media
+ok 372 - teacher overview exposes latest intervention state without learner media
+  ---
+  duration_ms: 0.18299
+  type: 'test'
+  ...
+# Subtest: teacher dashboard wires feedback assignment review and CSV export to real actions
+ok 373 - teacher dashboard wires feedback assignment review and CSV export to real actions
+  ---
+  duration_ms: 0.301505
+  type: 'test'
+  ...
+# Subtest: learner dashboard receives server-synced teacher actions through a separate network adapter
+ok 374 - learner dashboard receives server-synced teacher actions through a separate network adapter
+  ---
+  duration_ms: 0.165464
+  type: 'test'
+  ...
+# Subtest: actions V7 styles load last and keep modal/inbox responsive
+ok 375 - actions V7 styles load last and keep modal/inbox responsive
+  ---
+  duration_ms: 0.256968
+  type: 'test'
+  ...
+# Subtest: teacher blueprint is mounted after the existing role shell and reference styles
+ok 376 - teacher blueprint is mounted after the existing role shell and reference styles
+  ---
+  duration_ms: 11.447947
+  type: 'test'
+  ...
+# Subtest: teacher blueprint adds the missing reference controls without creating another data API
+ok 377 - teacher blueprint adds the missing reference controls without creating another data API
+  ---
+  duration_ms: 0.24392
+  type: 'test'
+  ...
+# Subtest: teacher watch filters use existing rendered supervision evidence instead of changing learner scores
+ok 378 - teacher watch filters use existing rendered supervision evidence instead of changing learner scores
+  ---
+  duration_ms: 0.12248
+  type: 'test'
+  ...
+# Subtest: teacher local review note is session-memory only and cannot impersonate server review
+ok 379 - teacher local review note is session-memory only and cannot impersonate server review
+  ---
+  duration_ms: 0.114669
+  type: 'test'
+  ...
+# Subtest: visual blueprint preserves three-zone desktop composition and responsive collapse
+ok 380 - visual blueprint preserves three-zone desktop composition and responsive collapse
+  ---
+  duration_ms: 0.259503
+  type: 'test'
+  ...
+# Subtest: teacher data V6 loads after the visual fidelity layer
+ok 381 - teacher data V6 loads after the visual fidelity layer
+  ---
+  duration_ms: 1.892451
+  type: 'test'
+  ...
+# Subtest: teacher dashboard derives additional indicators only from returned learner evidence
+ok 382 - teacher dashboard derives additional indicators only from returned learner evidence
+  ---
+  duration_ms: 0.48864
+  type: 'test'
+  ...
+# Subtest: teacher overview exposes six honest KPI tiles and richer supervision states
+ok 383 - teacher overview exposes six honest KPI tiles and richer supervision states
+  ---
+  duration_ms: 0.281605
+  type: 'test'
+  ...
+# Subtest: teacher review state reflects real analysis quality instead of always claiming review
+ok 384 - teacher review state reflects real analysis quality instead of always claiming review
+  ---
+  duration_ms: 0.158884
+  type: 'test'
+  ...
+# Subtest: teacher V6 uses informative empty states without fabricated learners or media
+ok 385 - teacher V6 uses informative empty states without fabricated learners or media
+  ---
+  duration_ms: 0.287334
+  type: 'test'
+  ...
+# Subtest: teacher V6 remains media-free and does not change scoring or persistence
+ok 386 - teacher V6 remains media-free and does not change scoring or persistence
+  ---
+  duration_ms: 0.274745
+  type: 'test'
+  ...
+# Subtest: teacher overview follows the reference three-zone supervision layout
+ok 387 - teacher overview follows the reference three-zone supervision layout
+  ---
+  duration_ms: 1.96719
+  type: 'test'
+  ...
+# Subtest: teacher topbar has real learner search with Ctrl K shortcut
+ok 388 - teacher topbar has real learner search with Ctrl K shortcut
+  ---
+  duration_ms: 2.346449
+  type: 'test'
+  ...
+# Subtest: teacher dashboard exposes actionable supervision surfaces
+ok 389 - teacher dashboard exposes actionable supervision surfaces
+  ---
+  duration_ms: 0.400701
+  type: 'test'
+  ...
+# Subtest: teacher overview keeps supervision honest about server media limits
+ok 390 - teacher overview keeps supervision honest about server media limits
+  ---
+  duration_ms: 0.572213
+  type: 'test'
+  ...
+# Subtest: reference visual layer loads after the role and typography styles
+ok 391 - reference visual layer loads after the role and typography styles
+  ---
+  duration_ms: 0.259542
+  type: 'test'
+  ...
+# Subtest: responsive reference layout collapses without dropping the right rail
+ok 392 - responsive reference layout collapses without dropping the right rail
+  ---
+  duration_ms: 0.221306
+  type: 'test'
+  ...
+# Subtest: teacher scale layer is loaded after the blueprint layer
+ok 393 - teacher scale layer is loaded after the blueprint layer
+  ---
+  duration_ms: 5.112387
+  type: 'test'
+  ...
+# Subtest: teacher dashboard avoids miniature typography on desktop
+ok 394 - teacher dashboard avoids miniature typography on desktop
+  ---
+  duration_ms: 0.442102
+  type: 'test'
+  ...
+# Subtest: teacher desktop composition keeps the reference three-zone proportions
+ok 395 - teacher desktop composition keeps the reference three-zone proportions
+  ---
+  duration_ms: 0.36617
+  type: 'test'
+  ...
+# Subtest: teacher scale layer does not change data, APIs, scoring or persistence
+ok 396 - teacher scale layer does not change data, APIs, scoring or persistence
+  ---
+  duration_ms: 0.289056
+  type: 'test'
+  ...
+# Subtest: teacher structure V4 is the final visual layer
+ok 397 - teacher structure V4 is the final visual layer
+  ---
+  duration_ms: 2.886136
+  type: 'test'
+  ...
+# Subtest: teacher topbar removes learner-course controls without deleting their logic
+ok 398 - teacher topbar removes learner-course controls without deleting their logic
+  ---
+  duration_ms: 0.341403
+  type: 'test'
+  ...
+# Subtest: teacher desktop composition follows sidebar center supervision rail reference
+ok 399 - teacher desktop composition follows sidebar center supervision rail reference
+  ---
+  duration_ms: 0.377867
+  type: 'test'
+  ...
+# Subtest: teacher central work surfaces are bright while supervision rail stays dark
+ok 400 - teacher central work surfaces are bright while supervision rail stays dark
+  ---
+  duration_ms: 0.240274
+  type: 'test'
+  ...
+# Subtest: teacher navigation includes the audited two-way message surface
+ok 401 - teacher navigation includes the audited two-way message surface
+  ---
+  duration_ms: 0.192674
+  type: 'test'
+  ...
+# Subtest: structure layer does not alter data APIs scoring or persistence
+ok 402 - structure layer does not alter data APIs scoring or persistence
+  ---
+  duration_ms: 0.257911
+  type: 'test'
+  ...
+# Subtest: teacher visual V5 loads after structure V4
+ok 403 - teacher visual V5 loads after structure V4
+  ---
+  duration_ms: 0.852777
+  type: 'test'
+  ...
+# Subtest: teacher visual V5 preserves reference bright center and dark supervision rail
+ok 404 - teacher visual V5 preserves reference bright center and dark supervision rail
+  ---
+  duration_ms: 1.556434
+  type: 'test'
+  ...
+# Subtest: teacher hero and command bar use reference visual hierarchy
+ok 405 - teacher hero and command bar use reference visual hierarchy
+  ---
+  duration_ms: 0.173255
+  type: 'test'
+  ...
+# Subtest: teacher capability labels match the instructor reference without inventing new services
+ok 406 - teacher capability labels match the instructor reference without inventing new services
+  ---
+  duration_ms: 0.194076
+  type: 'test'
+  ...
+# Subtest: teacher visual V5 is presentation-only
+ok 407 - teacher visual V5 is presentation-only
+  ---
+  duration_ms: 0.340732
+  type: 'test'
+  ...
+# Subtest: visual V8 loads after all teacher data and action layers
+ok 408 - visual V8 loads after all teacher data and action layers
+  ---
+  duration_ms: 6.149657
+  type: 'test'
+  ...
+# Subtest: visual V8 targets the supplied desktop three-zone proportions
+ok 409 - visual V8 targets the supplied desktop three-zone proportions
+  ---
+  duration_ms: 0.477474
+  type: 'test'
+  ...
+# Subtest: desktop work surfaces are compact without hiding learner or analysis rows
+ok 410 - desktop work surfaces are compact without hiding learner or analysis rows
+  ---
+  duration_ms: 0.533426
+  type: 'test'
+  ...
+# Subtest: visual V8 preserves four real analysis actions and responsive usability
+ok 411 - visual V8 preserves four real analysis actions and responsive usability
+  ---
+  duration_ms: 0.295977
+  type: 'test'
+  ...
+# Subtest: visual V8 remains presentation only
+ok 412 - visual V8 remains presentation only
+  ---
+  duration_ms: 0.343166
+  type: 'test'
+  ...
+# Subtest: final teacher UI keeps the reference-oriented visual layers in effective order
+ok 413 - final teacher UI keeps the reference-oriented visual layers in effective order
+  ---
+  duration_ms: 1.109616
+  type: 'test'
+  ...
+# Subtest: all instructor navigation destinations remain present
+ok 414 - all instructor navigation destinations remain present
+  ---
+  duration_ms: 0.31206
+  type: 'test'
+  ...
+# Subtest: teacher roster remains signed authorized-class and reversible
+ok 415 - teacher roster remains signed authorized-class and reversible
+  ---
+  duration_ms: 0.163501
+  type: 'test'
+  ...
+# Subtest: teacher roster client does not receive private device identity or phone
+ok 416 - teacher roster client does not receive private device identity or phone
+  ---
+  duration_ms: 0.195848
+  type: 'test'
+  ...
+# Subtest: roster synchronization is manual plus visible-tab 60-second refresh and role-gated
+ok 417 - roster synchronization is manual plus visible-tab 60-second refresh and role-gated
+  ---
+  duration_ms: 0.167678
+  type: 'test'
+  ...
+# Subtest: teacher interventions remain text-only and cannot mutate canonical AI scoring
+ok 418 - teacher interventions remain text-only and cannot mutate canonical AI scoring
+  ---
+  duration_ms: 0.2442
+  type: 'test'
+  ...
+# Subtest: teacher overview remains media-free
+ok 419 - teacher overview remains media-free
+  ---
+  duration_ms: 0.275206
+  type: 'test'
+  ...
+# Subtest: final visual override uses Vietnamese-safe display font and stays presentation-only
+ok 420 - final visual override uses Vietnamese-safe display font and stays presentation-only
+  ---
+  duration_ms: 0.3118
+  type: 'test'
+  ...
+# Subtest: teacher management surfaces are actually mounted in the application shell
+ok 421 - teacher management surfaces are actually mounted in the application shell
+  ---
+  duration_ms: 0.394321
+  type: 'test'
+  ...
+# Subtest: V34 derives scoped messages and assignments from the authorized work scope
+ok 422 - V34 derives scoped messages and assignments from the authorized work scope
+  ---
+  duration_ms: 0.692131
+  type: 'test'
+  ...
+# Subtest: V34 analysis uses the same class scope for local workspace and queue
+ok 423 - V34 analysis uses the same class scope for local workspace and queue
+  ---
+  duration_ms: 0.123402
+  type: 'test'
+  ...
+# Subtest: V34 messages never reply through a learner outside the active scope
+ok 424 - V34 messages never reply through a learner outside the active scope
+  ---
+  duration_ms: 0.317768
+  type: 'test'
+  ...
+# Subtest: V34 schedule is class scoped and opens only scoped learners
+ok 425 - V34 schedule is class scoped and opens only scoped learners
+  ---
+  duration_ms: 0.224751
+  type: 'test'
+  ...
+# Subtest: V34 preserves all-classes behavior when no explicit scope is selected
+ok 426 - V34 preserves all-classes behavior when no explicit scope is selected
+  ---
+  duration_ms: 0.376125
+  type: 'test'
+  ...
+# (node:953) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:953) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# Subtest: registered approved teacher loads the real signed overview and sees only assigned learners
+ok 427 - registered approved teacher loads the real signed overview and sees only assigned learners
+  ---
+  duration_ms: 825.138905
+  type: 'test'
+  ...
+# Subtest: pending and expired teacher access is reported without granting dashboard rights
+ok 428 - pending and expired teacher access is reported without granting dashboard rights
+  ---
+  duration_ms: 321.1518
+  type: 'test'
+  ...
+# Subtest: an approved learner cannot load teacher data with a valid signature
+ok 429 - an approved learner cannot load teacher data with a valid signature
+  ---
+  duration_ms: 246.7434
+  type: 'test'
+  ...
+# Subtest: V35 OverviewDashboard defines summary in its own render scope
+ok 430 - V35 OverviewDashboard defines summary in its own render scope
+  ---
+  duration_ms: 1.031391
+  type: 'test'
+  ...
+# Subtest: V35 keeps the summary fallback aligned with the TeacherOverview summary contract
+ok 431 - V35 keeps the summary fallback aligned with the TeacherOverview summary contract
+  ---
+  duration_ms: 0.167517
+  type: 'test'
+  ...
+# Subtest: V36 loads after previous teacher visual layers
+ok 432 - V36 loads after previous teacher visual layers
+  ---
+  duration_ms: 0.778848
+  type: 'test'
+  ...
+# Subtest: V36 class workspace follows compact header, toolbar, class grid and right rail structure
+ok 433 - V36 class workspace follows compact header, toolbar, class grid and right rail structure
+  ---
+  duration_ms: 0.37971
+  type: 'test'
+  ...
+# Subtest: V36 class cards expose only real connected teacher workflows
+ok 434 - V36 class cards expose only real connected teacher workflows
+  ---
+  duration_ms: 0.270639
+  type: 'test'
+  ...
+# Subtest: V36 shell carries selected class scope into learners, tasks, reports and analysis
+ok 435 - V36 shell carries selected class scope into learners, tasks, reports and analysis
+  ---
+  duration_ms: 0.184241
+  type: 'test'
+  ...
+# Subtest: V36 uses a two-column class area plus a bounded right rail on desktop
+ok 436 - V36 uses a two-column class area plus a bounded right rail on desktop
+  ---
+  duration_ms: 2.959354
+  type: 'test'
+  ...
+# Subtest: V36 applies the same compact visual system to secondary teacher tabs without raster backgrounds
+ok 437 - V36 applies the same compact visual system to secondary teacher tabs without raster backgrounds
+  ---
+  duration_ms: 0.139716
+  type: 'test'
+  ...
+# Subtest: V36 remains responsive across tablet and mobile breakpoints
+ok 438 - V36 remains responsive across tablet and mobile breakpoints
+  ---
+  duration_ms: 0.090293
+  type: 'test'
+  ...
+# Subtest: teacher shell activates only for the registered teacher role
+ok 439 - teacher shell activates only for the registered teacher role
+  ---
+  duration_ms: 0.788883
+  type: 'test'
+  ...
+# Subtest: teacher oversight API requires signed teacher access and scopes learners to assigned classes
+ok 440 - teacher oversight API requires signed teacher access and scopes learners to assigned classes
+  ---
+  duration_ms: 0.191403
+  type: 'test'
+  ...
+# Subtest: teacher supervision returns learning evidence without learner phone or original media
+ok 441 - teacher supervision returns learning evidence without learner phone or original media
+  ---
+  duration_ms: 0.241876
+  type: 'test'
+  ...
+# Subtest: teacher UI exposes supervision functions and keeps video review media-free
+ok 442 - teacher UI exposes supervision functions and keeps video review media-free
+  ---
+  duration_ms: 0.282006
+  type: 'test'
+  ...
+# Subtest: root layout mounts learner and teacher role adapters exactly once
+ok 443 - root layout mounts learner and teacher role adapters exactly once
+  ---
+  duration_ms: 0.17637
+  type: 'test'
+  ...
+# Subtest: teacher dashboard derives support flags without changing learner scoring
+ok 444 - teacher dashboard derives support flags without changing learner scoring
+  ---
+  duration_ms: 0.162029
+  type: 'test'
+  ...
+# Subtest: duplicate teacher roster mutations are no-ops
+ok 445 - duplicate teacher roster mutations are no-ops
+  ---
+  duration_ms: 0.963671
+  type: 'test'
+  ...
+# Subtest: idempotency guard runs before mutation and audit writes
+ok 446 - idempotency guard runs before mutation and audit writes
+  ---
+  duration_ms: 0.22376
+  type: 'test'
+  ...
+# Subtest: roster sync guards teacher role before deriving identity or calling roster API
+ok 447 - roster sync guards teacher role before deriving identity or calling roster API
+  ---
+  duration_ms: 11.332962
+  type: 'test'
+  ...
+# Subtest: leaving teacher role clears roster state and invalidates in-flight requests
+ok 448 - leaving teacher role clears roster state and invalidates in-flight requests
+  ---
+  duration_ms: 0.320272
+  type: 'test'
+  ...
+# Subtest: account switching detects device identity changes immediately
+ok 449 - account switching detects device identity changes immediately
+  ---
+  duration_ms: 0.172495
+  type: 'test'
+  ...
+# Subtest: generation guards prevent stale account responses from replacing the current roster
+ok 450 - generation guards prevent stale account responses from replacing the current roster
+  ---
+  duration_ms: 0.161127
+  type: 'test'
+  ...
+# Subtest: only one roster request is allowed at a time for the active account
+ok 451 - only one roster request is allowed at a time for the active account
+  ---
+  duration_ms: 0.293383
+  type: 'test'
+  ...
+# Subtest: visible-tab auto refresh remains at the requested 60-second cadence
+ok 452 - visible-tab auto refresh remains at the requested 60-second cadence
+  ---
+  duration_ms: 0.227355
+  type: 'test'
+  ...
+# Subtest: teacher roster new badge counts identities rather than status transitions
+ok 453 - teacher roster new badge counts identities rather than status transitions
+  ---
+  duration_ms: 0.986595
+  type: 'test'
+  ...
+# Subtest: auto refresh accumulates only genuinely new learners until acknowledgement
+ok 454 - auto refresh accumulates only genuinely new learners until acknowledgement
+  ---
+  duration_ms: 0.263989
+  type: 'test'
+  ...
+# Subtest: teacher roster API is signed and scoped to learner role plus authorized teacher classes
+ok 455 - teacher roster API is signed and scoped to learner role plus authorized teacher classes
+  ---
+  duration_ms: 0.977131
+  type: 'test'
+  ...
+# Subtest: teacher roster removal is reversible blocking rather than hard deletion
+ok 456 - teacher roster removal is reversible blocking rather than hard deletion
+  ---
+  duration_ms: 0.471705
+  type: 'test'
+  ...
+# Subtest: teacher roster approval requires complete registration and preserves paid access
+ok 457 - teacher roster approval requires complete registration and preserves paid access
+  ---
+  duration_ms: 0.770266
+  type: 'test'
+  ...
+# Subtest: teacher roster response does not expose phone or device keys to the client
+ok 458 - teacher roster response does not expose phone or device keys to the client
+  ---
+  duration_ms: 0.992824
+  type: 'test'
+  ...
+# Subtest: teacher roster manager supports manual sync and 60-second visible-tab refresh
+ok 459 - teacher roster manager supports manual sync and 60-second visible-tab refresh
+  ---
+  duration_ms: 0.252963
+  type: 'test'
+  ...
+# Subtest: teacher learner management exposes approve remove and restore without fake deletion
+ok 460 - teacher learner management exposes approve remove and restore without fake deletion
+  ---
+  duration_ms: 0.168388
+  type: 'test'
+  ...
+# Subtest: teacher shell provides sync and roster mounts and refreshes overview after roster changes
+ok 461 - teacher shell provides sync and roster mounts and refreshes overview after roster changes
+  ---
+  duration_ms: 0.391758
+  type: 'test'
+  ...
+# Subtest: roster V9 loads after visual V8 and remains responsive
+ok 462 - roster V9 loads after visual V8 and remains responsive
+  ---
+  duration_ms: 0.355945
+  type: 'test'
+  ...
+# Subtest: secondary tab design system loads after feature-specific teacher styles
+ok 463 - secondary tab design system loads after feature-specific teacher styles
+  ---
+  duration_ms: 0.731398
+  type: 'test'
+  ...
+# Subtest: all teacher secondary feature panels share one card and header language
+ok 464 - all teacher secondary feature panels share one card and header language
+  ---
+  duration_ms: 0.262717
+  type: 'test'
+  ...
+# Subtest: secondary page mastheads reuse the main dashboard navy visual language
+ok 465 - secondary page mastheads reuse the main dashboard navy visual language
+  ---
+  duration_ms: 0.217771
+  type: 'test'
+  ...
+# Subtest: feature panels use Vietnamese-safe display typography instead of their older Georgia rules
+ok 466 - feature panels use Vietnamese-safe display typography instead of their older Georgia rules
+  ---
+  duration_ms: 0.161218
+  type: 'test'
+  ...
+# Subtest: class learner reports messages schedule and profile keep responsive operational layouts
+ok 467 - class learner reports messages schedule and profile keep responsive operational layouts
+  ---
+  duration_ms: 0.327112
+  type: 'test'
+  ...
+# Subtest: secondary tab V10 remains presentation only
+ok 468 - secondary tab V10 remains presentation only
+  ---
+  duration_ms: 0.167126
+  type: 'test'
+  ...
+# Subtest: V37 secondary teacher tabs use the modern reference design layer
+ok 469 - V37 secondary teacher tabs use the modern reference design layer
+  ---
+  duration_ms: 1.665886
+  type: 'test'
+  ...
+# Subtest: V37 messages and schedule expose filters without changing server contracts
+ok 470 - V37 messages and schedule expose filters without changing server contracts
+  ---
+  duration_ms: 3.875794
+  type: 'test'
+  ...
+# Subtest: V37 local video page and analyzer share the dark visual system
+ok 471 - V37 local video page and analyzer share the dark visual system
+  ---
+  duration_ms: 0.436213
+  type: 'test'
+  ...
+# Subtest: V29 teacher usability layer loads last among teacher visual layers
+ok 472 - V29 teacher usability layer loads last among teacher visual layers
+  ---
+  duration_ms: 0.8683
+  type: 'test'
+  ...
+# Subtest: V29 fixes the sidebar flow bug instead of masking it with negative spacing
+ok 473 - V29 fixes the sidebar flow bug instead of masking it with negative spacing
+  ---
+  duration_ms: 0.506968
+  type: 'test'
+  ...
+# Subtest: V29 raises teacher typography to a readable desktop baseline
+ok 474 - V29 raises teacher typography to a readable desktop baseline
+  ---
+  duration_ms: 0.370777
+  type: 'test'
+  ...
+# Subtest: appearance settings control page content card accent density and radius
+ok 475 - appearance settings control page content card accent density and radius
+  ---
+  duration_ms: 0.55631
+  type: 'test'
+  ...
+# Subtest: teacher command bar refresh and roster sync actions are functional
+ok 476 - teacher command bar refresh and roster sync actions are functional
+  ---
+  duration_ms: 0.208257
+  type: 'test'
+  ...
+# Subtest: V29 remains a presentation and interaction layer without scoring contracts
+ok 477 - V29 remains a presentation and interaction layer without scoring contracts
+  ---
+  duration_ms: 0.256679
+  type: 'test'
+  ...
+# Subtest: threshold advisor is visible inside ground truth calibration but remains preview-only
+ok 478 - threshold advisor is visible inside ground truth calibration but remains preview-only
+  ---
+  duration_ms: 8.66801
+  type: 'test'
+  ...
+# Subtest: experimental UI does not expose internal version labels
+ok 479 - experimental UI does not expose internal version labels
+  ---
+  duration_ms: 1.462986
+  type: 'test'
+  ...
+# (node:1080) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1080) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# Subtest: registration offers manager identity without self-granting global management rights
+ok 480 - registration offers manager identity without self-granting global management rights
+  ---
+  duration_ms: 733.071417
+  type: 'test'
+  ...
+# Subtest: canonical assignments, real capacity counts, version conflicts and idempotent receipts
+ok 481 - canonical assignments, real capacity counts, version conflicts and idempotent receipts
+  ---
+  duration_ms: 388.92872
+  type: 'test'
+  ...
+# Subtest: scheduling rejects overlaps atomically, accepts adjacency and releases cancelled occupancy
+ok 482 - scheduling rejects overlaps atomically, accepts adjacency and releases cancelled occupancy
+  ---
+  duration_ms: 236.850964
+  type: 'test'
+  ...
+# Subtest: capacity, unavailable buildings, expired staff and stale assignments cannot create invalid schedules
+ok 483 - capacity, unavailable buildings, expired staff and stale assignments cannot create invalid schedules
+  ---
+  duration_ms: 242.755068
+  type: 'test'
+  ...
+# Subtest: student availability follows scheduled classes and class fullness follows actual headcount
+ok 484 - student availability follows scheduled classes and class fullness follows actual headcount
+  ---
+  duration_ms: 104.731178
+  type: 'test'
+  ...
+# Subtest: every identity writer clears manager permission, including role changes away and back
+ok 485 - every identity writer clears manager permission, including role changes away and back
+  ---
+  duration_ms: 36.497939
+  type: 'test'
+  ...
+# Subtest: invalid calendar dates, midnight overflow and non-object requests fail before allocations
+ok 486 - invalid calendar dates, midnight overflow and non-object requests fail before allocations
+  ---
+  duration_ms: 77.860061
+  type: 'test'
+  ...
+# Subtest: activation, renewal and unblock cannot overfill a class with an accepted room booking
+ok 487 - activation, renewal and unblock cannot overfill a class with an accepted room booking
+  ---
+  duration_ms: 135.692074
+  type: 'test'
+  ...
+# Subtest: renaming a class cannot orphan comma/newline teacher assignments or confuse internal spaces
+ok 488 - renaming a class cannot orphan comma/newline teacher assignments or confuse internal spaces
+  ---
+  duration_ms: 219.946206
+  type: 'test'
+  ...
+# Subtest: a bounded board aggregates large directories without repeated class scans
+ok 489 - a bounded board aggregates large directories without repeated class scans
+  ---
+  duration_ms: 477.757458
+  type: 'test'
+  ...
+# Local SQLite board read: 27ms, 3852 class comparisons
+# (node:1091) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1091) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# Subtest: registration presents exactly the three requested choices in order and marks manager selection
+ok 490 - registration presents exactly the three requested choices in order and marks manager selection
+  ---
+  duration_ms: 137.355285
+  type: 'test'
+  ...
+# Subtest: real client uses fresh signed proofs, keeps a command after lost reply, and reads actual counts
+ok 491 - real client uses fresh signed proofs, keeps a command after lost reply, and reads actual counts
+  ---
+  duration_ms: 936.51059
+  type: 'test'
+  ...
+# Subtest: aborted older reads cannot replace a newer allocation view
+ok 492 - aborted older reads cannot replace a newer allocation view
+  ---
+  duration_ms: 11.338667
+  type: 'test'
+  ...
+# Subtest: a scheduled session can be cancelled after its teacher expires and class is archived
+ok 493 - a scheduled session can be cancelled after its teacher expires and class is archived
+  ---
+  duration_ms: 110.189771
+  type: 'test'
+  ...
+# Subtest: allocation failures are announced as errors with a distinct visible state
+ok 494 - allocation failures are announced as errors with a distinct visible state
+  ---
+  duration_ms: 95.205312
+  type: 'test'
+  ...
+# Subtest: an acknowledged assignment starts a fresh command when deliberately requested again
+ok 495 - an acknowledged assignment starts a fresh command when deliberately requested again
+  ---
+  duration_ms: 210.743103
+  type: 'test'
+  ...
+# Subtest: trust-aware interpretation is wired after unified trust at the analysis root
+ok 496 - trust-aware interpretation is wired after unified trust at the analysis root
+  ---
+  duration_ms: 2.383224
+  type: 'test'
+  ...
+# Subtest: interpretation gate covers v1, cycle, bilateral and threshold advisor surfaces
+ok 497 - interpretation gate covers v1, cycle, bilateral and threshold advisor surfaces
+  ---
+  duration_ms: 0.268546
+  type: 'test'
+  ...
+# Subtest: reference language removes strong labels instead of changing measurements
+ok 498 - reference language removes strong labels instead of changing measurements
+  ---
+  duration_ms: 0.252663
+  type: 'test'
+  ...
+# Subtest: original wording is reversible when trust improves
+ok 499 - original wording is reversible when trust improves
+  ---
+  duration_ms: 0.14904
+  type: 'test'
+  ...
+# Subtest: unified trust reads explicit gate labels to avoid interpretation feedback loops
+ok 500 - unified trust reads explicit gate labels to avoid interpretation feedback loops
+  ---
+  duration_ms: 0.20314
+  type: 'test'
+  ...
+# Subtest: trust-aware interpretation remains local-only and non-scoring
+ok 501 - trust-aware interpretation remains local-only and non-scoring
+  ---
+  duration_ms: 0.353511
+  type: 'test'
+  ...
+# Subtest: high trust preserves assertive analysis language
+ok 502 - high trust preserves assertive analysis language
+  ---
+  duration_ms: 1.26164
+  type: 'test'
+  ...
+# Subtest: caution trust softens conclusions without hiding numeric evidence
+ok 503 - caution trust softens conclusions without hiding numeric evidence
+  ---
+  duration_ms: 0.238572
+  type: 'test'
+  ...
+# Subtest: reference trust removes strong wording from v1, cycle and bilateral conclusions
+ok 504 - reference trust removes strong wording from v1, cycle and bilateral conclusions
+  ---
+  duration_ms: 1.83105
+  type: 'test'
+  ...
+# Subtest: threshold advisor cannot look calibration-ready below high trust
+ok 505 - threshold advisor cannot look calibration-ready below high trust
+  ---
+  duration_ms: 0.219965
+  type: 'test'
+  ...
+# Subtest: unknown trust defaults conservatively to caution
+ok 506 - unknown trust defaults conservatively to caution
+  ---
+  duration_ms: 0.16966
+  type: 'test'
+  ...
+# Subtest: L9 learner replies require signed learner identity and a teacher action owned by the same device
+ok 507 - L9 learner replies require signed learner identity and a teacher action owned by the same device
+  ---
+  duration_ms: 0.89518
+  type: 'test'
+  ...
+# Subtest: L9 replies are bounded idempotent audited events
+ok 508 - L9 replies are bounded idempotent audited events
+  ---
+  duration_ms: 0.239203
+  type: 'test'
+  ...
+# Subtest: L9 learner inbox returns reply history only for the signed learner
+ok 509 - L9 learner inbox returns reply history only for the signed learner
+  ---
+  duration_ms: 0.120247
+  type: 'test'
+  ...
+# Subtest: L9 teacher sees replies only from approved learners in the authorized class set
+ok 510 - L9 teacher sees replies only from approved learners in the authorized class set
+  ---
+  duration_ms: 0.174437
+  type: 'test'
+  ...
+# Subtest: L9 replaces the fake message placeholder with real reply UI
+ok 511 - L9 replaces the fake message placeholder with real reply UI
+  ---
+  duration_ms: 0.138654
+  type: 'test'
+  ...
+# Subtest: L9 styles load after L8
+ok 512 - L9 styles load after L8
+  ---
+  duration_ms: 0.172144
+  type: 'test'
+  ...
+# Subtest: unified trust is wired once at the analysis root
+ok 513 - unified trust is wired once at the analysis root
+  ---
+  duration_ms: 0.852877
+  type: 'test'
+  ...
+# Subtest: the same trust badge is propagated across main analysis surfaces
+ok 514 - the same trust badge is propagated across main analysis surfaces
+  ---
+  duration_ms: 0.158975
+  type: 'test'
+  ...
+# Subtest: trust combines existing gates conservatively instead of averaging them
+ok 515 - trust combines existing gates conservatively instead of averaging them
+  ---
+  duration_ms: 2.783574
+  type: 'test'
+  ...
+# Subtest: unified trust remains local, interpretive and non-scoring
+ok 516 - unified trust remains local, interpretive and non-scoring
+  ---
+  duration_ms: 0.339781
+  type: 'test'
+  ...
+# Subtest: all required gates must pass before trust can be high
+ok 517 - all required gates must pass before trust can be high
+  ---
+  duration_ms: 2.334773
+  type: 'test'
+  ...
+# Subtest: any review gate lowers the unified label to caution
+ok 518 - any review gate lowers the unified label to caution
+  ---
+  duration_ms: 0.194376
+  type: 'test'
+  ...
+# Subtest: retry or poor evidence lowers the unified label to reference
+ok 519 - retry or poor evidence lowers the unified label to reference
+  ---
+  duration_ms: 4.607934
+  type: 'test'
+  ...
+# Subtest: explicit preflight override can never produce a high-trust result
+ok 520 - explicit preflight override can never produce a high-trust result
+  ---
+  duration_ms: 0.138494
+  type: 'test'
+  ...
+# Subtest: missing camera or unfinished evidence stays conservative
+ok 521 - missing camera or unfinished evidence stays conservative
+  ---
+  duration_ms: 0.169189
+  type: 'test'
+  ...
+# Subtest: Bơi ếch publishes a public Universal Management Contract v1
+ok 522 - Bơi ếch publishes a public Universal Management Contract v1
+  ---
+  duration_ms: 0.910772
+  type: 'test'
+  ...
+# Subtest: Bơi ếch keeps special access semantics fail-closed for generic mutation
+ok 523 - Bơi ếch keeps special access semantics fail-closed for generic mutation
+  ---
+  duration_ms: 0.161228
+  type: 'test'
+  ...
+# Subtest: video AI keeps original media on the learner device
+ok 524 - video AI keeps original media on the learner device
+  ---
+  duration_ms: 15.179579
+  type: 'test'
+  ...
+# Subtest: MediaPipe cannot start before informed telemetry consent
+ok 525 - MediaPipe cannot start before informed telemetry consent
+  ---
+  duration_ms: 2.344105
+  type: 'test'
+  ...
+# Subtest: experimental cycle engine recognizes a local five-phase breaststroke cycle without changing v1 scoring
+ok 526 - experimental cycle engine recognizes a local five-phase breaststroke cycle without changing v1 scoring
+  ---
+  duration_ms: 2.712319
+  type: 'test'
+  ...
+# Subtest: phase calibration remains local, bounded and tied to exact video timestamps
+ok 527 - phase calibration remains local, bounded and tied to exact video timestamps
+  ---
+  duration_ms: 4.053806
+  type: 'test'
+  ...
+# Subtest: cycle quality reviews each complete cycle locally and links the weakest phase to video
+ok 528 - cycle quality reviews each complete cycle locally and links the weakest phase to video
+  ---
+  duration_ms: 7.524163
+  type: 'test'
+  ...
+# Subtest: ground truth remains session-only and never overwrites AI phase predictions
+ok 529 - ground truth remains session-only and never overwrites AI phase predictions
+  ---
+  duration_ms: 2.582027
+  type: 'test'
+  ...
+# Subtest: video analysis API rejects binary-looking payload fields
+ok 530 - video analysis API rejects binary-looking payload fields
+  ---
+  duration_ms: 7.756376
+  type: 'test'
+  ...
+# Subtest: control overview exposes only a media-free assistive analysis summary
+ok 531 - control overview exposes only a media-free assistive analysis summary
+  ---
+  duration_ms: 1.135164
+  type: 'test'
+  ...
+# Subtest: leaving during a pending frame seek rejects immediately and removes the handler
+ok 532 - leaving during a pending frame seek rejects immediately and removes the handler
+  ---
+  duration_ms: 196.185389
+  type: 'test'
+  ...
+# Subtest: a failed seek removes its handler before another video can be selected
+ok 533 - a failed seek removes its handler before another video can be selected
+  ---
+  duration_ms: 92.795842
+  type: 'test'
+  ...
+# Subtest: sampling the current decoded timestamp does not wait for a new seek event
+ok 534 - sampling the current decoded timestamp does not wait for a new seek event
+  ---
+  duration_ms: 28.372459
+  type: 'test'
+  ...
+# Subtest: canceling releases an acquired AI model exactly once
+ok 535 - canceling releases an acquired AI model exactly once
+  ---
+  duration_ms: 0.903142
+  type: 'test'
+  ...
+# Subtest: a model that finishes loading after navigation is disposed without being used
+ok 536 - a model that finishes loading after navigation is disposed without being used
+  ---
+  duration_ms: 0.784106
+  type: 'test'
+  ...
+# Subtest: only one analyzer can seek and infer on the same learner video
+ok 537 - only one analyzer can seek and infer on the same learner video
+  ---
+  duration_ms: 0.536982
+  type: 'test'
+  ...
+# Subtest: a changed source or detached video cancels before the next inference
+ok 538 - a changed source or detached video cancels before the next inference
+  ---
+  duration_ms: 0.357867
+  type: 'test'
+  ...
+# Subtest: video-analyzer-impl.tsx: cancellation before model initialization releases AI resources
+ok 539 - video-analyzer-impl.tsx: cancellation before model initialization releases AI resources
+  ---
+  duration_ms: 38.644585
+  type: 'test'
+  ...
+# Subtest: video-analyzer-impl.tsx: cancellation during model initialization releases AI resources
+ok 540 - video-analyzer-impl.tsx: cancellation during model initialization releases AI resources
+  ---
+  duration_ms: 40.182
+  type: 'test'
+  ...
+# Subtest: camera-guidance-panel.tsx: cancellation before model initialization releases AI resources
+ok 541 - camera-guidance-panel.tsx: cancellation before model initialization releases AI resources
+  ---
+  duration_ms: 22.407997
+  type: 'test'
+  ...
+# Subtest: camera-guidance-panel.tsx: cancellation during model initialization releases AI resources
+ok 542 - camera-guidance-panel.tsx: cancellation during model initialization releases AI resources
+  ---
+  duration_ms: 17.615972
+  type: 'test'
+  ...
+# Subtest: phase-cycle-analyzer.tsx: cancellation before model initialization releases AI resources
+ok 543 - phase-cycle-analyzer.tsx: cancellation before model initialization releases AI resources
+  ---
+  duration_ms: 16.706309
+  type: 'test'
+  ...
+# Subtest: phase-cycle-analyzer.tsx: cancellation during model initialization releases AI resources
+ok 544 - phase-cycle-analyzer.tsx: cancellation during model initialization releases AI resources
+  ---
+  duration_ms: 24.301358
+  type: 'test'
+  ...
+# Subtest: phase analysis snapshots, pauses and restores the same learner video
+ok 545 - phase analysis snapshots, pauses and restores the same learner video
+  ---
+  duration_ms: 4.84946
+  type: 'test'
+  ...
+# Subtest: playback restoration is source-aware, local-only and tolerant of autoplay rejection
+ok 546 - playback restoration is source-aware, local-only and tolerant of autoplay rejection
+  ---
+  duration_ms: 3.456235
+  type: 'test'
+  ...
+# Subtest: restores the original timestamp and keeps an originally paused video paused
+ok 547 - restores the original timestamp and keeps an originally paused video paused
+  ---
+  duration_ms: 1.823148
+  type: 'test'
+  ...
+# Subtest: resumes playback only when the video was playing before analysis
+ok 548 - resumes playback only when the video was playing before analysis
+  ---
+  duration_ms: 4.391975
+  type: 'test'
+  ...
+# Subtest: does not seek or resume if the learner changed to a different video
+ok 549 - does not seek or resume if the learner changed to a different video
+  ---
+  duration_ms: 1.726835
+  type: 'test'
+  ...
+# Subtest: falls back to direct currentTime restoration when seek rejects
+ok 550 - falls back to direct currentTime restoration when seek rejects
+  ---
+  duration_ms: 0.320332
+  type: 'test'
+  ...
+# Subtest: navigation during playback restoration cannot resume the canceled video
+ok 551 - navigation during playback restoration cannot resume the canceled video
+  ---
+  duration_ms: 0.402243
+  type: 'test'
+  ...
+# Subtest: quay lại: detached analysis DOM cannot starve navigation before React passive cleanup
+ok 552 - quay lại: detached analysis DOM cannot starve navigation before React passive cleanup
+  ---
+  duration_ms: 136.361535
+  type: 'test'
+  ...
+# Subtest: quay lại before initial timer cannot recreate a portal in detached video DOM
+ok 553 - quay lại before initial timer cannot recreate a portal in detached video DOM
+  ---
+  duration_ms: 34.632509
+  type: 'test'
+  ...
+# Subtest: a connected analyzer repairs a removed preflight host once and cleans up observers
+ok 554 - a connected analyzer repairs a removed preflight host once and cleans up observers
+  ---
+  duration_ms: 27.790272
+  type: 'test'
+  ...
+# Subtest: back link uses native document navigation and cancels active analysis before leaving
+ok 555 - back link uses native document navigation and cancels active analysis before leaving
+  ---
+  duration_ms: 21.802954
+  type: 'test'
+  ...
+# Subtest: teacher return preserves only validated tab and encoded class context
+ok 556 - teacher return preserves only validated tab and encoded class context
+  ---
+  duration_ms: 33.106344
+  type: 'test'
+  ...
+# Subtest: browser back or pagehide cancels AI even when the page enters the back-forward cache
+ok 557 - browser back or pagehide cancels AI even when the page enters the back-forward cache
+  ---
+  duration_ms: 7.353872
+  type: 'test'
+  ...
+# Subtest: view quality gate is shared by bilateral, view-aware and calibration decisions
+ok 558 - view quality gate is shared by bilateral, view-aware and calibration decisions
+  ---
+  duration_ms: 2.290076
+  type: 'test'
+  ...
+# Subtest: view quality gate measures continuity, visibility, body coverage and stability
+ok 559 - view quality gate measures continuity, visibility, body coverage and stability
+  ---
+  duration_ms: 2.736204
+  type: 'test'
+  ...
+# Subtest: view quality remains local-only and never mutates primary scoring or thresholds
+ok 560 - view quality remains local-only and never mutates primary scoring or thresholds
+  ---
+  duration_ms: 0.557923
+  type: 'test'
+  ...
+1..560
+# tests 560
+# suites 0
+# pass 560
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5584.990463
