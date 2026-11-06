@@ -128,7 +128,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
     {selectedClass?<div className={styles.classFocus}>
      <div className={styles.drillHeading}><h4>{selectedClass.name}</h4><Badge tone={selectedClass.state}>{stateText[selectedClass.state]}</Badge></div>
      <ResourceStatusBars resource={selectedClass} board={board}/>
-     <div className={styles.classMembers}>{selectedMembers.filter(person=>person.role==="teacher").slice(0,3).map(person=><button type="button" key={person.id} onClick={()=>onOpenDetail({kind:"person",id:person.id})}>HLV: {person.name} →</button>)}</div>
+     <div className={styles.classMembers}>{selectedMembers.filter(person=>person.role==="teacher").slice(0,3).map(person=><button type="button" key={person.id} onClick={()=>onAssignPerson(person)}>Phân công HLV: {person.name} →</button>)}</div>
      <div className={styles.classActions}><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedClass.id})}>Xem lớp / học viên</button><button type="button" onClick={()=>onNavigate("people")}>Phân công →</button></div>
     </div>:null}
    </section>
