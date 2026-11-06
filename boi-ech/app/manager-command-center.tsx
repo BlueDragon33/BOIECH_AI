@@ -26,6 +26,24 @@ export function classesInRoom(board:TrainingBoard,roomId:string):TrainingResourc
  const ids=new Set(sessionsInWindow(board).filter(session=>session.roomId===roomId).map(session=>session.classId));
  return board.resources.filter(resource=>resource.kind==="class"&&ids.has(resource.id));
 }
+/** A room is free only when its time window is valid and its parent is active. */
+export function roomHasNoBookings(board:TrainingBoard,roomId:string):boolean {
+ const room=board.resources.find(resource=>resource.kind==="room"&&resource.id===roomId);
+ if(!room||room.status!=="active"||room.state==="inactive")return false;
+ const usage=roomOccupancy(roomId,board);
+ return usage.valid&&usage.occupiedMinutes===0;
+}
+/** Surface unusable rooms and any scheduled class with staffing/capacity problems. */
+export function roomNeedsAttention(board:TrainingBoard,roomId:string):boolean {
+ const room=board.resources.find(resource=>resource.kind==="room"&&resource.id===roomId);
+ if(!room)return false;
+ if(room.status!=="active"||room.state==="inactive")return true;
+ const roomSessions=sessionsInWindow(board).filter(session=>session.roomId===roomId);
+ return roomSessions.some(session=>{
+  const klass=board.resources.find(resource=>resource.kind==="class"&&resource.id===session.classId);
+  return !klass||klass.status!=="active"||klass.state==="overloaded"||klass.missingTeachers>0;
+ });
+}
 function membersOfClass(people:TrainingPerson[],resource:TrainingResource){
  return people.filter(person=>(person.role==="teacher"?classNames(person.className):[person.className]).some(name=>classKey(name)===classKey(resource.name)));
 }
@@ -43,7 +61,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
  const activeSessions=sessionsInWindow(board);
  const selectedBuilding=buildings.find(resource=>resource.id===buildingId)||buildings[0];
  const buildingRooms=rooms.filter(resource=>resource.parentId===selectedBuilding?.id);
- const filteredRooms=buildingRooms.filter(resource=>roomFilter==="all"||(roomFilter==="free"?resource.status==="active"&&roomOccupancy(resource.id,board).occupiedMinutes===0:resource.status!=="active"||resource.state==="overloaded"||resource.state==="missing"));
+ const filteredRooms=buildingRooms.filter(resource=>roomFilter==="all"||(roomFilter==="free"?roomHasNoBookings(board,resource.id):roomNeedsAttention(board,resource.id)));
  const selectedRoom=filteredRooms.find(resource=>resource.id===roomId)||filteredRooms[0];
  const selectedRoomSessions=selectedRoom?activeSessions.filter(session=>session.roomId===selectedRoom.id):[];
  const roomClassIds=new Set(selectedRoomSessions.map(session=>session.classId));
