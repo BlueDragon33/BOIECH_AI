@@ -79,11 +79,6 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
    </button>)}
   </section>
 
-  <section className={styles.launcher} aria-label="Thao tác quản lý nhanh">
-   {([{id:"schedule",label:"Xếp lịch"},{id:"class",label:"Lớp học"},{id:"people",label:"Học viên / HLV"},{id:"room",label:"Phòng / Hồ"},{id:"building",label:"Cơ sở / Tòa"},{id:"settings",label:"Cài đặt"}] as {id:Destination;label:string}[]).map(item=>
-    <button type="button" key={item.id} onClick={()=>onNavigate(item.id)}><AppIcon name={item.id}/><span>{item.label}</span></button>)}
-  </section>
-
   <div className={styles.diagramLayout}>
    <section className={styles.diagramPanel} aria-label="Sơ đồ cơ sở tương tác">
     <div className={styles.panelHeading}><div><small>SƠ ĐỒ & GIÁM SÁT</small><h3>Hệ thống cơ sở / tòa học</h3></div><button type="button" onClick={()=>onNavigate("building")}>Danh sách tòa →</button></div>
