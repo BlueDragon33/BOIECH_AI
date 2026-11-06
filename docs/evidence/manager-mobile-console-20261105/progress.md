@@ -15,3 +15,5 @@ Browser UI rendering: BLOCKED by URL protocol policy when opening the self-conta
 Technical whole-branch review: pending. No source beyond manager UI/QA/docs changed; no deploy, schema, rights or account-first change.
 
 Final review follow-up: fixed availability filtering and guarded replacement of omitted class memberships, both RED→GREEN. Also corrected validity-stage semantics and first-class setup navigation with RED→GREEN tests, and the two reported CSS touch/hover issues. Focused 24/24; final npm test 541/541; typecheck/lint exit 0. Rendering/live QA remains unverified. No deferred source findings.
+
+CI follow-up: validation run 42134975635 stopped at full repository lint because a new test used the reserved variable name module. Renamed the local test variable; full npm run lint now exits 0 with three existing warnings outside this feature, and new-feature tests pass 18/18. Application bytes and generated preview are unchanged.

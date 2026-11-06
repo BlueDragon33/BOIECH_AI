@@ -152,9 +152,9 @@ test('replacing inactive memberships requires an explicit confirmation and keeps
  assert.equal(commands.length,1);assert.equal(commands[0].expectedClassName,'A; Old');assert.deepEqual(commands[0].classIds,['class']);
 });
 test('class detail uses canonical memberships and current source sessions, omitting unrelated fields',()=>{
- let module;try{module=load('app/manager-details.tsx');}catch(error){if(error.code!=='ENOENT')throw error;module={};}
- assert.equal(typeof module.ManagerDetailSheet,'function');const b=board();b.people.push({...person,id:'other',name:'Unrelated AA',className:'AA',phone:'PRIVATE-PHONE'});
- const html=renderToStaticMarkup(React.createElement(module.ManagerDetailSheet,{target:{kind:'resource',id:'class'},board:b,onClose:()=>{},onEditResource:()=>{},onAssignPerson:()=>{},onEditSession:()=>{}}));
+ let detailsModule;try{detailsModule=load('app/manager-details.tsx');}catch(error){if(error.code!=='ENOENT')throw error;detailsModule={};}
+ assert.equal(typeof detailsModule.ManagerDetailSheet,'function');const b=board();b.people.push({...person,id:'other',name:'Unrelated AA',className:'AA',phone:'PRIVATE-PHONE'});
+ const html=renderToStaticMarkup(React.createElement(detailsModule.ManagerDetailSheet,{target:{kind:'resource',id:'class'},board:b,onClose:()=>{},onEditResource:()=>{},onAssignPerson:()=>{},onEditSession:()=>{}}));
  assert.match(html,/Học viên mẫu/);assert.match(html,/Giảng viên mẫu/);assert.match(html,/Buổi một/);assert.ok(!html.includes('Unrelated AA'));assert.ok(!html.includes('PRIVATE-PHONE'));
 });
 test('editing a resource keeps its optimistic version and preserves a rejected draft',async()=>{

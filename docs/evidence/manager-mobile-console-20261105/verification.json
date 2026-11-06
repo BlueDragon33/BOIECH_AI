@@ -29,6 +29,12 @@
       "initialReviewedCommit": "5791e9b1fd887b72ca0c6256ccc98226ac6f7304",
       "importantFindings": 2,
       "authorFollowUp": "findings addressed; regression tests passed; no independent re-review or release approval claimed"
+    },
+    "fullRepositoryLint": {
+      "exit": 0,
+      "errors": 0,
+      "existingWarnings": 3,
+      "scope": "teacher-role-shell.tsx, teacher-roster-manager.tsx, current-production-runtime-contract.test.mjs"
     }
   },
   "preview": {
