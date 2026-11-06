@@ -11,8 +11,8 @@ type Props={
  onNavigate:(destination:Destination)=>void;
  onOpenDetail:(target:DetailTarget)=>void;
  onAssignPerson:(person:TrainingPerson)=>void;
- onCreateResource:(kind:ResourceKind)=>void;
- onCreateSession:()=>void;
+ onCreateResource:(kind:ResourceKind,buildingId?:string)=>void;
+ onCreateSession:(roomId?:string,classId?:string)=>void;
 };
 function overlaps(session:TrainingSession,board:TrainingBoard){
  const from=Date.parse(board.from),to=Date.parse(board.to);
@@ -88,7 +88,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
  return <div className={styles.commandCenter}>
   <section className={styles.hero} aria-label="Trung tâm điều hành">
    <div><p className={styles.eyebrow}>BƠI ẾCH AI · MANAGER CONSOLE</p><h2>Trung tâm điều hành <span aria-hidden="true">✦</span></h2><p>Quản lý cơ sở, phân phòng, lớp, ca học và hồ sơ trên cùng dữ liệu điều phối.</p><small>Ảnh chụp dữ liệu lúc {formatDate(board.observedAt)} · Khoảng xem {formatDate(board.from)} – {formatDate(board.to)}</small></div>
-   <button type="button" disabled={busy} onClick={onCreateSession} className={styles.heroAction}>＋ Xếp buổi học</button>
+   <button type="button" disabled={busy} onClick={()=>onCreateSession()} className={styles.heroAction}>＋ Xếp buổi học</button>
   </section>
 
   <section className={styles.metrics} aria-label="Thống kê quản lý">
@@ -119,7 +119,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
    <section className={styles.drillPanel} aria-label="Sơ đồ phân cấp tòa phòng lớp">
     <div className={styles.panelHeading}><div><small>PHÂN CẤP TƯƠNG TÁC</small><h3>Tòa → Phòng / Hồ → Lớp / Ca</h3></div></div>
     <div className={styles.breadcrumb}><span>{selectedBuilding?.name||"Chưa có tòa"}</span><span aria-hidden="true">›</span><span>{selectedRoom?.name||"Chưa chọn phòng"}</span><span aria-hidden="true">›</span><span>{selectedClass?.name||"Chưa có lớp"}</span></div>
-    <div className={styles.drillHeading}><h4>Phòng / Hồ thuộc {selectedBuilding?.name||"tòa"}</h4><button type="button" disabled={busy||!selectedBuilding} onClick={()=>onCreateResource("room")}>＋ Phòng</button></div>
+    <div className={styles.drillHeading}><h4>Phòng / Hồ thuộc {selectedBuilding?.name||"tòa"}</h4><button type="button" disabled={busy||!selectedBuilding} onClick={()=>onCreateResource("room",selectedBuilding?.id)}>＋ Phòng</button></div>
     <div className={styles.roomFilters} aria-label="Lọc phòng">{([{id:"all",label:"Tất cả"},{id:"free",label:"Chưa có lịch"},{id:"attention",label:"Cần xử lý"}] as const).map(filter=><button key={filter.id} type="button" aria-pressed={roomFilter===filter.id} onClick={()=>{setRoomFilter(filter.id);setRoomId("");setClassId("");}}>{filter.label}</button>)}</div>
     <div className={styles.roomGrid}>
      {filteredRooms.map(room=>{
@@ -132,7 +132,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
      })}
      {!filteredRooms.length?<div className={styles.emptyCompact}>{buildingRooms.length?"Không có phòng theo bộ lọc này.":"Tòa chưa có phòng. Hãy tạo phòng trước khi xếp lịch."}</div>:null}
     </div>
-    {selectedRoom?<><div className={styles.drillHeading}><h4>{selectedRoom.name} · {roomClasses.length} lớp / {selectedRoomSessions.length} ca</h4><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedRoom.id})}>Chi tiết phòng →</button></div>
+    {selectedRoom?<><div className={styles.drillHeading}><h4>{selectedRoom.name} · {roomClasses.length} lớp / {selectedRoomSessions.length} ca</h4><div className={styles.roomContextActions}><button type="button" disabled={busy} onClick={()=>onCreateSession(selectedRoom.id,selectedClass?.id)}>＋ Thêm ca</button><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedRoom.id})}>Chi tiết phòng →</button></div></div>
      <div className={styles.sessionList}>{selectedRoomSessions.map(session=>{
       const klass=classes.find(resource=>resource.id===session.classId);
       const teacher=board.people.find(person=>person.id===session.teacherId);
@@ -163,7 +163,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
     {!activeSessions.length?<p>Không có lịch trong khoảng đang xem.</p>:null}
    </section>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Tác vụ nhanh</h3></div>
-    <div className={styles.quickActionGrid}><button type="button" disabled={busy} onClick={()=>onCreateResource("class")}><AppIcon name="class"/> Tạo lớp</button><button type="button" disabled={busy} onClick={()=>onCreateResource("room")}><AppIcon name="room"/> Tạo phòng</button><button type="button" disabled={busy} onClick={onCreateSession}><AppIcon name="schedule"/> Xếp lịch</button><button type="button" onClick={()=>onNavigate("people")}><AppIcon name="people"/> Phân công</button></div>
+    <div className={styles.quickActionGrid}><button type="button" disabled={busy} onClick={()=>onCreateResource("class")}><AppIcon name="class"/> Tạo lớp</button><button type="button" disabled={busy} onClick={()=>onCreateResource("room")}><AppIcon name="room"/> Tạo phòng</button><button type="button" disabled={busy} onClick={()=>onCreateSession()}><AppIcon name="schedule"/> Xếp lịch</button><button type="button" onClick={()=>onNavigate("people")}><AppIcon name="people"/> Phân công</button></div>
    </section>
   </div>
  </div>;
