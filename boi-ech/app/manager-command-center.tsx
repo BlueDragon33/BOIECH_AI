@@ -132,7 +132,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
      })}
      {!filteredRooms.length?<div className={styles.emptyCompact}>{buildingRooms.length?"Không có phòng theo bộ lọc này.":"Tòa chưa có phòng. Hãy tạo phòng trước khi xếp lịch."}</div>:null}
     </div>
-    {selectedRoom?<><div className={styles.drillHeading}><h4>{selectedRoom.name} · {roomClasses.length} lớp / {selectedRoomSessions.length} ca</h4><div className={styles.roomContextActions}><button type="button" disabled={busy} onClick={()=>onCreateSession(selectedRoom.id,selectedClass?.id)}>＋ Thêm ca</button><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedRoom.id})}>Chi tiết phòng →</button></div></div>
+    {selectedRoom?<><div className={`${styles.drillHeading} ${styles.roomContextHeading}`}><h4>{selectedRoom.name} · {roomClasses.length} lớp / {selectedRoomSessions.length} ca</h4><div className={styles.roomContextActions}><button type="button" disabled={busy} onClick={()=>onCreateSession(selectedRoom.id,selectedClass?.id)}>＋ Thêm ca</button><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedRoom.id})}>Chi tiết phòng →</button></div></div>
      <div className={styles.sessionList}>{selectedRoomSessions.map(session=>{
       const klass=classes.find(resource=>resource.id===session.classId);
       const teacher=board.people.find(person=>person.id===session.teacherId);
