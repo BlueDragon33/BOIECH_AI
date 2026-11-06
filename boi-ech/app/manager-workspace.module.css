@@ -64,6 +64,7 @@
 .workspace .nav{background:#14295cf5;border:1px solid #6c83cd;box-shadow:0 9px 28px #08183a85;backdrop-filter:blur(12px)}.workspace .nav button{color:#ccd8fa}.workspace .nav button[aria-current="page"]{background:linear-gradient(135deg,#305bd7,#6338d8);color:#fff}.workspace .nav .appIcon{background:transparent;color:inherit}
 .desktopRail{display:none}
 @media(min-width:1101px){
+ .workspace .appGrid{display:none} /* Desktop rail and command center cover launcher actions. */
  .workspace{padding:22px 25px 35px 270px}
  .appShell{max-width:1600px}
  .desktopRail{display:flex;position:fixed;left:0;top:0;bottom:0;width:245px;padding:25px 14px;flex-direction:column;gap:7px;overflow-y:auto;z-index:20;background:radial-gradient(circle at 0% 3%,#2e4bc6 0%,transparent 28%),radial-gradient(circle at 94% 88%,#3a1d92,transparent 43%),linear-gradient(180deg,#101e52,#0d1634);border-right:1px solid #5c7bd777;box-shadow:7px 0 30px #05112f4e}
