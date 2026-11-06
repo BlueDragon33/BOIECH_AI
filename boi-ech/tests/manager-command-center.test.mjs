@@ -25,7 +25,7 @@ function load(entry){
  return read(path.resolve(entry));
 }
 const module=load("app/manager-command-center.tsx");
-const {sessionsInWindow,classesInRoom}=module;
+const {sessionsInWindow,classesInRoom,roomHasNoBookings,roomNeedsAttention}=module;
 const resource={id:"class-a",kind:"class",name:"Ếch cơ bản",parentId:null,capacity:20,requiredTeachers:1,status:"active",version:1,learnerCount:10,teacherCount:1,remaining:10,missingTeachers:0,bookingCount:1,state:"available",roomCount:0};
 function board(){
  return {
@@ -70,4 +70,37 @@ test("empty building state offers real setup instead of showing fake map data",(
  assert.ok(markup.includes("Chưa có tòa học"));
  assert.ok(markup.includes("Tạo tòa"));
  assert.ok(!markup.includes("Tòa A"));
+});
+
+test("attention filter includes scheduled teacher shortages and overflow, not unrelated classes",()=>{
+ const b=board();
+ assert.equal(roomNeedsAttention(b,"room-1"),false);
+ b.resources=b.resources.map(r=>r.id==="class-a"?{...r,missingTeachers:1,state:"missing"}:r);
+ assert.equal(roomNeedsAttention(b,"room-1"),true);
+ b.resources=b.resources.map(r=>r.id==="class-a"?{...r,missingTeachers:0,state:"available"}:r.id==="class-b"?{...r,state:"overloaded"}:r);
+ assert.equal(roomNeedsAttention(b,"room-1"),true);
+ b.resources=b.resources.map(r=>r.id==="class-b"?{...r,state:"available"}:r.id==="other"?{...r,state:"overloaded"}:r);
+ assert.equal(roomNeedsAttention(b,"room-1"),false,"cancelled/out-of-window class must not flag room");
+});
+test("attention filter includes inactive rooms, inactive scheduled classes and broken references",()=>{
+ const b=board();
+ b.resources=b.resources.map(r=>r.id==="room-1"?{...r,state:"inactive"}:r);
+ assert.equal(roomNeedsAttention(b,"room-1"),true);
+ b.resources=b.resources.map(r=>r.id==="room-1"?{...r,state:"full"}:r.id==="class-a"?{...r,status:"archived"}:r);
+ assert.equal(roomNeedsAttention(b,"room-1"),true);
+ b.resources=b.resources.filter(r=>r.id!=="class-a");
+ assert.equal(roomNeedsAttention(b,"room-1"),true);
+ assert.equal(roomNeedsAttention(b,"unknown-room"),false);
+});
+test("free-room filter requires valid window, active parent, and no booking",()=>{
+ const b=board();
+ assert.equal(roomHasNoBookings(b,"room-1"),false);
+ b.sessions=[];
+ assert.equal(roomHasNoBookings(b,"room-1"),true);
+ b.from="invalid";
+ assert.equal(roomHasNoBookings(b,"room-1"),false);
+ b.from="2030-05-03T08:00:00.000Z";
+ b.resources=b.resources.map(r=>r.id==="room-1"?{...r,state:"inactive"}:r);
+ assert.equal(roomHasNoBookings(b,"room-1"),false);
+ assert.equal(roomHasNoBookings(b,"unknown-room"),false);
 });
