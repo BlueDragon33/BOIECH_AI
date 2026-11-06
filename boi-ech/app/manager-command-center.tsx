@@ -4,7 +4,7 @@ import {AppIcon,Badge,ResourceStatusBars,personReadiness,roomOccupancy,stateText
 import type {DetailTarget} from "./manager-details";
 import styles from "./manager-command-center.module.css";
 
-type Destination="schedule"|"people"|"class"|"room"|"building"|"settings";
+type Destination="schedule"|"people"|"class"|"room"|"building"|"settings"|"review";
 type Props={
  board:TrainingBoard;
  busy:boolean;
@@ -84,7 +84,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
   {label:"Lớp học",value:classes.length,icon:"class",destination:"class" as Destination,note:urgentClasses.length+" lớp cần chú ý"},
   {label:"Phòng / Hồ",value:rooms.length,icon:"room",destination:"room" as Destination,note:occupiedRoomIds.size+" phòng có lịch trong khoảng"},
   {label:"Cơ sở / Tòa",value:buildings.length,icon:"building",destination:"building" as Destination,note:"Dữ liệu cơ sở đã ghi nhận"},
-  {label:"Hồ sơ cần xem",value:pending.length,icon:"people",destination:"people" as Destination,note:"Chờ duyệt / thiếu đăng ký"},
+  {label:"Hồ sơ cần xem",value:pending.length,icon:"people",destination:"review" as Destination,note:"Chờ duyệt / thiếu đăng ký"},
  ];
  function selectBuilding(id:string){setBuildingId(id);setRoomId("");setClassId("");setRoomFilter("all");}
  function selectRoom(id:string){setRoomId(id);setClassId("");}
@@ -159,7 +159,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
   <div className={styles.bottomPanels}>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Ưu tiên xử lý</h3><button type="button" onClick={()=>onNavigate("class")}>Mở quản lý →</button></div>
     <button type="button" onClick={()=>onNavigate("class")}><Badge tone={urgentClasses.length?"missing":"available"}>{urgentClasses.length}</Badge><span>Lớp quá sĩ số hoặc thiếu giảng viên</span></button>
-    <button type="button" onClick={()=>onNavigate("people")}><Badge tone={pending.length?"missing":"available"}>{pending.length}</Badge><span>Hồ sơ thiếu đăng ký / chờ duyệt</span></button>
+    <button type="button" onClick={()=>onNavigate("review")}><Badge tone={pending.length?"missing":"available"}>{pending.length}</Badge><span>Hồ sơ thiếu đăng ký / chờ duyệt</span></button>
     <button type="button" onClick={()=>onNavigate("people")}><Badge tone={blockedOrExpired.length?"inactive":"available"}>{blockedOrExpired.length}</Badge><span>Hồ sơ bị khóa / hết hạn</span></button>
    </section>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Lịch trong khoảng xem</h3><button type="button" onClick={()=>onNavigate("schedule")}>Toàn bộ lịch →</button></div>
