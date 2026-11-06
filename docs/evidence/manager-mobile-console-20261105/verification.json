@@ -1,0 +1,64 @@
+{
+  "date": "2026-11-06",
+  "base": "b511255063a7637167f6d7ac5f8fd86f013f74b9",
+  "branch": "feat/manager-mobile-console-20261105",
+  "checks": {
+    "focused": {
+      "passed": 24,
+      "failed": 0
+    },
+    "fullNode": {
+      "passed": 541,
+      "failed": 0,
+      "command": "npm test"
+    },
+    "typecheck": {
+      "exit": 0,
+      "command": "tsc --noEmit --incremental false"
+    },
+    "changedSourceLint": {
+      "exit": 0
+    },
+    "finalBuild": {
+      "exit": 0,
+      "artifactValidation": true
+    },
+    "browserRendering": "BLOCKED_URL_PROTOCOL_POLICY",
+    "liveAcceptance": "NOT_PERFORMED",
+    "technicalReview": {
+      "initialReviewedCommit": "5791e9b1fd887b72ca0c6256ccc98226ac6f7304",
+      "importantFindings": 2,
+      "authorFollowUp": "findings addressed; regression tests passed; no independent re-review or release approval claimed"
+    }
+  },
+  "preview": {
+    "file": "manager-mobile-preview.html",
+    "sha256": "c621a2f3c876a961792bc252d5e8c1225c99ff432fe00839f277dec8f9032387",
+    "generatedFromProductionComponents": true,
+    "syntheticData": true,
+    "connectSrc": "none"
+  },
+  "scope": {
+    "apiChanges": false,
+    "schemaChanges": false,
+    "permissionChanges": false,
+    "deployment": false,
+    "productionWrites": false,
+    "dependencyChanges": false
+  },
+  "preserve": {
+    "boiAccountFirst": "8c2b4710cb4c2802affe7d433ab0450d030a944a",
+    "appManagerAccountFirst": "49a3f85fc42e564460732110974fd951ad8d117e",
+    "appManagerHotfix": "da5d3049bc39f85410d6762c19be894991720e69",
+    "accountFirstFlag": "OFF",
+    "accountFirstReview": "BLOCKED",
+    "accountFirstCi": "PENDING",
+    "globalD1": "10/10 BLOCKED"
+  },
+  "sourceSha256": {
+    "boi-ech/app/manager-workspace.tsx": "7b4efbc65f6bf3e763f1d9b79ee799608d4cc48c4385bf02cd2e185bf4b4b242",
+    "boi-ech/app/manager-workspace.module.css": "379ad98d1a9092706bbed6242903998ddad2faa41c9d7922f9084a11195eb2fc",
+    "boi-ech/app/manager-status.tsx": "356b6d1bcbc8c13b19c43061d475e0fbefe3b90917ae2a9a12b4c5e763a0219a",
+    "boi-ech/app/manager-details.tsx": "e0e42052a9ba69b86a94ddbe71deca006ab59d512099a1eaf357c83011019a94"
+  }
+}
