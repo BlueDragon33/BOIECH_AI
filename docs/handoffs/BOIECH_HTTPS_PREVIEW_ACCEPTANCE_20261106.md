@@ -12,7 +12,11 @@ Scope: repair the two existing Preview workflow guards; establish a genuinely is
 - [x] Verify focused regressions, full Node 22 build/tests, TypeScript, lint, release and Preview validators.
 - [x] Obtain an independent final code review and handle material findings.
 - [x] Verify configured deployment access and an approved manager identity before live Preview acceptance; report missing infrastructure explicitly.
-- [ ] Synchronize a reviewable candidate with a checked remote-HEAD lease, preserving the existing branch and all release gates.
+- [x] Synchronize the code-review candidate with a checked remote-HEAD lease, preserving the existing branch and all release gates (`165f1e681129979a5ea54b6002a32d2df10bf4f7`).
+
+## Latest connection checkpoint
+
+The Owner then requested configuration of the actual Cloudflare connection. The signed-in browser is now connected and a separate `boi-ech-preview` Worker exists with Hello World bootstrap only. A one-day Worker-only Editor token is prepared on its final review screen, awaiting direct confirmation before creating new write access. The app is not deployed: isolated D1 creation hit the 10/10 database quota, and R2 activation requires a usage-billed subscription outside the current ZERO-SPEND scope. Production manager approval does not establish a Preview session. See `docs/evidence/premium-manager-20261106/CLOUDFLARE_CONNECTION_20261106.md` for current evidence; the environment observations below describe the earlier checkpoint.
 
 ## Environment observations
 
