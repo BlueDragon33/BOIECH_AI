@@ -34,11 +34,11 @@ export function roomHasNoBookings(board:TrainingBoard,roomId:string):boolean {
  return usage.valid&&usage.occupiedMinutes===0;
 }
 /** Surface unusable rooms and any scheduled class with staffing/capacity problems. */
-export function roomNeedsAttention(board:TrainingBoard,roomId:string):boolean {
+export function roomNeedsAttention(board:TrainingBoard,roomId:string,windowSessions?:TrainingSession[]):boolean {
  const room=board.resources.find(resource=>resource.kind==="room"&&resource.id===roomId);
  if(!room)return false;
  if(room.status!=="active"||room.state==="inactive")return true;
- const roomSessions=sessionsInWindow(board).filter(session=>session.roomId===roomId);
+ const roomSessions=(windowSessions??sessionsInWindow(board)).filter(session=>session.roomId===roomId);
  // Scheduled uses of one physical room must not overlap, even for different classes.
  if(roomSessions.some((session,index)=>index>0&&Date.parse(session.startsAt)<Date.parse(roomSessions[index-1].endsAt)))return true;
  return roomSessions.some(session=>{
@@ -63,7 +63,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
  const activeSessions=sessionsInWindow(board);
  const selectedBuilding=buildings.find(resource=>resource.id===buildingId)||buildings[0];
  const buildingRooms=rooms.filter(resource=>resource.parentId===selectedBuilding?.id);
- const filteredRooms=buildingRooms.filter(resource=>roomFilter==="all"||(roomFilter==="free"?roomHasNoBookings(board,resource.id):roomNeedsAttention(board,resource.id)));
+ const filteredRooms=buildingRooms.filter(resource=>roomFilter==="all"||(roomFilter==="free"?roomHasNoBookings(board,resource.id):roomNeedsAttention(board,resource.id,activeSessions)));
  const selectedRoom=filteredRooms.find(resource=>resource.id===roomId)||filteredRooms[0];
  const selectedRoomSessions=selectedRoom?activeSessions.filter(session=>session.roomId===selectedRoom.id):[];
  const roomClassIds=new Set(selectedRoomSessions.map(session=>session.classId));
@@ -127,10 +127,11 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
     <div className={styles.roomGrid}>
      {filteredRooms.map(room=>{
       const sessions=activeSessions.filter(session=>session.roomId===room.id);
+      const needsAttention=roomNeedsAttention(board,room.id,activeSessions);
       return <button type="button" className={styles.roomNode} data-selected={selectedRoom?.id===room.id} key={room.id} aria-pressed={selectedRoom?.id===room.id} onClick={()=>selectRoom(room.id)}>
        <span className={styles.roomNodeHead}><AppIcon name="room"/><strong>{room.name}</strong></span>
        <small>{room.status!=="active"?"Tạm ngừng / lưu trữ":sessions.length?String(new Set(sessions.map(s=>s.classId)).size)+" lớp · "+sessions.length+" ca":"Chưa có ca"}</small>
-       <span className={styles.roomNodeState} data-alert={roomNeedsAttention(board,room.id)}>{roomNeedsAttention(board,room.id)?"Cần xử lý":stateText[room.state]}</span>
+       <span className={styles.roomNodeState} data-alert={needsAttention}>{needsAttention?"Cần xử lý":stateText[room.state]}</span>
       </button>;
      })}
      {!filteredRooms.length?<div className={styles.emptyCompact}>{buildingRooms.length?"Không có phòng theo bộ lọc này.":"Tòa chưa có phòng. Hãy tạo phòng trước khi xếp lịch."}</div>:null}
