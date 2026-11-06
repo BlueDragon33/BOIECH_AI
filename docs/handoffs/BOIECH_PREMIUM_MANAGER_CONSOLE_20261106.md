@@ -36,3 +36,34 @@ No changes to API, DB/schema, package/lockfile, grants, auth, deployment config 
 ## One next action
 
 Work: check fresh HEAD of feat/manager-premium-command-center-20261106, test/fix it source-only and browser on an authorized preview, preserve PR #107 and auth gates, then hand back exact verified SHA, preview and blockers for final Owner approval. Do not publish until explicit approval.
+
+## Follow-up integration: 2026-11-06 (same branch, no separate product)
+
+This follow-up improves the existing application source without expanding auth or backend scope.
+
+- Room attention identifies unavailable rooms, inactive scheduled classes, missing coaches, over-capacity classes, unresolved class references and overlapping room bookings. Adjacent nonoverlapping classes remain allowed. Text warnings accompany color.
+- Free-room filtering requires a valid selected time window and an active room/parent; invalid windows are not called free. Only real known room IDs count as occupied.
+- "+ Phòng" from a selected building preselects that building in the existing resource form. "+ Thêm ca" from a room preselects that room and the chosen class in the existing schedule form. Writes continue only through the signed, versioned training client.
+- On mobile, the six-app launcher precedes detailed management. On desktop, the left rail replaces the duplicated launcher. The bottom mobile dock remains.
+- Review KPI and pending-profile action open a filtered **read-only** list. No approve/reject mutation is added: /api/admin/devices uses requireDeviceAdmin, distinct from the manager grant.
+- Responsive room actions use an explicit class, not CSS :has. Room warning calculations reuse the already selected-window sessions instead of repeatedly sorting each time.
+
+The newly added suite defines **14 test cases** including hierarchy mapping, two classes in one room, boundaries, room-warning predicates, overlapping sessions, prefilled editor context and read-only review. These tests are COMMITTED but NOT EXECUTED in this chat.
+
+## Latest evidence, limits and zero-spend state
+
+- Read-only GitHub source inspection: **15/15 static invariants**. This is NOT a TypeScript, lint, build, browser, accessibility or independent review PASS.
+- Local runtime has Node 22.16 and TypeScript but no React dependencies or GitHub checkout; git ls-remote failed DNS resolution of github.com. The connected GitHub tools provide source read/write but not execution in a checkout.
+- GitHub Actions branch query: **0 workflow runs**. No GitHub-hosted Actions, preview deployment, merge or Production operation.
+- Old PR #107 541/541 validation belongs to the base, not the newer feature branch. Do not mark this candidate PASS on that evidence.
+- The repository's .blueprint/constitution-adoption.json currently enforces Blueprint OS 1.3.0. Do not invent adoption or compliance with a later version.
+
+## Work acceptance — follow continuously, no repeated owner prompts
+
+1. Refresh integration HEAD, base PR #107 HEAD and main; preserve concurrent changes; create a separate QA checkout.
+2. Use Node >=22.13. In boi-ech: npm ci --no-audit --no-fund; run node --test tests/manager-command-center.test.mjs tests/manager-mobile-console.test.mjs; npx --no-install tsc --noEmit --incremental false; npm run lint; then npm test including artifact validation. Fix errors, rerun focused tests before the full gate.
+3. Browser check at 320, 375 and 768px plus desktop: navigation; theme/large text; touch/focus/contrast; empty state; multiple classes per room; adjacent versus overlapping sessions; pending queue; context-prefilled forms; stale data and failed drafts; signed manager access.
+4. Confirm no API, D1 migration, package dependency, grants, account-first flag or deployment change; keep source records and user data private.
+5. If permitted, produce an authenticated preview, obtain Owner visual acceptance and independent review, then seek explicit exact-SHA release approval. Do NOT merge or publish before gates pass, and do not spend hosted CI in ZERO-SPEND mode without a separate cost decision.
+
+**Single Next Action:** Work takes the current integration-branch HEAD, completes source/browser QA and prepares a real authorized preview for final Owner acceptance. If blocked by checkout/runtime/access, report the exact blocker and preserve the candidate; no fake QA PASS.
