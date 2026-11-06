@@ -1,0 +1,14 @@
+import {build} from '../boi-ech/node_modules/esbuild/lib/main.js';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+const root=fileURLToPath(new URL('../',import.meta.url));
+const directory=path.join(root,'.qa-manager-mobile');
+const output=await build({entryPoints:[path.join(root,'qa/manager-mobile-preview.tsx')],absWorkingDir:path.join(root,'boi-ech'),nodePaths:[path.join(root,'boi-ech/node_modules')],outfile:path.join(directory,'preview.js'),bundle:true,write:false,format:'iife',platform:'browser',target:'es2022',jsx:'automatic',minify:true,define:{'process.env.NODE_ENV':'"production"'}});
+const js=output.outputFiles.find(f=>f.path.endsWith('.js')).text;
+const css=output.outputFiles.find(f=>f.path.endsWith('.css')).text;
+const html=`<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; base-uri 'none'; form-action 'none'"><title>Bơi Ếch · Xem thử giao diện cán bộ</title><style>body{margin:0}button,input,select{font:inherit}${css}</style></head><body><div id="root"></div><script>${js.replace(/<\/script/gi,'<\\/script')}</script></body></html>`;
+await mkdir(directory,{recursive:true});
+await writeFile(path.join(directory,'manager-mobile-preview.html'),html,{mode:0o600});
+console.log(JSON.stringify({file:path.join(directory,'manager-mobile-preview.html'),bytes:Buffer.byteLength(html),sha256:createHash('sha256').update(html).digest('hex'),networkBlocked:true,realData:false}));
