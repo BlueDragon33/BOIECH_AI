@@ -74,4 +74,4 @@
 
 .roomContextActions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
 .commandCenter .roomContextActions button{white-space:nowrap}
-@media(max-width:520px){.roomContextActions{width:100%;justify-content:flex-start}.drillHeading:has(.roomContextActions){align-items:flex-start;flex-direction:column}}
+@media(max-width:520px){.roomContextActions{width:100%;justify-content:flex-start}.roomContextHeading{align-items:flex-start;flex-direction:column}}
