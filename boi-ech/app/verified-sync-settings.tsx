@@ -1,5 +1,6 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
+import type { FormEvent } from "react";
 import {flushVerifiedSync,readPendingSync} from "./verified-sync-client";
 type Scope="learning-progress"|"study-preferences";
 type Consent={scope:string;enabled:number;revision:number;confirmed_at:string|null};
@@ -20,7 +21,7 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
  },[accountId]);
  useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Không đọc được trạng thái.");});
   return()=>{alive=false};},[refresh]);
- async function toggle(event:React.FormEvent<HTMLFormElement>,scope:Scope,enabled:boolean){
+ async function toggle(event:FormEvent<HTMLFormElement>,scope:Scope,enabled:boolean){
   event.preventDefault();
   if(busy)return;
   const form=event.currentTarget;const password=String(new FormData(form).get("password")||"");form.reset();
