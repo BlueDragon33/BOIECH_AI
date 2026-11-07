@@ -1,10 +1,14 @@
 import { DeviceAccessError, deviceErrorResponse, verifyDeviceRequest } from "../../../device-auth.server";
 import { managerReviewBoard, managerReviewCommand } from "../../../manager-device-review.server";
+import { accountConfiguration } from "../../../account-runtime.server";
 
 export const dynamic="force-dynamic";
 
 export async function POST(request:Request) {
   try {
+    if ((await accountConfiguration()).v2) throw new DeviceAccessError(
+      "Trong Account-first V2, duyệt học viên/giảng viên phải đi qua hai vòng xét duyệt tài khoản.",
+      403,"ACCOUNT_V2_MANAGER_REVIEW_REQUIRED");
     const raw=await request.text();
     if (raw.length>16_384) throw new DeviceAccessError("Yêu cầu quá lớn.",413,"MANAGER_REQUEST_TOO_LARGE");
     const payload=JSON.parse(raw) as Record<string,unknown>;
