@@ -8,12 +8,12 @@ function field(value: unknown, max: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > max || /[\x00-\x1f]/.test(value)) bad("PROFILE_INVALID", 400);
   return value.trim().normalize("NFC");
 }
-type State = { account_id: string; stage: Stage; revision: number; role: string; status: string; first_review_by: string | null };
+type State = { account_id: string; stage: Stage; revision: number; role: string; status: string; first_review_by: string | null; last_review_note: string | null };
 export class AccountV2Workflow {
   constructor(private db: D1Database, private accounts: AccountService) {}
   private async state(accountId: string): Promise<State> {
     const r = await this.db.prepare(`SELECT o.account_id,o.stage,o.revision,d.person_role AS role,
-      d.status,o.first_review_by FROM account_onboarding o JOIN accounts a ON a.account_id=o.account_id
+      d.status,o.first_review_by,o.last_review_note FROM account_onboarding o JOIN accounts a ON a.account_id=o.account_id
       JOIN device_access d ON d.device_id=a.storage_device_id WHERE o.account_id=?`)
       .bind(accountId).first<State>();
     if (!r) bad("ACCOUNT_ONBOARDING_MISSING", 409);
@@ -23,6 +23,7 @@ export class AccountV2Workflow {
     const actor = await this.accounts.session(token);
     const s = await this.state(actor.accountId);
     return { accountId: actor.accountId, role: s.role, stage: s.stage, revision: s.revision,
+      reviewNote: s.stage==="changes_requested" ? s.last_review_note : null,
       requiresProfile: s.stage === "profile_required" || s.stage === "changes_requested" };
   }
   private async reviewer(authority: Authority, role: string, targetId: string) {
