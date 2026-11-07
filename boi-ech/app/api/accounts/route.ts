@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       expiresAt: config.v2 && !account.deviceApproved ? null : account.expiresAt,
       deviceId: account.deviceId, deviceApproved: account.deviceApproved,
       onboardingStage: onboarding?.stage ?? null, onboardingRevision: onboarding?.revision ?? null,
+      onboardingNote: onboarding?.reviewNote ?? null,
       canReadRegistrants }, devices: await service.devices(token) });
   } catch (error) { return accountErrorResponse(error); }
 }
