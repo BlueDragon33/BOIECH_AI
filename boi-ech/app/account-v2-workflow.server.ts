@@ -48,11 +48,12 @@ export class AccountV2Workflow {
     if (target.stage !== "requested" || target.status !== "pending" || !Number.isInteger(revision)
       || revision !== target.revision) bad("ACCOUNT_CAS_CONFLICT", 409);
     const reviewer = await this.reviewer(authority, target.role, targetId);
+    const expected=revision as number;
     const statements: D1PreparedStatement[] = [
       this.db.prepare(`UPDATE account_onboarding SET stage='profile_required',revision=revision+1,
         first_review_by=?,first_review_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
         WHERE account_id=? AND revision=? AND stage='requested' AND ${reviewer.guard}`)
-        .bind(reviewer.id, targetId, revision, ...reviewer.values),
+        .bind(reviewer.id, targetId, expected, ...reviewer.values),
       this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
         SELECT ?,'account.review.first',?,'onboarding only; no access grant' WHERE changes()=1`)
         .bind(reviewer.id, targetId),
@@ -95,12 +96,13 @@ export class AccountV2Workflow {
     const target=await this.state(targetId);
     if(target.stage!=="profile_review"||!Number.isInteger(revision)||revision!==target.revision) bad("ACCOUNT_CAS_CONFLICT",409);
     const reviewer=await this.reviewer(authority,target.role,targetId);
+    const expected=revision as number;
     if(authority.kind==="manager" && target.first_review_by!==reviewer.id) bad("ACCOUNT_SCOPE_FORBIDDEN",403);
     const note=field(reason,200);
     const res=await this.db.batch([
       this.db.prepare(`UPDATE account_onboarding SET stage='changes_requested',revision=revision+1,
         last_review_note=?,updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='profile_review'
-        AND revision=? AND ${reviewer.guard}`).bind(note,targetId,revision,...reviewer.values),
+        AND revision=? AND ${reviewer.guard}`).bind(note,targetId,expected,...reviewer.values),
       this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
         SELECT ?,'account.review.changes',?,? WHERE changes()=1`).bind(reviewer.id,targetId,note),
     ]);
