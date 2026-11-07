@@ -368,6 +368,31 @@ export class AccountService {
     }
     return {ok:true,deviceId:target,recoveryCode:nextCode};
   }
+  async approveRecoveredDevice(input: Record<string,unknown>,peer:string) {
+    const row=await this.verifyRecoveryDeviceProof(input,peer);
+    const target=input.deviceId;
+    if(typeof target!=="string"||!TOKEN.test(target))fail("DEVICE_KEY_INVALID",400);
+    // A pending, non-revoked key is already counted in the 3-device SQL guard.
+    // Offline recovery requires both password AND the current one-use recovery code.
+    const nextCode=random();
+    try {
+      const result=await this.db.batch([
+        this.db.prepare(`UPDATE account_devices SET approved=1 WHERE account_id=? AND device_id=?
+          AND revoked=0 AND approved=0`).bind(row.account_id,target),
+        this.db.prepare(`UPDATE account_credentials SET recovery_hash=?,updated_at=CURRENT_TIMESTAMP
+          WHERE account_id=? AND recovery_hash=? AND changes()=1`)
+          .bind(digest(nextCode),row.account_id,row.recovery_hash),
+        this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+          VALUES(?,'account.device.recovered-approved',?,CASE WHEN changes()=1 THEN 'one-use proof + password' ELSE NULL END)`)
+          .bind(row.account_id,target),
+      ]);
+      if(Number(result[0].meta.changes)!==1||Number(result[1].meta.changes)!==1)fail("DEVICE_RECOVERY_CONFLICT",409);
+    }catch(error){
+      if(error instanceof Error && /NOT NULL.*purpose|constraint/i.test(error.message))fail("DEVICE_RECOVERY_CONFLICT",409);
+      throw error;
+    }
+    return {ok:true,deviceId:target,recoveryCode:nextCode};
+  }
   async capability(actor: Principal, scope: string) {
     // Read owning rows freshly, not a role or a client-provided capability claim.
     const row = await this.db.prepare(`SELECT 1 AS allowed FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
