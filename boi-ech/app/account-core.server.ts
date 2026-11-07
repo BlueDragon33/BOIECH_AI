@@ -57,7 +57,7 @@ type Row = { account_id: string; storage_device_id: string; login: string | null
   phone: string; payment_status: string; access_group: string; access_expires_at: string | null; management_enabled: number };
 export type AccountView = { accountId: string; storageDeviceId: string; login: string | null; revision: number;
   status: string; role: string; name: string; personCode: string; className: string; expiresAt: string | null };
-export type Principal = AccountView & { deviceId: string; sessionHash: string; generation: number; absoluteExpiry: number };
+export type Principal = AccountView & { deviceId: string; sessionHash: string; generation: number; absoluteExpiry: number; deviceApproved: boolean };
 const COLUMNS = `a.account_id,a.storage_device_id,a.login,a.revision,d.status,d.person_role,d.person_code,
  d.learner_name,d.class_name,d.phone,d.payment_status,d.access_group,d.access_expires_at,d.management_enabled`;
 function view(row: Row): AccountView {
@@ -66,7 +66,7 @@ function view(row: Row): AccountView {
     className: row.class_name, expiresAt: row.access_expires_at };
 }
 export class AccountService {
-  constructor(private db: D1Database, private now: () => number = Date.now) {}
+  constructor(private db: D1Database, private now: () => number = Date.now, private v2Enabled = false) {}
   private audit(actor: string, action: string, target: string, purpose: string, conditional = false) {
     return this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,?${conditional ? " WHERE changes()=1" : ""}`)
       .bind(actor, action, target, purpose);
@@ -119,8 +119,16 @@ export class AccountService {
     if (!credential || (expectedGeneration !== undefined && credential.generation !== expectedGeneration)) fail("AUTH_FAILED", 401);
     const existing = await this.db.prepare("SELECT revoked FROM account_devices WHERE account_id=? AND device_id=?").bind(accountId, deviceId).first<{ revoked: number }>();
     if (existing?.revoked) fail("DEVICE_REVOKED", 403);
-    const statements = [this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk) VALUES(?,?,?)
-      ON CONFLICT(account_id,device_id) DO NOTHING`).bind(accountId, deviceId, publicKeyJson(publicKey))];
+    // A new key is pending owner confirmation; only the first key of an entirely new account
+    // is trusted at signup. Existence is evaluated inside the D1 write transaction.
+    const deviceInsert = this.v2Enabled
+      ? this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved)
+          SELECT ?,?,?,CASE WHEN NOT EXISTS(SELECT 1 FROM account_devices WHERE account_id=?) THEN 1 ELSE 0 END
+          WHERE 1 ON CONFLICT(account_id,device_id) DO NOTHING`)
+          .bind(accountId, deviceId, publicKeyJson(publicKey), accountId)
+      : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk) VALUES(?,?,?)
+          ON CONFLICT(account_id,device_id) DO NOTHING`).bind(accountId, deviceId, publicKeyJson(publicKey));
+    const statements = [deviceInsert];
     statements.push(this.db.prepare(`INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at)
       SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM account_credentials WHERE account_id=? AND generation=?)
        AND EXISTS(SELECT 1 FROM account_devices WHERE account_id=? AND device_id=? AND revoked=0)`)
@@ -139,6 +147,7 @@ export class AccountService {
     const login = loginName(input.login);
     await this.throttle(login, peer, "register", 5);
     if (input.privacyAccepted !== true || !["learner", "manager", "teacher"].includes(String(input.role))) fail("ACCOUNT_INPUT", 400);
+    if (this.v2Enabled) return this.registerV2(input, login);
     const role = String(input.role), code = bounded(input.personCode, 32).toUpperCase();
     const rawPhone = bounded(input.phone, 32).replace(/[ ()-]/g, "");
     const phone = rawPhone.startsWith("+84") ? "0" + rawPhone.slice(3) : rawPhone;
@@ -169,6 +178,31 @@ export class AccountService {
     if (issued.deviceId !== keyId) fail("DEVICE_KEY_INVALID", 400);
     return { ...issued, recoveryCode };
   }
+  private async registerV2(input: Record<string, unknown>, login: string) {
+    const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
+    const verifier = await hashPassword(input.password), accountId = "acc_" + random();
+    const storageId = random(), recoveryCode = random();
+    try {
+      await this.db.batch([
+        this.db.prepare(`INSERT INTO device_access(device_id,display_code,public_key_jwk,status,
+          person_role,registration_submitted_at,management_enabled)
+          VALUES(?,?,?,'pending',?,CURRENT_TIMESTAMP,0)`)
+          .bind(storageId, "BE-"+storageId.slice(0,16).toUpperCase(), publicKeyJson(input.publicKey), role),
+        this.db.prepare("INSERT INTO device_profiles(device_id) VALUES(?)").bind(storageId),
+        this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
+        this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
+          .bind(accountId,verifier,digest(recoveryCode)),
+        this.audit(accountId, "registration.requested.v2", accountId, "profile only after first review"),
+      ]);
+    } catch(error) {
+      if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED",409);
+      if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
+      throw error;
+    }
+    const issued=await this.issue(accountId,input.publicKey);
+    if(issued.deviceId!==keyId) fail("DEVICE_KEY_INVALID",400);
+    return { ...issued, recoveryCode };
+  }
   async login(input: Record<string, unknown>, peer: string) {
     const login = loginName(input.login);
     await this.throttle(login, peer, "login");
@@ -187,18 +221,25 @@ export class AccountService {
   async session(token: string): Promise<Principal> {
     if (!TOKEN.test(token)) fail("SESSION_REQUIRED", 401);
     const now = this.now();
-    const row = await this.db.prepare(`SELECT ${COLUMNS},s.device_id,s.generation,s.expires_at FROM account_sessions s
+    const row = await this.db.prepare(`SELECT ${COLUMNS},s.device_id,s.generation,s.expires_at${this.v2Enabled ? ",b.approved AS device_approved" : ""} FROM account_sessions s
       JOIN accounts a ON a.account_id=s.account_id JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
       JOIN account_credentials c ON c.account_id=s.account_id AND c.generation=s.generation
       WHERE s.token_hash=? AND s.revoked=0 AND b.revoked=0 AND s.expires_at>? AND s.idle_expires_at>?`)
-      .bind(digest(token), now, now).first<Row & { device_id: string; generation: number; expires_at: number }>();
+      .bind(digest(token), now, now).first<Row & { device_id: string; generation: number; expires_at: number; device_approved?: number }>();
     if (!row) fail("SESSION_INVALID", 401);
-    return { ...view(row), deviceId: row.device_id, sessionHash: digest(token), generation: row.generation, absoluteExpiry: row.expires_at };
+    return { ...view(row), deviceId: row.device_id, sessionHash: digest(token), generation: row.generation,
+      absoluteExpiry: row.expires_at, deviceApproved: !this.v2Enabled || row.device_approved === 1 };
   }
   async authorize(token: string, protectedModule = true) {
     const actor = await this.session(token);
     if (protectedModule) {
+      if (this.v2Enabled) {
+        if (!actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
+        const stage = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?")
+          .bind(actor.accountId).first<{stage:string}>();
+        if (stage?.stage !== "active") fail(stage ? "ACCOUNT_ONBOARDING_REQUIRED" : "ACCOUNT_ONBOARDING_MISSING");
+      }
       if (actor.status !== "approved") fail(actor.status === "blocked" ? "ACCOUNT_BLOCKED" : "ACCOUNT_PENDING");
       if (actor.expiresAt && !(Date.parse(actor.expiresAt) > this.now())) fail("ACCOUNT_EXPIRED");
     }
@@ -223,6 +264,7 @@ export class AccountService {
   }
   async revokeDevice(token: string, deviceId: unknown) {
     const actor = await this.session(token);
+    if (this.v2Enabled && !actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
     if (typeof deviceId !== "string" || !TOKEN.test(deviceId)) fail("DEVICE_KEY_INVALID", 400);
     const result = await this.db.batch([
       this.db.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=? AND device_id=? AND revoked=0").bind(actor.accountId, deviceId),
@@ -233,8 +275,33 @@ export class AccountService {
   }
   async devices(token: string) {
     const actor = await this.session(token);
-    return (await this.db.prepare("SELECT device_id,revoked,created_at FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100")
-      .bind(actor.accountId).all()).results;
+    if (this.v2Enabled && !actor.deviceApproved) return [{ device_id: actor.deviceId, approved: 0, revoked: 0 }];
+    const query = this.v2Enabled
+      ? "SELECT device_id,revoked,approved,created_at FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100"
+      : "SELECT device_id,revoked,created_at FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100";
+    return (await this.db.prepare(query).bind(actor.accountId).all()).results;
+  }
+  async approveDevice(token: string, targetId: unknown, password: unknown, peer: string) {
+    if (!this.v2Enabled) fail("ACCOUNT_FEATURE_DISABLED",404);
+    const actor = await this.session(token);
+    if (!actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
+    if (typeof targetId !== "string" || !TOKEN.test(targetId)) fail("DEVICE_KEY_INVALID",400);
+    await this.throttle(actor.accountId,peer,"device-approval");
+    const credential = await this.db.prepare("SELECT password_verifier FROM account_credentials WHERE account_id=?")
+      .bind(actor.accountId).first<{password_verifier:string}>();
+    if (!credential || !await verifyPassword(password,credential.password_verifier)) fail("AUTH_FAILED",401);
+    const statements = [
+      this.db.prepare(`UPDATE account_devices SET approved=1 WHERE account_id=? AND device_id=?
+        AND revoked=0 AND approved=0 AND EXISTS(
+          SELECT 1 FROM account_devices WHERE account_id=? AND device_id=? AND approved=1 AND revoked=0)`)
+        .bind(actor.accountId,targetId,actor.accountId,actor.deviceId),
+      this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+        SELECT ?,'account.device.approved',?,'confirmed trusted device' WHERE changes()=1`)
+        .bind(actor.accountId,targetId),
+    ];
+    const result=await this.db.batch(statements);
+    if(Number(result[0].meta.changes)!==1) fail("DEVICE_APPROVAL_CONFLICT",409);
+    return {deviceId:targetId,approved:true};
   }
   async recover(input: Record<string, unknown>, peer: string) {
     const login = loginName(input.login);
@@ -277,6 +344,10 @@ export class AccountService {
     const expiry = input.expiresAt === undefined || input.expiresAt === null ? null : input.expiresAt;
     if (expiry !== null && (typeof expiry !== "number" || !Number.isSafeInteger(expiry) || expiry <= this.now() || expiry > this.now() + 366 * 86400000)) fail("ACCOUNT_INPUT", 400);
     if (op === "approve-manager" ? (row.status !== "pending" || row.payment_status !== "unassigned" || row.access_group !== "unassigned") : enabled && (row.status !== "approved" || (row.access_expires_at && !(Date.parse(row.access_expires_at) > this.now())))) fail("ACCOUNT_STATE_CONFLICT", 409);
+    if (this.v2Enabled && op === "approve-manager") {
+      const step = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").bind(id).first<{stage:string}>();
+      if (step?.stage !== "profile_review") fail("ACCOUNT_ONBOARDING_REQUIRED",409);
+    }
     const accessExpiry=op==="approve-manager"?await this.approvalExpiry():null;
     const scopes = op === "read-all" ? ["registrants.read.all"] : ["manager.approve.registration", "manager.manage.assigned"];
     const statements: D1PreparedStatement[] = [this.db.prepare("UPDATE accounts SET revision=revision+1 WHERE account_id=? AND revision=?")
@@ -288,6 +359,9 @@ export class AccountService {
       approved_at=CURRENT_TIMESTAMP,blocked_at=NULL,access_group='free',payment_status='free_approved',
       access_expires_at=CASE WHEN access_expires_at IS NULL OR datetime(access_expires_at)<=CURRENT_TIMESTAMP THEN ? ELSE access_expires_at END,updated_at=CURRENT_TIMESTAMP
       WHERE device_id=? AND status='pending' AND payment_status='unassigned' AND access_group='unassigned'`).bind(accessExpiry,row.storage_device_id));
+    if (op === "approve-manager" && this.v2Enabled) statements.push(this.db.prepare(`UPDATE account_onboarding
+      SET stage='active',revision=revision+1,second_review_by=?,second_review_at=CURRENT_TIMESTAMP,
+      updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='profile_review' AND changes()=1`).bind(owner.actor,id));
     if (op === "approve-manager") statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,'owner.manager-approval',?,CASE WHEN changes()=1 THEN 'pending unassigned account' ELSE NULL END`).bind(owner.actor,id));
     if (op === "management") statements.push(this.db.prepare("UPDATE device_access SET management_enabled=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=?")
       .bind(enabled ? 1 : 0, row.storage_device_id));
@@ -328,6 +402,11 @@ export class AccountService {
     const target = await this.row(targetId);
     if (!["learner", "teacher"].includes(target.person_role) || actor.accountId === targetId) fail("TARGET_ROLE_FORBIDDEN");
     if (!["approve", "block"].includes(action)) fail("ACCOUNT_INPUT", 400);
+    if (this.v2Enabled && action === "approve") {
+      const step=await this.db.prepare("SELECT stage,first_review_by FROM account_onboarding WHERE account_id=?")
+        .bind(targetId).first<{stage:string;first_review_by:string|null}>();
+      if(step?.stage!=="profile_review" || step.first_review_by!==actor.accountId) fail("ACCOUNT_ONBOARDING_REQUIRED",409);
+    }
     const guard = `EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id WHERE a.account_id=? AND d.person_role='manager'
       AND d.status='approved' AND d.management_enabled=1 AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
@@ -345,6 +424,10 @@ export class AccountService {
       WHERE device_id=? AND status='approved' AND EXISTS(SELECT 1 FROM manager_device_assignments WHERE target_device_id=? AND manager_device_id=?) AND ${guard}`)
       .bind(target.storage_device_id, target.storage_device_id, actor.storageDeviceId, actor.accountId, this.now()));
     // A failed conditional write must roll back preceding assignment and produce no success audit.
+    if (this.v2Enabled && action === "approve") statements.push(this.db.prepare(`UPDATE account_onboarding
+      SET stage='active',revision=revision+1,second_review_by=?,second_review_at=CURRENT_TIMESTAMP,
+      updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='profile_review' AND first_review_by=?
+      AND changes()=1`).bind(actor.accountId,targetId,actor.accountId));
     statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,CASE WHEN changes()=1 THEN ? ELSE NULL END`)
       .bind(actor.accountId, "registration." + action, targetId, "manager registration review"));
     try { await this.db.batch(statements); } catch (error) {
