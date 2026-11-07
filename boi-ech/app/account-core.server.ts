@@ -127,7 +127,11 @@ export class AccountService {
       .bind(digest(token), accountId, deviceId, credential.generation, now + SESSION_MS, now + IDLE_MS,
         accountId, credential.generation, accountId, deviceId));
     statements.push(this.audit(accountId, "session.created", deviceId, "authenticated login", true));
-    const result = await this.db.batch(statements);
+    const result = await this.db.batch(statements).catch(error => {
+      // D1 quota triggers are the final authority; the earlier read is only UX.
+      if (error instanceof Error && error.message.includes("ACCOUNT_DEVICE_LIMIT_REACHED")) fail("DEVICE_LIMIT_REACHED", 409);
+      throw error;
+    });
     if (Number(result[1].meta.changes) !== 1) fail("SESSION_CONFLICT", 409);
     return { token, deviceId, account: view(await this.row(accountId)) };
   }
@@ -155,6 +159,9 @@ export class AccountService {
         this.audit(accountId, "registration.submitted", accountId, "visible registration privacy notice accepted"),
       ]);
     } catch (error) {
+      // Distinguish a full account roster from a duplicate identity without exposing others' data.
+      if (error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED", 409);
+      if (error instanceof Error && error.message.includes("ACCOUNT_ROLE_OR_POLICY_MISSING")) fail("ACCOUNT_POLICY_UNAVAILABLE", 503);
       if (error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE", 409);
       throw error;
     }
