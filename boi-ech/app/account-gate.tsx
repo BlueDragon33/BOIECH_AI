@@ -10,19 +10,21 @@ type Account = { accountId: string; status: string; role: string; name: string; 
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
   canReadRegistrants?: boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
-type Mode = "login" | "register" | "claim" | "recover";
+type Mode = "login" | "register" | "claim" | "recover" | "devices";
 async function send(body: Record<string, unknown>) {
   const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Chưa xác minh được thao tác tài khoản.");
-  return data as { recoveryCode?: string; accountId?: string; account?: Account };
+  return data as { recoveryCode?: string; accountId?: string; account?: Account;
+    devices?:Array<{device_id:string;approved:number;created_at:string}> };
 }
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   const bypass = pathname === "/xem-thu-can-bo-quan-ly" || pathname.startsWith("/quan-ly-thiet-bi") || pathname.startsWith("/bien-tap-");
   const [account, setAccount] = useState<Account | null>(null), [devices, setDevices] = useState<Device[]>([]);
   const [v2,setV2]=useState(false);
+  const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
@@ -72,7 +74,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     const password = fields.password; const field = form.elements.namedItem("password") as HTMLInputElement | null;
     if (field) field.value = "";
     await run(async () => {
-      const key = mode === "recover" ? {} : await portableCredential(mode === "claim");
+      const key = mode === "recover" || mode==="devices" ? {} : await portableCredential(mode === "claim");
+      if(mode==="devices"){
+        const action=recoveryDevices.length?"recover-lost-device":"recovery-devices";
+        const result=await send({...fields,password,action});
+        if(action==="recovery-devices"){setRecoveryDevices(result.devices??[]);
+          setNotice("Đã xác minh bằng mật khẩu và mã khôi phục. Chọn một thiết bị để thu hồi.");}
+        else{setRecoveryDevices([]);setRecovery(result.recoveryCode??"");setMode("login");
+          setNotice("Đã thu hồi thiết bị và đổi mã khôi phục. Hãy lưu mã mới rồi đăng nhập lại.");}
+        return;
+      }
       const result = await send({ ...fields, password, ...key, action: mode, role, privacyAccepted: fields.privacyAccepted === "on" });
       if (result.recoveryCode) { recoveryOwner.current = result.account?.accountId ?? result.accountId ?? ""; setRecovery(result.recoveryCode); }
       if (mode === "recover") { setMode("login"); setNotice("Đã đổi mật khẩu và thu hồi các phiên cũ. Hãy lưu mã khôi phục mới."); }
@@ -133,16 +144,21 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             onClick={()=>void run(async()=>{await send({action:"revoke-device",deviceId:d.device_id});await reload();broadcast();})}>Thu hồi thiết bị này</button>:null}
         </div>)}</details>
       </> : <>
-        <div className={styles.actions}>{([["login", "Đăng nhập"], ["register", "Đăng ký một lần"], ["claim", "Chuyển hồ sơ cũ"], ["recover", "Quên mật khẩu"]] as [Mode, string][]).map(([id, label]) => <button type="button" key={id} aria-pressed={mode === id} disabled={busy} onClick={() => setMode(id)}>{label}</button>)}</div>
+        <div className={styles.actions}>{([["login", "Đăng nhập"], ["register", "Đăng ký một lần"], ["claim", "Chuyển hồ sơ cũ"], ["recover", "Quên mật khẩu"],
+  ...(v2?[["devices","Gỡ máy cũ khi đủ 3 thiết bị"] as [Mode,string]]:[])] as [Mode,string][]).map(([id, label]) => <button type="button" key={id} aria-pressed={mode === id} disabled={busy} onClick={() => {setMode(id);setRecoveryDevices([]);}}>{label}</button>)}</div>
         <form onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
           <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy}/></label>
-          <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login" ? 1 : 15} maxLength={1024} autoComplete={mode === "login" ? "current-password" : "new-password"} disabled={busy}/></label>
-          {mode === "recover" && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login"||mode==="devices" ? 1 : 15} maxLength={1024} autoComplete={mode === "login"||mode==="devices" ? "current-password" : "new-password"} disabled={busy}/></label>
+          {(mode === "recover" || mode==="devices") && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
+            <select name="deviceId" required disabled={busy}>
+              {recoveryDevices.map(d=><option key={d.device_id} value={d.device_id}>{d.device_id.slice(0,16)} · {d.created_at}</option>)}
+            </select></label>:null}
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
           {mode === "register" && <><RegistrationRoles value={role} onChange={setRole}/>{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["personCode", "Mã học viên / cán bộ / giảng viên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt lần một, bạn sẽ hoàn thiện hồ sơ cá nhân để duyệt lần hai.</p>}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
-          <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</button>
+          <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
         </form>
       </>}
     </section>
