@@ -9,6 +9,7 @@ import { portableCredential, preparePortableAccount } from "./multi-account-swit
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
+  onboardingNote?: string|null;
   canReadRegistrants?: boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
@@ -122,6 +123,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             : "Chưa đủ điều kiện truy cập."
             : account.status === "pending" ? "Chờ duyệt tài khoản. Bạn chỉ cần đăng ký một lần; trạng thái sẽ dùng chung trên mọi thiết bị."
             : "Tài khoản đã bị khóa hoặc hết hạn. Liên hệ cán bộ có thẩm quyền."}</p>}
+        {v2 && account.onboardingStage==="changes_requested" && account.onboardingNote ? <p role="status">
+          Yêu cầu bổ sung của người xét duyệt: {account.onboardingNote}</p>:null}
         {v2 && account.deviceApproved!==false && ["profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
           onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
           <h2>Hoàn thiện hồ sơ cá nhân — Bước 2</h2>
