@@ -1,36 +1,27 @@
-# BOIECH AI — Issue #108, source checkpoint (2026-11-07)
+# Account-first V2 Issue #108 — updated source-only checkpoint
 
-Status: **PARTIAL IMPLEMENTATION / NOT ACCEPTED / FLAG OFF / NO PRODUCTION CHANGE**.
+**2026-11-07. SOURCE-ONLY / NOT ACCEPTED / WORK HANDOFF PREPARED.** This file supersedes earlier initial-capacity-only observations but does not imply new runtime QA evidence.
 
-## Scope completed in this branch
+## Current implemented source
 
-Base: `candidate/account-first-p0-20261104` at `8c2b4710cb4c2802affe7d433ab0450d030a944a`. This branch is intentionally NOT rebased onto `main` or PR #107.
+- Account-first V2 only activates when BOTH `BOI_ECH_ACCOUNT_FIRST` and `BOI_ECH_ACCOUNT_V2` are set to `true`. Production retains them OFF until approved.
+- Registration/authorization: 5–10–200 role quota; 3 unique active device keys; requested → first review → profile → second review → active; separate manager and Owner authority, pending devices cannot access protected modules. API includes signed owner/manager first-review, profile correction and trusted-device confirmation.
+- Device self-service: current trusted device can approve/revoke; separate limited lost-device recovery and one-use recovery-code rotation for unavailable original devices. **Proof of private-key possession for the new device must still be independently reviewed**.
+- Sync: explicit per-device and per-scope consent, allowlisted progress/preferences payloads, revision CAS, event retry ACK, race guard and account-bound HTTP request; per-account local IndexedDB queue retains un-ACKed events and 409 conflicts; no media/video/credential auto sync. **Existing learning-progress write/read clients not yet migrated to the new verified-sync queue**; a full bridge is a release blocker.
+- Legacy: previous route for manager/device single-stage approval blocked in V2; older admin/teacher approval guards remain. Must still inspect ALL legacy signed endpoints for alternate rights/data paths.
+- Migrations: additive 0019 account caps, 0020 staged review/device consent, 0021 restricted sync and 0022 conditional 50/5→200/10 default shared approvals. Existing accounts remain `legacy_hold` and need explicit reconciliation; no data is dropped automatically. Real migration path/journal must be reviewed.
+- UI: minimal registration then profile, manager two-stage approval, device confirmation + recovery, sync consent and pending/conflict status.
 
-1. Additive `drizzle/0019_account_capacity.sql` policy 5 manager / 10 teacher / 200 learner. Atomic trigger blocks account registration overflow per role and prevents reassignment circumventing the cap. All existing canonical accounts (including historical/legacy) occupy the quota. Null-login historical backfills remain permitted to avoid destructive data loss when old count exceeds the cap. NO legacy person/course/certificate data is changed.
-2. D1 account-device triggers enforce 3 non-revoked device keys per canonical account, including reactivation; repeat login with existing key remains possible at 3/3.
-3. `account-core.server.ts` maps capacity and device D1 constraint errors to explicit 409 account codes; localized messages in `account-runtime.server.ts`.
-4. `account-capacity.server.ts`: owning-app account limit read/count and signed Owner-only mutation with expectedRevision CAS, audit and independent readback. `api/control/accounts` exposes `capacity`/`set-capacity` only through the existing Control service boundary. NO App-Management GUI update is claimed.
+## Tests/evidence honestly checked
 
-## Verification actually run
+- Existing locally executed SQLite source tests: 6/6 PASS for capacity/3-device/CAS/audit.
+- Additional **schema-equivalent** local Node 22 SQLite harness: 3/3 PASS for onboarding stage guards, sync event guard on unapproved/revoked device, and default manager 200/10 conditional migration. **Not live D1, not full end-to-end tests.**
+- New `tests/account-v2-onboarding-sync.test.mjs` is source checked in but **not executed** in this chat. Entire `npm test`, typecheck, lint, build, Workers Free CPU, browser/Preview/legacy snapshot, role replay, cost, independent reviewer and Production acceptance NOT RUN.
+- No GitHub-hosted Actions, merge, Draft PR, release, Cloudflare D1 changes, Production mutation or paid services in this task.
+- Source branch is **not declared 90–95% complete**: percent cannot be substantiated without integrated QA/Preview and live old-data migration.
 
-- Local Node 22 + SQLite, isolated synthetic fixtures:
-  - `account-v2-capacity.test.mjs`: 5/5 PASS (last-slot overflow, existing key retry vs 4th key, revoked reactivation, role-change guard, under-limit config, legacy >200 backfill).
-  - `account-v2-capacity-service.test.mjs`: 1/1 PASS (Owner read, role authorization failure, CAS stale write refusal, audit, readback).
-  - Combined: 6/6 PASS, 0 failed.
-- Tests were executed on source-equivalent local fixtures. Complete repository checkout, `npm test`, actual D1 multi-writer, complete TypeScript/build/lint, physical browser QA and independent review **NOT RUN**. GitHub-hosted Actions **NOT DISPATCHED**.
-- No merge, PR, Production, Cloudflare credentials, D1 write, live account grant or paid resource used in this task.
-- Migrations must be applied and tested in an approved isolated environment; source code presence is not a deployed policy.
+## Task owner Work
 
-## Remaining P0 release blockers
+[Work mode handoff with exact steps, blockers and release gates](../../handoffs/BOIECH_ACCOUNT_FIRST_V2_WORK_HANDOFF_20261107.md)
 
-- Account-first P0 has its own unresolved review/real-browser/target-runtime/legacy-snapshot gates. Feature flag `BOI_ECH_ACCOUNT_FIRST` must stay OFF.
-- **Two-stage approval** is NOT implemented; existing new-account registration still collects a full profile at first registration and current review remains one-stage. Must implement first review -> profile entry -> second review for manager and learner/teacher in BOTH Bơi and Central UI. No skip from request to ACTIVE.
-- 3-device denial has clear errors but **4th-device restricted recovery**, confirmation of device link, step-up, real mobile UI and legacy accounts with >3 existing keys remain pending. Do not auto revoke in migration.
-- Verified sync consent, per-account server revision/idempotent ACK, conflict resolution, no data loss on account-switch, offline video privacy and revocation must be implemented/tested. Current isolated IndexedDB stores are NOT a confirmed-sync solution.
-- Old manager-tier shared admission policy 50 learners / 5 teachers still needs controlled migration to support **200/10**. DO NOT silently mutate existing legacy limits or assert 200/10 active admissions.
-- Owner capacity settings GUI in `Application-Management` and independently verified MFA are not connected; backend path alone is not approval.
-- Cloudflare Workers Free CPU/KDF benchmark, D1 read/write and storage quota, 2 simultaneous last-slot operations and real authorized snapshot, Preview HTTPS/rollback + independent security acceptance must PASS.
-- Course lifecycle and certificate should be a **separate follow-up PR after Issue #108 passes**, with account-linked enrollment and manager-approved issuing; legacy verification codes must remain valid.
-- Existing Cloudflare Worker URL/slug, schema rights, production data and FREE-only spend policy remain unchanged.
-
-**Next action:** implement and locally test dual-approval state machine + fourth-device recovery before adding consented sync. Reconcile Central owner management UI, then isolated Cloudflare Preview QA. Do not begin course/certificate PR or Production publish until Issue #108 acceptance gates pass.
+**ONE NEXT ACTION:** In authorized Work environment, check out exact branch HEAD and execute offline full QA + security and sync bridge integration; correct failures before isolated Cloudflare FREE Preview. If Preview/Owner permissions unavailable, preserve flags OFF and Production untouched, report the blocker and single follow-up.
