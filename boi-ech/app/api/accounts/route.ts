@@ -33,6 +33,8 @@ export async function POST(request: Request) {
     // Peer identity is supplied by the trusted edge; never accept an arbitrary payload identity.
     const peer = request.headers.get("cf-connecting-ip") ?? "unavailable-edge-peer";
     if (p.action === "legacy-challenge") return json(await createDeviceChallenge(p.deviceId, true));
+    if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
+    if (config.v2 && p.action === "recover-lost-device") return json(await service.recoverLostDevice(p,peer));
     if (p.action === "register" || p.action === "login" || p.action === "claim") {
       let legacyId: string | null = null;
       if (p.action === "claim") {
