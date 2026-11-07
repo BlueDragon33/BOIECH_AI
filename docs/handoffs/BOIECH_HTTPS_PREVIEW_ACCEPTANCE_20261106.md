@@ -16,6 +16,8 @@ Scope: repair the two existing Preview workflow guards; establish a genuinely is
 
 ## Latest connection checkpoint
 
+**Superseded on 2026-11-07:** the approved Preview-only 30-day credential is now created and actual Cloudflare readback is token/Preview **200**, Production **403**. App-Management candidate `b2e36758d8dab5c953e71b3aa1f36490b55d770f` adds the requested UI. Website publication is still blocked by the new publication/lifecycle credential approvals and Bơi D1/R2 readiness. Continue from `docs/handoffs/BOIECH_UI_PUBLISH_CONNECTION_20261107.md`; the following text records the previous checkpoint.
+
 The Owner then requested configuration of the actual Cloudflare connection. The signed-in browser is now connected and a separate `boi-ech-preview` Worker exists with Hello World bootstrap only. A one-day Worker-only Editor token is prepared on its final review screen, awaiting direct confirmation before creating new write access. The app is not deployed: isolated D1 creation hit the 10/10 database quota, and R2 activation requires a usage-billed subscription outside the current ZERO-SPEND scope. Production manager approval does not establish a Preview session. See `docs/evidence/premium-manager-20261106/CLOUDFLARE_CONNECTION_20261106.md` for current evidence; the environment observations below describe the earlier checkpoint.
 
 ## Environment observations

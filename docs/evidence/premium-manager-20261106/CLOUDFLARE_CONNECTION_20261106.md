@@ -1,5 +1,7 @@
 # Cloudflare connection checkpoint — 2026-11-06
 
+Historical checkpoint: superseded by `docs/handoffs/BOIECH_UI_PUBLISH_CONNECTION_20261107.md`. The approved Preview-only token is now created and verified; the website is still not deployed.
+
 **Status: PARTIAL / BLOCKED. The signed-in Cloudflare dashboard is connected; the executor does not yet hold a deployment credential. No candidate HTTPS or authenticated manager acceptance is claimed.**
 
 ## Source and checks
