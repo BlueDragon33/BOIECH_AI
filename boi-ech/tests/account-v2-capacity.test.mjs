@@ -57,3 +57,17 @@ test('configured limit may decrease below existing count but blocks new admissio
   assert.equal(db.prepare("SELECT COUNT(*) AS used FROM accounts").get().used,4);
  }finally{db.close();}
 });
+
+test('legacy mapping remains lossless if historic people already exceed new cap',()=>{
+ const db=fixture();try{
+  for(let n=0;n<201;n++){
+   const id=`old-${n}`;
+   db.prepare("INSERT INTO device_access(device_id,person_role) VALUES (?,'learner')").run(id);
+   db.prepare('INSERT INTO accounts(account_id,storage_device_id,login) VALUES (?,?,NULL)').run(id,id);
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM accounts").get().n,201);
+  db.prepare("INSERT INTO device_access(device_id,person_role) VALUES ('new-201','learner')").run();
+  assert.throws(()=>db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES ('new-201','new-201','newlogin')").run(),/ACCOUNT_CAPACITY_REACHED/);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM accounts").get().n,201);
+ }finally{db.close();}
+});
