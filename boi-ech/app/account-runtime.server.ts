@@ -12,6 +12,7 @@ export async function accountConfiguration() {
     values = process.env;
   }
   const enabled = values.BOI_ECH_ACCOUNT_FIRST === "true";
+  const v2 = enabled && values.BOI_ECH_ACCOUNT_V2 === "true";
   const origin = typeof values.BOI_ECH_ACCOUNT_ORIGIN === "string" ? values.BOI_ECH_ACCOUNT_ORIGIN : "";
   if (enabled) {
     let valid = false;
@@ -19,7 +20,7 @@ export async function accountConfiguration() {
       (values.LOCAL_CONTROL_PLANE === "true" && ["localhost", "127.0.0.1"].includes(u.hostname))); } catch { /* fail closed */ }
     if (!valid) throw new AccountError("ACCOUNT_ORIGIN_UNCONFIGURED", 503);
   }
-  return { enabled, origin };
+  return { enabled, origin, v2 };
 }
 export function sameOrigin(origin: string | null, expected: string, contentType: string | null, requireJson = true) {
   if (!origin || origin !== expected || (requireJson && !contentType?.toLowerCase().startsWith("application/json"))) throw new AccountError("ACCOUNT_CSRF_REJECTED", 403);
@@ -27,7 +28,7 @@ export function sameOrigin(origin: string | null, expected: string, contentType:
 export async function accountService() {
   const config = await accountConfiguration();
   if (!config.enabled) throw new AccountError("ACCOUNT_FEATURE_DISABLED", 404);
-  return new AccountService(await getCourseDatabase());
+  return new AccountService(await getCourseDatabase(), Date.now, config.v2);
 }
 export async function accountCookieToken() { return (await cookies()).get(ACCOUNT_COOKIE)?.value ?? ""; }
 export function sessionCookie(token: string) {
@@ -40,7 +41,7 @@ export async function resolveAccountDevice(claimedDeviceId?: unknown) {
   const incoming = await headers();
   sameOrigin(incoming.get("origin"), config.origin, incoming.get("content-type"), false);
   const service = await accountService(), token = await accountCookieToken();
-  const actor = await service.session(token);
+  const actor = config.v2 ? await service.authorize(token) : await service.session(token);
   if (claimedDeviceId && claimedDeviceId !== actor.storageDeviceId) throw new AccountError("ACCOUNT_SWITCHED", 409);
   const state = await getPublicDeviceState(actor.storageDeviceId);
   if (!state) throw new AccountError("ACCOUNT_NOT_FOUND", 404);
@@ -63,7 +64,14 @@ export function accountErrorResponse(error: unknown) {
     REGISTRATION_UNAVAILABLE: "Không thể tạo hồ sơ này. Nếu đã đăng ký, hãy đăng nhập hoặc dùng khôi phục.",
     ACCOUNT_CAPACITY_REACHED: "Loại tài khoản này đã đủ số lượng. Đăng ký mới tạm dừng để bảo vệ hệ thống; hãy liên hệ cán bộ phụ trách.",
     ACCOUNT_POLICY_UNAVAILABLE: "Chính sách giới hạn tài khoản chưa sẵn sàng. Chưa tạo hồ sơ nào.",
-    DEVICE_LIMIT_REACHED: "Tài khoản đã liên kết đủ 3 thiết bị. Hãy đăng nhập trên một thiết bị đã liên kết để gỡ thiết bị không còn dùng, sau đó thử lại.",
+    DEVICE_LIMIT_REACHED: "Đã đủ 3 thiết bị. Hãy dùng máy đã xác nhận để gỡ máy cũ hoặc mã khôi phục an toàn.",
+    DEVICE_APPROVAL_REQUIRED: "Thiết bị mới đang chờ xác nhận từ một thiết bị tin cậy.",
+    DEVICE_APPROVAL_CONFLICT: "Thiết bị đã thay đổi trạng thái; tải lại trước khi duyệt.",
+    ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa hoàn tất hai lần phê duyệt.",
+    ACCOUNT_ONBOARDING_MISSING: "Trạng thái xét duyệt chưa được xác minh; hãy liên hệ quản trị.",
+    PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, mã, đơn vị và số điện thoại.",
+    PROFILE_CONFLICT: "Mã cá nhân hoặc số điện thoại đã được sử dụng. Kiểm tra lại với cán bộ.",
+    ACCOUNT_SCOPE_FORBIDDEN: "Không có quyền xử lý hồ sơ ngoài phạm vi được giao.",
     LEGACY_PROOF_REQUIRED: "Hãy chuyển tài khoản từ trình duyệt đã đăng ký, bằng khóa gốc của bạn.",
     ACCOUNT_PERMISSION_REQUIRED: "Tài khoản chưa được cấp quyền thực hiện thao tác này.",
     ACCOUNT_CAS_CONFLICT: "Thông tin đã thay đổi. Đồng bộ lại trước khi lưu.",
