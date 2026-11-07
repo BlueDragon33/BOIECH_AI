@@ -17,7 +17,9 @@ export async function GET(request: Request) {
     }
     // Only public account fields leave the server, never the principal/session hash.
     return json({ enabled: true, accountV2: config.v2, account: { accountId: account.accountId, status: account.status, role: account.role,
-      name: account.name, storageDeviceId: account.storageDeviceId, expiresAt: account.expiresAt,
+      name: config.v2 && !account.deviceApproved ? null : account.name,
+      storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
+      expiresAt: config.v2 && !account.deviceApproved ? null : account.expiresAt,
       deviceId: account.deviceId, deviceApproved: account.deviceApproved,
       onboardingStage: onboarding?.stage ?? null, onboardingRevision: onboarding?.revision ?? null,
       canReadRegistrants }, devices: await service.devices(token) });
