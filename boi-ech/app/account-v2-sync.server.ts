@@ -46,6 +46,14 @@ export class AccountVerifiedSync {
   if(row?.enabled!==1)fail("SYNC_CONSENT_REQUIRED");
   return actor;
  }
+ async status(token:string) {
+  const actor=await this.accounts.session(token);
+  if(!actor.deviceApproved)fail("DEVICE_APPROVAL_REQUIRED");
+  const grants=await this.db.prepare(`SELECT scope,enabled,revision,confirmed_at FROM account_sync_grants
+    WHERE account_id=? AND device_id=? ORDER BY scope`).bind(actor.accountId,actor.deviceId)
+    .all<{scope:string;enabled:number;revision:number;confirmed_at:string|null}>();
+  return {deviceId:actor.deviceId,grants:grants.results??[]};
+ }
  async consent(token:string,scopeRaw:unknown,enabledRaw:unknown,password:unknown) {
   const scope=validScope(scopeRaw);
   if(typeof enabledRaw!=="boolean")fail("SYNC_INPUT_INVALID",400);
