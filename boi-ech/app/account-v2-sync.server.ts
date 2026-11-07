@@ -92,11 +92,17 @@ export class AccountVerifiedSync {
   }
   const write=Number(expectedRevision)===0
    ?this.db.prepare(`INSERT INTO account_sync_records(account_id,scope,record_key,revision,content_json)
-     SELECT ?,?,?,1,? WHERE NOT EXISTS(SELECT 1 FROM account_sync_records WHERE account_id=? AND scope=? AND record_key=?)`)
-       .bind(actor.accountId,scope,recordKey,data,actor.accountId,scope,recordKey)
+     SELECT ?,?,?,1,? WHERE NOT EXISTS(SELECT 1 FROM account_sync_records WHERE account_id=? AND scope=? AND record_key=?)
+       AND EXISTS(SELECT 1 FROM account_sync_grants g JOIN account_devices d
+         ON g.account_id=d.account_id AND g.device_id=d.device_id WHERE g.account_id=? AND g.device_id=?
+         AND g.scope=? AND g.enabled=1 AND d.approved=1 AND d.revoked=0)`)
+       .bind(actor.accountId,scope,recordKey,data,actor.accountId,scope,recordKey,actor.accountId,actor.deviceId,scope)
    :this.db.prepare(`UPDATE account_sync_records SET revision=revision+1,content_json=?,updated_at=CURRENT_TIMESTAMP
-     WHERE account_id=? AND scope=? AND record_key=? AND revision=?`)
-       .bind(data,actor.accountId,scope,recordKey,expectedRevision);
+     WHERE account_id=? AND scope=? AND record_key=? AND revision=?
+       AND EXISTS(SELECT 1 FROM account_sync_grants g JOIN account_devices d
+         ON g.account_id=d.account_id AND g.device_id=d.device_id WHERE g.account_id=? AND g.device_id=?
+         AND g.scope=? AND g.enabled=1 AND d.approved=1 AND d.revoked=0)`)
+       .bind(data,actor.accountId,scope,recordKey,expectedRevision,actor.accountId,actor.deviceId,scope);
   const commitRevision=Number(expectedRevision)+1;
   let result;
   try{
