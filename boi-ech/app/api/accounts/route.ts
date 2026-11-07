@@ -1,26 +1,31 @@
 import { AccountError } from "../../account-core.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
-import { createDeviceChallenge, verifyDeviceIdentityRequest } from "../../device-auth.server";
+import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
+import { AccountV2Workflow } from "../../account-v2-workflow.server";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
 export async function GET(request: Request) {
-  try { const { service, token } = await accountRequest(request);
-    if (!token) return json({ enabled: true, account: null });
+  try { const { service, token, config } = await accountRequest(request);
+    if (!token) return json({ enabled: true, account: null, accountV2: config.v2 });
     const account = await service.session(token);
+    const onboarding = config.v2 ? await new AccountV2Workflow(await getCourseDatabase(),service).ownStatus(token) : null;
     let canReadRegistrants=false;
-    if(account.role==="manager"&&account.status==="approved") {
+    if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved))) {
       try { await service.capability(account,"registrants.read.all"); canReadRegistrants=true; }
       catch(error) { if(!(error instanceof AccountError)||error.code!=="ACCOUNT_PERMISSION_REQUIRED") throw error; }
     }
     // Only public account fields leave the server, never the principal/session hash.
     return json({ enabled: true, account: { accountId: account.accountId, status: account.status, role: account.role,
-      name: account.name, storageDeviceId: account.storageDeviceId, expiresAt: account.expiresAt, canReadRegistrants }, devices: await service.devices(token) });
+      name: account.name, storageDeviceId: account.storageDeviceId, expiresAt: account.expiresAt,
+      deviceId: account.deviceId, deviceApproved: account.deviceApproved,
+      onboardingStage: onboarding?.stage ?? null, onboardingRevision: onboarding?.revision ?? null,
+      canReadRegistrants }, devices: await service.devices(token) });
   } catch (error) { return accountErrorResponse(error); }
 }
 export async function POST(request: Request) {
   try {
-    const { service, token } = await accountRequest(request);
+    const { service, token, config } = await accountRequest(request);
     const raw = await request.text();
     if (raw.length > 16384) throw new AccountError("ACCOUNT_INPUT", 413);
     const p = JSON.parse(raw) as Record<string, unknown>;
@@ -38,6 +43,15 @@ export async function POST(request: Request) {
       const result = p.action === "register" ? await service.register(p, peer) : p.action === "login" ? await service.login(p, peer) : await service.claim(p, legacyId, peer);
       const { token: session, ...safe } = result;
       return json({ ok: true, ...safe }, sessionCookie(session));
+    }
+    if (config.v2) {
+      const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
+      if (p.action === "account-state") return json(await workflow.ownStatus(token));
+      if (p.action === "submit-profile") return json({ onboarding: await workflow.submitProfile(token,p) });
+      if (p.action === "review-first") return json({ onboarding: await workflow.firstReview({kind:"manager",token},String(p.accountId),p.expectedRevision) });
+      if (p.action === "review-changes") return json({ onboarding: await workflow.requestChanges(
+        {kind:"manager",token},String(p.accountId),p.expectedRevision,p.reason) });
+      if (p.action === "approve-device") return json(await service.approveDevice(token,p.deviceId,p.password,peer));
     }
     if (p.action === "rotate") { const result = await service.rotate(token); return json({ ok: true }, sessionCookie(result.token)); }
     if (p.action === "recover") return json({ ok: true, ...await service.recover(p, peer) }, sessionCookie(""));
