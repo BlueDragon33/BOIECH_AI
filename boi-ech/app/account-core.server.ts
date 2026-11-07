@@ -89,7 +89,12 @@ export class AccountService {
     const row = await this.row(id);
     const caps = await this.db.prepare("SELECT scope,enabled,expires_at FROM account_manager_permissions WHERE account_id=? ORDER BY scope").bind(id)
       .all<{ scope: string; enabled: number; expires_at: number | null }>();
-    return { ...view(row), permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
+    const onboarding = this.v2Enabled ? await this.db.prepare(
+      "SELECT stage,revision,last_review_note FROM account_onboarding WHERE account_id=?").bind(id)
+      .first<{stage:string;revision:number;last_review_note:string|null}>() : null;
+    return { ...view(row), onboardingStage: onboarding?.stage??null, onboardingRevision: onboarding?.revision??null,
+      reviewNote: onboarding?.last_review_note??null,
+      permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
         (!row.access_expires_at || Date.parse(row.access_expires_at) > this.now()), expiresAt: p.expires_at })) };
   }
