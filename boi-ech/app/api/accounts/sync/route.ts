@@ -11,6 +11,11 @@ export async function POST(request:Request) {
   if(raw.length>8192)throw new AccountError("SYNC_DATA_TOO_LARGE",413);
   const input=JSON.parse(raw) as Record<string,unknown>;
   if(!input||typeof input!=="object"||Array.isArray(input))throw new AccountError("SYNC_INPUT_INVALID",400);
+  // Revalidate the caller's immutable account namespace on every sync request.
+  // Without this, an old offline queue could be uploaded after a browser account switch.
+  const actor=await service.session(token);
+  if(typeof input.accountId!=="string" || input.accountId!==actor.accountId)
+    throw new AccountError("ACCOUNT_SWITCHED",409);
   const sync=new AccountVerifiedSync(await getCourseDatabase(),service);
   let result:unknown;
   if(input.action==="consent")result=await sync.consent(token,input.scope,input.enabled,input.password);
