@@ -1,7 +1,8 @@
 import { AccountError } from "../../../account-core.server";
 import { readAccountCapacity, changeAccountCapacity } from "../../../account-capacity.server";
+import { AccountV2Workflow } from "../../../account-v2-workflow.server";
 import { getCourseDatabase } from "../../../device-auth.server";
-import { accountErrorResponse, accountService } from "../../../account-runtime.server";
+import { accountErrorResponse, accountService, accountConfiguration } from "../../../account-runtime.server";
 import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../control-auth.server";
 export const dynamic = "force-dynamic";
 export function OPTIONS(request: Request) { return controlPreflight(request); }
@@ -13,6 +14,13 @@ export async function POST(request: Request) {
     if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);
     const input = JSON.parse(raw) as Record<string, unknown>;
     const service = await accountService();
+    if ((await accountConfiguration()).v2) {
+      const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
+      if (input.action === "review-first") return controlResponse({ onboarding: await workflow.firstReview(
+        {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision) },200,request);
+      if (input.action === "review-changes") return controlResponse({ onboarding: await workflow.requestChanges(
+        {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision,input.reason) },200,request);
+    }
     if (input.action === "capacity") return controlResponse(await readAccountCapacity(await getCourseDatabase(), owner), 200, request);
     if (input.action === "set-capacity") return controlResponse(await changeAccountCapacity(await getCourseDatabase(), owner, input), 200, request);
     if (input.action === "list") return controlResponse({ accounts: await service.ownerList() }, 200, request);
