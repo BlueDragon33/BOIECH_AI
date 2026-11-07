@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     if (p.action === "legacy-challenge") return json(await createDeviceChallenge(p.deviceId, true));
     if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
     if (config.v2 && p.action === "recover-lost-device") return json(await service.recoverLostDevice(p,peer));
+    if (config.v2 && p.action === "approve-recovered-device") return json(await service.approveRecoveredDevice(p,peer));
     if (p.action === "register" || p.action === "login" || p.action === "claim") {
       let legacyId: string | null = null;
       if (p.action === "claim") {
