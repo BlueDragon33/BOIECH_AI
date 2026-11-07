@@ -83,6 +83,7 @@ export class AccountVerifiedSync {
   if(typeof eventId!=="string"||!ID.test(eventId)||typeof recordKey!=="string"||!KEY.test(recordKey)
    ||!Number.isSafeInteger(expectedRevision)||Number(expectedRevision)<0)fail("SYNC_INPUT_INVALID",400);
   const actor=await this.permission(token,scope);
+  const revision=expectedRevision as number;
   const data=validData(scope,input.data);
   const payloadHash=hash(JSON.stringify([scope,recordKey,expectedRevision,data]));
   const existing=await this.previous(actor.accountId,eventId);
@@ -90,7 +91,7 @@ export class AccountVerifiedSync {
    if(existing.payload_hash!==payloadHash||existing.scope!==scope||existing.record_key!==recordKey)fail("SYNC_EVENT_REUSE",409);
    return {eventId,scope,recordKey,serverRevision:existing.committed_revision,acknowledged:true,replayed:true};
   }
-  const write=Number(expectedRevision)===0
+  const write=revision===0
    ?this.db.prepare(`INSERT INTO account_sync_records(account_id,scope,record_key,revision,content_json)
      SELECT ?,?,?,1,? WHERE NOT EXISTS(SELECT 1 FROM account_sync_records WHERE account_id=? AND scope=? AND record_key=?)
        AND EXISTS(SELECT 1 FROM account_sync_grants g JOIN account_devices d
@@ -102,8 +103,8 @@ export class AccountVerifiedSync {
        AND EXISTS(SELECT 1 FROM account_sync_grants g JOIN account_devices d
          ON g.account_id=d.account_id AND g.device_id=d.device_id WHERE g.account_id=? AND g.device_id=?
          AND g.scope=? AND g.enabled=1 AND d.approved=1 AND d.revoked=0)`)
-       .bind(data,actor.accountId,scope,recordKey,expectedRevision,actor.accountId,actor.deviceId,scope);
-  const commitRevision=Number(expectedRevision)+1;
+       .bind(data,actor.accountId,scope,recordKey,revision,actor.accountId,actor.deviceId,scope);
+  const commitRevision=revision+1;
   let result;
   try{
    result=await this.db.batch([
@@ -112,7 +113,7 @@ export class AccountVerifiedSync {
       expected_revision,committed_revision,payload_hash)
       SELECT ?,?,?,?,?,?,?,? WHERE changes()=1
        AND EXISTS(SELECT 1 FROM account_sync_grants WHERE account_id=? AND device_id=? AND scope=? AND enabled=1)`)
-      .bind(actor.accountId,eventId,actor.deviceId,scope,recordKey,expectedRevision,commitRevision,payloadHash,
+      .bind(actor.accountId,eventId,actor.deviceId,scope,recordKey,revision,commitRevision,payloadHash,
        actor.accountId,actor.deviceId,scope),
     this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
      SELECT ?,'sync.event.committed',?,? WHERE changes()=1`)
