@@ -379,10 +379,13 @@ export class AccountService {
   async reviewBoard(token: string) {
     const actor = await this.authorize(token);
     await this.capability(actor, "manager.approve.registration");
-    const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id FROM accounts a
-      JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id
+    const onboardingSelect = this.v2Enabled ? ",o.stage AS onboarding_stage,o.revision AS onboarding_revision,o.first_review_by" : "";
+    const onboardingJoin = this.v2Enabled ? " LEFT JOIN account_onboarding o ON o.account_id=a.account_id" : "";
+    const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect} FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
       WHERE (d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned' AND m.target_device_id IS NULL)
-       OR m.manager_device_id=? ORDER BY a.account_id LIMIT 201`).bind(actor.storageDeviceId).all<Row & { manager_device_id: string | null }>();
+       OR m.manager_device_id=? ORDER BY a.account_id LIMIT 201`).bind(actor.storageDeviceId)
+       .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
     if ((result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
     const counts = await this.db.prepare(`SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
       JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
@@ -394,7 +397,10 @@ export class AccountService {
       teacher: { limit: limits.teacher_limit, used: counts.results?.find(c => c.person_role === "teacher")?.used ?? 0 },
     }, devices: (result.results ?? []).map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
       deviceCode: r.person_code, role: r.person_role, name: r.learner_name, personCode: r.person_code, className: r.class_name,
-      status: r.status, registrationComplete: true, assignedToMe: r.manager_device_id === actor.storageDeviceId })) };
+      status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.person_code&&r.learner_name&&r.phone&&r.class_name) : true,
+      onboardingStage: r.onboarding_stage??null, onboardingRevision: r.onboarding_revision??null,
+      firstReviewMine: r.first_review_by===actor.accountId,
+      assignedToMe: r.manager_device_id === actor.storageDeviceId })) };
   }
   async review(token: string, targetId: string, action: string) {
     const actor = await this.authorize(token);
