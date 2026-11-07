@@ -322,6 +322,52 @@ export class AccountService {
     if (Number(result[0].meta.changes) !== 1) fail("AUTH_FAILED", 401);
     return { recoveryCode, accountId: row.account_id };
   }
+  private async verifyRecoveryDeviceProof(input: Record<string,unknown>, peer: string) {
+    if(!this.v2Enabled)fail("ACCOUNT_FEATURE_DISABLED",404);
+    const login=loginName(input.login);
+    await this.throttle(login,peer,"device-recovery",5);
+    const row=await this.db.prepare(`SELECT a.account_id,c.password_verifier,c.recovery_hash
+      FROM accounts a JOIN account_credentials c ON c.account_id=a.account_id
+      WHERE a.login=?`).bind(login).first<{account_id:string;password_verifier:string;recovery_hash:string}>();
+    const dummy=`scrypt$32768$8$3${"0".repeat(32)}${"0".repeat(64)}`;
+    const passwordValid=await verifyPassword(input.password,row?.password_verifier??dummy);
+    const code=typeof input.recoveryCode==="string"?input.recoveryCode:"";
+    const proofValid=TOKEN.test(code)&&!!row&&timingSafeEqual(Buffer.from(digest(code),"hex"),Buffer.from(row.recovery_hash,"hex"));
+    if(!row||!passwordValid||!proofValid)fail("AUTH_FAILED",401);
+    return row;
+  }
+  async recoveryDeviceList(input: Record<string,unknown>,peer:string) {
+    const row=await this.verifyRecoveryDeviceProof(input,peer);
+    const devices=await this.db.prepare(`SELECT device_id,approved,created_at FROM account_devices
+      WHERE account_id=? AND revoked=0 ORDER BY created_at DESC LIMIT 3`)
+      .bind(row.account_id).all<{device_id:string;approved:number;created_at:string}>();
+    return {devices:devices.results??[]};
+  }
+  async recoverLostDevice(input: Record<string,unknown>,peer:string) {
+    const row=await this.verifyRecoveryDeviceProof(input,peer);
+    const target=input.deviceId;
+    if(typeof target!=="string"||!TOKEN.test(target))fail("DEVICE_KEY_INVALID",400);
+    const nextCode=random();
+    try {
+      const results=await this.db.batch([
+        this.db.prepare(`UPDATE account_devices SET revoked=1
+          WHERE account_id=? AND device_id=? AND revoked=0`).bind(row.account_id,target),
+        this.db.prepare(`UPDATE account_credentials SET recovery_hash=?,updated_at=CURRENT_TIMESTAMP
+          WHERE account_id=? AND recovery_hash=? AND changes()=1`)
+          .bind(digest(nextCode),row.account_id,row.recovery_hash),
+        this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+          VALUES(?,'account.device.recovery',?,CASE WHEN changes()=1 THEN 'one-use recovery + password' ELSE NULL END)`)
+          .bind(row.account_id,target),
+        this.db.prepare(`UPDATE account_sessions SET revoked=1 WHERE account_id=? AND device_id=?`)
+          .bind(row.account_id,target),
+      ]);
+      if(Number(results[0].meta.changes)!==1||Number(results[1].meta.changes)!==1)fail("DEVICE_RECOVERY_CONFLICT",409);
+    } catch(error) {
+      if(error instanceof Error&&/NOT NULL.*purpose|constraint/i.test(error.message))fail("DEVICE_RECOVERY_CONFLICT",409);
+      throw error;
+    }
+    return {ok:true,deviceId:target,recoveryCode:nextCode};
+  }
   async capability(actor: Principal, scope: string) {
     // Read owning rows freshly, not a role or a client-provided capability claim.
     const row = await this.db.prepare(`SELECT 1 AS allowed FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
