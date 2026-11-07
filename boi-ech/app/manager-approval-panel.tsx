@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import type {TrainingProof} from "./training-client";
 import styles from "./manager-approval-panel.module.css";
+import ManagerV2ReviewPanel from "./manager-v2-review-panel";
 
 type Role="learner"|"teacher";
 type ManagedDevice={
@@ -26,7 +27,16 @@ const PREVIEW_BOARD:Board={
       personCode:"HV-MAU-02",className:"Lớp mẫu",status:"approved",assignedToMe:true,registrationComplete:true}
   ]
 };
-export default function ManagerApprovalPanel({getProof,previewOnly=false}:{getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;previewOnly?:boolean}){
+export default function ManagerApprovalPanel(props:{getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;previewOnly?:boolean}){
+ const [mode,setMode]=useState<"checking"|"legacy"|"v2">(props.previewOnly?"legacy":"checking");
+ useEffect(()=>{if(props.previewOnly)return;let alive=true;void fetch("/api/accounts",{credentials:"same-origin",cache:"no-store"})
+  .then(async response=>{if(!response.ok)throw new Error("ACCOUNT_STATUS_UNAVAILABLE");return response.json() as Promise<{accountV2?:boolean}>;})
+  .then(data=>{if(alive)setMode(data.accountV2?"v2":"legacy");})
+  .catch(()=>{if(alive)setMode("checking");});return()=>{alive=false};},[props.previewOnly]);
+ if(mode==="checking")return <p role="status">Đang xác minh chính sách duyệt tài khoản…</p>;
+ return mode==="v2"?<ManagerV2ReviewPanel/>:<LegacyManagerApprovalPanel {...props}/>;
+}
+function LegacyManagerApprovalPanel({getProof,previewOnly=false}:{getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;previewOnly?:boolean}){
   const [board,setBoard]=useState<Board|null>(previewOnly?PREVIEW_BOARD:null);
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
