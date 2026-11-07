@@ -1,0 +1,144 @@
+{
+  "checkedAt": "2026-11-07T08:04:00.975774+00:00",
+  "providerPlan": {
+    "source": "authenticated Cloudflare Workers plans UI",
+    "plan": "Free",
+    "price": "$0",
+    "upgradePerformed": false,
+    "r2Activated": false
+  },
+  "tokens": [
+    {
+      "id": "f59409a3c4ec4b88199b2c21d912ddfa",
+      "name": "boiech-manager-publish-ui-20261107",
+      "status": "active",
+      "expires_on": "2026-12-07T20:59:59Z",
+      "policies": [
+        {
+          "id": "324081a475154c4e8ea7a1d41f5f129a",
+          "effect": "allow",
+          "resources": {
+            "com.cloudflare.api.account.f88a42260814230aa4a151abbfe5659d": {
+              "com.cloudflare.edge.worker.script.1d0bbe45078d4f6fb7dd5a050b7526fc": "*",
+              "com.cloudflare.edge.worker.script.277ab3dcacd540a0bd7a510788bdef8c": "*",
+              "com.cloudflare.edge.worker.script.85af5173d30c478da08cd7b78f212efc": "*",
+              "com.cloudflare.edge.worker.script.cb26105a971c46bca2be2447c7801ec7": "*"
+            }
+          },
+          "permission_groups": [
+            {
+              "id": "7e79ec33834341f28dd431ab73884400",
+              "name": "Individual Workers Editor"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "df0b0f39f3dbc1ff0dcd89a093392bf6",
+      "name": "boiech-preview-lifecycle-ui-20261107",
+      "status": "active",
+      "expires_on": "2026-12-07T20:59:59Z",
+      "policies": [
+        {
+          "id": "97e37c77b5d74a9dab7a2fc68f2ac118",
+          "effect": "allow",
+          "resources": {
+            "com.cloudflare.api.account.f88a42260814230aa4a151abbfe5659d": "*"
+          },
+          "permission_groups": [
+            {
+              "id": "5bc3f8b21c554832afc660159ab75fa4",
+              "name": "Account API Tokens Write"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2a21717df30fb4941a25aa8e6324e86e",
+      "name": "boiech-preview-work-20261106",
+      "status": "active",
+      "expires_on": "2026-12-07T20:59:59Z",
+      "policies": [
+        {
+          "id": "248271c8e1ad4ad5a34969ca5be2e976",
+          "effect": "allow",
+          "resources": {
+            "com.cloudflare.api.account.f88a42260814230aa4a151abbfe5659d": {
+              "com.cloudflare.edge.worker.script.277ab3dcacd540a0bd7a510788bdef8c": "*"
+            }
+          },
+          "permission_groups": [
+            {
+              "id": "7e79ec33834341f28dd431ab73884400",
+              "name": "Individual Workers Editor"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "applicationManagementPreview": {
+    "revision": "b2e36758d8dab5c953e71b3aa1f36490b55d770f",
+    "deployment": {
+      "id": "f2fb7105-39f3-4993-ae34-28a199659e0f",
+      "source": "wrangler",
+      "versions": [
+        {
+          "version_id": "4a5e5b1f-200d-402d-88aa-28e63eb7171a",
+          "percentage": 100
+        }
+      ],
+      "created_on": "2026-11-07T07:59:32.967392Z"
+    },
+    "subdomainEnabled": true,
+    "secretNamesPreserved": [
+      "APPLICATION_MANAGEMENT_PREVIEW_ACCESS_SECRET",
+      "MANAGED_APP_CREDENTIAL_ENCRYPTION_KEY"
+    ],
+    "databaseId": "00f8a685-452f-472c-81c5-4d0b1c4037c9",
+    "ownerIsExistingPlaceholder": true,
+    "authenticatedAcceptance": "BLOCKED: existing access secret unavailable; preserved without rotation; placeholder owner is not a real manager identity",
+    "anonymousSmoke": [
+      {
+        "path": "/__deployment",
+        "status": 401,
+        "error": "preview_access_required"
+      },
+      {
+        "path": "/apps/boi-ech/cloudflare-preview",
+        "status": 401,
+        "error": "preview_access_required"
+      },
+      {
+        "path": "/api/apps/boi-ech/cloudflare-preview",
+        "status": 401,
+        "error": "preview_access_required"
+      },
+      {
+        "path": "/assets/connection-C2lAOeH9.js",
+        "status": 401,
+        "error": "preview_access_required"
+      }
+    ],
+    "wranglerExitCode": 1,
+    "wranglerError": "Account /workers/subdomain metadata read denied (10000) after upload; active deployment independently verified via per-Worker API"
+  },
+  "production": [
+    {
+      "worker": "application-management",
+      "settingsUnchanged": true
+    },
+    {
+      "worker": "boi-ech",
+      "settingsUnchanged": true
+    }
+  ],
+  "remainingBlockers": [
+    "Boi Preview D1 quota exhausted (10/10); no DB deleted or borrowed",
+    "R2 inactive; usage-billed activation prohibited under ZERO-SPEND",
+    "Boi Preview remains Hello World; no real manager acceptance",
+    "Preview UI vault connection and real 30-day manager flow not yet verified"
+  ]
+}

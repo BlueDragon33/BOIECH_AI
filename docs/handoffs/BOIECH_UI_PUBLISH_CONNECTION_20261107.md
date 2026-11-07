@@ -1,6 +1,12 @@
 # Bơi ếch UI publication checkpoint — 2026-11-07
 
-**The website has not been updated. Source QA is verified; actual isolated HTTPS acceptance and release remain BLOCKED.**
+**Updated 2026-11-07:** the Owner approved both credential drafts and reinforced **free-only**. Both keys are now active with the approved scopes and 30-day expiry. The App-Management candidate `b2e36758d8dab5c953e71b3aa1f36490b55d770f` is active on its existing isolated HTTPS Preview, independently verified after a post-upload CLI metadata-read failure. Bơi ếch manager acceptance and Production release remain **BLOCKED**.
+
+Current proof and remaining blockers: [free-tier Preview checkpoint](../evidence/premium-manager-20261107-free-preview/README.md). It supersedes the credential/deployment status in the historical checkpoint below. No Production, schema, role, billing, or hosted Actions changes occurred.
+
+**Current Next Action:** prepare the approved free isolated Bơi Preview resources and real authorized identities, then finish signed desktop/mobile acceptance before presenting the exact-SHA Production release.
+
+## Historical checkpoint before the latest approval
 
 ## Candidate identity
 
@@ -28,6 +34,6 @@ Owner clarified **30 days for both Cloudflare token and manager access**, with s
 
 No hosted Actions, PR creation, paid activation, schema/authorization-policy changes, manager grant/date writes, Production publication or merge occurred. Existing application slugs and repositories are preserved. The same application-source trees were verified after the Node 22 cache fallback was detected and corrected; earlier unguarded runtime labels are not used as final evidence.
 
-## One Next Action
+## Historical Next Action — now completed
 
 Confirm the two new 30-day publication/lifecycle credentials prepared on Cloudflare's final review pages, so the authorized deployment connection can proceed. This is new write access beyond the existing Preview-only key, not a repeat request for its approval; it does not waive ZERO-SPEND, remaining D1/R2 blockers or release gates.
