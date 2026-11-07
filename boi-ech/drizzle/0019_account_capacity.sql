@@ -9,9 +9,11 @@ CREATE TABLE IF NOT EXISTS account_admission_limits (
 --> statement-breakpoint
 INSERT OR IGNORE INTO account_admission_limits(person_role,account_limit) VALUES ('manager',5),('teacher',10),('learner',200);
 --> statement-breakpoint
--- Account insert is serialized by D1/SQLite. Every account, including a legacy claim,
--- occupies one seat in the role to prevent unlimited pending-registration storage.
+-- Account insert is serialized by D1/SQLite. All canonical identities count toward the cap.
+-- Allow historical backfill (NULL login) even when old data already exceeds a new limit;
+-- never discard or block legacy learning progress to impose a new registration policy.
 CREATE TRIGGER IF NOT EXISTS account_admission_insert BEFORE INSERT ON accounts
+WHEN NEW.login IS NOT NULL
 BEGIN
  SELECT CASE WHEN NOT EXISTS (
   SELECT 1 FROM device_access d JOIN account_admission_limits p ON p.person_role=d.person_role
