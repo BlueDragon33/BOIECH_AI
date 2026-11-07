@@ -18,7 +18,8 @@ export async function POST(request:Request) {
     throw new AccountError("ACCOUNT_SWITCHED",409);
   const sync=new AccountVerifiedSync(await getCourseDatabase(),service);
   let result:unknown;
-  if(input.action==="consent")result=await sync.consent(token,input.scope,input.enabled,input.password);
+  if(input.action==="status")result=await sync.status(token);
+  else if(input.action==="consent")result=await sync.consent(token,input.scope,input.enabled,input.password);
   else if(input.action==="write")result=await sync.write(token,input);
   else if(input.action==="read")result=await sync.read(token,input.scope,input.afterKey,input.limit);
   else throw new AccountError("SYNC_INPUT_INVALID",400);
