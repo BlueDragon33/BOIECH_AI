@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "application": "application-management",
+  "runtime": "control-plane",
+  "channel": "cloudflare-production",
+  "revision": "b2e36758d8dab5c953e71b3aa1f36490b55d770f",
+  "databaseReady": true,
+  "assetsReady": true,
+  "previewAccessConfigured": false,
+  "productionAuthConfigured": true,
+  "googleAuthConfigured": true,
+  "accessMode": "google-oauth+account-session",
+  "ownerPolicyConfigured": true,
+  "networkMode": "production",
+  "clients": {
+    "boiEch": true,
+    "healthCare": false,
+    "ruLife": false,
+    "baumanControl": true,
+    "baumanRuntime": true,
+    "growUp": false
+  },
+  "deployOps": {
+    "vercelConfigured": false,
+    "neonConfigured": false
+  },
+  "checkedAt": 1794040246807
+}

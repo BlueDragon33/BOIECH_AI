@@ -1,5 +1,7 @@
 # Bơi ếch UI publication checkpoint — 2026-11-07
 
+**Latest Production follow-up:** both exact source revisions are now published on the existing Production Workers under the Owner's immediate release direction with the Preview acceptance gap retained. See [Production release handoff](BOIECH_PRODUCTION_RELEASE_20261107.md) for live readback, source SHAs, actual manager/browser checks and the pending Owner Authenticator step. The checkpoint below is historical.
+
 **Updated 2026-11-07:** the Owner approved both credential drafts and reinforced **free-only**. Both keys are now active with the approved scopes and 30-day expiry. The App-Management candidate `b2e36758d8dab5c953e71b3aa1f36490b55d770f` is active on its existing isolated HTTPS Preview, independently verified after a post-upload CLI metadata-read failure. Bơi ếch manager acceptance and Production release remain **BLOCKED**.
 
 Current proof and remaining blockers: [free-tier Preview checkpoint](../evidence/premium-manager-20261107-free-preview/README.md). It supersedes the credential/deployment status in the historical checkpoint below. No Production, schema, role, billing, or hosted Actions changes occurred.

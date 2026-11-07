@@ -1,0 +1,369 @@
+[
+  {
+    "worker": "boi-ech",
+    "before": {
+      "compatibility_date": "2026-05-15",
+      "compatibility_flags": [
+        "nodejs_compat"
+      ],
+      "usage_model": "standard",
+      "limits": null,
+      "logpush": false,
+      "bindings": [
+        {
+          "name": "BOI_ECH_ACCESS_MODE",
+          "type": "plain_text",
+          "text": "managed"
+        },
+        {
+          "name": "CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "database_id": "7816425d-ce8a-4b3c-b303-7697fd4a529c",
+          "id": "7816425d-ce8a-4b3c-b303-7697fd4a529c",
+          "name": "DB",
+          "type": "d1"
+        }
+      ]
+    },
+    "after": {
+      "compatibility_date": "2026-05-15",
+      "compatibility_flags": [
+        "nodejs_compat"
+      ],
+      "usage_model": "standard",
+      "limits": null,
+      "logpush": false,
+      "bindings": [
+        {
+          "name": "BOI_ECH_ACCESS_MODE",
+          "type": "plain_text",
+          "text": "managed"
+        },
+        {
+          "name": "BOI_ECH_BUILD_REVISION",
+          "type": "plain_text",
+          "text": "6f1f9006a02693cb6923ed3f27ddfa6b6abd5e45"
+        },
+        {
+          "name": "BOI_ECH_BUILD_SOURCE",
+          "type": "plain_text",
+          "text": "BlueDragon33/BOIECH_AI/boi-ech"
+        },
+        {
+          "name": "BOI_ECH_DEPLOYMENT_CHANNEL",
+          "type": "plain_text",
+          "text": "cloudflare-production"
+        },
+        {
+          "name": "CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "database_id": "7816425d-ce8a-4b3c-b303-7697fd4a529c",
+          "id": "7816425d-ce8a-4b3c-b303-7697fd4a529c",
+          "name": "DB",
+          "type": "d1"
+        }
+      ]
+    }
+  },
+  {
+    "worker": "application-management",
+    "before": {
+      "compatibility_date": "2026-09-10",
+      "compatibility_flags": [
+        "nodejs_compat",
+        "global_fetch_strictly_public"
+      ],
+      "usage_model": "standard",
+      "limits": null,
+      "logpush": false,
+      "bindings": [
+        {
+          "name": "APPLICATION_MANAGEMENT_ACCESS_MODE",
+          "type": "plain_text",
+          "text": "standalone"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_BUILD_REVISION",
+          "type": "plain_text",
+          "text": "da5d3049bc39f85410d6762c19be894991720e69"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL",
+          "type": "plain_text",
+          "text": "cloudflare-production"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_INITIAL_ADMIN_PASSWORD",
+          "type": "secret_text"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_MFA_ENCRYPTION_KEY",
+          "type": "secret_text"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_PRODUCTION_READBACK_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "ASSETS",
+          "type": "assets"
+        },
+        {
+          "name": "BAUMAN_APP_ORIGIN",
+          "type": "plain_text",
+          "text": "https://bauman-master-ai.boiech-ai.workers.dev"
+        },
+        {
+          "name": "BAUMAN_CONTROL_BASE_URL",
+          "type": "plain_text",
+          "text": "https://bauman-control.boiech-ai.workers.dev"
+        },
+        {
+          "name": "BAUMAN_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "BOI_ECH_BASE_URL",
+          "type": "plain_text",
+          "text": "https://boi-ech.boiech-ai.workers.dev"
+        },
+        {
+          "name": "BOI_ECH_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "CONTROL_OWNER_EMAILS",
+          "type": "plain_text",
+          "text": "[owner-policy-redacted]"
+        },
+        {
+          "name": "CONTROL_PLANE_NETWORK_MODE",
+          "type": "plain_text",
+          "text": "production"
+        },
+        {
+          "name": "CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "database_id": "8a626342-21fd-46a7-bfbd-1c3c4866c999",
+          "id": "8a626342-21fd-46a7-bfbd-1c3c4866c999",
+          "name": "DB",
+          "type": "d1"
+        },
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_ID",
+          "type": "secret_text"
+        },
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "GROWUP_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "GROWUP_CONTROL_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "HEALTH_CARE_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "HEALTH_CARE_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "HEALTH_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "MANAGED_APP_CREDENTIAL_ENCRYPTION_KEY",
+          "type": "secret_text"
+        },
+        {
+          "name": "PRICE_REPORT_CONTROL_BASE_URL",
+          "type": "plain_text",
+          "text": "https://price-report-control-service.boiech-ai.workers.dev"
+        },
+        {
+          "name": "PRICE_REPORT_CONTROL_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "PRICE_REPORT_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "RU_LIFE_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "RU_LIFE_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "RU_LIFE_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        }
+      ]
+    },
+    "after": {
+      "compatibility_date": "2026-09-10",
+      "compatibility_flags": [
+        "nodejs_compat",
+        "global_fetch_strictly_public"
+      ],
+      "usage_model": "standard",
+      "limits": null,
+      "logpush": false,
+      "bindings": [
+        {
+          "name": "APPLICATION_MANAGEMENT_ACCESS_MODE",
+          "type": "plain_text",
+          "text": "standalone"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_BUILD_REVISION",
+          "type": "plain_text",
+          "text": "b2e36758d8dab5c953e71b3aa1f36490b55d770f"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL",
+          "type": "plain_text",
+          "text": "cloudflare-production"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_INITIAL_ADMIN_PASSWORD",
+          "type": "secret_text"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_MFA_ENCRYPTION_KEY",
+          "type": "secret_text"
+        },
+        {
+          "name": "APPLICATION_MANAGEMENT_PRODUCTION_READBACK_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "ASSETS",
+          "type": "assets"
+        },
+        {
+          "name": "BAUMAN_APP_ORIGIN",
+          "type": "plain_text",
+          "text": "https://bauman-master-ai.boiech-ai.workers.dev"
+        },
+        {
+          "name": "BAUMAN_CONTROL_BASE_URL",
+          "type": "plain_text",
+          "text": "https://bauman-control.boiech-ai.workers.dev"
+        },
+        {
+          "name": "BAUMAN_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "BOI_ECH_BASE_URL",
+          "type": "plain_text",
+          "text": "https://boi-ech.boiech-ai.workers.dev"
+        },
+        {
+          "name": "BOI_ECH_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "CONTROL_OWNER_EMAILS",
+          "type": "plain_text",
+          "text": "[owner-policy-redacted]"
+        },
+        {
+          "name": "CONTROL_PLANE_NETWORK_MODE",
+          "type": "plain_text",
+          "text": "production"
+        },
+        {
+          "name": "CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "database_id": "8a626342-21fd-46a7-bfbd-1c3c4866c999",
+          "id": "8a626342-21fd-46a7-bfbd-1c3c4866c999",
+          "name": "DB",
+          "type": "d1"
+        },
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_ID",
+          "type": "secret_text"
+        },
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "GROWUP_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "GROWUP_CONTROL_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "HEALTH_CARE_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "HEALTH_CARE_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "HEALTH_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "MANAGED_APP_CREDENTIAL_ENCRYPTION_KEY",
+          "type": "secret_text"
+        },
+        {
+          "name": "PRICE_REPORT_CONTROL_BASE_URL",
+          "type": "plain_text",
+          "text": "https://price-report-control-service.boiech-ai.workers.dev"
+        },
+        {
+          "name": "PRICE_REPORT_CONTROL_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "PRICE_REPORT_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        },
+        {
+          "name": "RU_LIFE_BASE_URL",
+          "type": "plain_text",
+          "text": ""
+        },
+        {
+          "name": "RU_LIFE_BASE_URL_OVERRIDE",
+          "type": "secret_text"
+        },
+        {
+          "name": "RU_LIFE_CONTROL_SERVICE_SECRET",
+          "type": "secret_text"
+        }
+      ]
+    }
+  }
+]

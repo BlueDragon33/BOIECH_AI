@@ -1,0 +1,111 @@
+{
+  "checkedAt": "2026-11-07T08:34:31.450099+00:00",
+  "production": [
+    {
+      "worker": "boi-ech",
+      "url": "https://boi-ech.boiech-ai.workers.dev",
+      "revision": "6f1f9006a02693cb6923ed3f27ddfa6b6abd5e45",
+      "databaseId": "7816425d-ce8a-4b3c-b303-7697fd4a529c",
+      "databasePreserved": true,
+      "secretNames": [
+        "CONTROL_SERVICE_SECRET"
+      ],
+      "deployment": {
+        "id": "5723814f-e637-4c68-a1dc-6ee6b23ca21e",
+        "versions": [
+          {
+            "version_id": "c507269f-9e92-4335-875f-01aca2a32298",
+            "percentage": 100
+          }
+        ],
+        "created_on": "2026-11-07T08:24:22.980031Z"
+      },
+      "rollbackVersionId": "cbb95179-842c-4c3b-baf1-b8c95e277ef6",
+      "cliExitCode": 1,
+      "postUploadMetadataReadDenied": true,
+      "activeDeploymentIndependentlyVerified": true
+    },
+    {
+      "worker": "application-management",
+      "url": "https://application-management.boiech-ai.workers.dev",
+      "revision": "b2e36758d8dab5c953e71b3aa1f36490b55d770f",
+      "databaseId": "8a626342-21fd-46a7-bfbd-1c3c4866c999",
+      "databasePreserved": true,
+      "secretNames": [
+        "APPLICATION_MANAGEMENT_INITIAL_ADMIN_PASSWORD",
+        "APPLICATION_MANAGEMENT_MFA_ENCRYPTION_KEY",
+        "APPLICATION_MANAGEMENT_PRODUCTION_READBACK_SECRET",
+        "BAUMAN_CONTROL_SERVICE_SECRET",
+        "BOI_ECH_BASE_URL_OVERRIDE",
+        "CONTROL_SERVICE_SECRET",
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET",
+        "HEALTH_CARE_BASE_URL_OVERRIDE",
+        "HEALTH_CONTROL_SERVICE_SECRET",
+        "MANAGED_APP_CREDENTIAL_ENCRYPTION_KEY",
+        "PRICE_REPORT_CONTROL_BASE_URL_OVERRIDE",
+        "PRICE_REPORT_CONTROL_SERVICE_SECRET",
+        "RU_LIFE_BASE_URL_OVERRIDE",
+        "RU_LIFE_CONTROL_SERVICE_SECRET"
+      ],
+      "deployment": {
+        "id": "a73ede0f-7997-4a87-9f32-37294686466a",
+        "versions": [
+          {
+            "version_id": "268c3b94-a88a-4217-84ce-135664991c61",
+            "percentage": 100
+          }
+        ],
+        "created_on": "2026-11-07T08:26:14.143153Z"
+      },
+      "rollbackVersionId": "e1b71b37-1fbb-4b02-8e12-1a70bb105ab1",
+      "cliExitCode": 1,
+      "postUploadMetadataReadDenied": true,
+      "activeDeploymentIndependentlyVerified": true
+    }
+  ],
+  "constraints": {
+    "newPaidServices": false,
+    "r2Activated": false,
+    "newDatabase": false,
+    "migrationsRun": false,
+    "existingGrantOrExpiryChanged": false,
+    "githubHostedActionsDispatched": false,
+    "mergePerformed": false
+  },
+  "postDeploy": {
+    "universalContractHttp": 200,
+    "genericDeviceMutationAllowed": false,
+    "freshDeviceSmoke": {
+      "identities": 2,
+      "registrationChallengeSignaturePresenceRepeatPassed": true,
+      "newDevicesRemain": "pending/unassigned/unregistered",
+      "approvalsGranted": 0,
+      "initialNodeDirectFetch": "EAI_AGAIN; retried unchanged verifier using inherited proxy and strict TLS"
+    },
+    "realManagerBrowser": {
+      "authenticated": true,
+      "newConsoleVisible": true,
+      "width375ScrollWidth": 359,
+      "width375ClientWidth": 359,
+      "newClassFormOpened": true,
+      "newClassFormSaved": false,
+      "newClassFormCancelled": true
+    },
+    "appManagement": {
+      "authenticatedMetadata": true,
+      "databaseReady": true,
+      "assetsReady": true,
+      "productionAuthConfigured": true,
+      "googleAuthConfigured": true,
+      "newConnectionPageAccessible": true,
+      "vaultConnection": "Owner Authenticator step-up pending; lifecycle not yet saved; Preview deployment token not yet saved"
+    }
+  },
+  "knownLimits": [
+    "Incomplete isolated Preview acceptance remains a recorded release exception, not PASS",
+    "No existing classes/sessions available for live multiple-class/conflict/assignment write acceptance; no production sample class created",
+    "Manager approval/rejection remains read-only/backend-restricted; no admin authority granted",
+    "Isolated Boi Preview D1/R2 blockers remain; not required to use the already existing Production bindings"
+  ]
+}
