@@ -153,10 +153,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
             <select name="deviceId" required disabled={busy}>
               {recoveryDevices.map(d=><option key={d.device_id} value={d.device_id}>{d.device_id.slice(0,16)} · {d.created_at}</option>)}
-            </select>
-            <small>Chỉ tích chọn nếu thiết bị vừa đăng nhập đang chờ xác nhận; không tự phê duyệt thiết bị khác.</small>
-            <label><input type="checkbox" name="approvePending" disabled={busy}/> Xác nhận thiết bị chờ duyệt (không gỡ)</label>
-          </label>:null}
+            </select></label>:null}
+          {mode==="devices" && recoveryDevices.length>0 ? <label><input type="checkbox" name="approvePending" disabled={busy}/>
+            Phê duyệt thiết bị chờ xác nhận thay vì gỡ thiết bị đã liên kết</label>:null}
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
           {mode === "register" && <><RegistrationRoles value={role} onChange={setRole}/>{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["personCode", "Mã học viên / cán bộ / giảng viên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt lần một, bạn sẽ hoàn thiện hồ sơ cá nhân để duyệt lần hai.</p>}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
