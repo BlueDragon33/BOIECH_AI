@@ -69,3 +69,13 @@ The last group is a cleanup candidate group, not proof of invalidity: recent bro
 ## Next Action
 
 Resolve one dedicated FREE D1 slot by an Owner-specified nonproduction retirement decision, with dependency checks, backup and verified restore before any irreversible action. Do not choose or delete another project's database without specific approval. Then complete the protected Preview bridge setup and actual acceptance; keep Production unchanged until the release gates pass.
+
+## Follow-up: current base reconciliation and retirement preparation
+
+- The PR metadata exposed an old base SHA. Direct branch-ref inspection and `git ls-remote` confirmed the actual target HEAD is `e229fa82983511aed42b54450597d01a19b856fe`.
+- Merging that target into the mobile candidate produced one conflict in `prepare-cloudflare-preview.mjs`. The resolution retains the reviewed no-R2 guard, mandatory V2 flags/origins and private config output.
+- Before this documentation addition, the resolved Git tree was **identical** to `4dafd540ab45d90307a1dc9addf6eed594deb9aa` (tree `b4b03a1bcc2c9823575f6a24f2803daa454444cd`). A fresh focused Node22 run passed **9/9**. The earlier 624-test/full-build evidence applies to the identical product files; it was not rerun for a metadata-only merge.
+- Owner's subsequent deletion instruction was interpreted in the immediately preceding scope: retirement of the named Bauman Preview environment, not deletion of Production databases or all Bơi Ếch users.
+- Both public URL switches on `bauman-control-preview` are now disabled. Worker code and encrypted secrets are retained for recovery.
+- A private logical SQL backup of `bauman-control-preview-db` was saved durably and restored to clean local SQLite: **10 user tables, 6 rows**, integrity OK, no foreign-key violations, every row count and SQLite sequence matched. SQL SHA-256: `b3ac3b1930179b13902a523d0d50dca49a60de2bc11de8f38d09e56f2e3ebb6b`. This is not a remote D1 restore test.
+- The database itself has not been deleted. Cloudflare's confirmation dialog labels deletion permanent; the browser operation is staged for specific action-time confirmation. D1 capacity and bridge secrets therefore remain blocked. No Production merge/deployment, subscription or hosted Actions was performed.

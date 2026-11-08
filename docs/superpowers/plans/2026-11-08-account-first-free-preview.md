@@ -40,7 +40,7 @@
 
 - [x] Document Account-first scope, absent payment storage and remaining full-payment gate; correct stale deployment ordering and required secrets.
 - [x] Run Node22 full test/build, TypeScript, lint and Preview/release gates. Check a real generated FREE Preview artifact locally; do not claim remote deployment.
-- [ ] Preserve exact source/evidence in an isolated branch with hosted CI skipped; do not dispatch or enable a dormant workflow.
+- [x] Preserve exact source/evidence in an isolated branch with hosted CI skipped; do not dispatch or enable a dormant workflow.
 
 ## Separate authorized cleanup
 
