@@ -22,7 +22,8 @@ function fixture(){
   payment_status TEXT DEFAULT 'unassigned',approved_at TEXT,blocked_at TEXT,updated_at TEXT
  );
  CREATE UNIQUE INDEX IF NOT EXISTS device_access_identity ON device_access(person_role,person_code);
- CREATE TABLE device_profiles(device_id TEXT PRIMARY KEY,completed_json TEXT DEFAULT '[]',scores_json TEXT DEFAULT '{}');
+ CREATE TABLE device_profiles(device_id TEXT PRIMARY KEY,completed_json TEXT DEFAULT '[]',scores_json TEXT DEFAULT '{}',
+  attempts_json TEXT DEFAULT '{}',total_active_seconds INTEGER DEFAULT 0,last_activity_at TEXT);
  CREATE TABLE manager_device_assignments(target_device_id TEXT PRIMARY KEY,manager_device_id TEXT,person_role TEXT);
  CREATE TABLE manager_approval_limits(scope TEXT PRIMARY KEY,learner_limit INTEGER,teacher_limit INTEGER);
  INSERT INTO manager_approval_limits VALUES('manager-tier',200,10);
@@ -142,6 +143,42 @@ test('V2 sync: explicit per-device consent, ACK and idempotent retry, conflict a
   assert.equal((await f.sync.read(b.token,scope)).records.length,1);
   await f.service.revokeDevice(learner.token,b.deviceId);
   await assert.rejects(()=>f.sync.read(b.token,scope),/SESSION_INVALID/);
+ }finally{f.sqlite.close()}
+});
+test('V2 canonical course read: only consented active devices see same server-owned progress, never synthetic sync claims',async()=>{
+ const f=fixture();try{
+  const manager=await activateManager(f),learner=await activateLearner(f,manager);
+  const storageId=learner.account.storageDeviceId;
+  f.sqlite.prepare(`UPDATE device_profiles SET completed_json=?,scores_json=?,attempts_json=?,
+    total_active_seconds=?,last_activity_at=? WHERE device_id=?`)
+   .run(JSON.stringify(['hoc-tap-01','kiem-tra-01','bai-01']),JSON.stringify({'01':9}),
+     JSON.stringify({'01':2}),135,'2026-11-08T10:00:00.000Z',storageId);
+  await assert.rejects(()=>f.sync.canonicalCourseProgress(learner.token),e=>e.code==='SYNC_CONSENT_REQUIRED');
+  await f.sync.consent(learner.token,'learning-progress',true,payload(1).password);
+  const original=await f.sync.canonicalCourseProgress(learner.token);
+  assert.equal(original.source,'server-verified-device-profile');
+  assert.equal(original.readOnly,true);assert.equal(original.accountId,learner.account.accountId);
+  assert.deepEqual(original.completed,['hoc-tap-01','kiem-tra-01','bai-01']);
+  assert.deepEqual(original.scores,{'01':9});assert.deepEqual(original.attempts,{'01':2});
+  assert.equal(original.totalActiveSeconds,135);
+  const second=await f.service.login({...payload(1),publicKey:await key()},'browser-b');
+  await assert.rejects(()=>f.sync.canonicalCourseProgress(second.token),e=>e.code==='DEVICE_APPROVAL_REQUIRED');
+  await f.service.approveDevice(learner.token,second.deviceId,payload(1).password,'browser-a');
+  assert.equal((await f.service.authorize(second.token)).storageDeviceId,storageId);
+  await assert.rejects(()=>f.sync.canonicalCourseProgress(second.token),e=>e.code==='SYNC_CONSENT_REQUIRED');
+  await f.sync.consent(second.token,'learning-progress',true,payload(1).password);
+  assert.deepEqual(await f.sync.canonicalCourseProgress(second.token),original,
+   'distinct trusted browser keys must read one canonical course profile');
+  await f.sync.write(second.token,{scope:'learning-progress',eventId:'event-canonical-0001',recordKey:'bai-01',
+   expectedRevision:0,data:{lessonId:'bai-01',completedParts:['unverified-client-part']}});
+  assert.deepEqual((await f.sync.canonicalCourseProgress(learner.token)).completed,original.completed,
+   'client queued sync must never award completion in canonical course');
+  const third=await f.service.login({...payload(1),publicKey:await key()},'browser-c');
+  assert.equal((await f.service.session(third.token)).deviceApproved,false);
+  await f.service.revokeDevice(learner.token,second.deviceId);
+  await assert.rejects(()=>f.sync.canonicalCourseProgress(second.token),e=>e.code==='SESSION_INVALID');
+  assert.deepEqual((await f.sync.canonicalCourseProgress(learner.token)).scores,{'01':9},
+   'revocation never deletes the canonical course record');
  }finally{f.sqlite.close()}
 });
 test('V2 migration retains historical accounts in legacy_hold until explicit reconciliation',()=>{
