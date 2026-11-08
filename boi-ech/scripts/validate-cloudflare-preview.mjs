@@ -38,6 +38,10 @@ for (const token of [
   '"binding": "BUCKET"',
   '"bucket_name": "boi-ech-preview-payments"',
   '__BOI_ECH_PREVIEW_D1_DATABASE_ID__',
+  '__BOI_ECH_PREVIEW_ORIGIN__',
+  '"BOI_ECH_ACCOUNT_ORIGIN": "__BOI_ECH_PREVIEW_ORIGIN__"',
+  '"BOI_ECH_ACCOUNT_FIRST": "true"',
+  '"BOI_ECH_ACCOUNT_V2": "true"',
 ]) {
   if (!template.includes(token)) throw new Error(`Preview template thiếu: ${token}`);
 }
@@ -47,6 +51,14 @@ if (!prepare.includes('d1Uuid("BOI_ECH_PRODUCTION_D1_DATABASE_ID")') || !prepare
 }
 if (prepare.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Prepare script không được hard-code production D1 ID.");
 if (!prepare.includes(".chatgpt.site")) throw new Error("Prepare script phải chặn fallback về ChatGPT Sites.");
+for (const marker of [
+  'optionalHttpsOrigin("BOI_ECH_PREVIEW_ORIGIN")',
+  'optionalHttpsOrigin("APPLICATION_MANAGEMENT_PREVIEW_ORIGIN")',
+  'if (!boiPreviewOrigin || !applicationManagementOrigin)',
+  'if (boiPreviewOrigin === applicationManagementOrigin)',
+]) {
+  if (!prepare.includes(marker)) throw new Error(`V2 Preview thiếu kiểm tra origins: ${marker}`);
+}
 if (!vite.includes("CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH") || !vite.includes("boi-ech-local")) {
   throw new Error("Vite phải tách local binding khỏi Cloudflare preview config.");
 }
@@ -71,6 +83,24 @@ for (const token of ["DEPLOY_PREVIEW", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_EC
   if (!previewWorkflow.includes(token)) throw new Error(`Preview workflow thiếu: ${token}`);
 }
 if (previewWorkflow.includes("boi-ech-db --remote")) throw new Error("Preview workflow không được migrate production D1.");
+for (const marker of [
+  'CONTROL_SERVICE_SECRET: ${{ secrets.CONTROL_SERVICE_SECRET }}',
+  'missing+=("CONTROL_SERVICE_SECRET")',
+  'missing+=("BOI_ECH_PREVIEW_ORIGIN")',
+  'missing+=("APPLICATION_MANAGEMENT_PREVIEW_ORIGIN")',
+  'npx wrangler secret put CONTROL_SERVICE_SECRET',
+  'Protected Preview environment is incomplete',
+]) {
+  if (!previewWorkflow.includes(marker)) throw new Error(`Preview chưa có fail-closed Owner bridge: ${marker}`);
+}
+const artifactGuard = previewWorkflow.indexOf("name: Verify generated Preview artifact before any remote D1 mutation");
+const sqlMutation = previewWorkflow.indexOf("name: Apply isolated Preview migrations");
+if (artifactGuard < 0 || sqlMutation < artifactGuard) {
+  throw new Error("Preview phải build+verify trước khi ghi D1 từ xa.");
+}
+if (/Development preview skipped; missing:/.test(previewWorkflow)) {
+  throw new Error("Preview không được báo workflow thành công khi thiếu bí mật.");
+}
 if (previewWorkflow.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Preview workflow không được hard-code production D1 ID.");
 if (previewWorkflow.includes("grep -R") && previewWorkflow.includes(".wrangler/deploy/config.json")) {
   throw new Error("Preview workflow không được grep redirect file như generated config.");
