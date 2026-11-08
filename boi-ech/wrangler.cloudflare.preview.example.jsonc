@@ -20,12 +20,6 @@
       "migrations_dir": "drizzle"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "boi-ech-preview-payments"
-    }
-  ],
   "vars": {
     "APPLICATION_MANAGEMENT_ORIGIN": "__APPLICATION_MANAGEMENT_PREVIEW_ORIGIN__",
     "BOI_ECH_ACCOUNT_ORIGIN": "__BOI_ECH_PREVIEW_ORIGIN__",

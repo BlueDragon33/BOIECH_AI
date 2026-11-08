@@ -42,8 +42,9 @@ if (String(db.database_id ?? "").toLowerCase() !== previewId) fail("Generated co
 if (String(db.database_id ?? "").toLowerCase() === LOCAL_D1_ID) fail("Generated config references local D1.");
 if (productionId && String(db.database_id ?? "").toLowerCase() === productionId) fail("Generated config references production D1.");
 
-const bucket = (Array.isArray(generated.r2_buckets) ? generated.r2_buckets : []).find((item) => item?.binding === "BUCKET");
-if (!bucket || bucket.bucket_name !== "boi-ech-preview-payments") fail("Generated config missing isolated Bơi ếch preview payment R2 bucket.");
+if (generated.r2_buckets !== undefined && (!Array.isArray(generated.r2_buckets) || generated.r2_buckets.length > 0)) {
+  fail("Account-first FREE Preview must not configure R2. Payment-proof storage remains unavailable.");
+}
 if (generated.assets?.binding !== "ASSETS") fail("Generated config missing ASSETS binding.");
 if (generated.images?.binding !== "IMAGES") fail("Generated config missing IMAGES binding.");
 
@@ -55,4 +56,4 @@ console.log("Bơi ếch generated Cloudflare deployment artifact PASS.");
 console.log(`Redirect: .wrangler/deploy/config.json -> ${generatedRelative}`);
 console.log(`Worker: ${generated.name}`);
 console.log(`D1: ${db.database_name}`);
-console.log(`R2: ${bucket.bucket_name}`);
+console.log("R2: disabled (FREE Account-first Preview; payment-proof storage not accepted)");

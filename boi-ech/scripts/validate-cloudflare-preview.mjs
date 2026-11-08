@@ -35,8 +35,6 @@ for (const token of [
   '"binding": "DB"',
   '"binding": "ASSETS"',
   '"binding": "IMAGES"',
-  '"binding": "BUCKET"',
-  '"bucket_name": "boi-ech-preview-payments"',
   '__BOI_ECH_PREVIEW_D1_DATABASE_ID__',
   '__BOI_ECH_PREVIEW_ORIGIN__',
   '"BOI_ECH_ACCOUNT_ORIGIN": "__BOI_ECH_PREVIEW_ORIGIN__"',
@@ -44,6 +42,10 @@ for (const token of [
   '"BOI_ECH_ACCOUNT_V2": "true"',
 ]) {
   if (!template.includes(token)) throw new Error(`Preview template thiếu: ${token}`);
+}
+const templateConfig = JSON.parse(template);
+if (templateConfig.r2_buckets !== undefined && (!Array.isArray(templateConfig.r2_buckets) || templateConfig.r2_buckets.length > 0)) {
+  throw new Error("Account-first FREE Preview must not configure R2.");
 }
 if (template.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Preview template chứa production D1 ID.");
 if (!prepare.includes('d1Uuid("BOI_ECH_PRODUCTION_D1_DATABASE_ID")') || !prepare.includes(LOCAL_D1_ID)) {
@@ -63,7 +65,7 @@ if (!vite.includes("CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH") || !vite.includes("bo
   throw new Error("Vite phải tách local binding khỏi Cloudflare preview config.");
 }
 
-for (const marker of ["redirect.configPath", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "boi-ech-preview-db", "boi-ech-preview-payments", "BOI_ECH_DEPLOYMENT_CHANNEL"]) {
+for (const marker of ["redirect.configPath", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "boi-ech-preview-db", "BOI_ECH_DEPLOYMENT_CHANNEL", "Account-first FREE Preview must not configure R2"]) {
   if (!artifact.includes(marker)) throw new Error(`Generated artifact validator thiếu guard: ${marker}`);
 }
 
@@ -111,4 +113,4 @@ if (!productionWorkflow.includes("workflow_dispatch") || !productionWorkflow.inc
 }
 if (/\n\s*push\s*:/.test(productionWorkflow)) throw new Error("Production không được auto-deploy khi push main trong giai đoạn migration.");
 
-console.log("Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, fail-closed production D1 guard, generated preview D1/R2 artifact verified.");
+console.log("Boi Ech Cloudflare scaffold gate PASS: canonical central separated, production frozen, fail-closed production D1 guard, FREE Account-first Preview excludes R2. Remote and payment acceptance remain separate.");

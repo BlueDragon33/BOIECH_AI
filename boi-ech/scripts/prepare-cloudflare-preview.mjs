@@ -73,7 +73,12 @@ if (/__[A-Z0-9_]+__/.test(rendered)) throw new Error("Cloudflare preview config 
 if (!rendered.includes('"BOI_ECH_ACCOUNT_FIRST": "true"') || !rendered.includes('"BOI_ECH_ACCOUNT_V2": "true"')) {
   throw new Error("Bản Preview phải bật đủ Account-first V2 để có thể nghiệm thu.");
 }
+const previewConfig = JSON.parse(rendered);
+if (previewConfig.r2_buckets !== undefined && (!Array.isArray(previewConfig.r2_buckets) || previewConfig.r2_buckets.length > 0)) {
+  throw new Error("Account-first FREE Preview must not configure R2. Payment-proof storage remains unavailable.");
+}
 fs.writeFileSync(TARGET, rendered, { mode: 0o600 });
-console.log(`Prepared ${TARGET} with isolated preview D1/R2 and revision ${revision}.`);
+console.log(`Prepared ${TARGET} with isolated preview D1 and revision ${revision}.`);
+console.log("R2 disabled for FREE Account-first Preview; payment-proof storage is not accepted by this deployment.");
 console.log(`Account-first V2 isolated to Preview origin: ${boiPreviewOrigin}`);
 console.log(`Application Management preview origin: ${applicationManagementOrigin}`);
