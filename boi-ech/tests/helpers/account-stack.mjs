@@ -4,7 +4,7 @@ const nativeRequire=createRequire(import.meta.url),root=fileURLToPath(new URL('.
 export function accountStack(){
  const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
  for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sqlite.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));
- function prepare(sql){let args=[];return{bind(...a){args=a;return this},async first(){return sqlite.prepare(sql).get(...args)??null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return{meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}},_run(){const st=sqlite.prepare(sql);return st.columns().length?{results:st.all(...args),meta:{changes:0}}:{meta:{changes:Number(st.run(...args).changes)}}}}}
+ function prepare(sql){let args=[];return{bind(...a){args=a;return this},async first(){return sqlite.prepare(sql).get(...args)??null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return{meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}},_run(){const st=sqlite.prepare(sql);return /^\s*(?:SELECT|PRAGMA|EXPLAIN)\b/i.test(sql)?{results:st.all(...args),meta:{changes:0}}:{meta:{changes:Number(st.run(...args).changes)}}}}}
  const db={prepare,async batch(stmts){sqlite.exec('BEGIN IMMEDIATE');try{const result=stmts.map(s=>s._run());sqlite.exec('COMMIT');return result}catch(e){sqlite.exec('ROLLBACK');throw e}}};
  let cookie='';const bindings={DB:db,BOI_ECH_ACCOUNT_FIRST:'true',BOI_ECH_ACCOUNT_ORIGIN:'https://fixture.invalid'},cache=new Map();
  function load(relative){const filename=path.resolve(root,'app',relative);if(cache.has(filename))return cache.get(filename).exports;const loaded={exports:{}};cache.set(filename,loaded);
