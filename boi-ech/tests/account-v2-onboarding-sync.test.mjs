@@ -27,7 +27,7 @@ function fixture(){
  CREATE TABLE manager_approval_limits(scope TEXT PRIMARY KEY,learner_limit INTEGER,teacher_limit INTEGER);
  INSERT INTO manager_approval_limits VALUES('manager-tier',200,10);
  CREATE TABLE access_automation_settings(id TEXT PRIMARY KEY,default_access_days INTEGER);
- INSERT INTO access_automation_settings VALUES('global',30);`);
+ INSERT INTO access_automation_settings VALUES('global',90);`);
  for(const file of ['0018_account_first.sql','0019_account_capacity.sql','0020_account_onboarding_v2.sql','0021_account_verified_sync.sql','0023_account_entitlement.sql']){
   sqlite.exec(fs.readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
  }
@@ -66,6 +66,10 @@ async function activateManager(f,n=100){
   {accountId:m.account.accountId,operation:'approve-manager',expectedRevision:0});
  assert.equal(approved.status,'approved');
  assert.equal((await f.flow.ownStatus(m.token)).stage,'active');
+ const readback=await f.service.ownerRead(m.account.accountId);
+ assert.ok(readback.entitlement?.active, 'second review must grant account entitlement');
+ const days=(Date.parse(readback.entitlement.expiresAt)-Date.now())/86400000;
+ assert.ok(days>29.99 && days<=30, 'account entitlement must be 30 days even if legacy device default is 90');
  return m;
 }
 async function activateLearner(f,manager,n=1){
@@ -74,6 +78,9 @@ async function activateLearner(f,manager,n=1){
  await f.flow.firstReview({kind:'manager',token:manager.token},learner.account.accountId,1);
  await f.flow.submitProfile(learner.token,{...profile(n),expectedRevision:2});
  await f.service.review(manager.token,learner.account.accountId,'approve');
+ const readback=await f.service.ownerRead(learner.account.accountId);
+ assert.ok(readback.entitlement?.active, 'learner needs independent active account entitlement');
+ assert.ok((Date.parse(readback.entitlement.expiresAt)-Date.now())/86400000 > 29.99);
  return learner;
 }
 test('V2 two-stage manager+learner approval: no premature access, owner/manager limits, audited transitions',async()=>{
