@@ -2,7 +2,7 @@ name: BOIECH_AI Validation CI
 
 on:
   push:
-    branches: [main, feat/boi-account-entitlement-108-20261108]
+    branches: [main, feat/boi-account-entitlement-108-20261108, feat/boi-v2-mobile-console-integration-20261108]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -55,7 +55,7 @@ jobs:
         timeout-minutes: 6
         run: npm test
       - name: Rehearse full D1 SQL migration sequence in isolated local Wrangler
-        if: github.ref == 'refs/heads/feat/boi-account-entitlement-108-20261108'
+        if: github.ref == 'refs/heads/feat/boi-account-entitlement-108-20261108' || github.ref == 'refs/heads/feat/boi-v2-mobile-console-integration-20261108'
         working-directory: boi-ech
         timeout-minutes: 5
         env:
