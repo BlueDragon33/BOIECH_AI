@@ -33,7 +33,10 @@ test('real client uses fresh signed proofs, keeps a command after lost reply, an
   const {TrainingDashboard}=load('app/manager-workspace.tsx',fetch);
   for(const tab of ['overview','schedule','people','class','room','building']){
    const html=renderToStaticMarkup(React.createElement(TrainingDashboard,{board,tab,setTab:()=>{},busy:false,notice:'',onCommand:async()=>false,onWindowChange:()=>{}}));
-   assert.match(html,/Cán bộ quản lý/);assert.match(html,/data-tone=/);assert.ok(!html.includes('0900000110'));
+   assert.match(html,/Cán bộ quản lý/);
+   if(tab==='schedule')assert.match(html,/Chưa có buổi học phù hợp/);
+   else assert.match(html,/data-tone=/);
+   assert.ok(!html.includes('0900000110'));
   }
  }finally{f.sqlite.close();}
 });
