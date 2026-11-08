@@ -55,15 +55,25 @@ if (d1Id === productionD1Id) {
 }
 
 const applicationManagementOrigin = optionalHttpsOrigin("APPLICATION_MANAGEMENT_PREVIEW_ORIGIN");
+const boiPreviewOrigin = optionalHttpsOrigin("BOI_ECH_PREVIEW_ORIGIN");
+if (!boiPreviewOrigin || !applicationManagementOrigin) {
+  throw new Error("Both BOI_ECH_PREVIEW_ORIGIN and APPLICATION_MANAGEMENT_PREVIEW_ORIGIN are required for isolated V2/Owner acceptance.");
+}
+if (boiPreviewOrigin === applicationManagementOrigin) {
+  throw new Error("Bơi ếch và Application-Management Preview phải có HTTPS origins riêng.");
+}
 const revision = buildRevision();
 const rendered = fs.readFileSync(TEMPLATE, "utf8")
   .replace("__BOI_ECH_PREVIEW_D1_DATABASE_ID__", d1Id)
   .replace("__APPLICATION_MANAGEMENT_PREVIEW_ORIGIN__", applicationManagementOrigin)
+  .replace("__BOI_ECH_PREVIEW_ORIGIN__", boiPreviewOrigin)
   .replace("__BOI_ECH_BUILD_REVISION__", revision);
 
 if (/__[A-Z0-9_]+__/.test(rendered)) throw new Error("Cloudflare preview config vẫn còn placeholder.");
+if (!rendered.includes('"BOI_ECH_ACCOUNT_FIRST": "true"') || !rendered.includes('"BOI_ECH_ACCOUNT_V2": "true"')) {
+  throw new Error("Bản Preview phải bật đủ Account-first V2 để có thể nghiệm thu.");
+}
 fs.writeFileSync(TARGET, rendered, { mode: 0o600 });
 console.log(`Prepared ${TARGET} with isolated preview D1/R2 and revision ${revision}.`);
-console.log(applicationManagementOrigin
-  ? `Application Management preview origin: ${applicationManagementOrigin}`
-  : "Application Management preview origin chưa có; browser Control API sẽ fail-closed cho tới khi cấu hình và redeploy.");
+console.log(`Account-first V2 isolated to Preview origin: ${boiPreviewOrigin}`);
+console.log(`Application Management preview origin: ${applicationManagementOrigin}`);
