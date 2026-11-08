@@ -35,7 +35,7 @@ function fixture(){
   async first(){return sqlite.prepare(sql).get(...args)??null},
   async all(){return {results:sqlite.prepare(sql).all(...args)}},
   async run(){const out=sqlite.prepare(sql).run(...args);return {meta:{changes:Number(out.changes)}}},
-  _run(){const st=sqlite.prepare(sql);if(st.columns().length)return {results:st.all(...args),meta:{changes:0}};
+  _run(){const st=sqlite.prepare(sql);if(/^\s*(?:SELECT|PRAGMA|EXPLAIN)\b/i.test(sql))return {results:st.all(...args),meta:{changes:0}};
    return {meta:{changes:Number(st.run(...args).changes)}};}};
  }
  const db={prepare,async batch(stmts){sqlite.exec('BEGIN IMMEDIATE');try{
@@ -113,7 +113,7 @@ test('V2 device link: 3 slots, untrusted pending device blocked, trusted confirm
   await f.service.approveDevice(learner.token,b.deviceId,payload(1).password,'a');
   assert.equal((await f.service.authorize(b.token)).status,'approved');
   const c=await f.service.login({...payload(1),publicKey:await key()},'browser-c');
-  await assert.rejects(()=>f.service.login({...payload(1),publicKey:await key()},'browser-d'),e=>e.code==='DEVICE_LIMIT_REACHED');
+  await assert.rejects(async()=>f.service.login({...payload(1),publicKey:await key()},'browser-d'),e=>e.code==='DEVICE_LIMIT_REACHED');
   await f.service.revokeDevice(learner.token,b.deviceId);
   await assert.rejects(()=>f.service.session(b.token),/SESSION_INVALID/);
   assert.equal((await f.service.session(c.token)).deviceApproved,false);
