@@ -23,7 +23,7 @@ export default function ManagerV2ReviewPanel(){
   }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  },[]);
- useEffect(()=>{mounted.current=true;void refresh();return()=>{mounted.current=false};},[refresh]);
+ useEffect(()=>{mounted.current=true;void Promise.resolve().then(()=>{if(mounted.current)return refresh();});return()=>{mounted.current=false};},[refresh]);
  async function decide(person:Person,action:"review-first"|"review"|"review-changes"){
   if(locked.current)return;
   const label=action==="review-first"?"duyệt tài khoản lần một":action==="review"?"kích hoạt lần hai":"yêu cầu bổ sung";
