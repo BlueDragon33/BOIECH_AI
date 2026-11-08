@@ -45,7 +45,9 @@ try{
  function prepare(sql){let args=[];return {bind(...values){args=values;return this},async first(){return sqlite.prepare(sql).get(...args)??null},async all(){return {results:sqlite.prepare(sql).all(...args)}},async run(){return {meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}},execute(){return {meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}}}}
  const db={prepare,async batch(queries){sqlite.exec('BEGIN IMMEDIATE');try{const result=queries.map(q=>q.execute());sqlite.exec('COMMIT');return result}catch(error){sqlite.exec('ROLLBACK');throw error}}};
  const loaded={exports:{}};const code=ts.transpileModule(readFileSync(new URL('../app/account-core.server.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- new Function('require','module','exports',code)(createRequire(import.meta.url),loaded,loaded.exports);
+ const entitlement={exports:{}};const entitlementCode=ts.transpileModule(readFileSync(new URL('../app/account-entitlement.server.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ new Function('require','module','exports',entitlementCode)(createRequire(import.meta.url),entitlement,entitlement.exports);
+ new Function('require','module','exports',code)(name=>name==='./account-entitlement.server'?entitlement.exports:createRequire(import.meta.url)(name),loaded,loaded.exports);
  const service=new loaded.exports.AccountService(db);const report=await service.migrationReport();
  if(report.conflicts.length){process.stdout.write(JSON.stringify({mode:'LOCAL_SNAPSHOT_DRY_RUN',node:process.version,report,applied:false})+'\n');process.exitCode=2;}
  else{
