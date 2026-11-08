@@ -2,7 +2,7 @@ name: BOIECH_AI Validation CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/boi-account-entitlement-108-20261108]
   pull_request:
     branches: [main]
   workflow_dispatch:
