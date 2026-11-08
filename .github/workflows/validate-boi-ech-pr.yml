@@ -54,3 +54,17 @@ jobs:
         working-directory: boi-ech
         timeout-minutes: 6
         run: npm test
+      - name: Rehearse full D1 SQL migration sequence in isolated local Wrangler
+        if: github.ref == 'refs/heads/feat/boi-account-entitlement-108-20261108'
+        working-directory: boi-ech
+        timeout-minutes: 5
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          CI: "true"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Local Miniflare D1 only: no account ID, API token, remote flag, paid resource or deployment.
+          npx --no-install wrangler d1 migrations apply boi-ech-local --local --config wrangler.local.jsonc --yes
+          npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT role,default_days FROM account_duration_policies ORDER BY role"
+          npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT account_id,expires_at,revision FROM account_entitlements LIMIT 1"
