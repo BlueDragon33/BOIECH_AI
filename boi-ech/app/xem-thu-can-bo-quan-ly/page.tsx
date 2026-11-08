@@ -4,7 +4,7 @@ import {useState} from "react";
 import ManagerApprovalPanel from "../manager-approval-panel";
 import {TrainingDashboard} from "../manager-workspace";
 import type {TrainingBoard} from "../training-types";
-type Tab="overview"|"schedule"|"people"|"building"|"room"|"class";
+type Tab="overview"|"schedule"|"people"|"building"|"room"|"class"|"settings";
 
 const DEMO_BOARD:TrainingBoard={
   from:"2026-11-02T08:00:00.000Z",to:"2026-11-02T18:00:00.000Z",
