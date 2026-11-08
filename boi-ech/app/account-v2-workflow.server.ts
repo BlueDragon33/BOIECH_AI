@@ -46,9 +46,10 @@ export class AccountV2Workflow {
   }
   async firstReview(authority: Authority, targetId: string, revision: unknown) {
     const target = await this.state(targetId);
+    // Check reviewer authorization before returning a stage/revision conflict.
+    const reviewer = await this.reviewer(authority, target.role, targetId);
     if (target.stage !== "requested" || target.status !== "pending" || !Number.isInteger(revision)
       || revision !== target.revision) bad("ACCOUNT_CAS_CONFLICT", 409);
-    const reviewer = await this.reviewer(authority, target.role, targetId);
     const expected=revision as number;
     const statements: D1PreparedStatement[] = [
       this.db.prepare(`UPDATE account_onboarding SET stage='profile_required',revision=revision+1,
@@ -95,8 +96,8 @@ export class AccountV2Workflow {
   }
   async requestChanges(authority: Authority, targetId: string, revision: unknown, reason: unknown) {
     const target=await this.state(targetId);
-    if(target.stage!=="profile_review"||!Number.isInteger(revision)||revision!==target.revision) bad("ACCOUNT_CAS_CONFLICT",409);
     const reviewer=await this.reviewer(authority,target.role,targetId);
+    if(target.stage!=="profile_review"||!Number.isInteger(revision)||revision!==target.revision) bad("ACCOUNT_CAS_CONFLICT",409);
     const expected=revision as number;
     if(authority.kind==="manager" && target.first_review_by!==reviewer.id) bad("ACCOUNT_SCOPE_FORBIDDEN",403);
     const note=field(reason,200);
