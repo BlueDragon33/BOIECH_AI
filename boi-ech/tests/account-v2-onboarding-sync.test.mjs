@@ -8,7 +8,7 @@ function load(path,imports={}) {
  const src=fs.readFileSync(new URL(path,import.meta.url),'utf8');
  const compiled=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const m={exports:{}};
- new Function('require','module','exports',compiled)(key=>imports[key]??realRequire(key),m,m.exports);
+ new Function('require','module','exports',compiled)(key=>key==='./account-entitlement.server'?load('../app/account-entitlement.server.ts'):imports[key]??realRequire(key),m,m.exports);
  return m.exports;
 }
 function fixture(){
@@ -28,7 +28,7 @@ function fixture(){
  INSERT INTO manager_approval_limits VALUES('manager-tier',200,10);
  CREATE TABLE access_automation_settings(id TEXT PRIMARY KEY,default_access_days INTEGER);
  INSERT INTO access_automation_settings VALUES('global',30);`);
- for(const file of ['0018_account_first.sql','0019_account_capacity.sql','0020_account_onboarding_v2.sql','0021_account_verified_sync.sql']){
+ for(const file of ['0018_account_first.sql','0019_account_capacity.sql','0020_account_onboarding_v2.sql','0021_account_verified_sync.sql','0023_account_entitlement.sql']){
   sqlite.exec(fs.readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
  }
  function prepare(sql){let args=[];return {bind(...a){args=a;return this},
