@@ -19,7 +19,7 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
    call(accountId,{action:"status"}) as Promise<{grants:Consent[]}>,readPendingSync(accountId)]);
   setGrants(result.grants);setPending(local.pending);setConflicts(local.conflicts);
  },[accountId]);
- useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Không đọc được trạng thái.");});
+ useEffect(()=>{let alive=true;void Promise.resolve().then(()=>{if(alive)return refresh();}).catch(e=>{if(alive)setError(e instanceof Error?e.message:"Không đọc được trạng thái.");});
   return()=>{alive=false};},[refresh]);
  async function toggle(event:FormEvent<HTMLFormElement>,scope:Scope,enabled:boolean){
   event.preventDefault();
