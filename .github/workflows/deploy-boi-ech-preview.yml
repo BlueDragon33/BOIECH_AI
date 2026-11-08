@@ -79,6 +79,15 @@ jobs:
         working-directory: boi-ech
         run: npm run cloudflare:preview:prepare
 
+      - name: Confirm dedicated D1 Preview identity without remote writes
+        if: steps.config.outputs.ready == 'true'
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install wrangler d1 list --json --config wrangler.cloudflare.preview.jsonc > "$RUNNER_TEMP/boi-ech-preview-d1-list.json"
+          node scripts/assert-preview-d1-inventory.mjs "$RUNNER_TEMP/boi-ech-preview-d1-list.json"
+
       - name: Build preview before any remote D1 mutation
         if: steps.config.outputs.ready == 'true'
         working-directory: boi-ech
