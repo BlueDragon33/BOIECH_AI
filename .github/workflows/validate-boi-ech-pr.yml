@@ -41,7 +41,9 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Audit release boundaries
         working-directory: boi-ech
-        run: npm run validate:release
+        run: |
+          npm run validate:release
+          npm run validate:cloudflare-preview
       - name: Lint application
         working-directory: boi-ech
         timeout-minutes: 2
