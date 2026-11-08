@@ -7,7 +7,7 @@ import ts from 'typescript';
 const require=createRequire(import.meta.url);
 const source=new URL('../app/account-core.server.ts',import.meta.url);
 // Fail as an assertion until the production service exists.
-function moduleUnderTest(){assert.ok(fs.existsSync(source),'account core must exist');const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync(source,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(require,m,m.exports);return m.exports;}
+function moduleUnderTest(){assert.ok(fs.existsSync(source),'account core must exist');const m={exports:{}};const entitlement={exports:{}};const entitlementCode=ts.transpileModule(fs.readFileSync(new URL('../app/account-entitlement.server.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;new Function('require','module','exports',entitlementCode)(require,entitlement,entitlement.exports);new Function('require','module','exports',ts.transpileModule(fs.readFileSync(source,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>name==='./account-entitlement.server'?entitlement.exports:require(name),m,m.exports);return m.exports;}
 function fixture(){
  const sqlite=new DatabaseSync(':memory:');sqlite.exec(`PRAGMA foreign_keys=ON;
  CREATE TABLE device_access(device_id TEXT PRIMARY KEY,display_code TEXT UNIQUE,public_key_jwk TEXT,status TEXT DEFAULT 'pending',person_role TEXT,person_code TEXT,phone TEXT UNIQUE,learner_name TEXT,learner_family_name TEXT,learner_given_name TEXT,class_name TEXT,registration_submitted_at TEXT,management_enabled INTEGER DEFAULT 0,access_expires_at TEXT,access_group TEXT DEFAULT 'unassigned',payment_status TEXT DEFAULT 'unassigned',approved_at TEXT,blocked_at TEXT,updated_at TEXT,last_seen_at TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -24,7 +24,7 @@ function fixture(){
    async first(){return sqlite.prepare(sql).get(...args)??null},
    async all(){return {results:sqlite.prepare(sql).all(...args)}},
    async run(){const r=sqlite.prepare(sql).run(...args);return {meta:{changes:Number(r.changes)}}},
-   _run(){const st=sqlite.prepare(sql);if(st.columns().length)return {results:st.all(...args),meta:{changes:0}};return {meta:{changes:Number(st.run(...args).changes)}}}
+   _run(){const st=sqlite.prepare(sql);if(/^\s*(?:SELECT|PRAGMA|EXPLAIN)\b/i.test(sql))return {results:st.all(...args),meta:{changes:0}};return {meta:{changes:Number(st.run(...args).changes)}}}
   };
  }
  const db={prepare,async batch(statements){sqlite.exec('BEGIN IMMEDIATE');try{const r=statements.map(s=>s._run());sqlite.exec('COMMIT');return r}catch(e){sqlite.exec('ROLLBACK');throw e}}};

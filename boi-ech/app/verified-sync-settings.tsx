@@ -4,6 +4,8 @@ import type { FormEvent } from "react";
 import {flushVerifiedSync,readPendingSync} from "./verified-sync-client";
 type Scope="learning-progress"|"study-preferences";
 type Consent={scope:string;enabled:number;revision:number;confirmed_at:string|null};
+type CanonicalCourse={source:"server-verified-device-profile";readOnly:true;completed:string[];
+ scores:Record<string,number>;attempts:Record<string,number>;totalActiveSeconds:number;lastActivityAt:string|null};
 async function call(accountId:string,data:Record<string,unknown>){
  const response=await fetch("/api/accounts/sync",{method:"POST",cache:"no-store",credentials:"same-origin",
   headers:{"content-type":"application/json"},body:JSON.stringify({...data,accountId})});
@@ -14,12 +16,13 @@ async function call(accountId:string,data:Record<string,unknown>){
 export default function VerifiedSyncSettings({accountId}:{accountId:string}){
  const [grants,setGrants]=useState<Consent[]>([]),[pending,setPending]=useState(0),[conflicts,setConflicts]=useState(0);
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
+ const [canonical,setCanonical]=useState<CanonicalCourse|null>(null);
  const refresh=useCallback(async()=>{
   const [result,local]=await Promise.all([
    call(accountId,{action:"status"}) as Promise<{grants:Consent[]}>,readPendingSync(accountId)]);
   setGrants(result.grants);setPending(local.pending);setConflicts(local.conflicts);
  },[accountId]);
- useEffect(()=>{let alive=true;void refresh().catch(e=>{if(alive)setError(e instanceof Error?e.message:"Không đọc được trạng thái.");});
+ useEffect(()=>{let alive=true;void Promise.resolve().then(()=>{if(alive)return refresh();}).catch(e=>{if(alive)setError(e instanceof Error?e.message:"Không đọc được trạng thái.");});
   return()=>{alive=false};},[refresh]);
  async function toggle(event:FormEvent<HTMLFormElement>,scope:Scope,enabled:boolean){
   event.preventDefault();
@@ -27,6 +30,7 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
   const form=event.currentTarget;const password=String(new FormData(form).get("password")||"");form.reset();
   setBusy(true);setError("");setNotice("");
   try{await call(accountId,{action:"consent",scope,enabled,password});await refresh();
+   if(scope==="learning-progress")setCanonical(null);
    setNotice(enabled?"Đã xác nhận phạm vi đồng bộ cho thiết bị này.":"Đã thu hồi quyền đồng bộ của thiết bị này.");}
   catch(e){setError(e instanceof Error?e.message:"Đồng bộ chưa được xác nhận.");}
   finally{setBusy(false);}
@@ -38,6 +42,15 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
    setNotice(`Máy chủ đã xác nhận ${result.sent} bản cập nhật; còn ${result.remaining} chờ, ${result.conflicts} xung đột.`);
    if(result.error)setError(result.error);}
   catch(e){setError(e instanceof Error?e.message:"Không gửi được đồng bộ.");}
+  finally{setBusy(false);}
+ }
+ async function inspectCanonical(){
+  if(busy)return;
+  setBusy(true);setError("");setNotice("");
+  try{const data=await call(accountId,{action:"canonical-course"}) as CanonicalCourse;
+   if(data.source!=="server-verified-device-profile"||data.readOnly!==true)throw new Error("Tiến độ gốc chưa được xác minh.");
+   setCanonical(data);setNotice("Đã đối chiếu tiến độ học trên máy chủ; không thay đổi kết quả hoặc hàng đợi.");}
+  catch(e){setCanonical(null);setError(e instanceof Error?e.message:"Không kiểm tra được tiến độ gốc.");}
   finally{setBusy(false);}
  }
  return <details style={{marginBlock:"1rem"}}><summary><strong>Đồng bộ có xác nhận</strong> · Chưa gửi: {pending} · Xung đột: {conflicts}</summary>
@@ -53,6 +66,13 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
     </form>;
   })}
   <button type="button" disabled={busy||pending===0} onClick={()=>void flush()}>Đồng bộ ngay dữ liệu đang chờ</button>
+  <button type="button" disabled={busy||!grants.some(g=>g.scope==="learning-progress"&&g.enabled===1)}
+   onClick={()=>void inspectCanonical()}>Đối chiếu tiến độ học gốc trên máy chủ</button>
+  {canonical?<section aria-label="Tiến độ học đã xác minh" role="status">
+   <p>Dữ liệu xác minh: {canonical.completed.length} mục hoàn thành · {Object.keys(canonical.scores).length} bài có điểm · {canonical.totalActiveSeconds} giây học.</p>
+   <p>Hoạt động gần nhất: {canonical.lastActivityAt??"Chưa có"}.</p>
+   <p>Bản đối chiếu chỉ đọc. Không tự chuyển hàng đợi thành điểm hoặc chứng chỉ.</p>
+  </section>:null}
   <p>Dữ liệu ngoại tuyến chưa được máy chủ xác nhận vẫn giữ trên thiết bị. Khi xung đột, không tự ghi đè.</p>
  </details>;
 }

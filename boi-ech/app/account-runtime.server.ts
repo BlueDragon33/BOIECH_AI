@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { AccountError, AccountService, ACCOUNT_COOKIE } from "./account-core.server";
+import { AccountEntitlementError } from "./account-entitlement.server";
 import { DeviceAccessError, getCourseDatabase, getPublicDeviceState } from "./device-auth.server";
 
 export async function accountConfiguration() {
@@ -54,8 +55,8 @@ export async function accountRequest(request: Request) {
   return { service: await accountService(), token: await accountCookieToken(), config };
 }
 export function accountErrorResponse(error: unknown) {
-  const code = error instanceof AccountError ? error.code : error instanceof DeviceAccessError ? error.code : "ACCOUNT_SERVICE_UNAVAILABLE";
-  const status = error instanceof AccountError || error instanceof DeviceAccessError ? error.status : 503;
+  const code = error instanceof AccountError || error instanceof AccountEntitlementError ? error.code : error instanceof DeviceAccessError ? error.code : "ACCOUNT_SERVICE_UNAVAILABLE";
+  const status = error instanceof AccountError || error instanceof AccountEntitlementError || error instanceof DeviceAccessError ? error.status : 503;
   const messages: Record<string, string> = {
     AUTH_FAILED: "Tên đăng nhập hoặc thông tin xác thực chưa đúng.",
     RATE_LIMITED: "Đã vượt số lần thử. Hãy thử lại sau 15 phút.",
@@ -84,6 +85,12 @@ export function accountErrorResponse(error: unknown) {
     LEGACY_PROOF_REQUIRED: "Hãy chuyển tài khoản từ trình duyệt đã đăng ký, bằng khóa gốc của bạn.",
     ACCOUNT_PERMISSION_REQUIRED: "Tài khoản chưa được cấp quyền thực hiện thao tác này.",
     ACCOUNT_CAS_CONFLICT: "Thông tin đã thay đổi. Đồng bộ lại trước khi lưu.",
+    ACCOUNT_ENTITLEMENT_REQUIRED: "Tài khoản chưa được cấp thời hạn sử dụng hợp lệ.",
+    ACCOUNT_SUSPENDED: "Tài khoản đã bị tạm khóa quyền sử dụng.",
+    ACCOUNT_EXPIRED: "Tài khoản đã hết thời hạn sử dụng. Hãy yêu cầu gia hạn.",
+    ACCOUNT_REASON_REQUIRED: "Nhập lý do thay đổi thời hạn từ 5 đến 300 ký tự.",
+    ACCOUNT_ACCESS_POLICY_UNAVAILABLE: "Chính sách thời hạn tài khoản chưa sẵn sàng.",
+    ACCOUNT_READBACK_FAILED: "Hệ thống chưa xác minh được thay đổi. Hãy tải lại trước khi thử tiếp.",
   };
   return Response.json({ code, error: messages[code] ?? "Chưa xác minh được thao tác tài khoản. Hãy đồng bộ và thử lại." }, {
     status, headers: { "cache-control": "no-store, private", "x-content-type-options": "nosniff", ...(status === 429 ? { "retry-after": "900" } : {}) },

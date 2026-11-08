@@ -1,4 +1,5 @@
 import { AccountError } from "../../../account-core.server";
+import { AccountEntitlementService } from "../../../account-entitlement.server";
 import { readAccountCapacity, changeAccountCapacity } from "../../../account-capacity.server";
 import { AccountV2Workflow } from "../../../account-v2-workflow.server";
 import { getCourseDatabase } from "../../../device-auth.server";
@@ -14,7 +15,16 @@ export async function POST(request: Request) {
     if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);
     const input = JSON.parse(raw) as Record<string, unknown>;
     const service = await accountService();
-    if ((await accountConfiguration()).v2) {
+    const v2 = (await accountConfiguration()).v2;
+    const entitlement = v2 ? new AccountEntitlementService(await getCourseDatabase()) : null;
+    if (entitlement) {
+      if (input.action === "list-entitlements") return controlResponse({accounts:await entitlement.list(owner)},200,request);
+      if (input.action === "entitlement-policy") return controlResponse({policies:await entitlement.policy()},200,request);
+      if (input.action === "set-entitlement-policy") return controlResponse({policy:await entitlement.setPolicy(owner,input)},200,request);
+      if (input.action === "read-entitlement") return controlResponse({entitlement:await entitlement.read(input.accountId)},200,request);
+      if (input.action === "set-entitlement") return controlResponse({entitlement:await entitlement.change(owner,input)},200,request);
+    }
+    if (v2) {
       const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
       if (input.action === "review-first") return controlResponse({ onboarding: await workflow.firstReview(
         {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision) },200,request);

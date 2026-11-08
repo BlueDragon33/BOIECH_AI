@@ -19,6 +19,7 @@ export async function POST(request:Request) {
   const sync=new AccountVerifiedSync(await getCourseDatabase(),service);
   let result:unknown;
   if(input.action==="status")result=await sync.status(token);
+  else if(input.action==="canonical-course")result=await sync.canonicalCourseProgress(token);
   else if(input.action==="consent")result=await sync.consent(token,input.scope,input.enabled,input.password);
   else if(input.action==="write")result=await sync.write(token,input);
   else if(input.action==="read")result=await sync.read(token,input.scope,input.afterKey,input.limit);

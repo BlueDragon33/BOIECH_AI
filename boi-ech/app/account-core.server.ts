@@ -1,5 +1,6 @@
 import { randomBytes, scrypt, timingSafeEqual, createHash } from "node:crypto";
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
+import { AccountEntitlementService } from "./account-entitlement.server";
 
 // Standard OpenSSL scrypt, OWASP's N=2^15/r=8/p=3 profile. No reversible password storage.
 const KDF = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 };
@@ -89,14 +90,16 @@ export class AccountService {
     const row = await this.row(id);
     const caps = await this.db.prepare("SELECT scope,enabled,expires_at FROM account_manager_permissions WHERE account_id=? ORDER BY scope").bind(id)
       .all<{ scope: string; enabled: number; expires_at: number | null }>();
+    const entitlement = this.v2Enabled ? await new AccountEntitlementService(this.db,this.now).read(id) : null;
     const onboarding = this.v2Enabled ? await this.db.prepare(
       "SELECT stage,revision,last_review_note FROM account_onboarding WHERE account_id=?").bind(id)
       .first<{stage:string;revision:number;last_review_note:string|null}>() : null;
     return { ...view(row), onboardingStage: onboarding?.stage??null, onboardingRevision: onboarding?.revision??null,
       reviewNote: onboarding?.last_review_note??null,
+      entitlement,
       permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
-        (!row.access_expires_at || Date.parse(row.access_expires_at) > this.now()), expiresAt: p.expires_at })) };
+        (!row.access_expires_at || Date.parse(row.access_expires_at) > this.now()) && (!this.v2Enabled || entitlement?.active === true), expiresAt: p.expires_at })) };
   }
   async ownerList() {
     const result = await this.db.prepare(`SELECT a.account_id FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
@@ -244,6 +247,7 @@ export class AccountService {
         const stage = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?")
           .bind(actor.accountId).first<{stage:string}>();
         if (stage?.stage !== "active") fail(stage ? "ACCOUNT_ONBOARDING_REQUIRED" : "ACCOUNT_ONBOARDING_MISSING");
+        await new AccountEntitlementService(this.db,this.now).assertActive(actor.accountId);
       }
       if (actor.status !== "approved") fail(actor.status === "blocked" ? "ACCOUNT_BLOCKED" : "ACCOUNT_PENDING");
       if (actor.expiresAt && !(Date.parse(actor.expiresAt) > this.now())) fail("ACCOUNT_EXPIRED");
@@ -435,9 +439,12 @@ export class AccountService {
       approved_at=CURRENT_TIMESTAMP,blocked_at=NULL,access_group='free',payment_status='free_approved',
       access_expires_at=CASE WHEN access_expires_at IS NULL OR datetime(access_expires_at)<=CURRENT_TIMESTAMP THEN ? ELSE access_expires_at END,updated_at=CURRENT_TIMESTAMP
       WHERE device_id=? AND status='pending' AND payment_status='unassigned' AND access_group='unassigned'`).bind(accessExpiry,row.storage_device_id));
-    if (op === "approve-manager" && this.v2Enabled) statements.push(this.db.prepare(`UPDATE account_onboarding
+    if (op === "approve-manager" && this.v2Enabled) {
+      statements.push(this.db.prepare(`UPDATE account_onboarding
       SET stage='active',revision=revision+1,second_review_by=?,second_review_at=CURRENT_TIMESTAMP,
       updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='profile_review' AND changes()=1`).bind(owner.actor,id));
+      statements.push(await new AccountEntitlementService(this.db,this.now).grantOnApproval(id,"manager"));
+    }
     if (op === "approve-manager") statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,'owner.manager-approval',?,CASE WHEN changes()=1 THEN 'pending unassigned account' ELSE NULL END`).bind(owner.actor,id));
     if (op === "management") statements.push(this.db.prepare("UPDATE device_access SET management_enabled=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=?")
       .bind(enabled ? 1 : 0, row.storage_device_id));
@@ -506,10 +513,13 @@ export class AccountService {
       WHERE device_id=? AND status='approved' AND EXISTS(SELECT 1 FROM manager_device_assignments WHERE target_device_id=? AND manager_device_id=?) AND ${guard}`)
       .bind(target.storage_device_id, target.storage_device_id, actor.storageDeviceId, actor.accountId, this.now()));
     // A failed conditional write must roll back preceding assignment and produce no success audit.
-    if (this.v2Enabled && action === "approve") statements.push(this.db.prepare(`UPDATE account_onboarding
+    if (this.v2Enabled && action === "approve") {
+      statements.push(this.db.prepare(`UPDATE account_onboarding
       SET stage='active',revision=revision+1,second_review_by=?,second_review_at=CURRENT_TIMESTAMP,
       updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='profile_review' AND first_review_by=?
       AND changes()=1`).bind(actor.accountId,targetId,actor.accountId));
+      statements.push(await new AccountEntitlementService(this.db,this.now).grantOnApproval(targetId,target.person_role));
+    }
     statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,CASE WHEN changes()=1 THEN ? ELSE NULL END`)
       .bind(actor.accountId, "registration." + action, targetId, "manager registration review"));
     try { await this.db.batch(statements); } catch (error) {
