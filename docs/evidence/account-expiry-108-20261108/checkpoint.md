@@ -30,3 +30,15 @@ Date: 2026-11-08. **SOURCE-ONLY, NOT TEST-ACCEPTED, NOT DEPLOYED.**
 - Repository uses `migrations_dir: "drizzle"` for Wrangler D1; Wrangler applies SQL migration files, while Drizzle `meta/_journal.json` ends at a mismatching 0015. These are distinct mechanisms. Preserve current journal and examine migration ledger/readback in isolated D1 before rollout; do not falsely claim it is reconciled.
 - Actual Node22 `npm ci`, lint, typecheck, npm test, build, D1 Preview workerd, browser/3-device and reviewer remain NOT_RUN. Production and Cloudflare secrets unchanged.
 - Source HEAD changes after original checkpoint: use live head from PR #109, not pinned old checkpoint SHA.
+
+## VERIFIED QA UPDATE — 2026-11-08 (supersedes older NOT_RUN claims)
+
+- Exact tested HEAD: `3702393fc7e772eecfdf6a43785b9908f3a83849`. [Validation CI #42488607870](https://github.com/BlueDragon33/BOIECH_AI/actions/runs/42488607870) PASS: Node 22.13, `npm ci`, 0 ESLint errors, tsc, verified build, 595/595 tests PASS.
+- [Constitution CI #42488612740](https://github.com/BlueDragon33/BOIECH_AI/actions/runs/42488612740) PASS at that SHA.
+- Real Wrangler 4.92.0, isolated **LOCAL** D1: all **26/26** SQL files (`0000`–`0023`, including both `0013` and `0017` filename variants) applied successfully via `wrangler d1 migrations apply boi-ech-local --local --config wrangler.local.jsonc`. Confirmed `account_duration_policies` has 30-day defaults for manager, teacher, learner; `account_entitlements` table is queryable.
+- Wrangler D1 SQL-file ledger and Drizzle generator `drizzle/meta/_journal.json` are DISTINCT: the latter still ends at unmatched `0015_child_health_content`, which has NOT been silently rewritten. Clean LOCAL Wrangler migration proof does **not** prove remote ledger/snapshot upgrade or production-safe replay.
+- Original `boi-ech-cloudflare-preview-ci.yml` is protected as **manual-only**; an experimental auto-trigger was rejected by release-readiness and reverted. Standard source-only QA still runs automatically on this isolated branch.
+- NOT ACCEPTED / RELEASE BLOCKED: real Cloudflare Preview Worker and remote D1, real legacy snapshot migration/backfill, 3 physical device browsers and offline consent-ACK/conflict, canonical course progress reconciliation, Workers FREE CPU/KDF budget, Owner MFA across both real Workers, PR #107 mobile manager integration and independent authorized human review.
+- Production flags remain OFF. No PR merged, no Production Worker/D1 mutation, no purchased resources.
+
+**Next action:** manual-gated isolated Cloudflare Preview with a distinct non-production D1 ID, then runtime and role/device/security acceptance.
