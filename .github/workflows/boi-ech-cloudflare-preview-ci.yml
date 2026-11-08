@@ -1,6 +1,8 @@
 name: Boi Ech Cloudflare Preview CI
 
 on:
+  push:
+    branches: [feat/boi-account-entitlement-108-20261108]
   workflow_dispatch:
 
 permissions:
