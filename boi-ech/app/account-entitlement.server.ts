@@ -22,7 +22,8 @@ export class AccountEntitlementService {
     return value as string;
   }
   private reason(value: unknown) {
-    if (typeof value !== "string" || value.trim().length < 5 || value.length > 300) reject("ACCOUNT_REASON_REQUIRED",400);
+    if (typeof value !== "string") throw new AccountEntitlementError("ACCOUNT_REASON_REQUIRED",400);
+    if (value.trim().length < 5 || value.length > 300) throw new AccountEntitlementError("ACCOUNT_REASON_REQUIRED",400);
     return value.trim();
   }
   async policy() {
@@ -35,7 +36,8 @@ export class AccountEntitlementService {
     if (!roles.includes(role as Role)) reject("ACCOUNT_INPUT",400);
     const row=await this.db.prepare("SELECT default_days FROM account_duration_policies WHERE role=?")
       .bind(role).first<{default_days:number}>();
-    if (!row || !Number.isInteger(row.default_days) || row.default_days < 1 || row.default_days > 365) reject("ACCOUNT_ACCESS_POLICY_UNAVAILABLE",503);
+    if (!row) throw new AccountEntitlementError("ACCOUNT_ACCESS_POLICY_UNAVAILABLE",503);
+    if (!Number.isInteger(row.default_days) || row.default_days < 1 || row.default_days > 365) throw new AccountEntitlementError("ACCOUNT_ACCESS_POLICY_UNAVAILABLE",503);
     return row.default_days;
   }
   async grantOnApproval(accountId: string, role: string) {
@@ -60,7 +62,7 @@ export class AccountEntitlementService {
   }
   async assertActive(accountId: string) {
     const row=await this.read(accountId);
-    if (!row) reject("ACCOUNT_ENTITLEMENT_REQUIRED",403);
+    if (!row) throw new AccountEntitlementError("ACCOUNT_ENTITLEMENT_REQUIRED",403);
     if (row.state!=="active") reject("ACCOUNT_SUSPENDED",403);
     if (!row.active) reject("ACCOUNT_EXPIRED",403);
   }
@@ -118,11 +120,12 @@ export class AccountEntitlementService {
       || !Number.isSafeInteger(input.expectedRevision) || (input.expectedRevision as number)<1) reject("ACCOUNT_INPUT",400);
     const reason=this.reason(input.reason);
     const current=await this.read(id);
-    if(!current) reject("ACCOUNT_ENTITLEMENT_REQUIRED",409);
+    if(!current) throw new AccountEntitlementError("ACCOUNT_ENTITLEMENT_REQUIRED",409);
     if(current.revision!==input.expectedRevision) reject("ACCOUNT_CAS_CONFLICT",409);
     let state=current.state,expiry=current.expiresAt;
     if(operation==="set-expiry"){
-      if(typeof input.expiresAt!=="string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(input.expiresAt)) reject("ACCOUNT_INPUT",400);
+      if(typeof input.expiresAt!=="string") throw new AccountEntitlementError("ACCOUNT_INPUT",400);
+      if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(input.expiresAt)) throw new AccountEntitlementError("ACCOUNT_INPUT",400);
       const next=Date.parse(input.expiresAt);
       if(!Number.isFinite(next)||next<=this.now()||next>this.now()+3650*86400000) reject("ACCOUNT_INPUT",400);
       expiry=new Date(next).toISOString();
