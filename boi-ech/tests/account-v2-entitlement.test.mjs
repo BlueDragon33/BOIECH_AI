@@ -28,7 +28,7 @@ function fixture(){
  const prepare=sql=>{let args=[];return{bind(...a){args=a;return this},
   async first(){return sqlite.prepare(sql).get(...args)??null},
   async all(){return{results:sqlite.prepare(sql).all(...args)}},
-  _run(){const s=sqlite.prepare(sql);const values=s.columns().length?s.all(...args):s.run(...args);return{meta:{changes:Number(values.changes??0)},results:Array.isArray(values)?values:[]}}}};
+  _run(){const s=sqlite.prepare(sql);const values=/^\s*(?:SELECT|PRAGMA|EXPLAIN)\b/i.test(sql)?s.all(...args):s.run(...args);return{meta:{changes:Number(values.changes??0)},results:Array.isArray(values)?values:[]}}}};
  const db={prepare,async batch(stmts){sqlite.exec("BEGIN IMMEDIATE");try{let out=stmts.map(s=>s._run());sqlite.exec("COMMIT");return out}
   catch(e){sqlite.exec("ROLLBACK");throw e}}};
  let now=initial;
