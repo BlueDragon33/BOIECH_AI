@@ -67,18 +67,23 @@ export class AccountEntitlementService {
   async list(actor: Owner) {
     this.owner(actor);
     const rows=await this.db.prepare(`SELECT a.account_id,d.learner_name,d.person_role,d.status,
-      o.stage,e.state AS entitlement_state,e.expires_at,e.activated_at,
+      o.stage,d.access_expires_at AS legacy_device_expires_at,d.payment_status,
+      e.state AS entitlement_state,e.expires_at,e.activated_at,
       e.revision AS entitlement_revision
       FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       LEFT JOIN account_onboarding o ON o.account_id=a.account_id
       LEFT JOIN account_entitlements e ON e.account_id=a.account_id
       ORDER BY a.account_id LIMIT 501`)
       .all<{account_id:string;learner_name:string;person_role:string;status:string;
-        stage:string|null;entitlement_state:string|null;expires_at:string|null;
+        stage:string|null;legacy_device_expires_at:string|null;payment_status:string;
+        entitlement_state:string|null;expires_at:string|null;
         activated_at:string|null;entitlement_revision:number|null}>();
     if ((rows.results?.length ?? 0)>500) reject("ACCOUNT_RESULT_LIMIT",413);
     return (rows.results??[]).map(r=>({accountId:r.account_id,name:r.learner_name,
       role:r.person_role,deviceStatus:r.status,onboardingStage:r.stage,
+      deviceAccessExpiresAt:r.legacy_device_expires_at,
+      deviceAccessExpired: Boolean(r.legacy_device_expires_at) && !(Date.parse(r.legacy_device_expires_at as string)>this.now()),
+      paymentStatus:r.payment_status,
       entitlement:r.entitlement_state ? {state:r.entitlement_state,expiresAt:r.expires_at,
         activatedAt:r.activated_at,revision:r.entitlement_revision,
         active:r.entitlement_state==="active" && Date.parse(r.expires_at??"")>this.now()} : null}));
