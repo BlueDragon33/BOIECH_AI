@@ -65,6 +65,6 @@ jobs:
         run: |
           set -euo pipefail
           # Local Miniflare D1 only: no account ID, API token, remote flag, paid resource or deployment.
-          npx --no-install wrangler d1 migrations apply boi-ech-local --local --config wrangler.local.jsonc --yes
+          npx --no-install wrangler d1 migrations apply boi-ech-local --local --config wrangler.local.jsonc
           npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT role,default_days FROM account_duration_policies ORDER BY role"
           npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT account_id,expires_at,revision FROM account_entitlements LIMIT 1"
