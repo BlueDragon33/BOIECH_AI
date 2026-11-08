@@ -19,3 +19,14 @@ Date: 2026-11-08. **SOURCE-ONLY, NOT TEST-ACCEPTED, NOT DEPLOYED.**
 - Feature flags `BOI_ECH_ACCOUNT_FIRST=OFF` and `BOI_ECH_ACCOUNT_V2=OFF` remain required for Production.
 
 **Next action:** full checkout Node22 and source QA (including existing Account First V2 tests and migrations) and fix any failures. After green source QA, isolated FREE Preview D1 and signed Owner/browser device acceptance, then independent review before merge or Production.
+
+## UPDATE 2026-11-08 — Draft PR #109 and test fixture repairs
+
+- Open draft PR #109 targets existing V2 branch `feat/account-first-v2-108-admission-20261107` (not main).
+- Fixed source test harness loading `account-entitlement.server.ts` in `tests/account-first.test.mjs`, `tests/account-v2-onboarding-sync.test.mjs`, and `scripts/account-migration.mjs`.
+- Added `0023_account_entitlement.sql` to the V2 synthetic SQLite fixture, with 90-day **legacy device** default deliberately distinct from new 30-day **account entitlement**. Approval tests assert the distinction.
+- Owner entitlement list now discloses legacy device expiry and payment status separately, without modifying device/payment data.
+- Local **synthetic SQL-only smoke** (reconstructed DDL/INSERT in Node v22 node:sqlite): pre-approval grant 0, second-approval grant 1, repeated grant 0 — PASS. This is **not** an exact-repository npm test nor migration acceptance.
+- Repository uses `migrations_dir: "drizzle"` for Wrangler D1; Wrangler applies SQL migration files, while Drizzle `meta/_journal.json` ends at a mismatching 0015. These are distinct mechanisms. Preserve current journal and examine migration ledger/readback in isolated D1 before rollout; do not falsely claim it is reconciled.
+- Actual Node22 `npm ci`, lint, typecheck, npm test, build, D1 Preview workerd, browser/3-device and reviewer remain NOT_RUN. Production and Cloudflare secrets unchanged.
+- Source HEAD changes after original checkpoint: use live head from PR #109, not pinned old checkpoint SHA.
