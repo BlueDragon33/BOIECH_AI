@@ -46,6 +46,33 @@ export class AccountVerifiedSync {
   if(row?.enabled!==1)fail("SYNC_CONSENT_REQUIRED");
   return actor;
  }
+ // Read-only bridge into the existing server-authoritative course profile.
+ // All approved V2 browsers map to the same account storageDeviceId. Never
+ // promote client-queued progress or grant lesson completion from this view.
+ async canonicalCourseProgress(token:string) {
+  const actor=await this.permission(token,"learning-progress");
+  const row=await this.db.prepare(`SELECT completed_json,scores_json,attempts_json,total_active_seconds,last_activity_at
+    FROM device_profiles WHERE device_id=?`).bind(actor.storageDeviceId)
+    .first<{completed_json:string;scores_json:string;attempts_json:string;total_active_seconds:number;last_activity_at:string|null}>();
+  const parse=(value:string|undefined,empty:unknown):unknown=>{
+   try{return value?JSON.parse(value) as unknown:empty;}catch{return empty;}
+  };
+  const completedRaw=parse(row?.completed_json,[]);
+  const completed=Array.isArray(completedRaw)?completedRaw.filter((v):v is string=>typeof v==="string"&&/^[A-Za-z0-9._:-]{1,90}$/.test(v)).slice(0,200):[];
+  const scoreRaw=parse(row?.scores_json,{});
+  const attemptRaw=parse(row?.attempts_json,{});
+  const lessonMap=(value:unknown,max:number)=>{
+   if(!value||typeof value!=="object"||Array.isArray(value))return {} as Record<string,number>;
+   return Object.fromEntries(Object.entries(value).filter(([key,n])=>/^(0[1-8])$/.test(key)
+    &&typeof n==="number"&&Number.isSafeInteger(n)&&n>=0&&n<=max)) as Record<string,number>;
+  };
+  const seconds=Number(row?.total_active_seconds??0);
+  return {source:"server-verified-device-profile" as const,readOnly:true,
+   accountId:actor.accountId,completed, scores:lessonMap(scoreRaw,100),
+   attempts:lessonMap(attemptRaw,1000000),
+   totalActiveSeconds:Number.isSafeInteger(seconds)&&seconds>=0?seconds:0,
+   lastActivityAt:row?.last_activity_at??null};
+ }
  async status(token:string) {
   const actor=await this.accounts.session(token);
   if(!actor.deviceApproved)fail("DEVICE_APPROVAL_REQUIRED");
