@@ -28,12 +28,14 @@ const PREVIEW_BOARD:Board={
   ]
 };
 export default function ManagerApprovalPanel(props:{getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;previewOnly?:boolean}){
- const [mode,setMode]=useState<"checking"|"legacy"|"v2">(props.previewOnly?"legacy":"checking");
- useEffect(()=>{if(props.previewOnly)return;let alive=true;void fetch("/api/accounts",{credentials:"same-origin",cache:"no-store"})
-  .then(async response=>{if(!response.ok)throw new Error("ACCOUNT_STATUS_UNAVAILABLE");return response.json() as Promise<{accountV2?:boolean}>;})
+ const [mode,setMode]=useState<"checking"|"legacy"|"v2"|"error">(props.previewOnly?"legacy":"checking");
+ const [attempt,setAttempt]=useState(0);
+ useEffect(()=>{if(props.previewOnly)return;let alive=true;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);void fetch("/api/accounts",{credentials:"same-origin",cache:"no-store",signal:controller.signal})
+  .then(async response=>{const data=await response.json() as {accountV2?:boolean;code?:string};if(response.status===404&&data.code==="ACCOUNT_FEATURE_DISABLED")return {accountV2:false};if(!response.ok)throw new Error("ACCOUNT_STATUS_UNAVAILABLE");return data;})
   .then(data=>{if(alive)setMode(data.accountV2?"v2":"legacy");})
-  .catch(()=>{if(alive)setMode("checking");});return()=>{alive=false};},[props.previewOnly]);
+  .catch(()=>{if(alive)setMode("error");}).finally(()=>clearTimeout(timer));return()=>{alive=false;clearTimeout(timer);controller.abort();};},[props.previewOnly,attempt]);
  if(mode==="checking")return <p role="status">Đang xác minh chính sách duyệt tài khoản…</p>;
+ if(mode==="error")return <div role="alert"><p>Không xác minh được chính sách duyệt tài khoản. Hãy kiểm tra kết nối và thử lại.</p><button type="button" onClick={()=>{setMode("checking");setAttempt(n=>n+1);}}>Thử lại</button></div>;
  return mode==="v2"?<ManagerV2ReviewPanel/>:<LegacyManagerApprovalPanel {...props}/>;
 }
 function LegacyManagerApprovalPanel({getProof,previewOnly=false}:{getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;previewOnly?:boolean}){

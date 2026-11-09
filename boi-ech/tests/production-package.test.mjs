@@ -48,3 +48,15 @@ test('live public asset checks reject missing or HTML JavaScript responses',asyn
  await assert.doesNotReject(verifyPublicAssets(files,async url=>new Response('',{headers:{'content-type':url.endsWith('.js')?'text/javascript':'text/css'}})));
  for(const r of [new Response('Not Found',{status:404}),new Response('<html>',{headers:{'content-type':'text/html'}})])await assert.rejects(verifyPublicAssets(files,async()=>r),/Production public asset failed/);
 });
+test('explicit Account-first activation sets both flags and the canonical CSRF origin without changing existing policy',()=>{
+ const c=productionPackage(settings(),revision,true);
+ assert.equal(c.vars.BOI_ECH_ACCOUNT_FIRST,'true');assert.equal(c.vars.BOI_ECH_ACCOUNT_V2,'true');
+ assert.equal(c.vars.BOI_ECH_ACCOUNT_ORIGIN,'https://boi-ech.boiech-ai.workers.dev');
+ assert.equal(c.vars.EXISTING_POLICY,'retained');assert.equal(c.vars.BOI_ECH_ACCESS_MODE,'managed');
+ assert.doesNotThrow(()=>verifyProductionArtifact(c,revision,true));
+});
+test('later releases retain an activated account mode and reject inconsistent or foreign-origin modes',()=>{
+ const s=settings();s.result.bindings.push(...Object.entries({BOI_ECH_ACCOUNT_FIRST:'true',BOI_ECH_ACCOUNT_V2:'true',BOI_ECH_ACCOUNT_ORIGIN:'https://boi-ech.boiech-ai.workers.dev'}).map(([name,text])=>({type:'plain_text',name,text})));
+ assert.equal(productionPackage(s,revision).vars.BOI_ECH_ACCOUNT_V2,'true');
+ for(const change of [s=>s.result.bindings.find(b=>b.name==='BOI_ECH_ACCOUNT_FIRST').text='false',s=>s.result.bindings.find(b=>b.name==='BOI_ECH_ACCOUNT_ORIGIN').text='https://other.invalid']){const bad=structuredClone(s);change(bad);assert.throws(()=>productionPackage(bad,revision));}
+});
