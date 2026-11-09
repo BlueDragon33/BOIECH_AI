@@ -552,7 +552,7 @@ export class AccountService {
     const scopePending = this.v2Enabled ? " AND (o.stage='requested' OR o.first_review_by=?)" : "";
     const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect} FROM accounts a
       JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
-      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
+      WHERE ((d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
         AND m.target_device_id IS NULL${scopePending})
        OR m.manager_device_id=?)${this.v2Enabled ? " AND a.account_id>?" : ""}
        ORDER BY a.account_id LIMIT ${this.v2Enabled ? "?" : "201"}`)
