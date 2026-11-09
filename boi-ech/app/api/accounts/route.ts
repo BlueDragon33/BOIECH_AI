@@ -2,6 +2,7 @@ import { AccountError } from "../../account-core.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
+import { AccountEntitlementService } from "../../account-entitlement.server";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
@@ -10,8 +11,9 @@ export async function GET(request: Request) {
     if (!token) return json({ enabled: true, account: null, accountV2: config.v2 });
     const account = await service.session(token);
     const onboarding = config.v2 ? await new AccountV2Workflow(await getCourseDatabase(),service).ownStatus(token) : null;
+    const entitlement = config.v2 ? await new AccountEntitlementService(await getCourseDatabase()).read(account.accountId) : null;
     let canReadRegistrants=false;
-    if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved))) {
+    if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved&&entitlement?.active===true))) {
       try { await service.capability(account,"registrants.read.all"); canReadRegistrants=true; }
       catch(error) { if(!(error instanceof AccountError)||error.code!=="ACCOUNT_PERMISSION_REQUIRED") throw error; }
     }
@@ -19,7 +21,9 @@ export async function GET(request: Request) {
     return json({ enabled: true, accountV2: config.v2, account: { accountId: account.accountId, status: account.status, role: account.role,
       name: config.v2 && !account.deviceApproved ? null : account.name,
       storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
-      expiresAt: config.v2 && !account.deviceApproved ? null : account.expiresAt,
+      // Account-first V2 duration is independent from retired device access expiry.
+      expiresAt: config.v2 ? (account.deviceApproved ? entitlement?.expiresAt ?? null : null) : account.expiresAt,
+      entitlementActive: config.v2 ? entitlement?.active === true : undefined,
       deviceId: account.deviceId, deviceApproved: account.deviceApproved,
       onboardingStage: onboarding?.stage ?? null, onboardingRevision: onboarding?.revision ?? null,
       onboardingNote: onboarding?.reviewNote ?? null,
