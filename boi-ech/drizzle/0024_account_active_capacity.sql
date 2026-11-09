@@ -60,3 +60,22 @@ CREATE INDEX IF NOT EXISTS account_onboarding_active_capacity_idx
 DROP TRIGGER IF EXISTS account_admission_insert;
 --> statement-breakpoint
 DROP TRIGGER IF EXISTS account_admission_role_change;
+
+--> statement-breakpoint
+-- Owner-issued manager invitation; token bytes are NEVER persisted, only SHA-256.
+-- Manager creates their own password/P-256 key on canonical Boi origin. No auto-approval.
+CREATE TABLE IF NOT EXISTS account_manager_invitations (
+ invite_hash TEXT PRIMARY KEY NOT NULL CHECK(length(invite_hash)=64),
+ issued_by TEXT NOT NULL,
+ issued_at_ms INTEGER NOT NULL,
+ expires_at_ms INTEGER NOT NULL CHECK(expires_at_ms>issued_at_ms),
+ consumed_by TEXT REFERENCES accounts(account_id) ON DELETE RESTRICT,
+ consumed_at_ms INTEGER,
+ revoked_at_ms INTEGER,
+ revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>=1),
+ CHECK((consumed_by IS NULL AND consumed_at_ms IS NULL)
+    OR (consumed_by IS NOT NULL AND consumed_at_ms IS NOT NULL))
+);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS account_manager_invitations_expiry_idx
+ ON account_manager_invitations(expires_at_ms,consumed_at_ms,revoked_at_ms);
