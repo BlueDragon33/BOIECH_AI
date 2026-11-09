@@ -15,3 +15,7 @@ Final release review identified Wrangler deployments JSON being oldest-first. Ac
 Final post-fix Node22 full suite635/635 passed;4 production packaging/workflow tests passed.
 
 Boi remote deployment results will be recorded after its job completes. No refund or account-usage change can be issued by this assistant.
+
+## Browser-verified asset routing correction
+
+Initial Boi release d42c9d9 passed API/device checks but the real browser failed to import /assets/index-BF7Rs-nl.js, confirmed as Not Found. The Boi router has no static asset forwarding; run_worker_first=true incorrectly sent public JS/CSS into it. Production packaging now restores assets-first routing (false) and validates it. A regression test observed RED then GREEN, and the release job now checks actual public JS/CSS status and MIME after deploy, in addition to API/device checks. Authentication/D1/secrets are unchanged.

@@ -11,13 +11,13 @@ export function productionPackage(settings,revision){
  const vars=Object.fromEntries(bindings.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));
  if(vars.BOI_ECH_ACCESS_MODE!=='managed'||vars.LOCAL_CONTROL_PLANE==='true'||vars.BOI_ECH_ACCOUNT_FIRST==='true'||vars.BOI_ECH_ACCOUNT_V2==='true')throw new Error('Production access mode must be preserved; V2 activation is a separate acceptance gate');
  return {name:'boi-ech',main:'./worker/index.ts',compatibility_date:'2026-09-11',compatibility_flags:['nodejs_compat'],workers_dev:true,
-  assets:{binding:'ASSETS',run_worker_first:true},images:{binding:'IMAGES'},
+  assets:{binding:'ASSETS',run_worker_first:false},images:{binding:'IMAGES'},
   d1_databases:[{binding:'DB',database_name:'boi-ech-db',database_id:id,migrations_dir:'drizzle'}],
   vars:{...vars,BOI_ECH_BUILD_REVISION:revision,BOI_ECH_DEPLOYMENT_CHANNEL:'cloudflare-production',BOI_ECH_BUILD_SOURCE:'BlueDragon33/BOIECH_AI/boi-ech',APPLICATION_MANAGEMENT_ORIGIN:'https://application-management.boiech-ai.workers.dev'}};
 }
 export function verifyProductionArtifact(c,revision){
  if(c.name!=='boi-ech'||c.d1_databases?.length!==1||c.d1_databases[0].binding!=='DB'||c.d1_databases[0].database_name!=='boi-ech-db'||c.d1_databases[0].database_id!==id)throw new Error('Production Worker/database mismatch');
- if(c.assets?.binding!=='ASSETS'||c.images?.binding!=='IMAGES'||(c.r2_buckets!==undefined&&(!Array.isArray(c.r2_buckets)||c.r2_buckets.length)))throw new Error('Production FREE asset/storage mismatch');
+ if(c.assets?.binding!=='ASSETS'||c.assets.run_worker_first!==false||c.images?.binding!=='IMAGES'||(c.r2_buckets!==undefined&&(!Array.isArray(c.r2_buckets)||c.r2_buckets.length)))throw new Error('Production FREE asset/storage mismatch');
  if(c.vars?.BOI_ECH_ACCESS_MODE!=='managed'||c.vars.BOI_ECH_BUILD_REVISION!==revision||c.vars.BOI_ECH_DEPLOYMENT_CHANNEL!=='cloudflare-production'||c.vars.BOI_ECH_ACCOUNT_FIRST==='true'||c.vars.BOI_ECH_ACCOUNT_V2==='true'||c.vars.LOCAL_CONTROL_PLANE==='true')throw new Error('Production revision/access policy mismatch');
 }
 export function rollbackPoint(bookmark,deployments){
@@ -26,6 +26,15 @@ export function rollbackPoint(bookmark,deployments){
  const latest=[...deployments].sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on))[0];
  if(!uuid.test(latest.id??'')||!Array.isArray(latest.versions)||!latest.versions.length||latest.versions.some(v=>!uuid.test(v.version_id??'')||!Number.isFinite(v.percentage)||v.percentage<=0||v.percentage>100)||Math.abs(latest.versions.reduce((n,v)=>n+v.percentage,0)-100)>0.00001)throw new Error('Production rollback version missing');
  return {databaseBookmark:bookmark.bookmark,previousDeployment:latest.id,previousVersions:latest.versions};
+}
+export async function verifyPublicAssets(files,http=fetch){
+ if(!files.some(f=>f.endsWith('.js'))||!files.some(f=>f.endsWith('.css')))throw new Error('Production JS/CSS probes missing');
+ for(const file of files){
+  if(!/^assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(file))throw new Error('Invalid public asset path');
+  const r=await http('https://boi-ech.boiech-ai.workers.dev/'+file,{redirect:'error',signal:AbortSignal.timeout(15000)});
+  const type=r.headers.get('content-type')??'';
+  if(r.status!==200||!(file.endsWith('.js')?/javascript|ecmascript/i.test(type):/text\/css/i.test(type)))throw new Error(`Production public asset failed: ${file} HTTP ${r.status}`);
+ }
 }
 async function settings(){
  if(String(process.env.CLOUDFLARE_ACCOUNT_ID??'').trim()!==account||!process.env.CLOUDFLARE_API_TOKEN)throw new Error('Existing production credentials unavailable');
@@ -45,6 +54,12 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
   const file=path.resolve('.wrangler/deploy',redirect.configPath),root=path.resolve('dist')+path.sep;
   if(!file.startsWith(root))throw new Error('Generated config must be under dist');
   verifyProductionArtifact(JSON.parse(fs.readFileSync(file,'utf8')),revision);console.log('Exact production Worker / D1 / revision / access artifact PASS.');
+ }else if(mode==='assets'){
+  const redirect=JSON.parse(fs.readFileSync('.wrangler/deploy/config.json','utf8'));
+  const file=path.resolve('.wrangler/deploy',redirect.configPath),c=JSON.parse(fs.readFileSync(file,'utf8'));
+  const directory=path.resolve(path.dirname(file),c.assets.directory,'assets');
+  const probes=fs.readdirSync(directory).filter(n=>/^index-.*\.js$/.test(n)||n.endsWith('.css')).map(n=>'assets/'+n);
+  await verifyPublicAssets(probes);console.log('Live production JavaScript/CSS asset read-back PASS.');
  }else if(mode==='readback'){
   const live=await settings(),vars=Object.fromEntries(live.result.bindings.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));
   productionPackage(live,revision);
