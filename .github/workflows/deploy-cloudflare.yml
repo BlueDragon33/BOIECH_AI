@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: boi-ech-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Require explicit production confirmation
         shell: bash
@@ -60,19 +63,23 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const account=String(process.env.CLOUDFLARE_ACCOUNT_ID??'').trim();
+          if(account!=='f88a42260814230aa4a151abbfe5659d') throw new Error('Production Cloudflare account mismatch');
+          fs.appendFileSync(process.env.GITHUB_ENV,`CLOUDFLARE_ACCOUNT_ID=${account}\n`);
+          NODE
 
-      - name: Apply production D1 migrations
+      - name: Package existing production Worker and preserve runtime policy
         working-directory: boi-ech
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler d1 migrations apply boi-ech-db --remote --config wrangler.d1.jsonc
+        run: node scripts/production-package.mjs prepare
 
       - name: Build with Cloudflare Vite plugin
         working-directory: boi-ech
         env:
           BOI_ECH_LOCAL_DATABASE_ID: 7816425d-ce8a-4b3c-b303-7697fd4a529c
           BOI_ECH_ACCESS_MODE: managed
+          CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH: wrangler.cloudflare.production.jsonc
         run: npm run build
 
       - name: Verify production D1 binding in generated artifact
@@ -86,11 +93,31 @@ jobs:
             echo '::error::Generated production artifact still references the local D1 placeholder.'
             exit 1
           fi
+          node scripts/production-package.mjs artifact
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const artifact = JSON.parse(fs.readFileSync('dist/server/wrangler.json', 'utf8'));
           if (artifact.vars?.BOI_ECH_ACCESS_MODE !== 'managed') throw new Error('Production device gate must be managed.');
           NODE
+
+      - name: Capture D1 and Worker rollback points before any migration
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 time-travel info boi-ech-db --json --config wrangler.d1.jsonc > .sites-runtime/production-release/bookmark.json
+          npx wrangler deployments list --name boi-ech --json --config wrangler.d1.jsonc > .sites-runtime/production-release/deployments.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {rollbackPoint} from './scripts/production-package.mjs';
+          const bookmark=JSON.parse(fs.readFileSync('.sites-runtime/production-release/bookmark.json','utf8'));
+          const deployments=JSON.parse(fs.readFileSync('.sites-runtime/production-release/deployments.json','utf8'));
+          console.log(JSON.stringify(rollbackPoint(bookmark,deployments)));
+          NODE
+
+      - name: Apply production D1 migrations
+        working-directory: boi-ech
+        run: npx wrangler d1 migrations apply boi-ech-db --remote --config wrangler.d1.jsonc
 
       - name: Deploy current Bơi ếch production Worker
         working-directory: boi-ech
@@ -98,6 +125,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
+
+      - name: Read back the exact live production revision and retained binding
+        working-directory: boi-ech
+        run: node scripts/production-package.mjs readback
 
       - name: Verify Universal Management Contract on live Production
         shell: bash
