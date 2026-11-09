@@ -38,6 +38,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [recovery, setRecovery] = useState(""), [notice, setNotice] = useState("");
+  const [managerInvite,setManagerInvite]=useState("");
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
   const reload = useCallback(async (claim = false) => {
@@ -61,6 +62,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     current.current = data.account?.accountId ?? "";
     if (mounted.current) { setObservedNow(Date.now()); setAccount(data.account ?? null); setDevices(data.devices ?? []); setReady(true); }
   }, []);
+  useEffect(()=>{
+    if(!enabled||bypass)return;
+    // Fragment never reaches the Worker or logs; remove it immediately after loading.
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    const invite=params.get("manager-invite");
+    if(invite!==null){
+      window.history.replaceState(window.history.state,"",window.location.pathname+window.location.search);
+      if(/^[a-f0-9]{64}$/.test(invite)){
+        setManagerInvite(invite);setRole("manager");setMode("register");
+      }else setError("Liên kết mời quản lý không hợp lệ. Hãy xin lại từ Owner.");
+    }
+  },[enabled,bypass]);
   useEffect(() => {
     if (!enabled || bypass) return;
     mounted.current = true;
@@ -93,7 +106,13 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           setNotice(action==="approve-recovered-device"?"Thiết bị được khôi phục bằng mã một lần. Hãy lưu mã mới.":"Đã thu hồi thiết bị và đổi mã khôi phục. Hãy lưu mã mới rồi đăng nhập lại.");}
         return;
       }
-      const result = await send({ ...fields, password, ...key, action: mode, role, privacyAccepted: fields.privacyAccepted === "on" });
+      const invited=mode==="register"&&Boolean(managerInvite);
+      const result = await send({ ...fields, password, ...key,
+        action:invited?"manager-register":mode,
+        role:invited?"manager":role,
+        ...(invited?{managerInviteToken:managerInvite}:{}),
+        privacyAccepted: fields.privacyAccepted === "on" });
+      if(invited)setManagerInvite("");
       if (result.recoveryCode) { recoveryOwner.current = result.account?.accountId ?? result.accountId ?? ""; setRecovery(result.recoveryCode); }
       if (mode === "recover") { setMode("login"); setNotice("Đã đổi mật khẩu và thu hồi các phiên cũ. Hãy lưu mã khôi phục mới."); }
       await reload(mode === "claim"); broadcast();
@@ -174,7 +193,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           {mode==="devices" && recoveryDevices.length>0 ? <label><input type="checkbox" name="approvePending" disabled={busy}/>
             Phê duyệt thiết bị chờ xác nhận thay vì gỡ thiết bị đã liên kết</label>:null}
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
-          {mode === "register" && <><RegistrationRoles value={role} onChange={setRole}/><p role="note">Tài khoản Cán bộ quản lý được tiếp nhận và duyệt bởi Owner tại Application-Management; không đăng ký từ biểu mẫu công khai này.</p>{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["personCode", "Mã học viên / cán bộ / giảng viên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt lần một, bạn sẽ hoàn thiện hồ sơ cá nhân để duyệt lần hai.</p>}
+          {mode === "register" && <>{managerInvite
+           ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; tài khoản vẫn chờ duyệt hai vòng.</p>
+           : <><RegistrationRoles value={role} onChange={setRole}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["personCode", "Mã học viên / cán bộ / giảng viên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt lần một, bạn sẽ hoàn thiện hồ sơ cá nhân để duyệt lần hai.</p>}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
           <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
