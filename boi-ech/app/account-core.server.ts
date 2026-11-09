@@ -466,10 +466,15 @@ export class AccountService {
     await this.capability(actor, "manager.approve.registration");
     const onboardingSelect = this.v2Enabled ? ",o.stage AS onboarding_stage,o.revision AS onboarding_revision,o.first_review_by" : "";
     const onboardingJoin = this.v2Enabled ? " LEFT JOIN account_onboarding o ON o.account_id=a.account_id" : "";
+    // Anonymous-profile requested rows form a bounded shared intake pool; after first review
+    // only the accepting manager may read the applicant's profile during second review.
+    const scopePending = this.v2Enabled ? " AND (o.stage='requested' OR o.first_review_by=?)" : "";
     const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect} FROM accounts a
       JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
-      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned' AND m.target_device_id IS NULL)
-       OR m.manager_device_id=? ORDER BY a.account_id LIMIT 201`).bind(actor.storageDeviceId)
+      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
+        AND m.target_device_id IS NULL${scopePending})
+       OR m.manager_device_id=? ORDER BY a.account_id LIMIT 201`)
+       .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId)
        .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
     if ((result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
     const counts = await this.db.prepare(`SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
