@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 type Person={accountId:string;role:"learner"|"teacher";name:string|null;personCode:string|null;
  className:string|null;status:"pending"|"approved"|"blocked";registrationComplete:boolean;
  onboardingStage:string|null;onboardingRevision:number|null;firstReviewMine:boolean;assignedToMe:boolean};
-type Board={devices:Person[];quotas:{learner:{limit:number;used:number};teacher:{limit:number;used:number}}};
+type Board={devices:Person[];nextCursor:string|null;quotas:{learner:{limit:number;used:number};teacher:{limit:number;used:number}}};
 async function command(payload:Record<string,unknown>){
  const response=await fetch("/api/accounts",{method:"POST",credentials:"same-origin",cache:"no-store",
   headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
@@ -15,11 +15,14 @@ export default function ManagerV2ReviewPanel(){
  const [board,setBoard]=useState<Board|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const mounted=useRef(true),locked=useRef(false);
- const refresh=useCallback(async()=>{
+ const refresh=useCallback(async(after="")=>{
   if(locked.current)return;
   locked.current=true;setBusy(true);setError("");
-  try{const data=await command({action:"review-list"});if(!data.board)throw new Error("Chưa có bảng xét duyệt xác thực.");
-    if(mounted.current)setBoard(data.board);
+  try{const data=await command({action:"review-list",after,limit:50});
+    if(!data.board||!Array.isArray(data.board.devices))throw new Error("Chưa có bảng xét duyệt xác thực.");
+    if(mounted.current)setBoard(current=>after&&current
+      ? {...data.board!,devices:[...current.devices.filter(a=>!data.board!.devices.some(b=>b.accountId===a.accountId)),
+         ...data.board!.devices]} : data.board!);
   }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  },[]);
@@ -69,5 +72,7 @@ export default function ManagerV2ReviewPanel(){
    {person.onboardingStage==="profile_review"&&!person.firstReviewMine?
      <p>Hồ sơ đã được một cán bộ khác tiếp nhận; không có quyền duyệt vòng hai.</p>:null}
   </article>)}
+  {board?.nextCursor?<button type="button" disabled={busy} onClick={()=>void refresh(board.nextCursor!)}>
+    Tải thêm yêu cầu đang chờ</button>:null}
  </section>;
 }
