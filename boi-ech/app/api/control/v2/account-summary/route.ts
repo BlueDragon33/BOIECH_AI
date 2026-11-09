@@ -1,6 +1,6 @@
-import { accountConfiguration, accountErrorResponse } from "../../../account-runtime.server";
-import { DeviceAccessError, getCourseDatabase } from "../../../device-auth.server";
-import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../control-auth.server";
+import { accountConfiguration, accountErrorResponse } from "../../../../account-runtime.server";
+import { DeviceAccessError, getCourseDatabase } from "../../../../device-auth.server";
+import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../../control-auth.server";
 
 export const dynamic = "force-dynamic";
 export function OPTIONS(request: Request) { return controlPreflight(request); }
