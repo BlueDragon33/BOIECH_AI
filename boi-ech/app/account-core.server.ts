@@ -495,7 +495,7 @@ export class AccountService {
     const row = await this.db.prepare(`SELECT 1 AS allowed FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id
       WHERE a.account_id=? AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
-      ${this.v2Enabled ? "" : "AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)"}
+      ${this.v2Enabled ? "AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)" : "AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)"}
       AND p.scope=? AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?)`)
       .bind(actor.accountId, scope, this.now()).first<{ allowed: number }>();
     if (!row) fail("ACCOUNT_PERMISSION_REQUIRED");
@@ -604,7 +604,8 @@ export class AccountService {
     }
     const guard = `EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id WHERE a.account_id=? AND d.person_role='manager'
-      AND d.status='approved' AND d.management_enabled=1 AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      AND d.status='approved' AND d.management_enabled=1
+      ${this.v2Enabled ? "AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)" : "AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)"}
       AND p.scope='manager.approve.registration' AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?))`;
     const statements: D1PreparedStatement[] = [];
     if (action === "approve") {
@@ -649,7 +650,8 @@ export class AccountService {
     const guard = `EXISTS(SELECT 1 FROM account_manager_permissions p JOIN accounts m ON m.account_id=p.account_id
       JOIN device_access md ON md.device_id=m.storage_device_id WHERE p.account_id=? AND p.scope='registrants.read.all'
       AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?) AND md.person_role='manager' AND md.status='approved'
-      AND md.management_enabled=1 AND (md.access_expires_at IS NULL OR datetime(md.access_expires_at)>CURRENT_TIMESTAMP))`;
+      AND md.management_enabled=1
+      ${this.v2Enabled ? "AND EXISTS(SELECT 1 FROM account_entitlements e JOIN account_onboarding o ON o.account_id=e.account_id WHERE e.account_id=m.account_id AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP AND o.stage='active')" : "AND (md.access_expires_at IS NULL OR datetime(md.access_expires_at)>CURRENT_TIMESTAMP)"})`;
     const query = `SELECT a.account_id,d.learner_name,d.person_role,d.person_code,d.class_name,d.status FROM accounts a
       JOIN device_access d ON d.device_id=a.storage_device_id WHERE ${guard} ORDER BY a.account_id LIMIT ? OFFSET ?`;
     const result = await this.db.batch([
