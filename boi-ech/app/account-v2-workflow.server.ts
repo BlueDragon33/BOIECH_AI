@@ -39,7 +39,9 @@ export class AccountV2Workflow {
     const guard = `EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id
       WHERE a.account_id=? AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
-      AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      AND EXISTS(SELECT 1 FROM account_onboarding o WHERE o.account_id=a.account_id AND o.stage='active')
+      AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id
+        AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)
       AND p.scope='manager.approve.registration' AND p.enabled=1
       AND (p.expires_at IS NULL OR p.expires_at>(unixepoch()*1000)))`;
     return { id: actor.accountId, guard, values: [actor.accountId] };
