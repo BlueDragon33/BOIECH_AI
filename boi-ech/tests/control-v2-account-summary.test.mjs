@@ -43,11 +43,11 @@ function fixture() {
     withControlCors: async (_req, response) => response,
   };
   const mocks = {
-    "../../../account-runtime.server": {
+    "../../../../account-runtime.server": {
       accountConfiguration: async () => ({ v2: enabled }),
       accountErrorResponse: error => Response.json({ error: error.message, code: error.code }, { status: error.status ?? 503 }),
     },
-    "../../../device-auth.server": {
+    "../../../../device-auth.server": {
       DeviceAccessError: ControlError,
       getCourseDatabase: async () => ({
         prepare: sql => ({
@@ -60,7 +60,7 @@ function fixture() {
         }),
       }),
     },
-    "../../../control-auth.server": auth,
+    "../../../../control-auth.server": auth,
   };
   const mod = { exports: {} };
   new Function("require", "module", "exports", output)(name => {
