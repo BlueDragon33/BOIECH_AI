@@ -64,6 +64,29 @@ jobs:
         with:
           node-version: "22.13.0"
 
+      - name: Fail-closed paired Account-first V2 source contract (before Preview writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const boi = fs.readFileSync("boi-ech/app/api/control/v2/account-summary/route.ts", "utf8");
+          const app = fs.readFileSync("application-management-preview-source/app/api/apps/boi-ech/access/route.ts", "utf8");
+          const view = fs.readFileSync("application-management-preview-source/app/boi-access-view.tsx", "utf8");
+          const contract = 'boi-account-summary.v2';
+          if (!boi.includes('contract: "' + contract + '"') ||
+              !boi.includes('export async function GET(') ||
+              !boi.includes('requireControlService(request)') ||
+              boi.includes('export async function POST(') ||
+              !app.includes('/api/control/v2/account-summary') ||
+              !app.includes('result.payload.contract !== "' + contract + '"') ||
+              !view.includes('data.contract === "' + contract + '"') ||
+              !view.includes('data.verified !== true')) {
+            throw new Error("Paired V2 source contract mismatch. STOP before D1 migration or Preview deployment.");
+          }
+          console.log("Paired BOIECH_AI x Application-Management V2 Preview source contract PASS (no remote writes).");
+          NODE
+
       - name: Detect preview readiness
         id: config
         shell: bash
