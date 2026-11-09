@@ -35,4 +35,8 @@ test('P0: actual HTTP registration ingress has a server-side manager deny, not U
  const route=read('../app/api/accounts/route.ts');
  assert.match(route,/p\.action === "register" && p\.role === "manager"/);
  assert.match(route,/MANAGER_OWNER_INTAKE_REQUIRED/);
+ const legacy=read('../app/device-auth.server.ts');
+ assert.match(legacy,/personRole === "manager"/);
+ assert.match(legacy,/current\?\.person_role !== "manager"/);
+ assert.match(legacy,/MANAGER_OWNER_INTAKE_REQUIRED/);
 });
