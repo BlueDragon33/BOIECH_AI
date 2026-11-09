@@ -68,3 +68,24 @@ test('CAS admission revision and quota 20 unused invites are enforced; no plaint
   for(const token of tokens)assert.ok(!JSON.stringify(f.sqlite.prepare('SELECT * FROM account_audit').all()).includes(token));
  }finally{f.close()}
 });
+
+test('Actual account HTTP manager-register requires one-time invite and returns pending account',async()=>{
+ const f=accountStack({v2:true});try{
+  const issued=await f.service.issueManagerInvite(owner,1);
+  const response=await f.post('api/accounts/route.ts',{
+    action:'manager-register',...request(100,issued.inviteToken),publicKey:await key()
+  });
+  assert.equal(response.status,200);
+  const payload=await response.json();
+  assert.equal(payload.ok,true);
+  assert.equal(payload.account.role,'manager');
+  assert.equal(payload.account.status,'pending');
+  assert.ok((response.headers.get('set-cookie')??'').includes('HttpOnly'));
+  assert.ok(!JSON.stringify(payload).includes(issued.inviteToken));
+  const replay=await f.post('api/accounts/route.ts',{
+    action:'manager-register',...request(101,issued.inviteToken),publicKey:await key()
+  });
+  assert.equal(replay.status,409);
+  assert.equal((await replay.json()).code,'MANAGER_INVITATION_INVALID');
+ }finally{f.close()}
+});
