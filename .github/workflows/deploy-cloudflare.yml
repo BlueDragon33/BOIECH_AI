@@ -130,6 +130,11 @@ jobs:
         working-directory: boi-ech
         run: node scripts/production-package.mjs readback
 
+      - name: Verify live Production JavaScript and CSS assets
+        # Public client assets must work before considering API-only smoke checks sufficient.
+        working-directory: boi-ech
+        run: node scripts/production-package.mjs assets
+
       - name: Verify Universal Management Contract on live Production
         shell: bash
         run: |

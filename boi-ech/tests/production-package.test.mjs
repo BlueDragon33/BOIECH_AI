@@ -6,7 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import yaml from 'js-yaml';
-import { productionPackage, verifyProductionArtifact } from '../scripts/production-package.mjs';
+import { productionPackage, verifyProductionArtifact, verifyPublicAssets } from '../scripts/production-package.mjs';
 const revision='a'.repeat(40);
 function settings(){return {success:true,result:{bindings:[{type:'d1',name:'DB',id:'7816425d-ce8a-4b3c-b303-7697fd4a529c'},{type:'secret_text',name:'CONTROL_SERVICE_SECRET'},{type:'plain_text',name:'BOI_ECH_ACCESS_MODE',text:'managed'},{type:'plain_text',name:'EXISTING_POLICY',text:'retained'}]}};}
 test('Production package uses existing boi-ech-db, retains runtime policy and never copies secret values',()=>{
@@ -15,6 +15,7 @@ test('Production package uses existing boi-ech-db, retains runtime policy and ne
  assert.equal(config.vars.EXISTING_POLICY,'retained');assert.equal(config.vars.BOI_ECH_BUILD_REVISION,revision);
  assert.equal('CONTROL_SERVICE_SECRET' in config.vars,false);assert.notEqual(config.vars.BOI_ECH_ACCOUNT_V2,'true');
  assert.deepEqual(config.r2_buckets??[],[]);
+ assert.equal(config.assets.run_worker_first,false,'Public client JS/CSS must be served by the asset handler before the app router');
 });
 test('Production preparation refuses an unexpected database, extra D1 or absent existing bridge',()=>{
  for(const change of [s=>s.result.bindings[0].id='4094a621-3b81-4533-9694-4a2103e03363',s=>s.result.bindings.push({type:'d1',name:'OTHER',id:'7816425d-ce8a-4b3c-b303-7697fd4a529c'}),s=>s.result.bindings=s.result.bindings.filter(b=>b.type!=='secret_text')]){
@@ -41,4 +42,9 @@ test('actual rollback workflow records newest deployment when Wrangler returns o
   assert.equal(r.status,0,r.stderr);const result=JSON.parse(r.stdout.trim());
   assert.equal(result.previousDeployment,latest.id);assert.deepEqual(result.previousVersions,latest.versions);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('live public asset checks reject missing or HTML JavaScript responses',async()=>{
+ const files=['assets/index-abc.js','assets/index-abc.css'];
+ await assert.doesNotReject(verifyPublicAssets(files,async url=>new Response('',{headers:{'content-type':url.endsWith('.js')?'text/javascript':'text/css'}})));
+ for(const r of [new Response('Not Found',{status:404}),new Response('<html>',{headers:{'content-type':'text/html'}})])await assert.rejects(verifyPublicAssets(files,async()=>r),/Production public asset failed/);
 });
