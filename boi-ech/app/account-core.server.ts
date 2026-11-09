@@ -452,6 +452,8 @@ export class AccountService {
       VALUES(?,?,?,?,?) ON CONFLICT(account_id,scope) DO UPDATE SET enabled=excluded.enabled,expires_at=excluded.expires_at,granted_by=excluded.granted_by`)
       .bind(id, scope, enabled ? 1 : 0, expiry, owner.actor));
     try { await this.db.batch(statements); } catch (error) {
+      if (error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED", 409);
+      if (error instanceof Error && error.message.includes("ACCOUNT_ROLE_OR_POLICY_MISSING")) fail("ACCOUNT_POLICY_UNAVAILABLE", 503);
       if (error instanceof Error && /NOT NULL.*purpose/.test(error.message)) fail("ACCOUNT_CAS_CONFLICT", 409);
       throw error;
     }
@@ -523,6 +525,8 @@ export class AccountService {
     statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,CASE WHEN changes()=1 THEN ? ELSE NULL END`)
       .bind(actor.accountId, "registration." + action, targetId, "manager registration review"));
     try { await this.db.batch(statements); } catch (error) {
+      if (error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED", 409);
+      if (error instanceof Error && error.message.includes("ACCOUNT_ROLE_OR_POLICY_MISSING")) fail("ACCOUNT_POLICY_UNAVAILABLE", 503);
       if (error instanceof Error && /QUOTA/.test(error.message)) fail("ACCOUNT_QUOTA_REACHED", 409);
       if (error instanceof Error && /constraint|MANAGER_/i.test(error.message)) fail("ACCOUNT_REVIEW_CONFLICT", 409);
       throw error;
