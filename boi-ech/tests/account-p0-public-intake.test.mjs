@@ -23,7 +23,9 @@ test('P0: public registration UI has only learner and teacher radio; Owner manag
  const gate=read('../app/account-gate.tsx');
  assert.match(roles,/id:"learner"/);
  assert.match(roles,/id:"teacher"/);
- assert.doesNotMatch(roles,/id:"manager"/);
+ assert.match(roles,/includeManager/);
+ assert.match(roles,/includeManager\?\[/);
+ assert.match(gate,/includeManager=\{false\}/);
  assert.match(gate,/Application-Management/);
  assert.match(gate,/Thử đọc lại phiên/);
  assert.match(gate,/Không kết nối được máy chủ tài khoản/);
@@ -38,5 +40,6 @@ test('P0: actual HTTP registration ingress has a server-side manager deny, not U
  const legacy=read('../app/device-auth.server.ts');
  assert.match(legacy,/personRole === "manager"/);
  assert.match(legacy,/current\?\.person_role !== "manager"/);
+ assert.match(legacy,/accountFirstRuntimeEnabled && personRole/);
  assert.match(legacy,/MANAGER_OWNER_INTAKE_REQUIRED/);
 });
