@@ -557,7 +557,7 @@ export class AccountService {
        OR m.manager_device_id=?)${this.v2Enabled ? " AND a.account_id>?" : ""}
        ORDER BY a.account_id LIMIT ${this.v2Enabled ? "?" : "201"}`)
        .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId,
-         ...(this.v2Enabled ? [after,pageLimit as number+1] : []))
+         ...(this.v2Enabled ? [after,(pageLimit as number)+1] : []))
        .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
     if (!this.v2Enabled && (result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
     const allRows=result.results??[],limit=this.v2Enabled?pageLimit as number:200;
