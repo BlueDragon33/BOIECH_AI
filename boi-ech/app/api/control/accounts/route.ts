@@ -33,6 +33,17 @@ export async function POST(request: Request) {
     }
     if (input.action === "capacity") return controlResponse(await readAccountCapacity(await getCourseDatabase(), owner), 200, request);
     if (input.action === "set-capacity") return controlResponse(await changeAccountCapacity(await getCourseDatabase(), owner, input), 200, request);
+    // Owner-only canonical Account-first V2 intake; this contract must not report
+    // an empty verified inbox while the V2 backend is not actually enabled.
+    if (input.action === "manager-inbox-v2") {
+      if (!v2) throw new AccountError("ACCOUNT_V2_REQUIRED", 409);
+      const items = await service.ownerList();
+      return controlResponse({ contract: "boi-manager-intake.v2", verified: true, managers: items.map(item => ({
+        accountId: item.accountId, role: item.role, name: item.name,
+        status: item.status, onboardingStage: item.onboardingStage,
+        onboardingRevision: item.onboardingRevision,
+      })) }, 200, request);
+    }
     if (input.action === "list") return controlResponse({ accounts: await service.ownerList() }, 200, request);
     if (input.action === "read") return controlResponse(await service.ownerRead(String(input.accountId)), 200, request);
     if (input.action !== "command") throw new AccountError("ACCOUNT_INPUT", 400);
