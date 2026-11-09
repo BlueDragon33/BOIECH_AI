@@ -539,7 +539,10 @@ export class AccountService {
     if (readback.revision !== row.revision + 1 || scopes.some(scope => {const p=readback.permissions.find(p=>p.scope===scope);return p?.configured!==enabled||p.expiresAt!==expiry;})) fail("ACCOUNT_READBACK_FAILED", 503);
     return readback;
   }
-  async reviewBoard(token: string) {
+  async reviewBoard(token: string, after: unknown = "", pageLimit: unknown = 50) {
+    if(this.v2Enabled && (typeof after!=="string" || (after && !ACCOUNT.test(after))
+      || !Number.isInteger(pageLimit) || (pageLimit as number)<1 || (pageLimit as number)>50))
+      fail("ACCOUNT_QUERY_LIMIT",400);
     const actor = await this.authorize(token);
     await this.capability(actor, "manager.approve.registration");
     const onboardingSelect = this.v2Enabled ? ",o.stage AS onboarding_stage,o.revision AS onboarding_revision,o.first_review_by" : "";
@@ -551,10 +554,14 @@ export class AccountService {
       JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
       WHERE (d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
         AND m.target_device_id IS NULL${scopePending})
-       OR m.manager_device_id=? ORDER BY a.account_id LIMIT 201`)
-       .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId)
+       OR m.manager_device_id=?)${this.v2Enabled ? " AND a.account_id>?" : ""}
+       ORDER BY a.account_id LIMIT ${this.v2Enabled ? "?" : "201"}`)
+       .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId,
+         ...(this.v2Enabled ? [after,pageLimit as number+1] : []))
        .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
-    if ((result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
+    if (!this.v2Enabled && (result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
+    const allRows=result.results??[],limit=this.v2Enabled?pageLimit as number:200;
+    const devices=allRows.slice(0,limit),hasMore=this.v2Enabled && allRows.length>limit;
     const counts = await this.db.prepare(`SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
       JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
       AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP) GROUP BY d.person_role`).all<{ person_role: string; used: number }>();
@@ -563,7 +570,8 @@ export class AccountService {
     return { managerDeviceId: actor.storageDeviceId, quotas: {
       learner: { limit: limits.learner_limit, used: counts.results?.find(c => c.person_role === "learner")?.used ?? 0 },
       teacher: { limit: limits.teacher_limit, used: counts.results?.find(c => c.person_role === "teacher")?.used ?? 0 },
-    }, devices: (result.results ?? []).map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
+    }, nextCursor:hasMore?devices[devices.length-1].account_id:null,
+    devices: devices.map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
       deviceCode: r.person_code, role: r.person_role, name: r.learner_name, personCode: r.person_code, className: r.class_name,
       status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.person_code&&r.learner_name&&r.phone&&r.class_name) : true,
       onboardingStage: r.onboarding_stage??null, onboardingRevision: r.onboarding_revision??null,
