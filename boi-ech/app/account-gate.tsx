@@ -145,6 +145,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       {!ready ? <><p role="status">{error ? "Chưa kết nối được máy chủ tài khoản." : "Đang kiểm tra phiên…"}</p>
           {error && <button type="button" disabled={busy} onClick={() => void run(() => reload())}>Thử đọc lại phiên</button>}</> : account ? <>
         <p>{account.name} · {account.role === "manager" ? "Cán bộ quản lý" : account.role === "teacher" ? "Giảng viên" : "Học viên"}</p>
+        {managerInvite?<p role="status">Bạn đang đăng nhập bằng tài khoản khác. Để sử dụng thư mời Cán bộ quản lý, chọn “Đăng xuất / đổi tài khoản”. Sau khi đăng xuất, biểu mẫu từ link mời sẽ xuất hiện mà không cần xin mã mới.</p>:null}
         {!active && <p role="status" className={styles.pending}>
           {v2 ? account.deviceApproved===false ? "Thiết bị mới chưa được xác nhận. Hãy phê duyệt từ thiết bị đã tin cậy trước khi mở dữ liệu."
             : account.onboardingStage==="requested" ? "Đã tiếp nhận tài khoản. Đang chờ người có thẩm quyền duyệt lần một."
@@ -166,7 +167,14 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         </form> : null}
         <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void run(() => reload())}>Đồng bộ trạng thái</button>
           <button type="button" disabled={busy} onClick={() => void run(async () => { await send({ action: "rotate" }); await reload(); setNotice("Đã đổi vé phiên an toàn; tối đa 8 giờ kể từ khi đăng nhập."); })}>Gia hạn phiên</button>
-          <button type="button" disabled={busy} onClick={() => void run(async () => { setReady(false); setRecovery(""); recoveryOwner.current=""; await send({ action: "logout" }); broadcast(); window.location.reload(); })}>Đăng xuất / đổi tài khoản</button></div>
+          <button type="button" disabled={busy} onClick={() => void run(async () => { setReady(false); setRecovery(""); recoveryOwner.current=""; await send({ action: "logout" }); broadcast();
+            // Keep a pending one-use invitation ONLY in the URL fragment during the
+            // cross-account navigation. Fragments are not sent in HTTP requests, and
+            // the mount effect immediately scrubs the token from the address bar.
+            // Never persist it in local/session storage or put it in the query string.
+            const nextFragment=/^[a-f0-9]{64}$/.test(managerInvite)
+              ? "#manager-invite="+managerInvite : "";
+            window.location.replace(window.location.pathname+window.location.search+nextFragment); })}>Đăng xuất / đổi tài khoản</button></div>
         {active&&account.canReadRegistrants?<RegistrantReader/>:null}
         {active&&v2&&account.role==="manager"?<details>
           <summary>Hàng chờ xét duyệt học viên và giảng viên · Account-first V2</summary>
