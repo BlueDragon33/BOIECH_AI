@@ -42,3 +42,4 @@ next-env.d.ts
 /outputs/
 /work/
 /wrangler.cloudflare.preview.jsonc
+/wrangler.cloudflare.production.jsonc

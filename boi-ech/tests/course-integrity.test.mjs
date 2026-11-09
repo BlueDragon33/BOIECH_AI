@@ -375,7 +375,8 @@ test("refreshes only fixed device codes and marks stale devices inactive", async
   assert.match(overview, /statement\.bind\(\.\.\.displayCodes\)/);
   assert.match(overview, /slice\(0, 500\)/);
   assert.match(overview, /DEVICE_PRESENCE_TIMEOUT_MS = 150_000/);
-  assert.match(overview, /Date\.now\(\) - lastPresenceTime <= DEVICE_PRESENCE_TIMEOUT_MS/);
+  assert.match(overview, /lastPresenceTime \+ DEVICE_PRESENCE_TIMEOUT_MS <= now/);
+  assert.match(overview, /lastPresenceTime <= now && !presenceExpired/);
   assert.match(overview, /requestedCodes === undefined/);
 });
 
@@ -583,7 +584,7 @@ test("supports installable offline learning without offline answer submission", 
     assert.equal(png.readUInt32BE(20), size, `${icon.src} height must match the manifest`);
     assert.ok(appShell.includes(icon.src), `${icon.src} must be available offline`);
   }
-  assert.match(page, /indexedDB\.open\("boi-ech-doc-lap", 4\)/);
+  assert.match(page, /indexedDB\.open\(document\.documentElement\.dataset\.accountLocalDatabase \|\| "boi-ech-doc-lap", 4\)/);
   assert.match(page, /enqueueOfflineAction/);
   assert.match(page, /existingRequest\.result/);
   assert.match(page, /flushOfflineQueue/);
@@ -718,7 +719,7 @@ test("keeps unique identity and teacher-only content editing with the three-role
 
   assert.match(auth, /PERSON_CODE_ALREADY_REGISTERED/);
   assert.match(auth, /personal_edit_enabled = CASE WHEN person_role = 'teacher' THEN 1 ELSE 0 END/);
-  assert.match(overview, /current\.person_role !== "teacher"/);
+  assert.match(overview, /current\.person_role !== "manager"/);
   assert.match(migration, /device_access_person_identity_unique/);
 });
 

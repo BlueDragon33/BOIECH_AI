@@ -1,0 +1,66 @@
+{
+  "authority": "SOURCE_ONLY_ENGINEERING_CANDIDATE",
+  "review": "BLOCKED",
+  "ci": "PENDING",
+  "globalD1": "10/10 BLOCKED",
+  "featureFlag": "BOI_ECH_ACCOUNT_FIRST default OFF",
+  "baseline": {
+    "tests": 545,
+    "pass": 526,
+    "fail": 19,
+    "skipped": 0
+  },
+  "test": {
+    "command": "node --test tests/*.test.mjs",
+    "node": "v24.22.1",
+    "stats": {
+      "tests": 567,
+      "pass": 567,
+      "fail": 0,
+      "skipped": 0
+    },
+    "failures": [],
+    "exitCode": 0
+  },
+  "newFailuresComparedWithBaseline": [],
+  "typecheck": {
+    "command": "tsc --noEmit --incremental false",
+    "exitCode": 0
+  },
+  "build": {
+    "command": "npm run build",
+    "exitCode": 0
+  },
+  "lint": {
+    "fullExitCode": 0,
+    "changedSourceErrors": 0,
+    "note": "Full lint 0 errors / 5 warnings; fresh final changed-source lint 0 errors."
+  },
+  "notRun": [
+    "real browser / Safari / iPhone QA",
+    "Cloudflare target compatibility-date 2026-08-26 / CPU-budget admission",
+    "live D1 independent readback",
+    "production migration or rollback",
+    "independent authority acceptance"
+  ],
+  "spend": "No GitHub Actions dispatched; no PR event, deploy, paid provider, production write or merge.",
+  "migration": {
+    "mode": "LOCAL_SNAPSHOT_DRY_RUN",
+    "node": "v24.22.1",
+    "report": {
+      "eligible": 3,
+      "conflicts": []
+    },
+    "mappedAccounts": 3,
+    "legacyTables": 24,
+    "legacyRowsUnchanged": true,
+    "idempotent": true,
+    "reopenReadback": true,
+    "sourceUnmodified": true,
+    "rollback": "delete disposable clone; source snapshot unchanged"
+  },
+  "workerd": {
+    "compatibilityDate": "2026-05-22",
+    "result": "PASS for actual standard scrypt execution only; not a target-runtime attestation"
+  }
+}

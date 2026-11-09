@@ -1,0 +1,1 @@
+{"mode":"LOCAL_SNAPSHOT_DRY_RUN","node":"v24.22.1","report":{"eligible":3,"conflicts":[]},"mappedAccounts":3,"legacyTables":24,"legacyRowsUnchanged":true,"idempotent":true,"reopenReadback":true,"sourceUnmodified":true,"rollback":"delete disposable clone; source snapshot unchanged"}

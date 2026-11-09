@@ -1,0 +1,98 @@
+import { cookies, headers } from "next/headers";
+import { AccountError, AccountService, ACCOUNT_COOKIE } from "./account-core.server";
+import { AccountEntitlementError } from "./account-entitlement.server";
+import { DeviceAccessError, getCourseDatabase, getPublicDeviceState } from "./device-auth.server";
+
+export async function accountConfiguration() {
+  let values: Record<string, unknown>;
+  try { values = (await import("cloudflare:workers")).env as unknown as Record<string, unknown>; }
+  catch (error) {
+    // The Node artifact-render test has no Workers binding. Missing configuration stays OFF.
+    const code = error && typeof error === "object" && "code" in error ? error.code : "";
+    if (code !== "ERR_UNSUPPORTED_ESM_URL_SCHEME" && code !== "ERR_MODULE_NOT_FOUND") throw error;
+    values = process.env;
+  }
+  const enabled = values.BOI_ECH_ACCOUNT_FIRST === "true";
+  const v2 = enabled && values.BOI_ECH_ACCOUNT_V2 === "true";
+  const origin = typeof values.BOI_ECH_ACCOUNT_ORIGIN === "string" ? values.BOI_ECH_ACCOUNT_ORIGIN : "";
+  if (enabled) {
+    let valid = false;
+    try { const u = new URL(origin); valid = u.origin === origin && (u.protocol === "https:" ||
+      (values.LOCAL_CONTROL_PLANE === "true" && ["localhost", "127.0.0.1"].includes(u.hostname))); } catch { /* fail closed */ }
+    if (!valid) throw new AccountError("ACCOUNT_ORIGIN_UNCONFIGURED", 503);
+  }
+  return { enabled, origin, v2 };
+}
+export function sameOrigin(origin: string | null, expected: string, contentType: string | null, requireJson = true) {
+  if (!origin || origin !== expected || (requireJson && !contentType?.toLowerCase().startsWith("application/json"))) throw new AccountError("ACCOUNT_CSRF_REJECTED", 403);
+}
+export async function accountService() {
+  const config = await accountConfiguration();
+  if (!config.enabled) throw new AccountError("ACCOUNT_FEATURE_DISABLED", 404);
+  return new AccountService(await getCourseDatabase(), Date.now, config.v2);
+}
+export async function accountCookieToken() { return (await cookies()).get(ACCOUNT_COOKIE)?.value ?? ""; }
+export function sessionCookie(token: string) {
+  // Host-only cookie: deliberately no Domain attribute. JS never receives a session token.
+  return `${ACCOUNT_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${token ? 28800 : 0}`;
+}
+export async function resolveAccountDevice(claimedDeviceId?: unknown) {
+  const config = await accountConfiguration();
+  if (!config.enabled) return null;
+  const incoming = await headers();
+  sameOrigin(incoming.get("origin"), config.origin, incoming.get("content-type"), false);
+  const service = await accountService(), token = await accountCookieToken();
+  const actor = config.v2 ? await service.authorize(token) : await service.session(token);
+  if (claimedDeviceId && claimedDeviceId !== actor.storageDeviceId) throw new AccountError("ACCOUNT_SWITCHED", 409);
+  const state = await getPublicDeviceState(actor.storageDeviceId);
+  if (!state) throw new AccountError("ACCOUNT_NOT_FOUND", 404);
+  return { ...state, accountId: actor.accountId };
+}
+export async function accountRequest(request: Request) {
+  const config = await accountConfiguration();
+  if (!config.enabled) throw new AccountError("ACCOUNT_FEATURE_DISABLED", 404);
+  if (request.method !== "GET") sameOrigin(request.headers.get("origin"), config.origin, request.headers.get("content-type"));
+  return { service: await accountService(), token: await accountCookieToken(), config };
+}
+export function accountErrorResponse(error: unknown) {
+  const code = error instanceof AccountError || error instanceof AccountEntitlementError ? error.code : error instanceof DeviceAccessError ? error.code : "ACCOUNT_SERVICE_UNAVAILABLE";
+  const status = error instanceof AccountError || error instanceof AccountEntitlementError || error instanceof DeviceAccessError ? error.status : 503;
+  const messages: Record<string, string> = {
+    AUTH_FAILED: "Tên đăng nhập hoặc thông tin xác thực chưa đúng.",
+    RATE_LIMITED: "Đã vượt số lần thử. Hãy thử lại sau 15 phút.",
+    ACCOUNT_PENDING: "Tài khoản đang chờ xét duyệt.", ACCOUNT_BLOCKED: "Tài khoản đã bị khóa.",
+    PASSWORD_POLICY: "Mật khẩu cần ít nhất 15 ký tự và tối đa 1.024 ký tự.",
+    REGISTRATION_UNAVAILABLE: "Không thể tạo hồ sơ này. Nếu đã đăng ký, hãy đăng nhập hoặc dùng khôi phục.",
+    ACCOUNT_CAPACITY_REACHED: "Loại tài khoản này đã đủ số lượng. Đăng ký mới tạm dừng để bảo vệ hệ thống; hãy liên hệ cán bộ phụ trách.",
+    ACCOUNT_POLICY_UNAVAILABLE: "Chính sách giới hạn tài khoản chưa sẵn sàng. Chưa tạo hồ sơ nào.",
+    DEVICE_LIMIT_REACHED: "Đã đủ 3 thiết bị. Hãy dùng máy đã xác nhận để gỡ máy cũ hoặc mã khôi phục an toàn.",
+    DEVICE_APPROVAL_REQUIRED: "Thiết bị mới đang chờ xác nhận từ một thiết bị tin cậy.",
+    DEVICE_APPROVAL_CONFLICT: "Thiết bị đã thay đổi trạng thái; tải lại trước khi duyệt.",
+    ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa hoàn tất hai lần phê duyệt.",
+    ACCOUNT_ONBOARDING_MISSING: "Trạng thái xét duyệt chưa được xác minh; hãy liên hệ quản trị.",
+    PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, mã, đơn vị và số điện thoại.",
+    PROFILE_CONFLICT: "Mã cá nhân hoặc số điện thoại đã được sử dụng. Kiểm tra lại với cán bộ.",
+    ACCOUNT_SCOPE_FORBIDDEN: "Không có quyền xử lý hồ sơ ngoài phạm vi được giao.",
+    ACCOUNT_SWITCHED: "Phiên tài khoản đã đổi. Hãy tải lại và kiểm tra dữ liệu trước khi đồng bộ.",
+    SYNC_CONSENT_REQUIRED: "Thiết bị chưa được bạn xác nhận quyền đồng bộ cho loại dữ liệu này.",
+    SYNC_CONFLICT: "Dữ liệu trên máy chủ đã có phiên bản khác. Bản trên thiết bị vẫn được giữ lại để xử lý.",
+    SYNC_EVENT_REUSE: "Mã sự kiện đã được dùng cho nội dung khác. Không ghi đè dữ liệu.",
+    SYNC_DATA_INVALID: "Nội dung đồng bộ không thuộc danh mục được phép.",
+    SYNC_DATA_TOO_LARGE: "Bản cập nhật quá lớn. Chỉ đồng bộ dữ liệu học tập nhỏ, không gửi video.",
+    SYNC_SCOPE_INVALID: "Loại dữ liệu này không hỗ trợ đồng bộ.",
+    DEVICE_RECOVERY_CONFLICT: "Thiết bị hoặc mã khôi phục đã thay đổi. Hãy xác minh lại.",
+
+    LEGACY_PROOF_REQUIRED: "Hãy chuyển tài khoản từ trình duyệt đã đăng ký, bằng khóa gốc của bạn.",
+    ACCOUNT_PERMISSION_REQUIRED: "Tài khoản chưa được cấp quyền thực hiện thao tác này.",
+    ACCOUNT_CAS_CONFLICT: "Thông tin đã thay đổi. Đồng bộ lại trước khi lưu.",
+    ACCOUNT_ENTITLEMENT_REQUIRED: "Tài khoản chưa được cấp thời hạn sử dụng hợp lệ.",
+    ACCOUNT_SUSPENDED: "Tài khoản đã bị tạm khóa quyền sử dụng.",
+    ACCOUNT_EXPIRED: "Tài khoản đã hết thời hạn sử dụng. Hãy yêu cầu gia hạn.",
+    ACCOUNT_REASON_REQUIRED: "Nhập lý do thay đổi thời hạn từ 5 đến 300 ký tự.",
+    ACCOUNT_ACCESS_POLICY_UNAVAILABLE: "Chính sách thời hạn tài khoản chưa sẵn sàng.",
+    ACCOUNT_READBACK_FAILED: "Hệ thống chưa xác minh được thay đổi. Hãy tải lại trước khi thử tiếp.",
+  };
+  return Response.json({ code, error: messages[code] ?? "Chưa xác minh được thao tác tài khoản. Hãy đồng bộ và thử lại." }, {
+    status, headers: { "cache-control": "no-store, private", "x-content-type-options": "nosniff", ...(status === 429 ? { "retry-after": "900" } : {}) },
+  });
+}

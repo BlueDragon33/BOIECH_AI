@@ -1,0 +1,71 @@
+✖ actual repository Preview release gate accepts the explicit protected deployment workflow (75.377957ms)
+✖ Preview gate rejects removal of confirmation or generated artifact verification (132.501672ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 305.064836
+
+✖ failing tests:
+
+test at tests/preview-release-gate.test.mjs:8:1
+✖ actual repository Preview release gate accepts the explicit protected deployment workflow (75.377957ms)
+  AssertionError [ERR_ASSERTION]: file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/validate-cloudflare-preview.mjs:71
+    if (!previewWorkflow.includes(token)) throw new Error(`Preview workflow thiếu: ${token}`);
+                                                ^
+  
+  Error: Preview workflow thiếu: DEPLOY_PREVIEW
+      at file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/scripts/validate-cloudflare-preview.mjs:71:47
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at async node:internal/modules/esm/loader:647:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+  
+  Node.js v24.22.1
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/preview-release-gate.test.mjs:9:41)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/preview-release-gate.test.mjs:11:1
+✖ Preview gate rejects removal of confirmation or generated artifact verification (132.501672ms)
+  AssertionError [ERR_ASSERTION]: file:///tmp/boi-preview-gate-wDU1m4/boi-ech/scripts/validate-cloudflare-preview.mjs:71
+    if (!previewWorkflow.includes(token)) throw new Error(`Preview workflow thiếu: ${token}`);
+                                                ^
+  
+  Error: Preview workflow thiếu: DEPLOY_PREVIEW
+      at file:///tmp/boi-preview-gate-wDU1m4/boi-ech/scripts/validate-cloudflare-preview.mjs:71:47
+      at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+      at async node:internal/modules/esm/loader:647:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+  
+  Node.js v24.22.1
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/preview-release-gate.test.mjs:19:110)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

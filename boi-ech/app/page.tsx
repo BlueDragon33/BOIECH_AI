@@ -170,7 +170,7 @@ function Icon({ name }: { name: SectionId | "menu" | "close" }) {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("boi-ech-doc-lap", 4);
+    const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap", 4);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("tien-do")) {
         request.result.createObjectStore("tien-do");
@@ -792,10 +792,11 @@ function DeviceGate({
             <label><span>{personRole === "manager" ? "Đơn vị công tác" : personRole === "teacher" ? "Lớp / đơn vị phụ trách" : "Lớp"}</span><input value={className} onChange={(event) => setClassName(event.target.value)} placeholder={personRole === "teacher" ? "Ví dụ: Đại đội 1" : "Ví dụ: 7A1"} maxLength={50} required /></label>
             <label><span>Số điện thoại</span><input value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" placeholder="Ví dụ: 0912345678" maxLength={14} required /></label>
             <label className="device-code-field"><span>Mã thiết bị</span><input value={device?.deviceCode ?? ""} readOnly /></label>
-            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu thông tin…" : personRole === "manager" ? "Lưu thông tin & mở điều phối" : "Lưu thông tin & vào học"}</button>
+            <button type="submit" disabled={submitting}>{submitting ? "Đang lưu thông tin…" : personRole === "manager" ? "Gửi đăng ký Cán bộ quản lý · chờ Chủ hệ thống duyệt" : "Lưu thông tin & vào học"}</button>
           </form>
         ) : null}
         {readyToLearn ? <button className="device-enter-learning" onClick={onEnter}>{device?.personRole === "manager" ? "Vào khu điều phối" : "Vào học"} <span>→</span></button> : null}
+        <p><a href="/xem-thu-can-bo-quan-ly">Xem thử chế độ Cán bộ quản lý (chỉ xem, không tác động dữ liệu thực)</a></p>
         {paymentRequested ? (
           <form className="device-payment-form" onSubmit={(event) => void submitPayment(event)}>
             {device?.paymentReviewNote ? <div className="payment-rejection" role="alert"><strong>Ảnh trước chưa được chấp nhận</strong><p>{device.paymentReviewNote}</p><small>Hãy kiểm tra lại thông tin chuyển khoản rồi gửi ảnh mới.</small></div> : null}

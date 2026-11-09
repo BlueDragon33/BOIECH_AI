@@ -1,6 +1,7 @@
 import {
   DeviceAccessError,
   getCourseDatabase,
+  isAccountFirstEnabled,
   verifyDeviceRequest,
 } from "../../../device-auth.server";
 
@@ -69,7 +70,7 @@ function rosterItem(row: RosterRow) {
   };
 }
 
-async function listRoster(classNames: string[]) {
+async function listRoster(classNames: string[], canManage: boolean) {
   const database = await getCourseDatabase();
   const classPlaceholders = classNames.map(() => "lower(trim(?))").join(", ");
   const result = await database.prepare(
@@ -85,6 +86,7 @@ async function listRoster(classNames: string[]) {
   ).bind(...classNames).all<RosterRow>();
   const roster = (result.results ?? []).map(rosterItem);
   return {
+    canManage,
     roster,
     counts: {
       pending: roster.filter((item) => item.status === "pending").length,
@@ -122,11 +124,17 @@ export async function POST(request: Request) {
     const classPlaceholders = teacherClasses.map(() => "lower(trim(?))").join(", ");
 
     const action = typeof payload.action === "string" ? payload.action : "list";
+    const canManage = !(await isAccountFirstEnabled());
     if (action === "list") {
-      return response(await listRoster(teacherClasses));
+      return response(await listRoster(teacherClasses, canManage));
     }
     if (action !== "approve" && action !== "remove") {
       throw new DeviceAccessError("Thao tác quản lý học viên không hợp lệ.", 400, "INVALID_TEACHER_ROSTER_ACTION");
+    }
+    // Account approval/block authority belongs to managers and the shared account
+    // quota/audit path. A legacy teacher route must never change those states.
+    if (!canManage) {
+      throw new DeviceAccessError("Cán bộ quản lý xét duyệt và quản lý quyền truy cập tài khoản học viên.", 403, "ACCOUNT_REVIEW_MANAGER_REQUIRED");
     }
 
     const personCode = normalizeTarget(payload.personCode);
@@ -153,7 +161,7 @@ export async function POST(request: Request) {
       (action === "approve" && target.status === "approved")
       || (action === "remove" && target.status === "blocked");
     if (alreadyInRequestedState) {
-      return response(await listRoster(teacherClasses));
+      return response(await listRoster(teacherClasses, canManage));
     }
 
     if (action === "approve") {
@@ -207,7 +215,7 @@ export async function POST(request: Request) {
     ).run();
 
     return response({
-      ...(await listRoster(teacherClasses)),
+      ...(await listRoster(teacherClasses, canManage)),
       changed: {
         action,
         personCode,

@@ -1,0 +1,31 @@
+✖ account-mode roster renders class data and manager instruction without approval/removal controls (112.54676ms)
+✔ legacy roster retains approve/remove/restore controls when server permits them (36.446904ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 452.633049
+
+✖ failing tests:
+
+test at tests/account-teacher-roster-ui.test.mjs:6:1
+✖ account-mode roster renders class data and manager instruction without approval/removal controls (112.54676ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Cán bộ quản lý xét duyệt/. Input:
+  
+  '<section class="teacher-roster-manager" data-teacher-roster-ui="true"><header><div><span>QUẢN LÝ HỌC VIÊN</span><h2>Đồng bộ &amp; quyền lớp phụ trách</h2><p>Giảng viên chỉ phê duyệt hoặc loại học viên thuộc đúng lớp của mình. “Loại” là khóa có thể khôi phục, không xóa dữ liệu.</p></div><button type="button">Đồng bộ dữ liệu</button></header><div class="teacher-roster-summary"><div><strong>1</strong><span>Đang học</span></div><div class="pending"><strong>1</strong><span>Chờ duyệt</span></div><div class="blocked"><strong>1</strong><span>Đã loại</span></div><div class="synced"><strong>Chưa đồng bộ</strong><span>Lần đồng bộ cuối</span></div></div><div class="teacher-roster-toolbar"><div class="teacher-roster-filters"><button type="button" class="active">Tất cả (3)</button><button type="button" class="">Chờ duyệt (1)</button><button type="button" class="">Đang học (1)</button><button type="button" class="">Đã loại (1)</button></div><input placeholder="Tìm tên hoặc mã học viên…" aria-label="Tìm học viên trong danh sách quản lý" value=""/></div><div class="teacher-roster-table-wrap"><table class="teacher-roster-table"><thead><tr><th>Học viên</th><th>Mã</th><th>Trạng thái</th><th>Gần nhất</th><th>Thao tác</th></tr></thead><tbody><tr><td><strong>Synthetic 0</strong><small>Class</small></td><td>PERSON0</td><td><span class="teacher-roster-status pending">Chờ duyệt</span></td><td>Chưa đồng bộ</td><td><button type="button" class="approve">Phê duyệt</button></td></tr><tr><td><strong>Synthetic 1</strong><small>Class</small></td><td>PERSON1</td><td><span class="teacher-roster-status approved">Đang học</span></td><td>Chưa đồng bộ</td><td><button type="button" class="remove">Loại khỏi lớp</button></td></tr><tr><td><strong>Synthetic 2</strong><small>Class</small></td><td>PERSON2</td><td><span class="teacher-roster-status blocked">Đã loại</span></td><td>Chưa đồng bộ</td><td><button type="button" class="restore">Khôi phục</button></td></tr></tbody></table></div></section>'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/account-teacher-roster-ui.test.mjs:6:239)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '<section class="teacher-roster-manager" data-teacher-roster-ui="true"><header><div><span>QUẢN LÝ HỌC VIÊN</span><h2>Đồng bộ &amp; quyền lớp phụ trách</h2><p>Giảng viên chỉ phê duyệt hoặc loại học viên thuộc đúng lớp của mình. “Loại” là khóa có thể khôi phục, không xóa dữ liệu.</p></div><button type="button">Đồng bộ dữ liệu</button></header><div class="teacher-roster-summary"><div><strong>1</strong><span>Đang học</span></div><div class="pending"><strong>1</strong><span>Chờ duyệt</span></div><div class="blocked"><strong>1</strong><span>Đã loại</span></div><div class="synced"><strong>Chưa đồng bộ</strong><span>Lần đồng bộ cuối</span></div></div><div class="teacher-roster-toolbar"><div class="teacher-roster-filters"><button type="button" class="active">Tất cả (3)</button><button type="button" class="">Chờ duyệt (1)</button><button type="button" class="">Đang học (1)</button><button type="button" class="">Đã loại (1)</button></div><input placeholder="Tìm tên hoặc mã học viên…" aria-label="Tìm học viên trong danh sách quản lý" value=""/></div><div class="teacher-roster-table-wrap"><table class="teacher-roster-table"><thead><tr><th>Học viên</th><th>Mã</th><th>Trạng thái</th><th>Gần nhất</th><th>Thao tác</th></tr></thead><tbody><tr><td><strong>Synthetic 0</strong><small>Class</small></td><td>PERSON0</td><td><span class="teacher-roster-status pending">Chờ duyệt</span></td><td>Chưa đồng bộ</td><td><button type="button" class="approve">Phê duyệt</button></td></tr><tr><td><strong>Synthetic 1</strong><small>Class</small></td><td>PERSON1</td><td><span class="teacher-roster-status approved">Đang học</span></td><td>Chưa đồng bộ</td><td><button type="button" class="remove">Loại khỏi lớp</button></td></tr><tr><td><strong>Synthetic 2</strong><small>Class</small></td><td>PERSON2</td><td><span class="teacher-roster-status blocked">Đã loại</span></td><td>Chưa đồng bộ</td><td><button type="button" class="restore">Khôi phục</button></td></tr></tbody></table></div></section>',
+    expected: /Cán bộ quản lý xét duyệt/,
+    operator: 'match',
+    diff: 'simple'
+  }

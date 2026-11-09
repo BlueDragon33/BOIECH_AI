@@ -10,6 +10,8 @@ const allowLan = process.env.LOCAL_CONTROL_ALLOW_LAN === "true";
 const cloudflareConfigPath = process.env.CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH?.trim();
 
 const localVars = [
+  "BOI_ECH_ACCOUNT_FIRST",
+  "BOI_ECH_ACCOUNT_ORIGIN",
   "CONTROL_SERVICE_SECRET",
   "APPLICATION_MANAGEMENT_ORIGIN",
   "LOCAL_CONTROL_PLANE",

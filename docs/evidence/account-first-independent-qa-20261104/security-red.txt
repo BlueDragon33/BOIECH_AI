@@ -1,0 +1,46 @@
+✖ account-mode teacher cannot approve past shared quota or mutate account approval via legacy roster (670.955663ms)
+✖ pre-proof challenges on both HTTP endpoints reveal no profile on success or blocked errors (286.612046ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1225.314121
+
+✖ failing tests:
+
+test at tests/account-legacy-boundary.test.mjs:2:1
+✖ account-mode teacher cannot approve past shared quota or mutate account approval via legacy roster (670.955663ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  200 !== 403
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/account-legacy-boundary.test.mjs:11:141)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 403,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/account-legacy-boundary.test.mjs:19:1
+✖ pre-proof challenges on both HTTP endpoints reveal no profile on success or blocked errors (286.612046ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /SENSITIVE PAYMENT NOTE|phone|learnerName|paymentReviewNote|"device"/. Input:
+  
+  '{"challenge":"2fEciLY6c83Hd6RleCHD78naZ3PPyvBrxExNCbUWPLE","expiresAt":1793805529396,"device":{"deviceId":"aa5aa5887d9bc06ff0343a80ccd35516383b0a0fd61db50e6e639b146f0b0867","deviceCode":"BE-AA5AA5887D9BC06F","status":"pending","deviceType":"desktop","detectedDeviceType":"desktop","deviceTypeOverride":null,"platform":null,"browser":null,"label":null,"learnerName":"Synthetic Person","learnerFamilyName":"Synthetic","learnerGivenName":"Person","personRole":"learner","managementEnabled":false,"personCode":"PERSON1","className":"Same class","phone":"0900000001","registrationComplete":true,"accessGroup":"unassigned","paymentStatus":"unassigned","paymentAmount":50000,"paymentSubmittedAt":null,"paymentRejectedAt":null,"paymentReviewNote":"SENSITIVE PAYMENT NOTE","accessExpiresAt":null,"accessExpired":false,"accessExpiringSoon":false,"accessDaysRemaining":null,"personalEditEnabled":false,"autoConfirmedAt":null}}'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/5a245b221d81/boi-account-first/boi-ech/tests/account-legacy-boundary.test.mjs:25:130)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{"challenge":"2fEciLY6c83Hd6RleCHD78naZ3PPyvBrxExNCbUWPLE","expiresAt":1793805529396,"device":{"deviceId":"aa5aa5887d9bc06ff0343a80ccd35516383b0a0fd61db50e6e639b146f0b0867","deviceCode":"BE-AA5AA5887D9BC06F","status":"pending","deviceType":"desktop","detectedDeviceType":"desktop","deviceTypeOverride":null,"platform":null,"browser":null,"label":null,"learnerName":"Synthetic Person","learnerFamilyName":"Synthetic","learnerGivenName":"Person","personRole":"learner","managementEnabled":false,"personCode":"PERSON1","className":"Same class","phone":"0900000001","registrationComplete":true,"accessGroup":"unassigned","paymentStatus":"unassigned","paymentAmount":50000,"paymentSubmittedAt":null,"paymentRejectedAt":null,"paymentReviewNote":"SENSITIVE PAYMENT NOTE","accessExpiresAt":null,"accessExpired":false,"accessExpiringSoon":false,"accessDaysRemaining":null,"personalEditEnabled":false,"autoConfirmedAt":null}}',
+    expected: /SENSITIVE PAYMENT NOTE|phone|learnerName|paymentReviewNote|"device"/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }

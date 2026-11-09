@@ -2,6 +2,7 @@ import {
   DeviceAccessError,
   deviceErrorResponse,
   getCourseDatabase,
+  isAccountFirstEnabled,
   normalizeAccessExpiry,
   requireDeviceAdmin,
 } from "../../../device-auth.server";
@@ -126,6 +127,7 @@ async function listDevices() {
             p.last_activity_at, p.last_lesson, p.last_part
        FROM device_access d
        LEFT JOIN device_profiles p ON p.device_id = d.device_id
+      WHERE d.person_role = 'manager'
       ORDER BY CASE d.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
                d.last_seen_at DESC
       LIMIT 200`,
@@ -136,6 +138,7 @@ async function listDevices() {
 export async function GET() {
   try {
     await requireDeviceAdmin();
+    if(await isAccountFirstEnabled()) throw new DeviceAccessError("Quyền tài khoản chỉ được xử lý qua hợp đồng xác thực.",403,"ACCOUNT_CONTROL_REQUIRED");
     return response({ devices: await listDevices() });
   } catch (error) {
     return deviceErrorResponse(error);
@@ -145,6 +148,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     await requireDeviceAdmin();
+    if(await isAccountFirstEnabled()) throw new DeviceAccessError("Quyền tài khoản chỉ được xử lý qua hợp đồng xác thực.",403,"ACCOUNT_CONTROL_REQUIRED");
     const payload = (await request.json()) as Record<string, unknown>;
     const action = typeof payload.action === "string" ? payload.action : "";
     const deviceId = typeof payload.deviceId === "string" ? payload.deviceId : "";
@@ -156,6 +160,14 @@ export async function POST(request: Request) {
       "SELECT device_id, learner_name, person_role, class_name, phone, registration_submitted_at FROM device_access WHERE device_id = ?",
     ).bind(deviceId).first<{ device_id: string; learner_name: string | null; person_role: "learner" | "manager" | "teacher" | null; class_name: string | null; phone: string | null; registration_submitted_at: string | null }>();
     if (!exists) throw new DeviceAccessError("Không tìm thấy thiết bị.", 404, "DEVICE_NOT_FOUND");
+    // Legacy admin-email API is not a second authority over learner/teacher
+    // approvals, blocks, profile edits, reset or role changes.
+    if (exists.person_role !== "manager") {
+      throw new DeviceAccessError(
+        "Quản trị viên trung tâm chỉ quản lý thiết bị cán bộ quản lý. Học viên và giảng viên do cán bộ Bơi Ếch xét duyệt.",
+        403, "MANAGER_ONLY_CENTRAL_REVIEW",
+      );
+    }
 
     if (action === "approve") {
       if (!exists.learner_name?.trim() || !exists.class_name?.trim() || !exists.phone?.trim() || !exists.registration_submitted_at) {
@@ -193,7 +205,7 @@ export async function POST(request: Request) {
         "UPDATE device_access SET device_type_override = ?, updated_at = CURRENT_TIMESTAMP WHERE device_id = ?",
       ).bind(requestedType === "auto" ? null : requestedType, deviceId).run();
     } else if (action === "teacher-classes") {
-      if (exists.person_role !== "teacher") {
+      if (exists.person_role === "manager") {
         throw new DeviceAccessError("Chỉ hồ sơ Giảng viên mới có thể được phân nhiều lớp.", 409, "TEACHER_ROLE_REQUIRED");
       }
       const classes = normalizeTeacherClasses(payload.teacherClasses);

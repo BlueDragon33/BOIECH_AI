@@ -1,0 +1,41 @@
+import { AccountError } from "../../../account-core.server";
+import { AccountEntitlementService } from "../../../account-entitlement.server";
+import { readAccountCapacity, changeAccountCapacity } from "../../../account-capacity.server";
+import { AccountV2Workflow } from "../../../account-v2-workflow.server";
+import { getCourseDatabase } from "../../../device-auth.server";
+import { accountErrorResponse, accountService, accountConfiguration } from "../../../account-runtime.server";
+import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../control-auth.server";
+export const dynamic = "force-dynamic";
+export function OPTIONS(request: Request) { return controlPreflight(request); }
+export async function POST(request: Request) {
+  try {
+    const owner = await requireControlService(request);
+    if (owner.role !== "owner") throw new AccountError("OWNER_REQUIRED");
+    const raw = await request.text();
+    if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);
+    const input = JSON.parse(raw) as Record<string, unknown>;
+    const service = await accountService();
+    const v2 = (await accountConfiguration()).v2;
+    const entitlement = v2 ? new AccountEntitlementService(await getCourseDatabase()) : null;
+    if (entitlement) {
+      if (input.action === "list-entitlements") return controlResponse({accounts:await entitlement.list(owner)},200,request);
+      if (input.action === "entitlement-policy") return controlResponse({policies:await entitlement.policy()},200,request);
+      if (input.action === "set-entitlement-policy") return controlResponse({policy:await entitlement.setPolicy(owner,input)},200,request);
+      if (input.action === "read-entitlement") return controlResponse({entitlement:await entitlement.read(input.accountId)},200,request);
+      if (input.action === "set-entitlement") return controlResponse({entitlement:await entitlement.change(owner,input)},200,request);
+    }
+    if (v2) {
+      const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
+      if (input.action === "review-first") return controlResponse({ onboarding: await workflow.firstReview(
+        {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision) },200,request);
+      if (input.action === "review-changes") return controlResponse({ onboarding: await workflow.requestChanges(
+        {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision,input.reason) },200,request);
+    }
+    if (input.action === "capacity") return controlResponse(await readAccountCapacity(await getCourseDatabase(), owner), 200, request);
+    if (input.action === "set-capacity") return controlResponse(await changeAccountCapacity(await getCourseDatabase(), owner, input), 200, request);
+    if (input.action === "list") return controlResponse({ accounts: await service.ownerList() }, 200, request);
+    if (input.action === "read") return controlResponse(await service.ownerRead(String(input.accountId)), 200, request);
+    if (input.action !== "command") throw new AccountError("ACCOUNT_INPUT", 400);
+    return controlResponse(await service.ownerCommand(owner, input), 200, request);
+  } catch (error) { return withControlCors(request, accountErrorResponse(error)); }
+}

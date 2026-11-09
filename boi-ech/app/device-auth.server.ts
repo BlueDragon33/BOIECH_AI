@@ -52,6 +52,7 @@ type LegacyCourseRow = {
 
 export type PublicDeviceState = {
   deviceId: string;
+  accountId?: string;
   deviceCode: string;
   status: DeviceStatus;
   deviceType: DeviceType;
@@ -106,6 +107,8 @@ export class DeviceAccessError extends Error {
   }
 }
 
+let accountFirstRuntimeEnabled = false;
+
 let deviceSchemaReady: Promise<unknown> | null = null;
 let deviceRuntimeSchemaReady: Promise<unknown> | null = null;
 
@@ -113,6 +116,7 @@ export async function getCourseDatabase() {
   const workers = await import("cloudflare:workers");
   if (!workers.env.DB) throw new Error("Kho tiến độ chưa sẵn sàng.");
   const database = workers.env.DB;
+  accountFirstRuntimeEnabled = (workers.env as unknown as Record<string, unknown>).BOI_ECH_ACCOUNT_FIRST === "true";
   deviceSchemaReady ??= database.batch([
     database.prepare(
       `CREATE TABLE IF NOT EXISTS device_access (
@@ -279,6 +283,11 @@ function fromBase64Url(value: string) {
   }
 }
 
+export async function isAccountFirstEnabled() {
+  await getCourseDatabase();
+  return accountFirstRuntimeEnabled;
+}
+
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
@@ -401,7 +410,7 @@ export async function getAccessAutomationSettings(): Promise<AccessAutomationSet
   const defaultDeviceLimit = Math.max(1, Math.min(1_000, Number(row?.default_device_limit) || 20));
   const activeAutoFreeDeviceCount = Math.max(0, Number(usage?.active_count) || 0);
   return {
-    enabled: row?.auto_confirm_new_devices !== 0,
+    enabled: row?.auto_confirm_new_devices === 1,
     defaultAccessDays: Math.max(1, Math.min(365, Number(row?.default_access_days) || 60)),
     defaultDeviceLimit,
     activeAutoFreeDeviceCount,
@@ -430,6 +439,10 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
   const serializedKey = canonicalPublicKey(normalizedKey);
   const deviceId = await sha256(serializedKey);
   const database = await getCourseDatabase();
+  if (accountFirstRuntimeEnabled) {
+    const account = await (await import("./account-runtime.server")).resolveAccountDevice();
+    if (account) return account;
+  }
 
   const removed = await database.prepare(
     "SELECT display_code FROM device_deletion_tombstones WHERE device_id = ?",
@@ -517,7 +530,7 @@ export async function registerDevice(publicKey: unknown, legacyToken: unknown, a
   } satisfies PublicDeviceState;
 }
 
-export async function createDeviceChallenge(deviceId: unknown) {
+export async function createDeviceChallenge(deviceId: unknown, accountClaim = false) {
   if (typeof deviceId !== "string" || !/^[a-f0-9]{64}$/.test(deviceId)) {
     throw new DeviceAccessError("Mã thiết bị không hợp lệ.", 400, "INVALID_DEVICE");
   }
@@ -527,8 +540,8 @@ export async function createDeviceChallenge(deviceId: unknown) {
   ).bind(deviceId).first<DeviceAccessRow>();
   if (!row) throw new DeviceAccessError("Thiết bị chưa được đăng ký.", 404, "DEVICE_NOT_REGISTERED");
   const device = publicState(row);
-  if (row.status === "blocked") {
-    throw new DeviceAccessError("Quyền truy cập của thiết bị này đã bị khóa.", 403, "DEVICE_BLOCKED", device);
+  if (row.status === "blocked" && !accountClaim) {
+    throw new DeviceAccessError("Quyền truy cập của thiết bị này đã bị khóa.", 403, "DEVICE_BLOCKED", accountFirstRuntimeEnabled ? undefined : device);
   }
   const nonce = base64Url(crypto.getRandomValues(new Uint8Array(32)));
   const expiresAt = Date.now() + 2 * 60 * 1000;
@@ -546,10 +559,19 @@ export async function createDeviceChallenge(deviceId: unknown) {
           )`,
     ).bind(deviceId, deviceId),
   ]);
-  return { challenge: nonce, expiresAt, device };
+  // Nonce issuance precedes key proof. In account mode it cannot be a second,
+  // unaudited profile endpoint for callers who know a legacy storage identifier.
+  return accountFirstRuntimeEnabled ? { challenge: nonce, expiresAt } : { challenge: nonce, expiresAt, device };
 }
 
-export async function verifyDeviceIdentityRequest(payload: Record<string, unknown>, skipSignatureCheck = false) {
+export async function verifyDeviceIdentityRequest(payload: Record<string, unknown>, skipSignatureCheck = false, originalLegacyProofOnly = false) {
+  await getCourseDatabase();
+  if (accountFirstRuntimeEnabled && !originalLegacyProofOnly) {
+    const account = await (await import("./account-runtime.server")).resolveAccountDevice(payload.deviceId);
+    if (account) return account;
+  }
+  // Account claim may verify the original key only; it cannot grant module access.
+  if (originalLegacyProofOnly) skipSignatureCheck = false;
   const deviceId = typeof payload.deviceId === "string" ? payload.deviceId : "";
   const challenge = typeof payload.challenge === "string" ? payload.challenge : "";
   const signature = typeof payload.signature === "string" ? payload.signature : "";
@@ -563,15 +585,15 @@ export async function verifyDeviceIdentityRequest(payload: Record<string, unknow
   ).bind(deviceId).first<DeviceAccessRow>();
   if (!row) throw new DeviceAccessError("Thiết bị chưa được đăng ký.", 403, "DEVICE_NOT_REGISTERED");
   const device = publicState(row);
-  if (row.status === "blocked") throw new DeviceAccessError("Quyền truy cập của thiết bị này đã bị khóa.", 403, "DEVICE_BLOCKED", device);
+  if (row.status === "blocked" && !originalLegacyProofOnly) throw new DeviceAccessError("Quyền truy cập của thiết bị này đã bị khóa.", 403, "DEVICE_BLOCKED", device);
 
   const proof = await database.prepare(
     "SELECT expires_at FROM device_challenges WHERE nonce = ? AND device_id = ?",
   ).bind(challenge, deviceId).first<{ expires_at: number }>();
-  await database.prepare(
+  const consumed = await database.prepare(
     "DELETE FROM device_challenges WHERE nonce = ? AND device_id = ?",
   ).bind(challenge, deviceId).run();
-  if (!proof || proof.expires_at < Date.now()) {
+  if (!proof || proof.expires_at < Date.now() || Number(consumed.meta.changes) !== 1) {
     throw new DeviceAccessError("Không thể hoàn tất xác thực thiết bị.", 401, "DEVICE_PROOF_EXPIRED");
   }
 
@@ -595,6 +617,10 @@ export async function verifyDeviceIdentityRequest(payload: Record<string, unknow
 
 export async function verifyDeviceRequest(payload: Record<string, unknown>, skipSignatureCheck = false) {
   const device = await verifyDeviceIdentityRequest(payload, skipSignatureCheck);
+  if (device.accountId) {
+    const runtime = await import("./account-runtime.server");
+    await (await runtime.accountService()).authorize(await runtime.accountCookieToken());
+  }
   if (device.status !== "approved") {
     throw new DeviceAccessError("Thiết bị đang chờ quản trị viên duyệt.", 403, "DEVICE_PENDING", device);
   }
@@ -666,6 +692,7 @@ function normalizePhone(value: unknown) {
 
 export async function saveDeviceRegistration(payload: Record<string, unknown>, skipSignatureCheck = false, manualReviewLabel: string | null = null) {
   const device = await verifyDeviceIdentityRequest(payload, skipSignatureCheck);
+  if (device.accountId) throw new DeviceAccessError("Hồ sơ tài khoản được quản lý theo tài khoản.", 403, "ACCOUNT_IDENTITY_LOCKED");
   const { learnerFamilyName, learnerGivenName, learnerName } = normalizeRegistrationName(payload);
   const { personRole, personCode } = normalizePersonIdentity(payload.personRole, payload.personCode);
   const className = normalizeClassName(payload.className);
@@ -807,10 +834,10 @@ export function deviceErrorResponse(error: unknown) {
   if (error instanceof Error && error.message.includes("TRAINING_CAPACITY")) {
     error = new DeviceAccessError("Lớp hoặc phòng đã đủ sức chứa. Điều chỉnh phân lớp/sức chứa trước khi duyệt hoặc gia hạn.", 409, "TRAINING_CAPACITY");
   }
-  if (error instanceof DeviceAccessError) {
+  if (error instanceof DeviceAccessError || (error instanceof Error && error.name === "AccountError" && "status" in error && "code" in error)) {
     return Response.json(
-      { error: error.message, code: error.code, device: error.device },
-      { status: error.status, headers: { "cache-control": "no-store, private", "x-content-type-options": "nosniff" } },
+      { error: error.message, code: error.code, device: "device" in error ? error.device : undefined },
+      { status: Number(error.status), headers: { "cache-control": "no-store, private", "x-content-type-options": "nosniff" } },
     );
   }
   return Response.json(

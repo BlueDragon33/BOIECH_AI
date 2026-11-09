@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { previewD1Policy, PREVIEW_MIGRATIONS_TABLE } from "./preview-d1-policy.mjs";
 
 const ROOT = process.cwd();
 const REDIRECT = path.join(ROOT, ".wrangler", "deploy", "config.json");
@@ -35,15 +36,18 @@ if (!generatedRelative.startsWith("dist/")) fail(`Generated Wrangler config must
 const generated = readJson(generatedPath, "Generated Wrangler config");
 
 if (generated.name !== "boi-ech-preview") fail(`Unexpected Worker name: ${String(generated.name)}.`);
-const db = (Array.isArray(generated.d1_databases) ? generated.d1_databases : []).find((item) => item?.binding === "DB");
+if (!Array.isArray(generated.d1_databases) || generated.d1_databases.length !== 1) fail("Generated Preview must contain exactly one D1 binding.");
+const db = generated.d1_databases.find((item) => item?.binding === "DB");
 if (!db) fail("Generated config missing DB binding.");
-if (db.database_name !== "boi-ech-preview-db") fail("Generated config uses wrong Bơi ếch preview database name.");
+if (db.database_name !== previewD1Policy().name) fail("Generated config uses wrong Bơi ếch preview database name.");
+if (db.migrations_table !== PREVIEW_MIGRATIONS_TABLE) fail("Generated config must use the separate Preview migration ledger.");
 if (String(db.database_id ?? "").toLowerCase() !== previewId) fail("Generated config D1 ID does not match BOI_ECH_PREVIEW_D1_DATABASE_ID.");
 if (String(db.database_id ?? "").toLowerCase() === LOCAL_D1_ID) fail("Generated config references local D1.");
 if (productionId && String(db.database_id ?? "").toLowerCase() === productionId) fail("Generated config references production D1.");
 
-const bucket = (Array.isArray(generated.r2_buckets) ? generated.r2_buckets : []).find((item) => item?.binding === "BUCKET");
-if (!bucket || bucket.bucket_name !== "boi-ech-preview-payments") fail("Generated config missing isolated Bơi ếch preview payment R2 bucket.");
+if (generated.r2_buckets !== undefined && (!Array.isArray(generated.r2_buckets) || generated.r2_buckets.length > 0)) {
+  fail("Account-first FREE Preview must not configure R2. Payment-proof storage remains unavailable.");
+}
 if (generated.assets?.binding !== "ASSETS") fail("Generated config missing ASSETS binding.");
 if (generated.images?.binding !== "IMAGES") fail("Generated config missing IMAGES binding.");
 
@@ -55,4 +59,4 @@ console.log("Bơi ếch generated Cloudflare deployment artifact PASS.");
 console.log(`Redirect: .wrangler/deploy/config.json -> ${generatedRelative}`);
 console.log(`Worker: ${generated.name}`);
 console.log(`D1: ${db.database_name}`);
-console.log(`R2: ${bucket.bucket_name}`);
+console.log("R2: disabled (FREE Account-first Preview; payment-proof storage not accepted)");

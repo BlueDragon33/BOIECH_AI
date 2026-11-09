@@ -1,0 +1,97 @@
+{
+  "authority": "SOURCE_ONLY_ENGINEERING_QA",
+  "review": "BLOCKED",
+  "ci": "PENDING",
+  "globalD1": "10/10 BLOCKED",
+  "featureFlag": "BOI_ECH_ACCOUNT_FIRST default OFF",
+  "ownerDirection": "Publication requested in latest user message; acceptance gates and ZERO-SPEND have not been waived.",
+  "reviewedPair": {
+    "boi": "276c296929d2a6d8ce8e417b3bb6f0ab2f355137",
+    "central": "b50878d2878bf51444d033064ce9d9cb4e56a3e0"
+  },
+  "initialIndependentEngineeringReview": {
+    "importantFindings": 2,
+    "criticalFindingsEstablished": 0,
+    "status": "CHANGES_REQUIRED; not authority approval",
+    "findings": [
+      "Legacy teacher roster could approve account 51 without manager assignment, expiry or account approval audit.",
+      "Challenge success and blocked errors disclosed profile/payment fields before proof on two HTTP endpoints."
+    ]
+  },
+  "fixVerification": {
+    "mode": "implementer behavioral verification, not independent acceptance",
+    "legacyRoutes": "account-mode teacher approve/remove denied before mutation; same-class reads retained with read-only UI; challenge nonce/expiry only including redacted blocked errors",
+    "redGreen": "observed failures before fixes; focused production-stack route and SQLite tests now pass; flag OFF contract and actual roster SSR controls also pass",
+    "independentRecheck": "NOT_COMPLETED; automated reviewer follow-up was blocked by the tool with a cybersecurity-content flag; no recheck PASS asserted"
+  },
+  "extraReleaseDefect": {
+    "before": "Preview validation rejected missing DEPLOY_PREVIEW and artifact check",
+    "after": "manual confirmation via environment input and generated artifact validation added before deploy; no workflow dispatched"
+  },
+  "checks": {
+    "npmTest": {
+      "command": "npm test",
+      "exitCode": 0,
+      "stats": {
+        "tests": 574,
+        "pass": 574,
+        "fail": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "includes": "verified build + all Node tests"
+    },
+    "typecheck": {
+      "command": "npx tsc --noEmit --incremental false",
+      "exitCode": 0
+    },
+    "lint": {
+      "command": "npm run lint",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 5
+    },
+    "changedLint": {
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 1
+    },
+    "releaseValidation": {
+      "exitCode": 0
+    },
+    "cloudflarePreviewValidation": {
+      "exitCode": 0
+    }
+  },
+  "browser": {
+    "status": "BLOCKED",
+    "attempt": "sites-preview start /workspace/scratch/5a245b221d81/boi-account-first/boi-ech",
+    "result": "health timeout; no usable preview URL; subsequent status stopped",
+    "notPerformed": [
+      "Chrome",
+      "Safari/iPhone",
+      "delayed account switch",
+      "real browser storage/claim/payment flows"
+    ],
+    "noInfrastructureBypass": true
+  },
+  "deploymentReadiness": {
+    "currentSessionCloudflareApiToken": false,
+    "currentSessionCloudflareAccountId": false,
+    "currentSessionPreviewD1": false,
+    "currentSessionProductionD1Guard": false,
+    "githubSecretsState": "NOT_INSPECTED; absence in current session does not assert absence in GitHub",
+    "canonicalRoute": "managed Cloudflare; repository production workflow is protected/manual; GitHub-hosted Actions remain prohibited",
+    "sitesFallback": "Existing ChatGPT Sites were identified read-only; not substituted for canonical Cloudflare identity/database or used to bypass release gates."
+  },
+  "notRun": [
+    "independent recheck of corrected source",
+    "target workerd 2026-08-26 / CPU-budget admission",
+    "real browser/Safari/iPhone",
+    "authorized real legacy snapshot migration rehearsal",
+    "live isolated D1 independent readback/rollback",
+    "production deployment and post-deploy checks"
+  ],
+  "publication": "NOT_PERFORMED; acceptance environment and independent review gates unavailable",
+  "spend": "ZERO-SPEND; no Actions, PR event, deploy, approval, merge/rebase, ratification, production DB write or feature enablement"
+}

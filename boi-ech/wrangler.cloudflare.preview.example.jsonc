@@ -17,17 +17,15 @@
       "binding": "DB",
       "database_name": "boi-ech-preview-db",
       "database_id": "__BOI_ECH_PREVIEW_D1_DATABASE_ID__",
+      "migrations_table": "boi_ech_preview_migrations",
       "migrations_dir": "drizzle"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "boi-ech-preview-payments"
     }
   ],
   "vars": {
     "APPLICATION_MANAGEMENT_ORIGIN": "__APPLICATION_MANAGEMENT_PREVIEW_ORIGIN__",
+    "BOI_ECH_ACCOUNT_ORIGIN": "__BOI_ECH_PREVIEW_ORIGIN__",
+    "BOI_ECH_ACCOUNT_FIRST": "true",
+    "BOI_ECH_ACCOUNT_V2": "true",
     "BOI_ECH_DEPLOYMENT_CHANNEL": "cloudflare-preview",
     "BOI_ECH_BUILD_REVISION": "__BOI_ECH_BUILD_REVISION__",
     "BOI_ECH_BUILD_SOURCE": "BlueDragon33/BOIECH_AI/boi-ech"

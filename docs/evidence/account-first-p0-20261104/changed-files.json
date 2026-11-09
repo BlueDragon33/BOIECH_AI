@@ -1,0 +1,158 @@
+[
+  {
+    "path": "boi-ech/app/api/admin/devices/route.ts",
+    "sha256": "ebf33deac94767b71f145a3369904257eb3497784595245e4301a5006cd75c46"
+  },
+  {
+    "path": "boi-ech/app/api/control/management-access/route.ts",
+    "sha256": "c923511ec2ef83945502340c3fb9669f44eddd2d7a7b7a21e9611be4924e5456"
+  },
+  {
+    "path": "boi-ech/app/api/control/overview/route.ts",
+    "sha256": "9fdafcf0ab6c691681d0d1b5b1d933512a991a05f9f6f0a73cb5872bd6897a5a"
+  },
+  {
+    "path": "boi-ech/app/api/training-management/route.ts",
+    "sha256": "fe26c9663d0ccf58c1dbf513aa869ab628380a282b45670cda83fbd0d1a90ef4"
+  },
+  {
+    "path": "boi-ech/app/device-auth.server.ts",
+    "sha256": "d538c343688ba330d3eebb1a40a1683c63523f7242b6cf2f3f010d270dafb080"
+  },
+  {
+    "path": "boi-ech/app/layout.tsx",
+    "sha256": "07d3a77fb8078b21b327cc6e53dd527552daed6e62dd06c51114b25a3f6ea687"
+  },
+  {
+    "path": "boi-ech/app/manager-device-review.server.ts",
+    "sha256": "2c32b2b81687c7c649b61c6a14079c98e58e20d3d36343e29bb070401d4727c1"
+  },
+  {
+    "path": "boi-ech/app/multi-account-switcher.tsx",
+    "sha256": "f5d02c17b610eacd8b78b689129987e28f8e374f30dbc4cdfed8e7f3f5760415"
+  },
+  {
+    "path": "boi-ech/app/page.tsx",
+    "sha256": "b48261822f95d157a3c05c9da04de69b5680cc24a0ede1da65db39e4f2485c50"
+  },
+  {
+    "path": "boi-ech/app/phan-tich-video/video-analyzer-impl.tsx",
+    "sha256": "f1b70c49c62ff7d6debc6c293b1d8862128cb0da4a6e8c93f342277424e96b8f"
+  },
+  {
+    "path": "boi-ech/app/student-adaptive-coach.tsx",
+    "sha256": "1a461c9058690efb251e62fb45548adf89b805e0dcba0c34c4f4f24ba45f3cf3"
+  },
+  {
+    "path": "boi-ech/app/student-teacher-inbox.tsx",
+    "sha256": "f90b558f1b3435f2557a25c4e2c19c92434f0347c2050e4f101b9f28a8a630ee"
+  },
+  {
+    "path": "boi-ech/app/teacher-role-shell.tsx",
+    "sha256": "982b82248a7847c4973363949ac883e8c70744f3126d39727027e8eeb5b749e3"
+  },
+  {
+    "path": "boi-ech/app/teacher-roster-manager.tsx",
+    "sha256": "ab0ab2145ef4f3632c6d491cacb135c2a6425808ba99965d577f62e0c8805319"
+  },
+  {
+    "path": "boi-ech/app/training-management.server.ts",
+    "sha256": "4e315326ad899fdf0dee5507a461ba210735e494ae80898487d1613791dd2c90"
+  },
+  {
+    "path": "boi-ech/app/xem-thu-can-bo-quan-ly/page.tsx",
+    "sha256": "4e8f90c731cf9e98fa047c70955050cb878b58f55e8874a0a4efa407b6c113a0"
+  },
+  {
+    "path": "boi-ech/tests/central-control-status-runtime.test.mjs",
+    "sha256": "1d4d4b65cc4d747d0a729bafa4b3f802311bb48b1656d43e8c631547ea8e2863"
+  },
+  {
+    "path": "boi-ech/tests/course-integrity.test.mjs",
+    "sha256": "c598a31153bf60fd61cf570f1aee096a7a9d793dd5d321c8889b4b5e51509332"
+  },
+  {
+    "path": "boi-ech/tests/helpers/device-auth-fixture.mjs",
+    "sha256": "ea52aa40ac2ba983a4a3e25873991a8a7175ad6fcd6efb6271701628f7520e9e"
+  },
+  {
+    "path": "boi-ech/tests/helpers/training-fixture.mjs",
+    "sha256": "4eeb53a80b1ef67563e24dbc1ed2b5c72a800cdf232ab341b9f68b709f75cf17"
+  },
+  {
+    "path": "boi-ech/tests/teacher-control-center-v30.test.mjs",
+    "sha256": "988ba08ee00cacebcea7f1d0f047297144701052028f7d454f4b9b435ca2944e"
+  },
+  {
+    "path": "boi-ech/tests/training-management-runtime.test.mjs",
+    "sha256": "448cd61a88aea0d34ed502220b9bc8625794f7c7326ac3f1c80819af9252db58"
+  },
+  {
+    "path": "boi-ech/vite.config.ts",
+    "sha256": "46c844f79dfcedb3c7c498312f7809f83a201f9b1e84c7a66e8abfd0f9104221"
+  },
+  {
+    "path": "boi-ech/app/account-core.server.ts",
+    "sha256": "305a760981666c5ad34d5f42593543b7f60d741ef9056fa4af0715832f3f1fa5"
+  },
+  {
+    "path": "boi-ech/app/account-gate.module.css",
+    "sha256": "a0abd4f4b1ef52873e6c79579da960f0a668d9b5e559995d2d327c4e9295522f"
+  },
+  {
+    "path": "boi-ech/app/account-gate.tsx",
+    "sha256": "4a30e6f049d98bfc21936743505f8597fab949485167571a3030dbee45199168"
+  },
+  {
+    "path": "boi-ech/app/account-runtime.server.ts",
+    "sha256": "f21b0c6e30425040ad44fb73a0bd88c3c0dabf88685841d0ab1f605186886673"
+  },
+  {
+    "path": "boi-ech/app/account-scope.ts",
+    "sha256": "d0a9eb0304288203385835fcc8e351b398f23ac18a1883aa9240359834a63f58"
+  },
+  {
+    "path": "boi-ech/app/api/accounts/route.ts",
+    "sha256": "659b27164390c325d62a118ca52166e32a044064d9b257cad9a00b637a6a7bd1"
+  },
+  {
+    "path": "boi-ech/app/api/control/accounts/route.ts",
+    "sha256": "30b691957b553c90f7609564f120c90584976da121c65cd1abf5b82fcae67c1d"
+  },
+  {
+    "path": "boi-ech/app/registrant-reader.tsx",
+    "sha256": "7ff69a86f05098a3431b66aaeed4c5a65f1afeca5608858ce547e0efd96160dc"
+  },
+  {
+    "path": "boi-ech/drizzle/0018_account_first.sql",
+    "sha256": "be2e3598155c7ed6e487277cb8f5143968628aea7420aaf71c1a473f0e7fa1d9"
+  },
+  {
+    "path": "boi-ech/scripts/account-migration.mjs",
+    "sha256": "cf2a606b7e4c67bd2ce22145cd32738c66e9699db9902a0892de341f4e31ba57"
+  },
+  {
+    "path": "boi-ech/tests/account-first.test.mjs",
+    "sha256": "5d4251fae3ac5389e2629bb9e7b832ba3815cb7a49552c4ed3e33cebd36874b4"
+  },
+  {
+    "path": "boi-ech/tests/account-scope.test.mjs",
+    "sha256": "649a1cb16e75e4bd7e315420ff67c9e8e6fdffcd7c4688f95dc1a65ae6b6a7ea"
+  },
+  {
+    "path": "boi-ech/tests/account-training-guard.test.mjs",
+    "sha256": "9489b695c493a189ec6ac03d875c80294cca3656c8fd0450a3444476a221bfb7"
+  },
+  {
+    "path": "boi-ech/tests/account-workerd.test.mjs",
+    "sha256": "34af602630e1213b427fc940c4b9e5faffc0d0e08844009deb9a8faf3fe29461"
+  },
+  {
+    "path": "docs/handoffs/BOIECH_ACCOUNT_FIRST_P0_IMPLEMENTATION_20261104.md",
+    "sha256": "4f5846996167f74803a27a98a7516b2a6d2bc07cb8c0fa17cd311a2cdef5bf75"
+  },
+  {
+    "path": "docs/handoffs/BOIECH_ACCOUNT_FIRST_P0_REVIEWER_HANDOFF_20261104.md",
+    "sha256": "f3c53f7bcfb71edc7a397f41ca91d9a0c409ee708d9030978a73a3c9a5522748"
+  }
+]

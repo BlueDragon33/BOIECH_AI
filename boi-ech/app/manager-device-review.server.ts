@@ -1,0 +1,151 @@
+import { accessExpiryAfterDays, DeviceAccessError, getAccessAutomationSettings, getCourseDatabase, type PublicDeviceState } from "./device-auth.server";
+import { requireManager } from "./training-management.server";
+
+export const MANAGER_DEFAULT_LEARNER_LIMIT = 50;
+export const MANAGER_DEFAULT_TEACHER_LIMIT = 5;
+
+type ApprovalRole = "learner" | "teacher";
+type ReviewRow = {
+  device_id: string; display_code: string; person_role: ApprovalRole;
+  learner_name: string | null; person_code: string | null;
+  class_name: string | null; status: "pending" | "approved" | "blocked";
+  registration_submitted_at: string | null; manager_device_id: string | null;
+};
+type LimitRow = { learner_limit: number; teacher_limit: number };
+type UsageRow = { person_role: ApprovalRole; used: number };
+
+export async function managerReviewBoard(actor: PublicDeviceState) {
+  requireManager(actor);
+  if (actor.accountId) {
+    const runtime = await import("./account-runtime.server");
+    return (await runtime.accountService()).reviewBoard(await runtime.accountCookieToken());
+  }
+  const db = await getCourseDatabase();
+  const [limits, usage, queued] = await Promise.all([
+    db.prepare("SELECT learner_limit, teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'")
+      .first<LimitRow>(),
+    db.prepare(`SELECT a.person_role, COUNT(*) AS used FROM manager_device_assignments a
+      JOIN device_access d ON d.device_id=a.target_device_id
+      WHERE d.status='approved' AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      GROUP BY a.person_role`).all<UsageRow>(),
+    db.prepare(`SELECT d.device_id,d.display_code,d.person_role,d.learner_name,d.person_code,
+      d.class_name,d.status,d.registration_submitted_at,a.manager_device_id
+      FROM device_access d LEFT JOIN manager_device_assignments a ON a.target_device_id=d.device_id
+      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher')
+        AND d.payment_status='unassigned' AND a.target_device_id IS NULL
+        AND d.registration_submitted_at IS NOT NULL)
+        OR a.manager_device_id=?
+      ORDER BY CASE WHEN d.status='pending' THEN 0 ELSE 1 END,d.created_at DESC LIMIT 201`)
+      .bind(actor.deviceId).all<ReviewRow>(),
+  ]);
+  if ((queued.results?.length ?? 0)>200) {
+    throw new DeviceAccessError("Có quá nhiều hồ sơ. Hãy thu hẹp hàng chờ trước khi quản lý.",413,"MANAGER_QUEUE_LIMIT");
+  }
+  const used = Object.fromEntries((usage.results ?? []).map(row=>[row.person_role,Number(row.used)]));
+  // Shared quotas across ALL managers. Only the assignment owner may block.
+  const quotas = {
+    learner: {limit: limits?.learner_limit ?? MANAGER_DEFAULT_LEARNER_LIMIT, used: used.learner ?? 0},
+    teacher: {limit: limits?.teacher_limit ?? MANAGER_DEFAULT_TEACHER_LIMIT, used: used.teacher ?? 0},
+  };
+  return {
+    managerDeviceId:actor.deviceId,
+    quotas,
+    devices:(queued.results ?? []).map(row=>({
+      deviceId:row.device_id,deviceCode:row.display_code,role:row.person_role,
+      name:row.learner_name ?? "",personCode:row.person_code ?? "",
+      className:row.class_name ?? "",status:row.status,
+      assignedToMe:row.manager_device_id===actor.deviceId,
+      registrationComplete:Boolean(row.registration_submitted_at),
+    })),
+  };
+}
+
+export async function managerReviewCommand(actor: PublicDeviceState, payload: Record<string,unknown>) {
+  requireManager(actor);
+  if (actor.accountId) {
+    const runtime = await import("./account-runtime.server");
+    const service = await runtime.accountService(), token = await runtime.accountCookieToken();
+    const db = await getCourseDatabase();
+    const target = await db.prepare("SELECT account_id FROM accounts WHERE storage_device_id=?")
+      .bind(payload.targetDeviceId).first<{account_id:string}>();
+    if (!target) throw new DeviceAccessError("Không tìm thấy tài khoản đã ánh xạ.",404,"ACCOUNT_NOT_FOUND");
+    await service.review(token,target.account_id,String(payload.action));
+    return service.reviewBoard(token);
+  }
+  const action = payload.action;
+  const deviceId = payload.targetDeviceId;
+  if ((action!=="approve" && action!=="block") || typeof deviceId!=="string"
+    || !/^[a-f0-9]{64}$/.test(deviceId) || deviceId===actor.deviceId) {
+    throw new DeviceAccessError("Thao tác hoặc thiết bị chưa hợp lệ.",400,"MANAGER_REVIEW_INVALID");
+  }
+  const db=await getCourseDatabase();
+  const target=await db.prepare(`SELECT d.status,d.person_role,d.payment_status,d.registration_submitted_at,
+      a.manager_device_id FROM device_access d LEFT JOIN manager_device_assignments a
+      ON a.target_device_id=d.device_id WHERE d.device_id=?`)
+    .bind(deviceId).first<{status:string;person_role:string;payment_status:string;
+      registration_submitted_at:string|null;manager_device_id:string|null}>();
+  if (!target || !["learner","teacher"].includes(target.person_role)) {
+    throw new DeviceAccessError("Chỉ cán bộ quản lý được xét duyệt thiết bị học viên và giảng viên.",403,"MANAGER_TARGET_ROLE_FORBIDDEN");
+  }
+  // Status and audit must commit as one owning-client D1 transaction.
+  // changes() binds the audit row to a successful immediately preceding write.
+  const audit = () => db.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json)
+    SELECT ?,?,?,? WHERE changes()=1`).bind(
+    actor.deviceCode,
+    action==="approve"?"manager_device_approved":"manager_device_blocked",
+    deviceId,JSON.stringify({managerDeviceId:actor.deviceId,role:target.person_role}),
+  );
+  if (action==="block") {
+    if (target.manager_device_id!==actor.deviceId || target.status!=="approved")
+      throw new DeviceAccessError("Chỉ có thể khóa thiết bị đang được chính bạn quản lý.",403,"MANAGER_SCOPE_FORBIDDEN");
+    const [update, auditWrite]=await db.batch([
+      db.prepare(`UPDATE device_access SET status='blocked',
+        blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE device_id=? AND status='approved' AND person_role IN ('learner','teacher')
+        AND EXISTS(SELECT 1 FROM manager_device_assignments
+          WHERE target_device_id=? AND manager_device_id=?)
+        AND EXISTS(SELECT 1 FROM device_access m
+          WHERE m.device_id=? AND m.person_role='manager' AND m.management_enabled=1
+            AND m.status='approved' AND m.registration_submitted_at IS NOT NULL
+            AND (m.access_expires_at IS NULL OR datetime(m.access_expires_at)>CURRENT_TIMESTAMP))`)
+      .bind(deviceId,deviceId,actor.deviceId,actor.deviceId),
+      audit(),
+    ]);
+    if (Number(update.meta.changes)!==1 || Number(auditWrite.meta.changes)!==1)
+      throw new DeviceAccessError("Thiết bị vừa thay đổi; đồng bộ lại.",409,"MANAGER_REVIEW_CONFLICT");
+  } else {
+    if(target.status!=="pending" || target.payment_status!=="unassigned"
+      || !target.registration_submitted_at || target.manager_device_id) {
+      throw new DeviceAccessError("Thiết bị không còn chờ duyệt hoặc đang thuộc cán bộ khác.",409,"MANAGER_REVIEW_CONFLICT");
+    }
+    const automation=await getAccessAutomationSettings();
+    const accessExpiresAt=accessExpiryAfterDays(automation.defaultAccessDays);
+    // D1 batch is one transaction. The migration trigger validates active
+    // manager grant, complete target, unique assignment and quota at INSERT.
+    const results=await db.batch([
+      db.prepare(`INSERT INTO manager_device_assignments(target_device_id,manager_device_id,person_role)
+        VALUES(?,?,?)`).bind(deviceId,actor.deviceId,target.person_role),
+      db.prepare(`UPDATE device_access SET status='approved',access_group='free',
+          payment_status='free_approved',approved_at=CURRENT_TIMESTAMP,
+          blocked_at=NULL,access_expires_at=COALESCE(access_expires_at,?),
+          updated_at=CURRENT_TIMESTAMP
+        WHERE device_id=? AND status='pending' AND payment_status='unassigned'
+          AND person_role=? AND registration_submitted_at IS NOT NULL
+          AND EXISTS(SELECT 1 FROM manager_device_assignments
+            WHERE target_device_id=? AND manager_device_id=?)`)
+        .bind(accessExpiresAt,deviceId,target.person_role,deviceId,actor.deviceId),
+      audit(),
+    ]);
+    if (Number(results[0].meta.changes)!==1 || Number(results[1].meta.changes)!==1
+      || Number(results[2].meta.changes)!==1)
+      throw new DeviceAccessError("Xung đột khi cấp quyền, không xác minh được cập nhật.",409,"MANAGER_REVIEW_CONFLICT");
+  }
+  // Separate readback. Do not mark applied on mutation response alone.
+  const current=await db.prepare(`SELECT d.status,a.manager_device_id FROM device_access d
+    JOIN manager_device_assignments a ON a.target_device_id=d.device_id WHERE d.device_id=?`)
+    .bind(deviceId).first<{status:string;manager_device_id:string}>();
+  if (current?.manager_device_id!==actor.deviceId ||
+      current.status!==(action==="approve"?"approved":"blocked"))
+    throw new DeviceAccessError("Đã gửi lệnh nhưng đọc lại không khớp. Đồng bộ trước khi thử lại.",503,"MANAGER_REVIEW_READBACK_MISMATCH");
+  return managerReviewBoard(actor);
+}

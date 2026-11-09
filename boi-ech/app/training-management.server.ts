@@ -18,7 +18,7 @@ function instant(v:unknown) { const s=text(v,40);if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d
 export function trainingWindow(payload:Record<string,unknown>) { const from=instant(payload.from),to=instant(payload.to);if(from>=to||Date.parse(to)-Date.parse(from)>31*86400000)fail("Chọn khoảng thời gian hợp lệ, tối đa 31 ngày.");return {from,to}; }
 export function requireManager(actor:PublicDeviceState) { if(actor.personRole!=="manager"||!actor.managementEnabled)fail("Cán bộ quản lý cần được Owner cấp quyền điều phối. Quyền truy cập học tập không tự cấp quyền này.","MANAGEMENT_PERMISSION_REQUIRED",403); }
 const AUTH_GUARD=`EXISTS(SELECT 1 FROM device_access a WHERE a.device_id=? AND a.person_role='manager' AND a.management_enabled=1 AND a.status='approved' AND a.registration_submitted_at IS NOT NULL AND (a.access_expires_at IS NULL OR datetime(a.access_expires_at)>CURRENT_TIMESTAMP))`;
-export async function trainingBoard(from:string,to:string):Promise<TrainingBoard> {
+export async function trainingBoard(from:string,to:string,actor?:PublicDeviceState):Promise<TrainingBoard> {
  const db=await trainingDatabase();
  const [rs,ps,ss]=await Promise.all([
  db.prepare('SELECT id,kind,name,parent_id AS parentId,capacity,required_teachers AS requiredTeachers,status,version FROM training_resources ORDER BY name LIMIT 1001').all<TrainingResource>(),
@@ -62,10 +62,50 @@ export async function trainingBoard(from:string,to:string):Promise<TrainingBoard
  for(const b of resources.filter(r=>r.kind==="building")){const rooms=roomsByBuilding.get(b.id)??[];b.roomCount=rooms.length;b.remaining=rooms.filter(r=>r.state==="available").length;b.bookingCount=rooms.reduce((n,r)=>n+r.bookingCount,0);if(b.status==="active")b.state=!b.roomCount?"missing":b.remaining?"available":"full";}
  const classes=resources.filter(r=>r.kind==="class");
  const classKeys=new Set(classes.map(resource=>classKey(resource.name)));
- return {resources,people,sessions,from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:people.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:people.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
+ let visiblePeople=people;
+ if(actor?.accountId){
+  const runtime=await import("./account-runtime.server");
+  const service=await runtime.accountService(),principal=await service.authorize(await runtime.accountCookieToken());
+  await service.capability(principal,"manager.manage.assigned");
+  const assigned=await db.prepare("SELECT target_device_id FROM manager_device_assignments WHERE manager_device_id=?")
+    .bind(actor.deviceId).all<{target_device_id:string}>();
+  const ids=new Set((assigned.results??[]).map(r=>r.target_device_id));
+  visiblePeople=people.filter(p=>ids.has(p.id));
+ }
+ return {resources,people:visiblePeople,sessions,from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:people.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:people.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
 export async function trainingCommand(actor:PublicDeviceState,payload:Record<string,unknown>) {
- requireManager(actor);const db=await trainingDatabase();const commandId=id(payload.commandId);
+ requireManager(actor);
+ let accountSessionHash="";
+ if(actor.accountId){
+  const runtime=await import("./account-runtime.server");
+  const service=await runtime.accountService(),principal=await service.authorize(await runtime.accountCookieToken());
+  await service.capability(principal,"manager.manage.assigned");
+  accountSessionHash=principal.sessionHash;
+  if(payload.action==="assign-person"||payload.action==="save-session"){
+   const target=payload.action==="assign-person"?payload.personId:payload.teacherId;
+   const owned=await (await trainingDatabase()).prepare("SELECT 1 AS allowed FROM manager_device_assignments WHERE manager_device_id=? AND target_device_id=?")
+    .bind(actor.deviceId,target).first<{allowed:number}>();
+   if(!owned)fail("Hồ sơ chưa thuộc phạm vi được phân công.","MANAGER_SCOPE_FORBIDDEN",403);
+  }
+ }
+ const scopedTarget=actor.accountId&&(payload.action==="assign-person"||payload.action==="save-session")
+  ? String(payload.action==="assign-person"?payload.personId:payload.teacherId):null;
+ const authorityGuard=actor.accountId?`EXISTS(SELECT 1 FROM device_access a
+  JOIN accounts ca ON ca.storage_device_id=a.device_id
+  JOIN account_manager_permissions p ON p.account_id=ca.account_id
+  JOIN account_sessions s ON s.account_id=ca.account_id
+  JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+  JOIN account_credentials c ON c.account_id=ca.account_id AND c.generation=s.generation
+  WHERE a.device_id=? AND a.person_role='manager' AND a.management_enabled=1 AND a.status='approved'
+  AND (a.access_expires_at IS NULL OR datetime(a.access_expires_at)>CURRENT_TIMESTAMP)
+  AND p.scope='manager.manage.assigned' AND p.enabled=1
+  AND (p.expires_at IS NULL OR p.expires_at>(julianday('now')-2440587.5)*86400000)
+  AND s.token_hash=? AND s.revoked=0 AND b.revoked=0
+  AND s.expires_at>(julianday('now')-2440587.5)*86400000 AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
+  ${scopedTarget?"AND EXISTS(SELECT 1 FROM manager_device_assignments ma WHERE ma.manager_device_id=a.device_id AND ma.target_device_id=?)":""})`:AUTH_GUARD;
+ const authorityBindings=actor.accountId?[actor.deviceId,accountSessionHash,...(scopedTarget?[scopedTarget]:[])]:[actor.deviceId];
+ const db=await trainingDatabase();const commandId=id(payload.commandId);
  const action=payload.action;let command:Record<string,unknown>;let write:D1PreparedStatement;
  if(action==="save-resource") {
   const kind=payload.kind;if(kind!=="class"&&kind!=="room"&&kind!=="building")fail("Loại tài nguyên không hợp lệ.");
@@ -75,8 +115,8 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   const version=integer(payload.expectedVersion,0,1000000);
   command={action,id:resourceId,kind,name,parentId,capacity,requiredTeachers,status,version};
   if(kind==="room"&&!await db.prepare("SELECT id FROM training_resources WHERE id=? AND kind='building' AND status='active'").bind(parentId).first())fail("Hãy chọn tòa học đang hoạt động.","TRAINING_RESOURCE_UNAVAILABLE",409);
-  write=version===0?db.prepare(`INSERT INTO training_resources(id,kind,name,parent_id,capacity,required_teachers,status,version) SELECT ?,?,?,?,?,?,?,1 WHERE ${AUTH_GUARD}`).bind(resourceId,kind,name,parentId,capacity,requiredTeachers,status,actor.deviceId)
-  :db.prepare(`UPDATE training_resources SET name=?,parent_id=?,capacity=?,required_teachers=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND kind=? AND version=? AND ${AUTH_GUARD}`).bind(name,parentId,capacity,requiredTeachers,status,resourceId,kind,version,actor.deviceId);
+  write=version===0?db.prepare(`INSERT INTO training_resources(id,kind,name,parent_id,capacity,required_teachers,status,version) SELECT ?,?,?,?,?,?,?,1 WHERE ${authorityGuard}`).bind(resourceId,kind,name,parentId,capacity,requiredTeachers,status,...authorityBindings)
+  :db.prepare(`UPDATE training_resources SET name=?,parent_id=?,capacity=?,required_teachers=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND kind=? AND version=? AND ${authorityGuard}`).bind(name,parentId,capacity,requiredTeachers,status,resourceId,kind,version,...authorityBindings);
  } else if(action==="save-session") {
   const sessionId=id(payload.id),title=text(payload.title,100),classId=id(payload.classId),roomId=id(payload.roomId),teacherId=id(payload.teacherId),startsAt=instant(payload.startsAt),endsAt=instant(payload.endsAt);
   const status=payload.status,version=integer(payload.expectedVersion,0,1000000);
@@ -84,8 +124,8 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(!["scheduled","completed","cancelled"].includes(String(status)))fail("Trạng thái buổi học không hợp lệ.");
   if(status==="completed"&&Date.parse(endsAt)>Date.now())fail("Chưa thể hoàn thành buổi học chưa kết thúc.");
   command={action,id:sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,version};
-  write=version===0?db.prepare(`INSERT INTO training_sessions(id,title,class_id,room_id,teacher_id,starts_at,ends_at,status,version) SELECT ?,?,?,?,?,?,?,?,1 WHERE ${AUTH_GUARD}`).bind(sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,actor.deviceId)
-  :db.prepare(`UPDATE training_sessions SET title=?,class_id=?,room_id=?,teacher_id=?,starts_at=?,ends_at=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=? AND ${AUTH_GUARD}`).bind(title,classId,roomId,teacherId,startsAt,endsAt,status,sessionId,version,actor.deviceId);
+  write=version===0?db.prepare(`INSERT INTO training_sessions(id,title,class_id,room_id,teacher_id,starts_at,ends_at,status,version) SELECT ?,?,?,?,?,?,?,?,1 WHERE ${authorityGuard}`).bind(sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,...authorityBindings)
+  :db.prepare(`UPDATE training_sessions SET title=?,class_id=?,room_id=?,teacher_id=?,starts_at=?,ends_at=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=? AND ${authorityGuard}`).bind(title,classId,roomId,teacherId,startsAt,endsAt,status,sessionId,version,...authorityBindings);
  } else if(action==="assign-person") {
   const personId=id(payload.personId),expectedClassName=typeof payload.expectedClassName==="string"?payload.expectedClassName:fail("Thiếu lớp hiện tại để kiểm tra thay đổi đồng thời.");
   const target=await db.prepare("SELECT person_role AS role FROM device_access WHERE device_id=? AND person_role IN ('learner','teacher') AND registration_submitted_at IS NOT NULL").bind(personId).first<{role:string}>();
@@ -95,7 +135,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   for(const key of ids){const row=await db.prepare("SELECT name FROM training_resources WHERE id=? AND kind='class' AND status='active'").bind(key).first<{name:string}>();if(!row)fail("Lớp học chưa sẵn sàng.","TRAINING_RESOURCE_UNAVAILABLE",409);names.push(row.name);}
   const className=names.join("; ")||(target.role==="learner"?"Chưa phân lớp":"Chưa phân công");
   command={action,personId,classIds:ids,expectedClassName};
-  write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=? AND (?=0 OR (status='approved' AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))) AND ${AUTH_GUARD}`).bind(className,personId,expectedClassName,target.role,ids.length,actor.deviceId);
+  write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=? AND (?=0 OR (status='approved' AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))) AND ${authorityGuard}`).bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings);
  } else fail("Thao tác điều phối không hợp lệ.");
  const canonical=JSON.stringify(command);
  async function receipt(){return db.prepare("SELECT actor_id,payload_json FROM training_commands WHERE command_id=?").bind(commandId).first<{actor_id:string;payload_json:string}>();}

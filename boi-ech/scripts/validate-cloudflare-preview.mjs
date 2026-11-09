@@ -35,11 +35,17 @@ for (const token of [
   '"binding": "DB"',
   '"binding": "ASSETS"',
   '"binding": "IMAGES"',
-  '"binding": "BUCKET"',
-  '"bucket_name": "boi-ech-preview-payments"',
   '__BOI_ECH_PREVIEW_D1_DATABASE_ID__',
+  '__BOI_ECH_PREVIEW_ORIGIN__',
+  '"BOI_ECH_ACCOUNT_ORIGIN": "__BOI_ECH_PREVIEW_ORIGIN__"',
+  '"BOI_ECH_ACCOUNT_FIRST": "true"',
+  '"BOI_ECH_ACCOUNT_V2": "true"',
 ]) {
   if (!template.includes(token)) throw new Error(`Preview template thiếu: ${token}`);
+}
+const templateConfig = JSON.parse(template);
+if (templateConfig.r2_buckets !== undefined && (!Array.isArray(templateConfig.r2_buckets) || templateConfig.r2_buckets.length > 0)) {
+  throw new Error("Account-first FREE Preview must not configure R2.");
 }
 if (template.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Preview template chứa production D1 ID.");
 if (!prepare.includes('d1Uuid("BOI_ECH_PRODUCTION_D1_DATABASE_ID")') || !prepare.includes(LOCAL_D1_ID)) {
@@ -47,11 +53,19 @@ if (!prepare.includes('d1Uuid("BOI_ECH_PRODUCTION_D1_DATABASE_ID")') || !prepare
 }
 if (prepare.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Prepare script không được hard-code production D1 ID.");
 if (!prepare.includes(".chatgpt.site")) throw new Error("Prepare script phải chặn fallback về ChatGPT Sites.");
+for (const marker of [
+  'optionalHttpsOrigin("BOI_ECH_PREVIEW_ORIGIN")',
+  'optionalHttpsOrigin("APPLICATION_MANAGEMENT_PREVIEW_ORIGIN")',
+  'if (!boiPreviewOrigin || !applicationManagementOrigin)',
+  'if (boiPreviewOrigin === applicationManagementOrigin)',
+]) {
+  if (!prepare.includes(marker)) throw new Error(`V2 Preview thiếu kiểm tra origins: ${marker}`);
+}
 if (!vite.includes("CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH") || !vite.includes("boi-ech-local")) {
   throw new Error("Vite phải tách local binding khỏi Cloudflare preview config.");
 }
 
-for (const marker of ["redirect.configPath", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "boi-ech-preview-db", "boi-ech-preview-payments", "BOI_ECH_DEPLOYMENT_CHANNEL"]) {
+for (const marker of ["redirect.configPath", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "previewD1Policy", "PREVIEW_MIGRATIONS_TABLE", "BOI_ECH_DEPLOYMENT_CHANNEL", "Account-first FREE Preview must not configure R2"]) {
   if (!artifact.includes(marker)) throw new Error(`Generated artifact validator thiếu guard: ${marker}`);
 }
 
@@ -67,10 +81,29 @@ for (const marker of ["BOI_ECH_DEPLOYMENT_CHANNEL", "BOI_ECH_BUILD_REVISION", 'a
 
 if (!previewWorkflow.includes("workflow_dispatch")) throw new Error("Preview deployment phải manual-only.");
 if (/\n\s*push\s*:/.test(previewWorkflow)) throw new Error("Preview chưa được auto-deploy theo push.");
-for (const token of ["DEPLOY_PREVIEW", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "boi-ech-preview-db --remote", "npm run cloudflare:artifact:check", "wrangler.cloudflare.preview.jsonc"]) {
+for (const token of ["DEPLOY_PREVIEW", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "migrations apply DB --remote", "npm run cloudflare:artifact:check", "wrangler.cloudflare.preview.jsonc"]) {
   if (!previewWorkflow.includes(token)) throw new Error(`Preview workflow thiếu: ${token}`);
 }
 if (previewWorkflow.includes("boi-ech-db --remote")) throw new Error("Preview workflow không được migrate production D1.");
+for (const marker of [
+  'INSTALL_PREVIEW_BRIDGE',
+  'PREVIEW_BRIDGE_CONFIRMATION',
+  'node scripts/preview-stack-remote.mjs check',
+  'node scripts/preview-stack-remote.mjs install-bridge',
+  'CONTROL_OWNER_EMAILS',
+  'APPLICATION_MANAGEMENT_PREVIEW_ORIGIN',
+  'Protected Preview environment is incomplete',
+]) {
+  if (!previewWorkflow.includes(marker)) throw new Error(`Preview chưa có fail-closed Owner bridge: ${marker}`);
+}
+const artifactGuard = previewWorkflow.indexOf("name: Verify generated Preview artifact before any remote D1 mutation");
+const sqlMutation = previewWorkflow.indexOf("name: Apply isolated Preview migrations");
+if (artifactGuard < 0 || sqlMutation < artifactGuard) {
+  throw new Error("Preview phải build+verify trước khi ghi D1 từ xa.");
+}
+if (/Development preview skipped; missing:/.test(previewWorkflow)) {
+  throw new Error("Preview không được báo workflow thành công khi thiếu bí mật.");
+}
 if (previewWorkflow.includes(LEGACY_PRODUCTION_D1_ID)) throw new Error("Preview workflow không được hard-code production D1 ID.");
 if (previewWorkflow.includes("grep -R") && previewWorkflow.includes(".wrangler/deploy/config.json")) {
   throw new Error("Preview workflow không được grep redirect file như generated config.");
@@ -81,4 +114,4 @@ if (!productionWorkflow.includes("workflow_dispatch") || !productionWorkflow.inc
 }
 if (/\n\s*push\s*:/.test(productionWorkflow)) throw new Error("Production không được auto-deploy khi push main trong giai đoạn migration.");
 
-console.log("Boi Ech Cloudflare migration gate PASS: canonical central separated, production frozen, fail-closed production D1 guard, generated preview D1/R2 artifact verified.");
+console.log("Boi Ech Cloudflare scaffold gate PASS: canonical central separated, production frozen, fail-closed production D1 guard, FREE Account-first Preview excludes R2. Remote and payment acceptance remain separate.");

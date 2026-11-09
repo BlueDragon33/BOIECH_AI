@@ -7,6 +7,7 @@ import {
   deviceErrorResponse,
   getAccessAutomationSettings,
   getCourseDatabase,
+  isAccountFirstEnabled,
   normalizeAccessExpiry,
 } from "../../../device-auth.server";
 
@@ -185,13 +186,22 @@ function view(row: Row) {
   );
   const scoreTotal = COURSE_LESSON_NUMBERS.reduce((total, lesson) => total + Math.max(0, Math.min(10, scores[lesson] ?? 0)), 0);
   const lastPresenceAt = row.last_seen_at;
-  const lastPresenceTime = Date.parse(lastPresenceAt);
+  // D1 CURRENT_TIMESTAMP is UTC without an explicit offset; parse it as UTC.
+  const lastPresenceTime = Date.parse(
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(lastPresenceAt)
+      ? lastPresenceAt.replace(" ", "T") + "Z" : lastPresenceAt,
+  );
+  const now = Date.now();
+  const presenceExpired = Number.isFinite(lastPresenceTime)
+    && lastPresenceTime + DEVICE_PRESENCE_TIMEOUT_MS <= now;
   const active = row.status !== "blocked"
     && Number.isFinite(lastPresenceTime)
-    && Date.now() - lastPresenceTime <= DEVICE_PRESENCE_TIMEOUT_MS;
-  const offlineSinceAt = active || !Number.isFinite(lastPresenceTime)
-    ? null
-    : new Date(lastPresenceTime + DEVICE_PRESENCE_TIMEOUT_MS).toISOString();
+    && lastPresenceTime <= now && !presenceExpired;
+  // A blocked account with a *recent* heartbeat is not proof that the
+  // device actually went offline. Never publish a future offline timestamp.
+  const offlineSinceAt = presenceExpired
+    ? new Date(lastPresenceTime + DEVICE_PRESENCE_TIMEOUT_MS).toISOString()
+    : null;
   const registrationComplete = Boolean(row.learner_name?.trim() && row.person_role && row.person_code?.trim() && row.class_name?.trim() && row.phone?.trim() && row.registration_submitted_at);
   const expiryTime = row.access_expires_at ? Date.parse(row.access_expires_at) : Number.NaN;
   const accessExpired = Number.isFinite(expiryTime) && expiryTime <= Date.now();
@@ -230,6 +240,7 @@ function view(row: Row) {
     personalEditConfigured: row.personal_edit_enabled === 1,
     autoConfirmedAt: row.auto_confirmed_at,
     createdAt: row.created_at,
+    registrationSubmittedAt: row.registration_submitted_at,
     approvedAt: row.approved_at,
     blockedAt: row.blocked_at,
     lastSeenAt: row.last_seen_at,
@@ -388,6 +399,7 @@ async function deletedDeviceRows() {
 export async function GET(request: Request) {
   try {
     const { role } = await requireControlService(request);
+    if(await isAccountFirstEnabled()) throw new DeviceAccessError("Luồng tài khoản chỉ cung cấp trạng thái quản trị qua /api/control/accounts; hồ sơ cá nhân thuộc Bơi Ếch.",409,"ACCOUNT_CONTROL_REQUIRED");
     const searchParams = new URL(request.url).searchParams;
     const deviceCodePattern = /^BE-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/;
     const suppliedCode = searchParams.get("deviceCode");
@@ -416,6 +428,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { actor, role } = await requireControlService(request);
+    if(await isAccountFirstEnabled() && role!=="owner") throw new DeviceAccessError("Thao tác tương thích tài khoản cần Owner đã xác thực.",403,"OWNER_REQUIRED");
     if (!["publisher", "owner"].includes(role)) return controlResponse({ error: "Không có quyền quản lý thiết bị học." }, 403, request);
     const respond = (data: unknown, status = 200) => controlResponse(data, status, request);
     const payload = (await request.json()) as Record<string, unknown>;
@@ -425,6 +438,7 @@ export async function POST(request: Request) {
 
     if (action === "update-automation") {
       const enabled = payload.enabled === true;
+      if (enabled) return respond({ error: "Chế độ duyệt tự động đã chuyển sang xét duyệt hai cấp. Cán bộ quản lý phải duyệt học viên và giảng viên.", code: "MANAGER_REVIEW_POLICY_ACTIVE" }, 409);
       const defaultAccessDays = Math.floor(Number(payload.defaultAccessDays));
       const defaultDeviceLimit = Math.floor(Number(payload.defaultDeviceLimit));
       if (!Number.isFinite(defaultAccessDays) || defaultAccessDays < 1 || defaultAccessDays > 365) {
@@ -453,6 +467,11 @@ export async function POST(request: Request) {
     const deviceId = typeof payload.deviceId === "string" ? payload.deviceId : "";
     if (!/^[a-f0-9]{64}$/.test(deviceId)) return respond({ error: "Mã thiết bị không hợp lệ." }, 400);
 
+    // The central control plane may no longer restore/delete ordinary
+    // learner/teacher device identities. Only manager account decisions remain.
+    if (action === "restore-deleted-device" || action === "delete-spam-device") {
+      return respond({error:"Quản trị trung tâm chỉ xử lý tài khoản cán bộ quản lý; khôi phục/xóa thiết bị học tập thuộc Bơi Ếch.",code:"MANAGER_ONLY_CENTRAL_REVIEW"},403);
+    }
     if (action === "restore-deleted-device") {
       if (role !== "owner") {
         return respond({ error: "Chỉ Chủ hệ thống mới được cho phép thiết bị đã xóa đăng ký lại." }, 403);
@@ -502,6 +521,12 @@ export async function POST(request: Request) {
       migrated_from_user_key: string | null;
     }>();
     if (!current) return respond({ error: "Không tìm thấy thiết bị." }, 404);
+    if (current.person_role !== "manager") {
+      return respond({error:"App-Manager chỉ xét duyệt tài khoản cán bộ quản lý. Học viên và giảng viên do cán bộ Bơi Ếch quản lý.",code:"MANAGER_ONLY_CENTRAL_REVIEW"},403);
+    }
+    if (role !== "owner") {
+      return respond({error:"Chỉ Chủ hệ thống được thay đổi quyền tài khoản cán bộ quản lý.",code:"OWNER_REQUIRED"},403);
+    }
 
     if (payload.expectedStatus !== undefined || payload.expectedPaymentStatus !== undefined || payload.expectedAccessGroup !== undefined) {
       if (!["pending", "approved", "blocked"].includes(String(payload.expectedStatus))
@@ -685,7 +710,7 @@ export async function POST(request: Request) {
     } else if (action === "toggle-personal-edit") {
       if (!registrationComplete) return respond({ error: "Thiết bị chưa nhập đủ thông tin người học." }, 409);
       const enabled = payload.enabled === true;
-      if (enabled && current.person_role !== "teacher") {
+      if (enabled) {
         return respond({ error: "Quyền sửa nội dung chỉ cấp cho hồ sơ Giảng viên." }, 409);
       }
       if (enabled && current.access_group === "paid" && current.payment_status !== "paid_verified") {

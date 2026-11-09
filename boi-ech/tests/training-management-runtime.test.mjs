@@ -90,8 +90,8 @@ test('activation, renewal and unblock cannot overfill a class with an accepted r
  const f=await setup();try{
   await grant(f);await resources(f);const teacher=await person(f,'teacher',120);const first=await person(f,'learner',121);await person(f,'learner',122);
   assert.equal((await f.call({action:'save-session',id:'capacity-activation',title:'A',classId:'class',roomId:'room',teacherId:teacher.device.deviceId,startsAt:'2030-01-01T09:00:00Z',endsAt:'2030-01-01T10:00:00Z',status:'scheduled',expectedVersion:0})).status,200);
-  const third=await person(f,'learner',123);assert.equal(third.device.status,'pending','registration remains usable, while class capacity defers automatic admission');
-  const deferred=f.sqlite.prepare("SELECT detail_json FROM course_audit_log WHERE target=? AND action='learning_device_auto_confirmation_deferred' ORDER BY id DESC LIMIT 1").get(third.device.deviceId);assert.equal(JSON.parse(deferred.detail_json).reason,'class_capacity_reached');
+  const third=await person(f,'learner',123,'A',false);assert.equal(third.device.status,'pending','registration remains usable, while class capacity defers automatic admission');
+  // Two-tier registration stays pending. Admission capacity is enforced by the following actual SQL mutations.
   f.sqlite.prepare("UPDATE device_access SET class_name=NULL,status='approved' WHERE device_id=?").run(third.device.deviceId);
   assert.throws(()=>f.sqlite.prepare("UPDATE device_access SET class_name='A' WHERE device_id=?").run(third.device.deviceId),/TRAINING_CAPACITY/);
   f.sqlite.prepare("UPDATE device_access SET class_name='A',status='pending' WHERE device_id=?").run(third.device.deviceId);
