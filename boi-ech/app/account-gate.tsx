@@ -14,6 +14,12 @@ type Account = { accountId: string; status: string; role: string; name: string; 
   canReadRegistrants?: boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
+function accountNetworkError(error: unknown) {
+  const raw=error instanceof Error?error.message:"";
+  if (/load failed|failed to fetch|networkerror|network request failed/i.test(raw))
+    return "Không kết nối được máy chủ tài khoản. Nếu vừa đăng ký, hãy thử Đăng nhập hoặc Đồng bộ trạng thái trước khi gửi lại để tránh trùng yêu cầu.";
+  return raw || "Chưa xác minh được kết nối tài khoản.";
+}
 async function send(body: Record<string, unknown>) {
   const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -59,7 +65,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     if (!enabled || bypass) return;
     mounted.current = true;
     document.documentElement.dataset.accountFirst = "true";
-    const refresh = () => { if (!document.hidden && !lock.current) void reload().catch(e => { if (mounted.current) setError(e instanceof Error ? e.message : "Chưa đồng bộ."); }); };
+    const refresh = () => { if (!document.hidden && !lock.current) void reload().catch(e => { if (mounted.current) setError(accountNetworkError(e)); }); };
     refresh(); window.addEventListener("focus", refresh); window.addEventListener("pageshow",refresh);
     const timer = window.setInterval(() => { if(mounted.current) setObservedNow(Date.now()); refresh(); },60000);
     const channel = new BroadcastChannel("boiech-account-auth"); channel.onmessage = refresh;
@@ -67,7 +73,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   }, [enabled, bypass, reload]);
   async function run(action: () => Promise<void>) {
     if (lock.current) return; lock.current = true; setBusy(true); setError(""); setNotice("");
-    try { await action(); } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : "Chưa hoàn tất thao tác."); }
+    try { await action(); } catch (e) { if (mounted.current) setError(accountNetworkError(e)); }
     finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
   function broadcast() { const c = new BroadcastChannel("boiech-account-auth"); c.postMessage("changed"); c.close(); }
