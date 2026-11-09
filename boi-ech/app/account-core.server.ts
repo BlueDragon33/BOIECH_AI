@@ -186,7 +186,52 @@ export class AccountService {
     if (issued.deviceId !== keyId) fail("DEVICE_KEY_INVALID", 400);
     return { ...issued, recoveryCode };
   }
-  private async registerV2(input: Record<string, unknown>, login: string) {
+  // One-use secret only leaves this method once. Store/audit its digest, never plaintext.
+  async issueManagerInvite(owner: { actor: string; role: string }, expectedRevision: unknown) {
+    if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED", 409);
+    if (owner.role !== "owner" || !owner.actor || owner.actor === "system") fail("OWNER_REQUIRED");
+    if (!Number.isSafeInteger(expectedRevision) || (expectedRevision as number) < 1) fail("ACCOUNT_INPUT", 400);
+    const token = random(), inviteHash = digest(token), now = this.now(), expires = now + 24 * 60 * 60 * 1000;
+    try {
+      await this.db.batch([
+        this.db.prepare(`INSERT INTO account_manager_invitations(invite_hash,issued_by,issued_at_ms,expires_at_ms)
+          SELECT ?,?,?,? WHERE EXISTS(
+            SELECT 1 FROM account_admission_limits WHERE person_role='manager' AND revision=?
+          ) AND (SELECT COUNT(*) FROM account_manager_invitations
+            WHERE consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?)<20`)
+          .bind(inviteHash,owner.actor,now,expires,expectedRevision,now),
+        // A failed conditional insert aborts the whole batch via the NOT NULL audit column.
+        this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+          SELECT ?,'owner.manager-invite.issued',?,
+          CASE WHEN changes()=1 THEN 'one-use invitation; expires in 24 hours' ELSE NULL END`)
+          .bind(owner.actor,inviteHash),
+      ]);
+    } catch { fail("MANAGER_INVITATION_CONFLICT", 409); }
+    const readback=await this.db.prepare(`SELECT issued_by,expires_at_ms,consumed_at_ms
+      FROM account_manager_invitations WHERE invite_hash=?`)
+      .bind(inviteHash).first<{issued_by:string;expires_at_ms:number;consumed_at_ms:number|null}>();
+    if(!readback || readback.issued_by!==owner.actor || readback.expires_at_ms!==expires
+      || readback.consumed_at_ms!==null) fail("ACCOUNT_READBACK_FAILED", 503);
+    return { inviteToken:token, expiresAt:new Date(expires).toISOString(), verified:true };
+  }
+
+  async registerManagerWithInvite(input: Record<string,unknown>, peer:string) {
+    if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED", 409);
+    if(input.role !== "manager" || input.privacyAccepted!==true) fail("ACCOUNT_INPUT", 400);
+    const login=loginName(input.login);
+    await this.throttle(login,peer,"manager-register",3);
+    const secret=input.managerInviteToken;
+    if(typeof secret!=="string" || !/^[a-f0-9]{64}$/.test(secret))
+      fail("MANAGER_INVITATION_INVALID",409);
+    const inviteHash=digest(secret),now=this.now();
+    const available=await this.db.prepare(`SELECT 1 AS valid FROM account_manager_invitations
+      WHERE invite_hash=? AND consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?`)
+      .bind(inviteHash,now).first<{valid:number}>();
+    if(!available) fail("MANAGER_INVITATION_INVALID",409);
+    return this.registerV2(input,login,inviteHash);
+  }
+
+  private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string) {
     const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
     const verifier = await hashPassword(input.password), accountId = "acc_" + random();
     const storageId = random(), recoveryCode = random();
@@ -200,9 +245,22 @@ export class AccountService {
         this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
         this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
           .bind(accountId,verifier,digest(recoveryCode)),
-        this.audit(accountId, "registration.requested.v2", accountId, "profile only after first review"),
+        ...(inviteHash ? [
+          this.db.prepare(`UPDATE account_manager_invitations
+            SET consumed_by=?,consumed_at_ms=?,revision=revision+1
+            WHERE invite_hash=? AND consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?`)
+            .bind(accountId,this.now(),inviteHash,this.now()),
+          this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+            SELECT ?,'manager.invite.redeemed',?,
+            CASE WHEN changes()=1 THEN 'single-use token consumed atomically during registration' ELSE NULL END`)
+            .bind(accountId,inviteHash),
+        ] : []),
+        this.audit(accountId, "registration.requested.v2", accountId,
+          inviteHash ? "owner invitation; account remains pending" : "profile only after first review"),
       ]);
     } catch(error) {
+      if(inviteHash && error instanceof Error && /NOT NULL.*purpose|MANAGER_INVITATION/i.test(error.message))
+        fail("MANAGER_INVITATION_INVALID",409);
       if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED",409);
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
