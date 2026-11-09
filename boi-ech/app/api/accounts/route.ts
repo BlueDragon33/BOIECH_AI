@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     if (p.action === "recover") return json({ ok: true, ...await service.recover(p, peer) }, sessionCookie(""));
     if (p.action === "logout") { if (token) await service.logout(token); return json({ ok: true }, sessionCookie("")); }
     if (p.action === "revoke-device") { await service.revokeDevice(token, p.deviceId); return json({ ok: true }); }
-    if (p.action === "review-list") return json({ board: await service.reviewBoard(token) });
+    if (p.action === "review-list") return json({ board: await service.reviewBoard(token,p.after ?? "",p.limit ?? 50) });
     if (p.action === "review") return json({ account: await service.review(token, String(p.accountId), String(p.operation)) });
     if (p.action === "read-registrants") return json(await service.readRegistrants(token, p.purpose, Number(p.offset ?? 0), Number(p.limit ?? 50)));
     throw new AccountError("ACCOUNT_INPUT", 400);
