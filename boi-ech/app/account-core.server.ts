@@ -219,7 +219,7 @@ export class AccountService {
             SELECT 1 FROM account_admission_limits WHERE person_role='manager' AND revision=?
           ) AND (SELECT COUNT(*) FROM account_manager_invitations
             WHERE consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?)<20`)
-          .bind(inviteHash,owner.actor,now,expires,expectedRevision,now),
+          .bind(inviteHash,owner.actor,now,expires,expectedRevision as number,now),
         // A failed conditional insert aborts the whole batch via the NOT NULL audit column.
         this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
           SELECT ?,'owner.manager-invite.issued',?,
