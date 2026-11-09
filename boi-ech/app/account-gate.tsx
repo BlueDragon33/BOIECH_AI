@@ -30,7 +30,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "teacher">("learner");
+  const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [recovery, setRecovery] = useState(""), [notice, setNotice] = useState("");
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
