@@ -101,6 +101,26 @@ export class AccountService {
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
         (!row.access_expires_at || Date.parse(row.access_expires_at) > this.now()) && (!this.v2Enabled || entitlement?.active === true), expiresAt: p.expires_at })) };
   }
+  async ownerManagerPage(after: unknown = "", pageLimit: unknown = 40) {
+    if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED",409);
+    if(typeof after !== "string" || (after && !ACCOUNT.test(after))
+      || !Number.isInteger(pageLimit) || (pageLimit as number)<1 || (pageLimit as number)>50)
+      fail("ACCOUNT_INPUT",400);
+    const limit=pageLimit as number;
+    const result=await this.db.prepare(`SELECT a.account_id AS accountId,
+      a.revision AS accountRevision,d.person_role AS role,d.learner_name AS name,
+      d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision
+      FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+      JOIN account_onboarding o ON o.account_id=a.account_id
+      WHERE d.person_role='manager' AND a.account_id>?
+      ORDER BY a.account_id LIMIT ?`).bind(after,limit+1)
+      .all<{accountId:string;accountRevision:number;role:string;name:string|null;
+        status:string;onboardingStage:string;onboardingRevision:number}>();
+    const rows=result.results??[],hasMore=rows.length>limit,managers=rows.slice(0,limit);
+    return {contract:"boi-manager-intake.v2" as const,verified:true,
+      managers,nextCursor:hasMore?managers[managers.length-1].accountId:null};
+  }
+
   async ownerList() {
     const result = await this.db.prepare(`SELECT a.account_id FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       WHERE d.person_role='manager' ORDER BY a.account_id LIMIT 101`).all<{ account_id: string }>();
