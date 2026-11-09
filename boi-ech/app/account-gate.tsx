@@ -28,6 +28,14 @@ async function send(body: Record<string, unknown>) {
   return data as { recoveryCode?: string; accountId?: string; account?: Account;
     devices?:Array<{device_id:string;approved:number;created_at:string}> };
 }
+function reloadPreservingPendingManagerInvite(token: string) {
+  const oneUseFragment=/^[a-f0-9]{64}$/.test(token) ? "#manager-invite="+token : "";
+  if(oneUseFragment){
+    // Fragment-only transfer: it is excluded from the HTTP request and scrubbed
+    // immediately by the next AccountGate mount. Never write it to Web Storage.
+    window.location.replace(window.location.pathname+window.location.search+oneUseFragment);
+  } else window.location.reload();
+}
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   const bypass = pathname === "/xem-thu-can-bo-quan-ly" || pathname.startsWith("/quan-ly-thiet-bi") || pathname.startsWith("/bien-tap-");
@@ -39,6 +47,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [recovery, setRecovery] = useState(""), [notice, setNotice] = useState("");
   const [managerInvite,setManagerInvite]=useState("");
+  const managerInviteRef=useRef("");
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
   const reload = useCallback(async (claim = false) => {
@@ -46,12 +55,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; error?: string };
     if (mounted.current) setV2(data.accountV2 === true);
     if (!response.ok) {
-      if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);window.location.reload();return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
+      if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
       throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
     }
     // Keep a document's namespace immutable: old async completions can only write its old account store.
     if (accountTransitionNeedsReload(current.current,data.account?.accountId ?? "")) {
-      setReady(false); setRecovery(""); recoveryOwner.current=""; window.location.reload(); return;
+      setReady(false); setRecovery(""); recoveryOwner.current=""; reloadPreservingPendingManagerInvite(managerInviteRef.current); return;
     }
     if ((current.current && data.account?.accountId !== current.current) ||
       (recoveryOwner.current && data.account && data.account.accountId !== recoveryOwner.current)) {
@@ -73,7 +82,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       if(invite!==null){
         window.history.replaceState(window.history.state,"",window.location.pathname+window.location.search);
         if(/^[a-f0-9]{64}$/.test(invite)){
-          setManagerInvite(invite);setRole("manager");setMode("register");
+          managerInviteRef.current=invite;setManagerInvite(invite);setRole("manager");setMode("register");
         }else setError("Liên kết mời quản lý không hợp lệ. Hãy xin lại từ Owner.");
       }
     });
@@ -117,7 +126,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         role:invited?"manager":role,
         ...(invited?{managerInviteToken:managerInvite}:{}),
         privacyAccepted: fields.privacyAccepted === "on" });
-      if(invited)setManagerInvite("");
+      if(invited){managerInviteRef.current="";setManagerInvite("");}
       if (result.recoveryCode) { recoveryOwner.current = result.account?.accountId ?? result.accountId ?? ""; setRecovery(result.recoveryCode); }
       if (mode === "recover") { setMode("login"); setNotice("Đã đổi mật khẩu và thu hồi các phiên cũ. Hãy lưu mã khôi phục mới."); }
       await reload(mode === "claim"); broadcast();
@@ -172,9 +181,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             // cross-account navigation. Fragments are not sent in HTTP requests, and
             // the mount effect immediately scrubs the token from the address bar.
             // Never persist it in local/session storage or put it in the query string.
-            const nextFragment=/^[a-f0-9]{64}$/.test(managerInvite)
-              ? "#manager-invite="+managerInvite : "";
-            window.location.replace(window.location.pathname+window.location.search+nextFragment); })}>Đăng xuất / đổi tài khoản</button></div>
+            reloadPreservingPendingManagerInvite(managerInviteRef.current); })}>Đăng xuất / đổi tài khoản</button></div>
         {active&&account.canReadRegistrants?<RegistrantReader/>:null}
         {active&&v2&&account.role==="manager"?<details>
           <summary>Hàng chờ xét duyệt học viên và giảng viên · Account-first V2</summary>
