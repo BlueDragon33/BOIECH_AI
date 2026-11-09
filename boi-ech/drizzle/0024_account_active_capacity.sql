@@ -1,10 +1,6 @@
 -- #108 L1/P0: separate pending intake from occupied active account seats.
 -- Additive corrective migration to already-deployed 0019; NEVER edit 0019 or backfill legacy rows.
 -- Preserve 0019 device quota triggers, account identities, and historical learning/certificates.
-DROP TRIGGER IF EXISTS account_admission_insert;
---> statement-breakpoint
-DROP TRIGGER IF EXISTS account_admission_role_change;
---> statement-breakpoint
 -- Atomic D1/SQLite trigger: activating a reviewed account reserves one capacity slot.
 -- Suspended accounts retain their previously assigned slot to prevent overcommit on resume.
 -- Pending and legacy_hold accounts are NOT counted; first approval does not consume a slot.
@@ -58,3 +54,9 @@ END;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS account_onboarding_active_capacity_idx
  ON account_onboarding(stage,account_id);
+--> statement-breakpoint
+-- Remove legacy pre-admission blockers LAST. If migration stops early, old guards
+-- remain in force and fail closed instead of temporarily permitting over-admission.
+DROP TRIGGER IF EXISTS account_admission_insert;
+--> statement-breakpoint
+DROP TRIGGER IF EXISTS account_admission_role_change;
