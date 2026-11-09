@@ -55,6 +55,23 @@ function elements(node){if(Array.isArray(node))return node.flatMap(elements);if(
 function content(node){if(Array.isArray(node))return node.map(content).join('');if(node===null||node===undefined)return'';if(typeof node!=='object')return String(node);return content(node.props?.children);}
 function dashboardHarness(props){const values=[];let cursor=0;const hooks={...React,useState(initial){const index=cursor++;if(!(index in values))values[index]=typeof initial==='function'?initial():initial;return[values[index],next=>{values[index]=typeof next==='function'?next(values[index]):next;}];}};const {TrainingDashboard}=load('app/manager-workspace.tsx',async()=>{},hooks);return()=>{cursor=0;return elements(TrainingDashboard(props));};}
 
+test('manager account controls render inside the themed workspace rather than above the application',()=>{
+ const {TrainingDashboard}=load('app/manager-workspace.tsx');
+ const html=renderToStaticMarkup(React.createElement(TrainingDashboard,{board:{from:'2030-01-01T09:00:00Z',to:'2030-01-01T10:00:00Z',observedAt:'2030-01-01T09:00:00Z',people:[],resources:[],sessions:[],summary:{}},tab:'overview',setTab:()=>{},busy:false,notice:'',onCommand:async()=>false,onWindowChange:()=>{},accountControls:React.createElement('details',null,React.createElement('summary',null,'Quản lý tài khoản'))}));
+ assert.match(html,/<main[^>]*>[\s\S]*Quản lý tài khoản[\s\S]*<\/main>/);
+});
+test('manager approval policy resolves the disabled feature and shows a retryable error on service failure',async()=>{
+ for(const [status,body,expected] of [[404,{code:'ACCOUNT_FEATURE_DISABLED'},'Duyệt thiết bị học viên và giảng viên'],[503,{error:'unavailable'},'Không xác minh được chính sách']]){
+  const values=[];let cursor=0;let effect;
+  const hooks={...React,useState(initial){const i=cursor++;if(!(i in values))values[i]=initial;return[values[i],next=>{values[i]=typeof next==='function'?next(values[i]):next;}];},useEffect(fn){effect=fn;}};
+  const {default:Panel}=load('app/manager-approval-panel.tsx',async()=>new Response(JSON.stringify(body),{status}),hooks);
+  Panel({});effect();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));cursor=0;
+  const html=renderToStaticMarkup(Panel({previewOnly:false}));assert.match(html,new RegExp(expected));
+  assert.ok(!html.includes('Đang xác minh chính sách'));
+  if(status===503)assert.match(html,/role="alert"[\s\S]*Thử lại/);
+ }
+});
+
 test('a scheduled session can be cancelled after its teacher expires and class is archived',async()=>{
  const teacher={id:'teacher',name:'Teacher',code:'SQ1',role:'teacher',className:'A',status:'approved',expired:true,registered:true,bookingCount:1};
  const session={id:'session',title:'Old',classId:'class',roomId:'room',teacherId:'teacher',startsAt:'2030-01-01T09:00:00Z',endsAt:'2030-01-01T10:00:00Z',status:'scheduled',version:1};

@@ -7,6 +7,11 @@ on:
         description: "Gõ DEPLOY_PRODUCTION để triển khai Bơi ếch vào production hiện tại"
         required: true
         type: string
+      activate_account_first:
+        description: "Bật Account-first V2 theo phê duyệt của Owner; không tự duyệt hồ sơ cũ"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -23,6 +28,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BOI_ECH_ACTIVATE_ACCOUNT_FIRST: ${{ inputs.activate_account_first }}
     steps:
       - name: Require explicit production confirmation
         shell: bash
@@ -71,6 +77,7 @@ jobs:
           NODE
 
       - name: Package existing production Worker and preserve runtime policy
+        id: package
         working-directory: boi-ech
         run: node scripts/production-package.mjs prepare
 
@@ -118,6 +125,21 @@ jobs:
       - name: Apply production D1 migrations
         working-directory: boi-ech
         run: npx wrangler d1 migrations apply boi-ech-db --remote --config wrangler.d1.jsonc
+
+      - name: Map existing profiles only when activating Account-first
+        if: inputs.activate_account_first
+        working-directory: boi-ech
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --json --command "SELECT (SELECT COUNT(*) FROM (SELECT person_code FROM device_access WHERE registration_submitted_at IS NOT NULL GROUP BY person_code HAVING COUNT(*)>1))+(SELECT COUNT(*) FROM (SELECT phone FROM device_access WHERE registration_submitted_at IS NOT NULL GROUP BY phone HAVING COUNT(*)>1))+(SELECT COUNT(*) FROM device_access d JOIN accounts a ON a.account_id='acc_'||d.device_id WHERE a.storage_device_id<>d.device_id) AS conflicts" > .sites-runtime/production-release/mapping-preflight.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data=JSON.parse(fs.readFileSync('.sites-runtime/production-release/mapping-preflight.json','utf8'));
+          if(data.length!==1||data[0].success!==true||data[0].results?.[0]?.conflicts!==0)throw new Error('Legacy mapping conflicts; activation stopped');
+          NODE
+          npx wrangler d1 execute boi-ech-db --remote --config wrangler.d1.jsonc --file scripts/account-first-legacy.sql > .sites-runtime/production-release/mapping-result.txt
+          echo 'Legacy mappings prepared; original profiles, payments and approvals retained. No V2 account auto-approved.'
 
       - name: Deploy current Bơi ếch production Worker
         working-directory: boi-ech
@@ -173,5 +195,11 @@ jobs:
           NODE
 
       - name: Verify two new device identities on live Production
+        if: steps.package.outputs.account_v2 != 'true'
         working-directory: boi-ech
         run: node scripts/verify-device-auth-live.mjs https://boi-ech.boiech-ai.workers.dev
+
+      - name: Verify live Account-first V2 session and authorization boundary
+        if: steps.package.outputs.account_v2 == 'true'
+        working-directory: boi-ech
+        run: node scripts/verify-account-first-live.mjs

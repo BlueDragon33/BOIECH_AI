@@ -38,3 +38,5 @@
 @media(prefers-reduced-motion:no-preference){.workspace button{transition:background-color .15s ease}.track>i{transition:width .2s ease}}
 
 .warning{background:var(--mgr-amber-bg);color:var(--mgr-amber);padding:14px;border-radius:12px;grid-column:1/-1}.warning p{margin-top:0}
+
+.accountTools{background:var(--mgr-surface);border:1px solid var(--mgr-line);border-radius:16px;padding:12px 16px;margin:0 0 20px;display:flex;gap:12px;align-items:start;flex-wrap:wrap}.accountTools details{flex:1 1 300px;min-width:0}.accountTools summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:650}.accountTools>button{font-size:.75em}.accountTools p{overflow-wrap:anywhere}

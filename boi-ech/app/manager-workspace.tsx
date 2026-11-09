@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
 import {createTrainingClient,type TrainingProof,type TrainingWindow} from "./training-client";
 import {classKey,classNames,type ResourceKind,type ResourceStatus,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession} from "./training-types";
 import {AppIcon,Badge,ResourceStatusBars,PersonStatusBar,personReadiness,eligible,stateText,defaultDisplay,parseDisplayPreferences,type DisplayPreferences} from "./manager-status";
@@ -17,7 +17,7 @@ function currentWindow(){const start=new Date();start.setMinutes(0,0,0);return {
 type ResourceDraft={id:string;kind:ResourceKind;name:string;parentId:string;capacity:number;requiredTeachers:number;status:ResourceStatus;expectedVersion:number};
 type SessionDraft={id:string;title:string;classId:string;roomId:string;teacherId:string;startsAt:string;endsAt:string;status:TrainingSession["status"];expectedVersion:number};
 
-export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=false,onCommand,onWindowChange,appearance=defaultDisplay,onAppearanceChange=()=>{}}:{board:TrainingBoard;tab:Tab;setTab:(tab:Tab)=>void;busy:boolean;notice:string;noticeError?:boolean;onCommand:Write;onWindowChange:(window:TrainingWindow)=>void;appearance?:DisplayPreferences;onAppearanceChange?:(next:DisplayPreferences)=>void}){
+export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=false,onCommand,onWindowChange,appearance=defaultDisplay,onAppearanceChange=()=>{},accountControls}:{board:TrainingBoard;tab:Tab;setTab:(tab:Tab)=>void;busy:boolean;notice:string;noticeError?:boolean;onCommand:Write;onWindowChange:(window:TrainingWindow)=>void;appearance?:DisplayPreferences;onAppearanceChange?:(next:DisplayPreferences)=>void;accountControls?:ReactNode}){
  const [query,setQuery]=useState("");const [filter,setFilter]=useState("all");
  const [resource,setResource]=useState<ResourceDraft|null>(null);const [session,setSession]=useState<SessionDraft|null>(null);
  const [assignment,setAssignment]=useState<{person:TrainingPerson;ids:string[];omittedNames:string[];replaceConfirmed:boolean}|null>(null);const [formError,setFormError]=useState("");
@@ -43,6 +43,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  return <main className={styles.workspace} data-theme={appearance.theme} data-text-size={appearance.textSize} aria-busy={busy}><div className={styles.appShell}>
   <header className={styles.header}><div className={styles.brand}><span className={styles.brandMark} aria-hidden="true">BẾ</span><div><small>BƠI ẾCH AI · ĐIỀU PHỐI</small><h1>Cán bộ quản lý</h1></div></div><button type="button" className={styles.iconButton} aria-label="Mở cài đặt" onClick={()=>selectTab("settings")}><AppIcon name="settings"/></button></header>
   <div className={styles.syncLine}><span className={styles.syncDot} data-busy={busy}/><small>{busy?"Đang đồng bộ…":`Cập nhật gần nhất ${dateLabel(board.observedAt)}`}</small><button type="button" className={styles.textButton} disabled={busy} onClick={()=>onWindowChange({from:board.from,to:board.to})}>Đồng bộ</button></div>
+  {accountControls?<section className={styles.accountTools} aria-label="Quản lý tài khoản">{accountControls}</section>:null}
   <section className={styles.window} aria-label="Khoảng kiểm tra còn trống"><button type="button" className={styles.windowToggle} aria-expanded={showWindow} onClick={()=>setShowWindow(!showWindow)}><span><small>Khoảng đang xem</small><strong>{dateLabel(board.from)} → {dateLabel(board.to)}</strong></span><span aria-hidden="true">⌄</span></button><form hidden={!showWindow} onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);try{setFormError("");onWindowChange({from:utc(String(data.get("from"))),to:utc(String(data.get("to")))});}catch(error){setFormError(error instanceof Error?error.message:"");}}}><label>Từ<input key={board.from} name="from" type="datetime-local" defaultValue={localDate(board.from)} required disabled={busy}/></label><label>Đến<input key={board.to} name="to" type="datetime-local" defaultValue={localDate(board.to)} required disabled={busy}/></label><button disabled={busy}>Kiểm tra / đồng bộ</button></form><small className={styles.timezone}>{timezone} · Trạng thái phòng và nhân sự tính trong khoảng này.</small></section>
   {notice?<p className={noticeError?styles.error:styles.notice} role={noticeError?"alert":"status"}>{notice}</p>:null}{formError?<p className={styles.error} role="alert">{formError}</p>:null}
   {tab==="overview"?<>
@@ -82,7 +83,5 @@ export default function ManagerWorkspace({deviceId,getProof}:{deviceId:string;ge
  </main>;
  if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button><button type="button" onClick={()=>setPreviewOnly(true)}>Xem thử không cần cấp quyền · dữ liệu mẫu</button></main>;
  return <div data-device-id={deviceId} data-person-role="manager">
-   <button type="button" onClick={()=>setPreviewOnly(true)} disabled={busy}>Xem thử giao diện · không thay đổi dữ liệu</button>
-   <details><summary>Quản lý tài khoản · phê duyệt hai vòng</summary><ManagerApprovalPanel getProof={getProof}/></details>
-   <TrainingDashboard appearance={appearance} onAppearanceChange={changeAppearance} board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindowRange(next);}}/></div>;
+   <TrainingDashboard accountControls={<><details><summary>Quản lý tài khoản · phê duyệt hai vòng</summary><ManagerApprovalPanel getProof={getProof}/></details><button type="button" onClick={()=>setPreviewOnly(true)} disabled={busy}>Xem thử giao diện · không thay đổi dữ liệu</button></>} appearance={appearance} onAppearanceChange={changeAppearance} board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindowRange(next);}}/></div>;
 }
