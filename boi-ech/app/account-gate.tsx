@@ -64,15 +64,20 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   }, []);
   useEffect(()=>{
     if(!enabled||bypass)return;
-    // Fragment never reaches the Worker or logs; remove it immediately after loading.
-    const params=new URLSearchParams(window.location.hash.slice(1));
-    const invite=params.get("manager-invite");
-    if(invite!==null){
-      window.history.replaceState(window.history.state,"",window.location.pathname+window.location.search);
-      if(/^[a-f0-9]{64}$/.test(invite)){
-        setManagerInvite(invite);setRole("manager");setMode("register");
-      }else setError("Liên kết mời quản lý không hợp lệ. Hãy xin lại từ Owner.");
-    }
+    // Read the invitation from the browser fragment, not from a server URL or a log.
+    let live=true;
+    queueMicrotask(()=>{
+      if(!live)return;
+      const params=new URLSearchParams(window.location.hash.slice(1));
+      const invite=params.get("manager-invite");
+      if(invite!==null){
+        window.history.replaceState(window.history.state,"",window.location.pathname+window.location.search);
+        if(/^[a-f0-9]{64}$/.test(invite)){
+          setManagerInvite(invite);setRole("manager");setMode("register");
+        }else setError("Liên kết mời quản lý không hợp lệ. Hãy xin lại từ Owner.");
+      }
+    });
+    return ()=>{live=false};
   },[enabled,bypass]);
   useEffect(() => {
     if (!enabled || bypass) return;
