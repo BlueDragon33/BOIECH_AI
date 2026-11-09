@@ -99,7 +99,7 @@ export class AccountService {
       entitlement,
       permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
-        (!row.access_expires_at || Date.parse(row.access_expires_at) > this.now()) && (!this.v2Enabled || entitlement?.active === true), expiresAt: p.expires_at })) };
+        (this.v2Enabled || !row.access_expires_at || Date.parse(row.access_expires_at) > this.now()) && (!this.v2Enabled || entitlement?.active === true), expiresAt: p.expires_at })) };
   }
   async ownerManagerPage(after: unknown = "", pageLimit: unknown = 40) {
     if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED",409);
@@ -328,7 +328,8 @@ export class AccountService {
         await new AccountEntitlementService(this.db,this.now).assertActive(actor.accountId);
       }
       if (actor.status !== "approved") fail(actor.status === "blocked" ? "ACCOUNT_BLOCKED" : "ACCOUNT_PENDING");
-      if (actor.expiresAt && !(Date.parse(actor.expiresAt) > this.now())) fail("ACCOUNT_EXPIRED");
+      // V2 entitlement, not the retired device expiry, owns account duration.
+      if (!this.v2Enabled && actor.expiresAt && !(Date.parse(actor.expiresAt) > this.now())) fail("ACCOUNT_EXPIRED");
     }
     return actor;
   }
@@ -481,11 +482,20 @@ export class AccountService {
     return {ok:true,deviceId:target,recoveryCode:nextCode};
   }
   async capability(actor: Principal, scope: string) {
+    // Public account snapshots can call capability() with a session() principal.
+    // Enforce V2 onboarding/device/entitlement even on that path.
+    if (this.v2Enabled) {
+      if (!actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
+      const row = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?")
+        .bind(actor.accountId).first<{stage:string}>();
+      if (row?.stage !== "active") fail("ACCOUNT_ONBOARDING_REQUIRED");
+      await new AccountEntitlementService(this.db,this.now).assertActive(actor.accountId);
+    }
     // Read owning rows freshly, not a role or a client-provided capability claim.
     const row = await this.db.prepare(`SELECT 1 AS allowed FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id
       WHERE a.account_id=? AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
-      AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      ${this.v2Enabled ? "" : "AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)"}
       AND p.scope=? AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?)`)
       .bind(actor.accountId, scope, this.now()).first<{ allowed: number }>();
     if (!row) fail("ACCOUNT_PERMISSION_REQUIRED");
@@ -501,7 +511,10 @@ export class AccountService {
     if (typeof enabled !== "boolean") fail("ACCOUNT_INPUT", 400);
     const expiry = input.expiresAt === undefined || input.expiresAt === null ? null : input.expiresAt;
     if (expiry !== null && (typeof expiry !== "number" || !Number.isSafeInteger(expiry) || expiry <= this.now() || expiry > this.now() + 366 * 86400000)) fail("ACCOUNT_INPUT", 400);
-    if (op === "approve-manager" ? (row.status !== "pending" || row.payment_status !== "unassigned" || row.access_group !== "unassigned") : enabled && (row.status !== "approved" || (row.access_expires_at && !(Date.parse(row.access_expires_at) > this.now())))) fail("ACCOUNT_STATE_CONFLICT", 409);
+    if (op === "approve-manager" ? (row.status !== "pending" || row.payment_status !== "unassigned" || row.access_group !== "unassigned") : enabled && (row.status !== "approved" || (!this.v2Enabled && row.access_expires_at && !(Date.parse(row.access_expires_at) > this.now())))) fail("ACCOUNT_STATE_CONFLICT", 409);
+    if (this.v2Enabled && enabled && op !== "approve-manager") {
+      await new AccountEntitlementService(this.db,this.now).assertActive(id);
+    }
     if (this.v2Enabled && op === "approve-manager") {
       const step = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").bind(id).first<{stage:string}>();
       if (step?.stage !== "profile_review") fail("ACCOUNT_ONBOARDING_REQUIRED",409);
