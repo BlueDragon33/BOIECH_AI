@@ -57,7 +57,7 @@ jobs:
         timeout-minutes: 6
         run: npm test
       - name: Rehearse full D1 SQL migration sequence in isolated local Wrangler
-        if: github.ref == 'refs/heads/feat/boi-account-entitlement-108-20261108' || github.ref == 'refs/heads/feat/boi-v2-mobile-console-integration-20261108'
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/feat/boi-account-entitlement-108-20261108' || github.ref == 'refs/heads/feat/boi-v2-mobile-console-integration-20261108'
         working-directory: boi-ech
         timeout-minutes: 5
         env:
@@ -70,3 +70,6 @@ jobs:
           npx --no-install wrangler d1 migrations apply boi-ech-local --local --config wrangler.local.jsonc
           npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT role,default_days FROM account_duration_policies ORDER BY role"
           npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT account_id,expires_at,revision FROM account_entitlements LIMIT 1"
+          npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT person_role,account_limit FROM account_admission_limits ORDER BY person_role"
+          npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT COUNT(*) AS invite_table_exists FROM sqlite_master WHERE type='table' AND name='account_manager_invitations'"
+          npx --no-install wrangler d1 execute boi-ech-local --local --config wrangler.local.jsonc --command "SELECT COUNT(*) AS activation_guard_exists FROM sqlite_master WHERE type='trigger' AND name='account_activation_capacity'"
