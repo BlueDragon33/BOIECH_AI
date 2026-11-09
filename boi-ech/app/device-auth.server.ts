@@ -730,7 +730,8 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
   }>();
   // Legacy signed device-registration endpoint is public. Existing manager devices may
   // update the same verified role/code; NEW manager requests require Owner-controlled intake.
-  if (personRole === "manager" && (current?.person_role !== "manager" || current.person_code !== personCode)) {
+  if (accountFirstRuntimeEnabled && personRole === "manager"
+    && (current?.person_role !== "manager" || current.person_code !== personCode)) {
     throw new DeviceAccessError(
       "Đăng ký Cán bộ quản lý mới chỉ thực hiện qua Application-Management và được Owner xét duyệt.",
       403, "MANAGER_OWNER_INTAKE_REQUIRED"
