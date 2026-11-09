@@ -65,7 +65,7 @@ if (!vite.includes("CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH") || !vite.includes("bo
   throw new Error("Vite phải tách local binding khỏi Cloudflare preview config.");
 }
 
-for (const marker of ["redirect.configPath", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "boi-ech-preview-db", "BOI_ECH_DEPLOYMENT_CHANNEL", "Account-first FREE Preview must not configure R2"]) {
+for (const marker of ["redirect.configPath", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "previewD1Policy", "PREVIEW_MIGRATIONS_TABLE", "BOI_ECH_DEPLOYMENT_CHANNEL", "Account-first FREE Preview must not configure R2"]) {
   if (!artifact.includes(marker)) throw new Error(`Generated artifact validator thiếu guard: ${marker}`);
 }
 
@@ -81,16 +81,17 @@ for (const marker of ["BOI_ECH_DEPLOYMENT_CHANNEL", "BOI_ECH_BUILD_REVISION", 'a
 
 if (!previewWorkflow.includes("workflow_dispatch")) throw new Error("Preview deployment phải manual-only.");
 if (/\n\s*push\s*:/.test(previewWorkflow)) throw new Error("Preview chưa được auto-deploy theo push.");
-for (const token of ["DEPLOY_PREVIEW", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "boi-ech-preview-db --remote", "npm run cloudflare:artifact:check", "wrangler.cloudflare.preview.jsonc"]) {
+for (const token of ["DEPLOY_PREVIEW", "BOI_ECH_PREVIEW_D1_DATABASE_ID", "BOI_ECH_PRODUCTION_D1_DATABASE_ID", "migrations apply DB --remote", "npm run cloudflare:artifact:check", "wrangler.cloudflare.preview.jsonc"]) {
   if (!previewWorkflow.includes(token)) throw new Error(`Preview workflow thiếu: ${token}`);
 }
 if (previewWorkflow.includes("boi-ech-db --remote")) throw new Error("Preview workflow không được migrate production D1.");
 for (const marker of [
-  'CONTROL_SERVICE_SECRET: ${{ secrets.CONTROL_SERVICE_SECRET }}',
-  'missing+=("CONTROL_SERVICE_SECRET")',
-  'missing+=("BOI_ECH_PREVIEW_ORIGIN")',
-  'missing+=("APPLICATION_MANAGEMENT_PREVIEW_ORIGIN")',
-  'npx wrangler secret put CONTROL_SERVICE_SECRET',
+  'INSTALL_PREVIEW_BRIDGE',
+  'PREVIEW_BRIDGE_CONFIRMATION',
+  'node scripts/preview-stack-remote.mjs check',
+  'node scripts/preview-stack-remote.mjs install-bridge',
+  'CONTROL_OWNER_EMAILS',
+  'APPLICATION_MANAGEMENT_PREVIEW_ORIGIN',
   'Protected Preview environment is incomplete',
 ]) {
   if (!previewWorkflow.includes(marker)) throw new Error(`Preview chưa có fail-closed Owner bridge: ${marker}`);

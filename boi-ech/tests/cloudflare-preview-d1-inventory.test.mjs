@@ -35,3 +35,11 @@ test("remote inventory gate blocks absent Preview, full FREE account, collisions
  for(const inventory of cases)assert.notEqual(check(inventory).status,0,JSON.stringify(inventory));
  assert.notEqual(check(example,{BOI_ECH_PREVIEW_D1_DATABASE_ID:production}).status,0);
 });
+test("remote inventory gate accepts only the explicitly approved retired Preview name and UUID",()=>{
+ const borrowed='4094a621-3b81-4533-9694-4a2103e03363';
+ const inventory=[{uuid:production,name:'boi-ech-db'},{uuid:borrowed,name:'bauman-control-preview-db'}];
+ const env={BOI_ECH_PREVIEW_D1_DATABASE_NAME:'bauman-control-preview-db',BOI_ECH_PREVIEW_D1_DATABASE_ID:borrowed};
+ assert.equal(check(inventory,env).status,0);
+ assert.notEqual(check(inventory,{...env,BOI_ECH_PREVIEW_D1_DATABASE_ID:preview}).status,0);
+ assert.notEqual(check(inventory,{...env,BOI_ECH_PREVIEW_D1_DATABASE_NAME:'boi-ech-preview-db'}).status,0);
+});

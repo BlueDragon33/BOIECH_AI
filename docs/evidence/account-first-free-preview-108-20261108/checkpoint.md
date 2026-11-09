@@ -79,3 +79,25 @@ Resolve one dedicated FREE D1 slot by an Owner-specified nonproduction retiremen
 - Both public URL switches on `bauman-control-preview` are now disabled. Worker code and encrypted secrets are retained for recovery.
 - A private logical SQL backup of `bauman-control-preview-db` was saved durably and restored to clean local SQLite: **10 user tables, 6 rows**, integrity OK, no foreign-key violations, every row count and SQLite sequence matched. SQL SHA-256: `b3ac3b1930179b13902a523d0d50dca49a60de2bc11de8f38d09e56f2e3ebb6b`. This is not a remote D1 restore test.
 - The database itself has not been deleted. Cloudflare's confirmation dialog labels deletion permanent; the browser operation is staged for specific action-time confirmation. D1 capacity and bridge secrets therefore remain blocked. No Production merge/deployment, subscription or hosted Actions was performed.
+
+## Current follow-up — 2026-11-09: authorized FREE reuse and protected stack package
+
+This section supersedes the earlier capacity/deployment Next Action. The Owner explicitly requested mandatory deployment and temporary reuse of an unused resource. No deletion is needed.
+
+- `bauman-control-preview-db` is retained. Both old Worker URL switches are disabled, and its `DB` binding was removed and read back as **No connected bindings**. Its code, encrypted secret and all database rows remain available for recovery.
+- Boi packaging accepts only the dedicated Preview name or the exact approved retired name/UUID, with a separate `boi_ech_preview_migrations` ledger. Production and App Preview D1 are excluded; the generated Boi artifact also rejects every additional D1 or R2 binding.
+- All **26** Boi SQL migrations were applied over the actual logical backup in local SQLite. **10 original tables / 6 rows unchanged**, integrity OK, no foreign-key violations. This is compatibility evidence, not a remote migration/restore claim.
+- One manual protected BOI workflow packages both exact Preview Workers. App source is pinned to **070fc3f156052384fffdd6ef1c5da5420f9a56c3**. Its only change from ea7e46c fixes a test that compared a stale step label; command ordering remains enforced. App repository's separate dormant workflow is unchanged.
+- Node **22.13.0** full suites: Boi **631/631**, including the borrowed job environment; App **865/865**. Boi TypeScript passed and lint passed with five existing unused-variable warnings. Boi's actual generated borrowed-D1 artifact passed, without R2. Both artifact checks must also pass in the protected remote job before any SQL mutation.
+- Fresh final AI code review found **no Critical/Important issues**; approval is limited to this protected Preview package, not business acceptance. Author found the extra-D1 gap, reproduced RED, fixed it, then ran the green full suite.
+- Minor deferred: Owner email comparison is literal after App preparation normalizes it. Protected metadata was supplied already normalized, with the current authenticated Owner's single address; future normalization improvements are not part of this release.
+- The protected BOI Environment now contains the two origins, approved Preview name/UUID, both Production identity guards, App Preview UUID and normalized Owner metadata. Required reviewer remains BlueDragon33; administrator bypass remains disabled. Credential values were neither read nor copied.
+- The job retains existing App access/vault secrets and generates a new random bridge key only for `boi-ech-preview` and `application-management-preview`. Its final live checks require exact SHA/channel/D1 identity, Boi Control API DB access and App anonymous JSON 401. No key is written to repository, logs or artifacts.
+
+Ruling: Temporary reuse replaces deletion or a paid capacity increase, under the Owner's explicit instruction. Recovery risk: restoring Bauman Preview requires retaining Boi data separately before reattaching the old Worker.
+
+Ruling: One pinned two-Preview workflow implements the Owner's deployment instruction without enabling automatic release. Partial provider failure can leave Preview revisions different; the job fails and cannot establish acceptance or Production readiness.
+
+Review boundaries: token scope and actual provider mutations will be checked by the protected job; current metadata cannot prove credential values or deployment success. Owner login/MFA, two approval rounds, CAS/audit/30-day duration, three actual devices, offline/conflict/recovery and payment acceptance still require real evidence. Production merge/publish remains excluded from this package.
+
+Next Action: queue the reviewed exact-source protected Preview job, obtain action-time authorization for the new Preview D1/Owner bridge access, then release its approval gate and inspect actual provider/runtime results. A queued job is not a deployment claim.

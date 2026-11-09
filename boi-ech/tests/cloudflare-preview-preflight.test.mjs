@@ -12,6 +12,7 @@ const template=fs.readFileSync(path.join(root,'wrangler.cloudflare.preview.examp
 const previewD1='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const productionD1='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const defaults={
+ BOI_ECH_PREVIEW_D1_DATABASE_NAME:'boi-ech-preview-db',
  BOI_ECH_PREVIEW_D1_DATABASE_ID:previewD1,
  BOI_ECH_PRODUCTION_D1_DATABASE_ID:productionD1,
  BOI_ECH_PREVIEW_ORIGIN:'https://boi-ech-preview.example.invalid',
@@ -59,4 +60,19 @@ test('Preview materializer fails closed for equal production D1, absent/collidin
   assert.notEqual(result.status,0,'invalid preview config must be rejected: '+JSON.stringify(x));
   assert.equal(exists,false,'do not materialize a Preview config from a failed safety gate');
  }
+});
+
+test('approved retired Preview D1 uses its exact UUID and a separate migration ledger',()=>{
+ const borrowed={BOI_ECH_PREVIEW_D1_DATABASE_NAME:'bauman-control-preview-db',BOI_ECH_PREVIEW_D1_DATABASE_ID:'4094a621-3b81-4533-9694-4a2103e03363'};
+ const {result,rendered}=prepare(borrowed);
+ assert.equal(result.status,0,result.stderr);
+ const db=JSON.parse(rendered).d1_databases[0];
+ assert.equal(db.database_name,borrowed.BOI_ECH_PREVIEW_D1_DATABASE_NAME);
+ assert.equal(db.migrations_table,'boi_ech_preview_migrations');
+ for(const override of [
+  {...borrowed,BOI_ECH_PREVIEW_D1_DATABASE_ID:previewD1},
+  {...borrowed,BOI_ECH_PREVIEW_D1_DATABASE_NAME:'application-management-preview-db'},
+  {...borrowed,BOI_ECH_PREVIEW_D1_DATABASE_NAME:'boi-ech-preview-db'},
+  {BOI_ECH_PREVIEW_D1_DATABASE_NAME:'boi-ech-db'},
+ ]) assert.notEqual(prepare(override).result.status,0,JSON.stringify(override));
 });

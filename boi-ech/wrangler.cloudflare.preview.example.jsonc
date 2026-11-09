@@ -17,6 +17,7 @@
       "binding": "DB",
       "database_name": "boi-ech-preview-db",
       "database_id": "__BOI_ECH_PREVIEW_D1_DATABASE_ID__",
+      "migrations_table": "boi_ech_preview_migrations",
       "migrations_dir": "drizzle"
     }
   ],

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { previewD1Policy, PREVIEW_MIGRATIONS_TABLE } from "./preview-d1-policy.mjs";
 
 const ROOT = process.cwd();
 const REDIRECT = path.join(ROOT, ".wrangler", "deploy", "config.json");
@@ -35,9 +36,11 @@ if (!generatedRelative.startsWith("dist/")) fail(`Generated Wrangler config must
 const generated = readJson(generatedPath, "Generated Wrangler config");
 
 if (generated.name !== "boi-ech-preview") fail(`Unexpected Worker name: ${String(generated.name)}.`);
-const db = (Array.isArray(generated.d1_databases) ? generated.d1_databases : []).find((item) => item?.binding === "DB");
+if (!Array.isArray(generated.d1_databases) || generated.d1_databases.length !== 1) fail("Generated Preview must contain exactly one D1 binding.");
+const db = generated.d1_databases.find((item) => item?.binding === "DB");
 if (!db) fail("Generated config missing DB binding.");
-if (db.database_name !== "boi-ech-preview-db") fail("Generated config uses wrong Bơi ếch preview database name.");
+if (db.database_name !== previewD1Policy().name) fail("Generated config uses wrong Bơi ếch preview database name.");
+if (db.migrations_table !== PREVIEW_MIGRATIONS_TABLE) fail("Generated config must use the separate Preview migration ledger.");
 if (String(db.database_id ?? "").toLowerCase() !== previewId) fail("Generated config D1 ID does not match BOI_ECH_PREVIEW_D1_DATABASE_ID.");
 if (String(db.database_id ?? "").toLowerCase() === LOCAL_D1_ID) fail("Generated config references local D1.");
 if (productionId && String(db.database_id ?? "").toLowerCase() === productionId) fail("Generated config references production D1.");

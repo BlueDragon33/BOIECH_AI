@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { previewD1Policy } from "./preview-d1-policy.mjs";
 
 const TEMPLATE = "wrangler.cloudflare.preview.example.jsonc";
 const TARGET = "wrangler.cloudflare.preview.jsonc";
@@ -46,6 +47,7 @@ function buildRevision() {
 if (!fs.existsSync(TEMPLATE)) throw new Error(`Thiếu ${TEMPLATE}.`);
 
 const d1Id = d1Uuid("BOI_ECH_PREVIEW_D1_DATABASE_ID");
+const d1Policy = previewD1Policy();
 if (d1Id === LOCAL_D1_ID) {
   throw new Error("Preview tuyệt đối không được dùng D1 local của Bơi ếch.");
 }
@@ -64,6 +66,7 @@ if (boiPreviewOrigin === applicationManagementOrigin) {
 }
 const revision = buildRevision();
 const rendered = fs.readFileSync(TEMPLATE, "utf8")
+  .replace('"database_name": "boi-ech-preview-db"', `"database_name": "${d1Policy.name}"`)
   .replace("__BOI_ECH_PREVIEW_D1_DATABASE_ID__", d1Id)
   .replace("__APPLICATION_MANAGEMENT_PREVIEW_ORIGIN__", applicationManagementOrigin)
   .replace("__BOI_ECH_PREVIEW_ORIGIN__", boiPreviewOrigin)
@@ -79,6 +82,7 @@ if (previewConfig.r2_buckets !== undefined && (!Array.isArray(previewConfig.r2_b
 }
 fs.writeFileSync(TARGET, rendered, { mode: 0o600 });
 console.log(`Prepared ${TARGET} with isolated preview D1 and revision ${revision}.`);
+console.log(`D1: ${d1Policy.name}; migrations table: boi_ech_preview_migrations. Existing Bauman tables are retained.`);
 console.log("R2 disabled for FREE Account-first Preview; payment-proof storage is not accepted by this deployment.");
 console.log(`Account-first V2 isolated to Preview origin: ${boiPreviewOrigin}`);
 console.log(`Application Management preview origin: ${applicationManagementOrigin}`);

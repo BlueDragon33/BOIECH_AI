@@ -11,6 +11,7 @@ const previewId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const productionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const env = {
   ...process.env,
+  BOI_ECH_PREVIEW_D1_DATABASE_NAME: "boi-ech-preview-db",
   BOI_ECH_PREVIEW_D1_DATABASE_ID: previewId,
   BOI_ECH_PRODUCTION_D1_DATABASE_ID: productionId,
   BOI_ECH_PREVIEW_ORIGIN: "https://boi-ech-preview.example.invalid",
@@ -89,4 +90,10 @@ test("no-R2 Preview still rejects a Production D1 identity", () => temporary(dir
   const result = artifact(dir, config => { config.d1_databases[0].database_id = productionId; });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /D1 ID|production D1/);
+}));
+
+test("generated Preview artifact rejects an additional D1 binding even when DB is correct", () => temporary(dir => {
+  const result = artifact(dir, config => { config.d1_databases.push({binding:"OTHER", database_name:"boi-ech-db", database_id:productionId}); });
+  assert.notEqual(result.status, 0, "Preview must never gain a second database binding");
+  assert.match(result.stderr, /exactly one D1/);
 }));

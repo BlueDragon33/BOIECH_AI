@@ -1,7 +1,8 @@
 import fs from "node:fs";
+import { previewD1Policy } from "./preview-d1-policy.mjs";
 
 const [file] = process.argv.slice(2);
-const previewName = "boi-ech-preview-db";
+const previewName = previewD1Policy().name;
 const previewId = String(process.env.BOI_ECH_PREVIEW_D1_DATABASE_ID ?? "").toLowerCase().trim();
 const productionId = String(process.env.BOI_ECH_PRODUCTION_D1_DATABASE_ID ?? "").toLowerCase().trim();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -19,7 +20,7 @@ if (!Array.isArray(list) || list.some(item => !item || typeof item !== "object"
 }
 const previews = list.filter(item => item.name === previewName);
 if (previews.length !== 1) {
-  block(`Expected exactly one ${previewName}, found ${previews.length} of ${list.length} D1 databases. On FREE only 10 D1 databases are allowed. Do not auto-delete/reuse any database.`);
+  block(`Expected exactly one approved ${previewName}, found ${previews.length} of ${list.length} D1 databases. Do not auto-delete or select another database.`);
 }
 if (previews[0].uuid.toLowerCase() !== previewId) {
   block("Dedicated Preview D1 UUID does not match the protected environment secret.");
