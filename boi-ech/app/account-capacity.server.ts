@@ -9,8 +9,10 @@ function requireOwner(owner: Owner) {
 export async function readAccountCapacity(db: D1Database, owner: Owner) {
  requireOwner(owner);
  const response = await db.prepare(`SELECT p.person_role AS role,p.account_limit AS accountLimit,p.revision,
-   (SELECT COUNT(*) FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
-    WHERE d.person_role=p.person_role) AS used
+   (SELECT COUNT(*) FROM accounts a
+     JOIN device_access d ON d.device_id=a.storage_device_id
+     JOIN account_onboarding o ON o.account_id=a.account_id
+     WHERE d.person_role=p.person_role AND o.stage IN ('active','suspended')) AS used
   FROM account_admission_limits p ORDER BY CASE p.person_role
    WHEN 'manager' THEN 0 WHEN 'teacher' THEN 1 ELSE 2 END`).all<{
     role: string; accountLimit: number; revision: number; used: number
