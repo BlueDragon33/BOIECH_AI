@@ -39,7 +39,7 @@ test('Applicant controls own credential+P256; redemption is atomic, pending and 
   const consumed=f.sqlite.prepare('SELECT consumed_by,revision FROM account_manager_invitations').get();
   assert.equal(consumed.consumed_by,result.account.accountId);
   assert.equal(consumed.revision,2);
-  await assert.rejects(()=>f.service.registerManagerWithInvite(
+  await assert.rejects(async()=>f.service.registerManagerWithInvite(
    {...request(11,issued.inviteToken),publicKey:await key()},'peer-11'),e=>e.code==='MANAGER_INVITATION_INVALID');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM accounts').get().n,1);
  }finally{f.close()}
@@ -47,12 +47,12 @@ test('Applicant controls own credential+P256; redemption is atomic, pending and 
 test('Wrong role, expired or forged invitation cannot create account and no auth sessions',async()=>{
  const f=accountStack({v2:true});try{
   const issued=await f.service.issueManagerInvite(owner,1);
-  await assert.rejects(()=>f.service.registerManagerWithInvite(
+  await assert.rejects(async()=>f.service.registerManagerWithInvite(
     {...request(21,'0'.repeat(64)),publicKey:await key()},'peer-21'),e=>e.code==='MANAGER_INVITATION_INVALID');
-  await assert.rejects(()=>f.service.registerManagerWithInvite(
+  await assert.rejects(async()=>f.service.registerManagerWithInvite(
     {...request(22,issued.inviteToken),role:'teacher',publicKey:await key()},'peer-22'),e=>e.code==='ACCOUNT_INPUT');
   f.sqlite.prepare('UPDATE account_manager_invitations SET expires_at_ms=?').run(Date.now()-1);
-  await assert.rejects(()=>f.service.registerManagerWithInvite(
+  await assert.rejects(async()=>f.service.registerManagerWithInvite(
     {...request(23,issued.inviteToken),publicKey:await key()},'peer-23'),e=>e.code==='MANAGER_INVITATION_INVALID');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM accounts').get().n,0);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM account_sessions').get().n,0);
