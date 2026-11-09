@@ -39,6 +39,9 @@ export async function POST(request: Request) {
     if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
     if (config.v2 && p.action === "recover-lost-device") return json(await service.recoverLostDevice(p,peer));
     if (config.v2 && p.action === "approve-recovered-device") return json(await service.approveRecoveredDevice(p,peer));
+    // Public Bơi Ếch intake is only for learners/teachers. Manager requests must
+    // enter the existing App-Management Owner-controlled workflow, never via this API.
+    if (p.action === "register" && p.role === "manager") throw new AccountError("MANAGER_OWNER_INTAKE_REQUIRED", 403);
     if (p.action === "register" || p.action === "login" || p.action === "claim") {
       let legacyId: string | null = null;
       if (p.action === "claim") {
