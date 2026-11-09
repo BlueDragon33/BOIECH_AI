@@ -10,7 +10,7 @@ import { portableCredential, preparePortableAccount } from "./multi-account-swit
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
-  onboardingNote?: string|null;
+  onboardingNote?: string|null; entitlementActive?: boolean;
   canReadRegistrants?: boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
@@ -134,7 +134,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   }
   if (!enabled || bypass) return children;
   const active = account?.status === "approved" && (!account.expiresAt || Date.parse(account.expiresAt) > observedNow)
-    && (!v2 || (account.onboardingStage==="active" && account.deviceApproved===true));
+    && (!v2 || (account.onboardingStage==="active" && account.deviceApproved===true && account.entitlementActive===true));
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
@@ -162,6 +162,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             : account.onboardingStage==="profile_review" ? "Hồ sơ đang được xét duyệt lần hai."
             : account.onboardingStage==="changes_requested" ? "Hồ sơ cần bổ sung. Hãy cập nhật và gửi lại."
             : account.onboardingStage==="legacy_hold" ? "Hồ sơ cũ cần được đối chiếu trước khi chuyển sang V2."
+            : account.onboardingStage==="active" && account.entitlementActive===false ? "Thời hạn tài khoản đã hết, chưa được cấp hoặc tài khoản đang tạm khóa. Hãy liên hệ Owner để kiểm tra và gia hạn trong Application-Management."
             : "Chưa đủ điều kiện truy cập."
             : account.status === "pending" ? "Chờ duyệt tài khoản. Bạn chỉ cần đăng ký một lần; trạng thái sẽ dùng chung trên mọi thiết bị."
             : "Tài khoản đã bị khóa hoặc hết hạn. Liên hệ cán bộ có thẩm quyền."}</p>}
