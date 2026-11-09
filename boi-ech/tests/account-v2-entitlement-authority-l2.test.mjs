@@ -54,7 +54,7 @@ test("V2 suspended/expired entitlements fail closed even if legacy device expiry
     .run("2099-01-01T00:00:00.000Z",manager.account.storageDeviceId);
   f.sqlite.prepare("UPDATE account_entitlements SET state='suspended' WHERE account_id=?").run(id);
   await assert.rejects(()=>f.service.authorize(manager.token),e=>e.code==="ACCOUNT_SUSPENDED");
-  await assert.rejects(()=>f.service.capability(await f.service.session(manager.token),"manager.approve.registration"),
+  await assert.rejects(async()=>f.service.capability(await f.service.session(manager.token),"manager.approve.registration"),
     e=>e.code==="ACCOUNT_SUSPENDED");
   const suspended=await (await f.get("api/accounts/route.ts")).json();
   assert.equal(suspended.account.entitlementActive,false);
