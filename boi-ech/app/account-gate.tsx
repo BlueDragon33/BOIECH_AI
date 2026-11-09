@@ -5,6 +5,7 @@ import RegistrantReader from "./registrant-reader";
 import VerifiedSyncSettings from "./verified-sync-settings";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { RegistrationRoles } from "./registration-roles";
+import ManagerV2ReviewPanel from "./manager-v2-review-panel";
 import { portableCredential, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
@@ -137,6 +138,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           <button type="button" disabled={busy} onClick={() => void run(async () => { await send({ action: "rotate" }); await reload(); setNotice("Đã đổi vé phiên an toàn; tối đa 8 giờ kể từ khi đăng nhập."); })}>Gia hạn phiên</button>
           <button type="button" disabled={busy} onClick={() => void run(async () => { setReady(false); setRecovery(""); recoveryOwner.current=""; await send({ action: "logout" }); broadcast(); window.location.reload(); })}>Đăng xuất / đổi tài khoản</button></div>
         {active&&account.canReadRegistrants?<RegistrantReader/>:null}
+        {active&&v2&&account.role==="manager"?<details>
+          <summary>Hàng chờ xét duyệt học viên và giảng viên · Account-first V2</summary>
+          <ManagerV2ReviewPanel/>
+        </details>:null}
         {active&&v2?<VerifiedSyncSettings accountId={account.accountId}/>:null}
         <details><summary>Thiết bị đã liên kết</summary>{devices.map(d=><div key={d.device_id}>
           <span>{d.device_id.slice(0,12)} · {d.revoked?"Đã thu hồi":v2&&d.approved===0?"Chờ xác nhận":"Đã xác nhận"}</span>
