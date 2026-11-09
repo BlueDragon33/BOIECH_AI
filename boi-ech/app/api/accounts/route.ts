@@ -42,6 +42,11 @@ export async function POST(request: Request) {
     // Public Bơi Ếch intake is only for learners/teachers. Manager requests must
     // enter the existing App-Management Owner-controlled workflow, never via this API.
     if (p.action === "register" && p.role === "manager") throw new AccountError("MANAGER_OWNER_INTAKE_REQUIRED", 403);
+    if (p.action === "manager-register") {
+      const result=await service.registerManagerWithInvite(p,peer);
+      const {token:session,...safe}=result;
+      return json({ok:true,...safe},sessionCookie(session));
+    }
     if (p.action === "register" || p.action === "login" || p.action === "claim") {
       let legacyId: string | null = null;
       if (p.action === "claim") {
