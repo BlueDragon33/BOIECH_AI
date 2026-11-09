@@ -61,6 +61,7 @@ export function accountErrorResponse(error: unknown) {
     AUTH_FAILED: "Tên đăng nhập hoặc thông tin xác thực chưa đúng.",
     RATE_LIMITED: "Đã vượt số lần thử. Hãy thử lại sau 15 phút.",
     ACCOUNT_PENDING: "Tài khoản đang chờ xét duyệt.", ACCOUNT_BLOCKED: "Tài khoản đã bị khóa.",
+    MANAGER_OWNER_INTAKE_REQUIRED: "Yêu cầu tài khoản Cán bộ quản lý phải thực hiện qua Application-Management và được Owner xét duyệt.",
     PASSWORD_POLICY: "Mật khẩu cần ít nhất 15 ký tự và tối đa 1.024 ký tự.",
     REGISTRATION_UNAVAILABLE: "Không thể tạo hồ sơ này. Nếu đã đăng ký, hãy đăng nhập hoặc dùng khôi phục.",
     ACCOUNT_CAPACITY_REACHED: "Loại tài khoản này đã đủ số lượng. Đăng ký mới tạm dừng để bảo vệ hệ thống; hãy liên hệ cán bộ phụ trách.",
