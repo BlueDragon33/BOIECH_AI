@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const workflow = fs.readFileSync(new URL("../../.github/workflows/deploy-boi-ech-preview.yml", import.meta.url), "utf8");
-const appSha = "e55b81a0cb0c5f5ff771b16eac57ed7234e14ed3";
+const appSha = "dd4c39daebd9349cb2be032ef06d34b09412ae75";
 
 test("protected paired Preview candidate uses the exact tested App SHA everywhere", () => {
   const pins = workflow.match(/[a-f0-9]{40}/g) ?? [];
