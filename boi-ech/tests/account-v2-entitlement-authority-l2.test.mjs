@@ -1,0 +1,97 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {accountStack} from "./helpers/account-stack.mjs";
+
+const owner={role:"owner",actor:"owner@fixture.invalid"};
+const profile=n=>({familyName:"Synthetic",givenName:"Tester",personCode:"ENTITLE"+n,
+ className:"Lab class",phone:"090"+String(n).padStart(7,"0")});
+async function createActiveManager(f,n=801) {
+ const manager=await f.register(n,"manager");
+ await f.flow.firstReview({kind:"owner",actor:owner.actor},manager.account.accountId,1);
+ await f.flow.submitProfile(manager.token,{...profile(n),expectedRevision:2});
+ await f.service.ownerCommand(owner,{accountId:manager.account.accountId,
+   operation:"approve-manager",expectedRevision:0});
+ return manager;
+}
+test("V2 account entitlement overrules expired legacy device expiry for real manager and learner approval",async()=>{
+ const f=accountStack({v2:true});
+ try {
+  const manager=await createActiveManager(f);
+  const before=await f.service.ownerRead(manager.account.accountId);
+  assert.equal(before.entitlement?.active,true);
+  const legacy="2001-01-01T00:00:00.000Z";
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at=? WHERE device_id=?")
+   .run(legacy,manager.account.storageDeviceId);
+  const actor=await f.service.authorize(manager.token);
+  assert.equal(actor.status,"approved");
+  await f.service.capability(await f.service.session(manager.token),"manager.approve.registration");
+  const now=await f.service.ownerRead(manager.account.accountId);
+  assert.equal(now.permissions.find(p=>p.scope==="manager.approve.registration")?.effective,true);
+  const learner=await f.register(802,"learner");
+  await f.flow.firstReview({kind:"manager",token:manager.token},learner.account.accountId,1);
+  await f.flow.submitProfile(learner.token,{...profile(802),expectedRevision:2});
+  const accepted=await f.service.review(manager.token,learner.account.accountId,"approve");
+  assert.equal(accepted.status,"approved");
+  f.setCookie(manager.token);
+  const response=await f.get("api/accounts/route.ts");
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.account.accountId,manager.account.accountId);
+  assert.equal(data.account.entitlementActive,true);
+  assert.equal(data.account.expiresAt,before.entitlement.expiresAt);
+  assert.notEqual(data.account.expiresAt,legacy);
+  assert.equal(data.account.onboardingStage,"active");
+ }finally{f.close()}
+});
+test("V2 suspended/expired entitlements fail closed even if legacy device expiry remains valid",async()=>{
+ const f=accountStack({v2:true});
+ try{
+  const manager=await createActiveManager(f,811);
+  const id=manager.account.accountId;
+  f.setCookie(manager.token);
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at=? WHERE device_id=?")
+    .run("2099-01-01T00:00:00.000Z",manager.account.storageDeviceId);
+  f.sqlite.prepare("UPDATE account_entitlements SET state='suspended' WHERE account_id=?").run(id);
+  await assert.rejects(()=>f.service.authorize(manager.token),e=>e.code==="ACCOUNT_SUSPENDED");
+  await assert.rejects(()=>f.service.capability(await f.service.session(manager.token),"manager.approve.registration"),
+    e=>e.code==="ACCOUNT_SUSPENDED");
+  const suspended=await (await f.get("api/accounts/route.ts")).json();
+  assert.equal(suspended.account.entitlementActive,false);
+  assert.equal(suspended.account.canReadRegistrants,false);
+  f.sqlite.prepare("UPDATE account_entitlements SET state='active',expires_at=? WHERE account_id=?")
+   .run("2000-01-01T00:00:00.000Z",id);
+  await assert.rejects(()=>f.service.authorize(manager.token),e=>e.code==="ACCOUNT_EXPIRED");
+  const expired=await (await f.get("api/accounts/route.ts")).json();
+  assert.equal(expired.account.entitlementActive,false);
+  assert.equal(expired.account.expiresAt,"2000-01-01T00:00:00.000Z");
+ }finally{f.close()}
+});
+test("Owner may manage role on V2 account with active entitlement even if legacy device expiry ended",async()=>{
+ const f=accountStack({v2:true});
+ try {
+  const manager=await createActiveManager(f,821);
+  const id=manager.account.accountId;
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at='2001-01-01T00:00:00.000Z' WHERE device_id=?")
+   .run(manager.account.storageDeviceId);
+  const before=await f.service.ownerRead(id);
+  const updated=await f.service.ownerCommand(owner,{accountId:id,operation:"management",
+    enabled:true,expectedRevision:before.revision});
+  assert.equal(updated.revision,before.revision+1);
+  assert.equal(updated.permissions.find(p=>p.scope==="manager.approve.registration")?.effective,true);
+  f.sqlite.prepare("UPDATE account_entitlements SET state='suspended' WHERE account_id=?").run(id);
+  await assert.rejects(()=>f.service.ownerCommand(owner,{accountId:id,operation:"management",
+    enabled:true,expectedRevision:updated.revision}),e=>e.code==="ACCOUNT_SUSPENDED");
+ }finally{f.close()}
+});
+test("UI shell requires V2 account entitlement and V1 legacy expiry path remains available",()=>{
+ const gate=readFileSync(new URL("../app/account-gate.tsx",import.meta.url),"utf8");
+ const api=readFileSync(new URL("../app/api/accounts/route.ts",import.meta.url),"utf8");
+ const core=readFileSync(new URL("../app/account-core.server.ts",import.meta.url),"utf8");
+ assert.match(gate,/account\.entitlementActive===true/);
+ assert.match(gate,/Thời hạn tài khoản đã hết/);
+ assert.match(api,/entitlementActive: config\.v2 \? entitlement\?\.active === true : undefined/);
+ assert.match(api,/expiresAt: config\.v2 \? \(account\.deviceApproved \? entitlement\?\.expiresAt/);
+ assert.match(core,/if \(!this\.v2Enabled && actor\.expiresAt/);
+ assert.match(core,/datetime\(e\.expires_at\)>CURRENT_TIMESTAMP/);
+});
