@@ -44,6 +44,47 @@ test("V2 account entitlement overrules expired legacy device expiry for real man
   assert.equal(data.account.onboardingStage,"active");
  }finally{f.close()}
 });
+test("V2 SQL trigger rejects suspended and expired manager entitlements even with valid legacy expiry",async()=>{
+ const f=accountStack({v2:true});
+ try {
+  const manager=await createActiveManager(f,851);
+  const learner=await f.register(852,"learner");
+  await f.flow.firstReview({kind:"manager",token:manager.token},learner.account.accountId,1);
+  await f.flow.submitProfile(learner.token,{...profile(852),expectedRevision:2});
+  const sql="INSERT INTO manager_device_assignments(target_device_id,manager_device_id,person_role) VALUES (?,?,?)";
+  const params=[learner.account.storageDeviceId,manager.account.storageDeviceId,"learner"];
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at='2099-01-01T00:00:00.000Z' WHERE device_id=?")
+    .run(manager.account.storageDeviceId);
+  f.sqlite.prepare("UPDATE account_entitlements SET state='suspended' WHERE account_id=?")
+    .run(manager.account.accountId);
+  assert.throws(()=>f.sqlite.prepare(sql).run(...params),/MANAGER_APPROVAL_FORBIDDEN/);
+  f.sqlite.prepare("UPDATE account_entitlements SET state='active',expires_at='2000-01-01T00:00:00.000Z' WHERE account_id=?")
+    .run(manager.account.accountId);
+  assert.throws(()=>f.sqlite.prepare(sql).run(...params),/MANAGER_APPROVAL_FORBIDDEN/);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS total FROM manager_device_assignments WHERE target_device_id=?")
+    .get(learner.account.storageDeviceId).total,0);
+ }finally{f.close()}
+});
+test("V2 new trigger preserves V1 legacy expiry guard for non-V2 staged intake",async()=>{
+ const f=accountStack({v2:false});
+ try{
+  const manager=await f.register(861,"manager");
+  await f.service.ownerCommand(owner,{
+    accountId:manager.account.accountId,operation:"approve-manager",expectedRevision:0
+  });
+  const learner=await f.register(862,"learner");
+  const sql="INSERT INTO manager_device_assignments(target_device_id,manager_device_id,person_role) VALUES(?,?,?)";
+  const params=[learner.account.storageDeviceId,manager.account.storageDeviceId,"learner"];
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at='2000-01-01T00:00:00.000Z' WHERE device_id=?")
+    .run(manager.account.storageDeviceId);
+  assert.throws(()=>f.sqlite.prepare(sql).run(...params),/MANAGER_APPROVAL_FORBIDDEN/);
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at='2099-01-01T00:00:00.000Z' WHERE device_id=?")
+    .run(manager.account.storageDeviceId);
+  f.sqlite.prepare(sql).run(...params);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS total FROM manager_device_assignments WHERE target_device_id=?")
+    .get(learner.account.storageDeviceId).total,1);
+ }finally{f.close()}
+});
 test("V2 suspended/expired entitlements fail closed even if legacy device expiry remains valid",async()=>{
  const f=accountStack({v2:true});
  try{
