@@ -68,6 +68,9 @@ test("V2 SQL trigger rejects suspended and expired manager entitlements even wit
 test("V2 new trigger preserves V1 legacy expiry guard for non-V2 staged intake",async()=>{
  const f=accountStack({v2:false});
  try{
+  // V1 approvalExpiry needs an explicit legacy global policy in this fixture;
+  // accountStack only seeds it automatically in V2 mode.
+  f.sqlite.prepare("INSERT OR IGNORE INTO access_automation_settings(id,default_access_days) VALUES('global',90)").run();
   const manager=await f.register(861,"manager");
   await f.service.ownerCommand(owner,{
     accountId:manager.account.accountId,operation:"approve-manager",expectedRevision:0
