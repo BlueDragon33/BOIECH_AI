@@ -62,3 +62,17 @@
   .authRoot :global(.person-role-field>div){grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.authRoot *{scroll-behavior:auto}}
+
+.authRoot .contactChoice{display:grid;gap:11px;min-width:0;margin:0;padding:0;border:0}
+.authRoot .contactChoice legend{font-weight:700;color:#264d59;margin-bottom:8px}
+.authRoot .contactChoice legend span{color:#087a90}
+.authRoot .contactMethods{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.authRoot .contactMethods button{background:#f8fcfd;color:#245362;border:1px solid #bed7de;
+ border-radius:12px;min-height:46px;box-shadow:none;font-weight:650}
+.authRoot .contactMethods button[aria-pressed=true]{background:#e0f8f4;color:#075663;border-color:#0aa695}
+.authRoot .contactChoice>label{display:grid;gap:7px;color:#264d59;font-weight:600}
+.authRoot .contactChoice input:not([type=hidden]){width:100%;box-sizing:border-box;min-height:50px;
+ border:1px solid #b7d4df;border-radius:13px;padding:12px 14px;background:#f9fcfe;
+ color:#193f4c;font:inherit}
+.authRoot .contactChoice input:focus-visible{outline:3px solid #42bdb4;outline-offset:2px}
+.authRoot .contactChoice small{color:#647e87;font-size:.8rem;line-height:1.5}
