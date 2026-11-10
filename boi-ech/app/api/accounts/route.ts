@@ -42,6 +42,10 @@ export async function POST(request: Request) {
     const peer = request.headers.get("cf-connecting-ip") ?? "unavailable-edge-peer";
     if (p.action === "legacy-challenge") return json(await createDeviceChallenge(p.deviceId, true));
     if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
+    if (config.v2 && p.action === "contact-check") {
+      const c=normalizeRegistrationContact(p.contactType,p.contactValue);
+      return json(await service.compareRegisteredContact(token,c.kind,c.value,peer));
+    }
     if (config.v2 && p.action === "recover-lost-device") return json(await service.recoverLostDevice(p,peer));
     if (config.v2 && p.action === "approve-recovered-device") return json(await service.approveRecoveredDevice(p,peer));
     // Public Bơi Ếch intake is only for learners/teachers. Manager requests must
