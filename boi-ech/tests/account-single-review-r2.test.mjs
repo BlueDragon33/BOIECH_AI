@@ -4,7 +4,8 @@ import {accountStack} from "./helpers/account-stack.mjs";
 
 const owner={role:"owner",actor:"owner@fixture.invalid"};
 const profile=n=>({familyName:"Synthetic",givenName:"Profile",personCode:"R2PROFILE"+n,
-  className:"Training class",phone:"090"+String(n).padStart(7,"0")});
+  className:"Training class",phone:"090"+String(n).padStart(7,"0"),
+  facultyUnit:"Training department",jobTitle:"Faculty member",jobPosition:"Unit manager"});
 async function approvedManager(f,n){
  const m=await f.register(n,"manager");
  const result=await f.flow.firstReview({kind:"owner",actor:owner.actor},m.account.accountId,1);
