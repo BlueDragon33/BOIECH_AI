@@ -2,9 +2,9 @@
 -- legacy device access deadline. Earlier deployed 0017 trigger remains immutable;
 -- replace it additively in 0025, preserving the V1 guard and all quota checks.
 -- No D1 binding, account data, permission, limit or environment configuration is changed.
-DROP TRIGGER IF EXISTS manager_assignment_guard;
---> statement-breakpoint
-CREATE TRIGGER manager_assignment_guard
+-- Install the complete new guard BEFORE removing the old trigger. A partial
+-- interrupted migration remains fail-closed because at least one guard exists.
+CREATE TRIGGER IF NOT EXISTS manager_assignment_v2_entitlement_guard
 BEFORE INSERT ON manager_device_assignments BEGIN
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM device_access m
@@ -56,3 +56,7 @@ BEFORE INSERT ON manager_device_assignments BEGIN
   ), CASE WHEN NEW.person_role='learner' THEN 50 ELSE 5 END)
   THEN RAISE(ABORT,'MANAGER_APPROVAL_QUOTA_REACHED') END;
 END;
+--> statement-breakpoint
+-- Drop obsolete legacy device-expiry guard LAST, after the full substitute exists.
+-- A rerun is safe. No change to legacy 0017 migration history.
+DROP TRIGGER IF EXISTS manager_assignment_guard;
