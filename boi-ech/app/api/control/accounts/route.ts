@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);
     const input = JSON.parse(raw) as Record<string, unknown>;
     const service = await accountService();
-    const v2 = (await accountConfiguration()).v2;
+    const config = await accountConfiguration();
+    const v2 = config.v2;
     const entitlement = v2 ? new AccountEntitlementService(await getCourseDatabase()) : null;
     if (entitlement) {
       if (input.action === "list-entitlements") return controlResponse({accounts:await entitlement.list(owner)},200,request);
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
       if (input.action === "set-entitlement") return controlResponse({entitlement:await entitlement.change(owner,input)},200,request);
     }
     if (v2) {
-      const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
+      const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
       if (input.action === "review-first") return controlResponse({ onboarding: await workflow.firstReview(
         {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision) },200,request);
       if (input.action === "review-changes") return controlResponse({ onboarding: await workflow.requestChanges(
