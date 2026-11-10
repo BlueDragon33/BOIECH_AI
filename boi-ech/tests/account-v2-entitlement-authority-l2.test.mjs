@@ -65,6 +65,27 @@ test("V2 SQL trigger rejects suspended and expired manager entitlements even wit
     .get(learner.account.storageDeviceId).total,0);
  }finally{f.close()}
 });
+test("V2 SQL assignment is denied if the learner is awaiting changes, not yet in second-review stage",async()=>{
+ const f=accountStack({v2:true});
+ try {
+  const manager=await createActiveManager(f,871);
+  const learner=await f.register(872,"learner");
+  await f.flow.firstReview({kind:"manager",token:manager.token},learner.account.accountId,1);
+  await f.flow.submitProfile(learner.token,{...profile(872),expectedRevision:2});
+  await f.flow.requestChanges({kind:"manager",token:manager.token},
+    learner.account.accountId,3,"Synthetic correction requested");
+  assert.equal(f.sqlite.prepare("SELECT stage FROM account_onboarding WHERE account_id=?")
+    .get(learner.account.accountId).stage,"changes_requested");
+  // The old 0025 CASE fell back to legacy manager device expiry when
+  // target stage was not profile_review, despite V2 manager entitlement.
+  const sql="INSERT INTO manager_device_assignments(target_device_id,manager_device_id,person_role) VALUES(?,?,?)";
+  assert.throws(()=>f.sqlite.prepare(sql).run(
+    learner.account.storageDeviceId,manager.account.storageDeviceId,"learner"),
+    /MANAGER_APPROVAL_FORBIDDEN/);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM manager_device_assignments WHERE target_device_id=?")
+    .get(learner.account.storageDeviceId).n,0);
+ } finally {f.close()}
+});
 test("V2 new trigger preserves V1 legacy expiry guard for non-V2 staged intake",async()=>{
  const f=accountStack({v2:false});
  try{
