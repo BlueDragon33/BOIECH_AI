@@ -55,7 +55,7 @@ function payload(n,role='learner') {return {login:'person'+n,password:'A careful
  role,privacyAccepted:true};}
 async function register(f,n,role='learner'){return f.service.register({...payload(n,role),publicKey:await key()},'peer'+n);}
 const profile=(n)=>({familyName:'Nguyễn',givenName:'Nam',personCode:'PERSON'+n,
- className:'Lớp A',phone:'090'+String(n).padStart(7,'0')});
+ className:'Lớp A',phone:'090'+String(n).padStart(7,'0'),facultyUnit:"Training Department",jobTitle:"Instructor",jobPosition:"Unit Manager"});
 async function activateManager(f,n=100){
  const m=await register(f,n,'manager');
  assert.equal((await f.flow.ownStatus(m.token)).stage,'requested');
