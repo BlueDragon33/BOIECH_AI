@@ -222,7 +222,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
               <span>{label} <span className={styles.requiredMark} aria-label="Bắt buộc">*</span></span>
               <input name={name} type={kind} required aria-required="true" minLength={name==="phone"?7:2}
-                maxLength={name==="phone"||name==="personCode"?32:name==="facultyUnit"?80:120}
+                maxLength={name==="phone"||name==="personCode"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
                 autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
                 disabled={busy}/>
