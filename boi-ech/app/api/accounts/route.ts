@@ -18,8 +18,14 @@ export async function GET(request: Request) {
       try { await service.capability(account,"registrants.read.all"); canReadRegistrants=true; }
       catch(error) { if(!(error instanceof AccountError)||error.code!=="ACCOUNT_PERMISSION_REQUIRED") throw error; }
     }
+    // Only reveal the registration CONTACT KIND (not its value), and only to the
+    // owning authenticated, trusted device. This selects the opposite UI field.
+    const primaryContact=config.v2 && account.role==="manager" && account.deviceApproved
+      ? await (await getCourseDatabase()).prepare("SELECT kind FROM account_contacts WHERE account_id=?")
+        .bind(account.accountId).first<{kind:"email"|"phone"}>() : null;
     // Only public account fields leave the server, never the principal/session hash.
     return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, account: { accountId: account.accountId, status: account.status, role: account.role,
+      primaryContactKind:primaryContact?.kind??null,
       name: config.v2 && !account.deviceApproved ? null : account.name,
       storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
       // Account-first V2 duration is independent from retired device access expiry.
