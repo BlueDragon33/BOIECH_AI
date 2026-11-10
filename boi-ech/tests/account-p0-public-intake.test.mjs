@@ -43,3 +43,26 @@ test('P0: actual HTTP registration ingress has a server-side manager deny, not U
  assert.match(legacy,/accountFirstRuntimeEnabled && personRole/);
  assert.match(legacy,/MANAGER_OWNER_INTAKE_REQUIRED/);
 });
+
+test("L2 auth UX: simple login, separate registration and contextual password recovery",()=>{
+ const gate=read('../app/account-gate.tsx');
+ const css=read('../app/account-gate.module.css');
+ assert.match(gate,/mode==="register" \? "Đăng ký"/);
+ assert.match(gate,/mode==="login"\?<div className=\{styles.authInlineLinks\}/);
+ assert.match(gate,/name="passwordConfirm"/);
+ assert.match(gate,/fields\.password!==fields\.passwordConfirm/);
+ assert.match(gate,/key=\{mode\} className=\{styles.authForm\}/);
+ assert.match(gate,/Chưa có tài khoản\?/);
+ assert.match(gate,/Đã có tài khoản\?/);
+ assert.doesNotMatch(gate,/"Đăng ký một lần"|"Chuyển hồ sơ cũ"|"Gỡ máy cũ khi đủ 3 thiết bị"/);
+ assert.match(css,/authRoot/);
+ assert.match(css,/@media\(max-width:560px\)/);
+});
+test("L2 account UX: linked devices stay in authenticated account area and manager invites retain their path",()=>{
+ const gate=read('../app/account-gate.tsx');
+ assert.match(gate,/account \? styles\.root :/);
+ assert.match(gate,/className=\{styles\.profileDevices\}/);
+ assert.match(gate,/Thu hồi thiết bị này/);
+ assert.match(gate,/managerInviteRef\.current=invite;setManagerInvite\(invite\)/);
+ assert.match(gate,/includeManager=\{false\}/);
+});
