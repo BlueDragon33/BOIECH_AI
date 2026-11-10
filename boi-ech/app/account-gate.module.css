@@ -76,3 +76,16 @@
  color:#193f4c;font:inherit}
 .authRoot .contactChoice input:focus-visible{outline:3px solid #42bdb4;outline-offset:2px}
 .authRoot .contactChoice small{color:#647e87;font-size:.8rem;line-height:1.5}
+.deviceContactCheck{display:grid;gap:12px;padding:18px;margin:16px 0;border:1px solid #0d9a96;
+ border-radius:16px;background:#eefaf8;color:#164453}
+.deviceContactCheck h2{font-size:1.13rem;margin:0}
+.deviceContactCheck p{font-size:.88rem;line-height:1.5;margin:0;color:#3d6470}
+.deviceContactCheck .contactMethods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.deviceContactCheck .contactMethods button{background:#fff;color:#064f60;border:1px solid #bad8db;
+ border-radius:11px;min-height:44px;box-shadow:none}
+.deviceContactCheck .contactMethods button[aria-pressed=true]{background:#d4f6f0;border-color:#087f80}
+.deviceContactCheck label{font-weight:650;color:#164453}
+.deviceContactCheck input:not([type=hidden]){width:100%;box-sizing:border-box;min-height:44px;
+ border-radius:10px;border:1px solid #8ab7bf;background:#fff;padding:10px;color:#164453;font:inherit}
+.deviceContactCheck input:focus-visible,.deviceContactCheck button:focus-visible{outline:3px solid #0d9a96;outline-offset:3px}
+@media(max-width:560px){.deviceContactCheck{padding:12px}.deviceContactCheck .contactMethods{grid-template-columns:1fr 1fr}}
