@@ -208,7 +208,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         </div>)}</details>
       </> : <>
 
-        <form className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
+        <form key={mode} className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
           <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy}/></label>
           <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login"||mode==="devices" ? 1 : 15} maxLength={1024} autoComplete={mode === "login"||mode==="devices" ? "current-password" : "new-password"} disabled={busy}/></label>
           {mode==="register"?<label>Nhập lại mật khẩu<input name="passwordConfirm" type="password" required minLength={15} maxLength={1024} autoComplete="new-password" disabled={busy}/></label>:null}
