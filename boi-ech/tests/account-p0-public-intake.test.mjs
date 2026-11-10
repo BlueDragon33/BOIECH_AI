@@ -31,7 +31,7 @@ test('P0: public registration UI has only learner and teacher radio; Owner manag
  assert.match(gate,/Không kết nối được máy chủ tài khoản/);
  assert.match(gate,/tránh trùng yêu cầu/);
  assert.doesNotMatch(gate,/setTimeout\([^)]*send\(/);
- assert.match(gate,/<ManagerV2ReviewPanel\/>/);
+ assert.match(gate,/<ManagerV2ReviewPanel(?:\s+singleReview=\{singleReview\})?\/>/);
 });
 test('P0: actual HTTP registration ingress has a server-side manager deny, not UI-only protection',()=>{
  const route=read('../app/api/accounts/route.ts');
