@@ -128,3 +128,15 @@
  .root .profileFooter button{width:100%;min-width:0;}
 }
 @media(prefers-reduced-motion:reduce){.root .profileForm *{transition:none;}}
+
+
+/* Account-first R5: manager lands on workspace; account security is secondary. */
+.managerAccountTools{max-width:1080px;margin:26px auto 42px;padding:12px 18px;
+ background:#f5f9fd;border:1px solid #d4e0ea;border-radius:14px;color:#15364f;}
+.managerAccountTools>summary{cursor:pointer;list-style-position:inside;font-size:.92rem;
+ font-weight:750;color:#194d71;min-height:34px;display:flex;align-items:center;gap:9px;}
+.managerAccountTools .root{margin:12px 0 0;max-width:none;background:#fff;
+ border-color:#dfebf3;box-shadow:none;}
+.managerAccountTools[open]{background:#fff;}
+.profileGrid small{display:block;font-size:.76rem;font-weight:450;color:#637c90;line-height:1.5;}
+@media(max-width:580px){.managerAccountTools{margin:16px 12px 26px;padding:12px;}}

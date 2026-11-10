@@ -417,6 +417,30 @@ export async function preparePortableAccount(accountId: string | null, claim = f
   document.documentElement.dataset.accountLocalDatabase = databaseName;
   document.documentElement.dataset.accountVideoDatabase = typeof videoScope === "string" ? videoScope : VIDEO_DB + ":" + (accountId ?? "signed-out");
 }
+/**
+ * Account-first V2 manager proof. Never registers a second legacy device.
+ * The storage anchor and account session are server-bound; challenge is signed
+ * with the same P-256 key as the canonical account's first trusted device.
+ */
+export async function portableManagerProof(storageDeviceId: string) {
+  if(!/^[a-f0-9]{64}$/.test(storageDeviceId)) throw new Error("Mã thiết bị tài khoản chưa hợp lệ.");
+  const credential=await readActiveCredential();
+  if(!credential?.privateKey) throw new Error("Thiếu khóa P-256 của tài khoản. Hãy đăng nhập lại trên thiết bị đã xác nhận.");
+  const response=await fetch("/api/accounts",{
+    method:"POST",credentials:"same-origin",cache:"no-store",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({action:"legacy-challenge",deviceId:storageDeviceId})
+  });
+  const result=await response.json() as {challenge?:string;error?:string};
+  if(!response.ok||!result.challenge) throw new Error(result.error??"Không nhận được thử thách ký thiết bị.");
+  const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},credential.privateKey,
+    new TextEncoder().encode(`boi-ech:${storageDeviceId}:${result.challenge}`));
+  let binary="";
+  new Uint8Array(signature).forEach(byte=>{binary+=String.fromCharCode(byte);});
+  return {deviceId:storageDeviceId,challenge:result.challenge,
+    signature:btoa(binary).replaceAll("+","-").replaceAll("/","_").replaceAll("=","")};
+}
+
 export async function portableCredential(withProof = false) {
   let credential = await readActiveCredential();
   if (!credential?.privateKey || !credential.publicKey) {

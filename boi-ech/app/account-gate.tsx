@@ -2,13 +2,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import RegistrantReader from "./registrant-reader";
+import ManagerWorkspace from "./manager-workspace";
 import VerifiedSyncSettings from "./verified-sync-settings";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { RegistrationRoles } from "./registration-roles";
 import ManagerV2ReviewPanel from "./manager-v2-review-panel";
-import { portableCredential, preparePortableAccount } from "./multi-account-switcher";
+import { portableCredential, portableManagerProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
+  storageDeviceId?:string|null; primaryContactKind?:"email"|"phone"|null;
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
   onboardingNote?: string|null; entitlementActive?: boolean;
   canReadRegistrants?: boolean };
@@ -147,9 +149,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         : "Thông tin liên hệ chưa khớp. Kiểm tra lại hoặc sử dụng quy trình khôi phục an toàn.");
     });
   }
+  const managerStorageId=account?.storageDeviceId??"";
+  const getManagerProof=useCallback((signal?:AbortSignal)=>{
+    signal?.throwIfAborted();
+    return portableManagerProof(managerStorageId);
+  },[managerStorageId]);
   if (!enabled || bypass) return children;
   const active = account?.status === "approved" && (!account.expiresAt || Date.parse(account.expiresAt) > observedNow)
     && (!v2 || (account.onboardingStage==="active" && account.deviceApproved===true && account.entitlementActive===true));
+  const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
+    && account.storageDeviceId && pathname==="/");
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
@@ -158,8 +167,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       setNotice(singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Hồ sơ đã gửi chờ duyệt lần thứ hai. Chưa có quyền sử dụng chức năng chính.");
     });
   }
-  return <>
-    <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
+  const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
       {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
       <h1>{account ? "Tài khoản Bơi Ếch" : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
       {!account?<p className={styles.authSubtitle}>{mode==="register" ? "Tạo tài khoản và gửi yêu cầu xét duyệt." : mode==="recover" ? "Sử dụng mã khôi phục an toàn đã được cấp." : "Đăng nhập để tiếp tục học tập và giảng dạy."}</p>:null}
@@ -210,7 +218,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <span className={styles.profileEyebrow}>BƯỚC 02 · HỒ SƠ ĐỊNH DANH</span>
             <h2>{account.role==="manager"?"Hồ sơ Cán bộ quản lý":"Hoàn thiện hồ sơ cá nhân"}</h2>
             <p>{account.role==="manager"
-              ?"Bổ sung thông tin công tác. Không cần mã cá nhân hoặc nhập lại số điện thoại; thông tin liên hệ đã có từ bước đăng ký."
+              ?"Bổ sung thông tin công tác và phương thức liên hệ còn thiếu. Không cần mã cá nhân hoặc nhập lại liên hệ đã đăng ký."
               :"Điền thông tin cần thiết để phân lớp và quản lý học tập."}</p>
           </header>
           <div className={styles.profileGrid}>
@@ -227,6 +235,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
                 disabled={busy}/>
             </label>)}
+            {account.role==="manager" && account.primaryContactKind ? <label className={styles.profileFieldWide}>
+              <span>{account.primaryContactKind==="email"?"Số điện thoại bổ sung":"Email bổ sung"} <small>(không bắt buộc)</small></span>
+              <input name="secondaryContact" type={account.primaryContactKind==="email"?"tel":"email"}
+                inputMode={account.primaryContactKind==="email"?"tel":"email"}
+                autoComplete={account.primaryContactKind==="email"?"tel":"email"}
+                maxLength={account.primaryContactKind==="email"?32:254}
+                placeholder={account.primaryContactKind==="email"?"Ví dụ: +84 912 345 678":"Ví dụ: ten@example.com"}
+                disabled={busy}/>
+              <small>Chỉ là thông tin liên hệ tự khai; không dùng thay xác minh thiết bị hoặc cấp quyền truy cập.</small>
+            </label> : null}
           </div>
           <footer className={styles.profileFooter}>
             <p>Thông tin được lưu vào hồ sơ Bơi Ếch. Chỉ tài khoản đủ quyền mới được xem hoặc xử lý.</p>
@@ -301,7 +319,14 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         </div>
         <p className={styles.authFootnote}>Hồ sơ cũ được bảo toàn. Việc liên kết tài khoản cần xác minh quyền sở hữu trước khi chuyển dữ liệu.</p>
       </>}
-    </section>
-    {ready && active && !recovery ? <div key={account.accountId}>{children}</div> : null}
+    </section>;
+  return <>
+    {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
+      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}/>
+    </div> : null}
+    {managerDashboard?<details className={styles.managerAccountTools}>
+      <summary>Tài khoản, bảo mật và đăng xuất</summary>{accountPanel}
+    </details>:accountPanel}
+    {ready && active && !recovery && !managerDashboard && account ? <div key={account.accountId}>{children}</div> : null}
   </>;
 }
