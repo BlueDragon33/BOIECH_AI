@@ -8,7 +8,7 @@ function load(path,imports={}) {
  const src=fs.readFileSync(new URL(path,import.meta.url),'utf8');
  const compiled=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const m={exports:{}};
- new Function('require','module','exports',compiled)(key=>key==='./account-entitlement.server'?load('../app/account-entitlement.server.ts'):imports[key]??realRequire(key),m,m.exports);
+ new Function('require','module','exports',compiled)(key=>key==='./account-entitlement.server'?load('../app/account-entitlement.server.ts'):key==='./account-contact.server'?load('../app/account-contact.server.ts',imports):imports[key]??realRequire(key),m,m.exports);
  return m.exports;
 }
 function fixture(){
