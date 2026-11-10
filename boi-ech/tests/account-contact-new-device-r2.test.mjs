@@ -56,7 +56,7 @@ test("R2: new-device contact form shows requested type and labels required profi
  assert.match(source,/Thiết bị mới · Đối chiếu liên hệ/);
  assert.match(source,/name="contactValue" required/);
  assert.match(source,/Để mở dữ liệu, cần xác nhận từ thiết bị tin cậy/);
- assert.match(source,/\{label\} <span aria-hidden="true">\*<\/span>/);
+ assert.match(source,/<span>\{label\} <span className=\{styles\.requiredMark\}/);
  assert.match(core,/return \{matched,deviceApproved:false,verified:false\}/);
  const compareMethod=core.slice(core.indexOf("async compareRegisteredContact"),core.indexOf("async recover("));
  assert.ok(compareMethod.length>100);
