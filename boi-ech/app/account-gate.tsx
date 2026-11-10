@@ -106,6 +106,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   function broadcast() { const c = new BroadcastChannel("boiech-account-auth"); c.postMessage("changed"); c.close(); }
   async function submit(form: HTMLFormElement) {
     const fields = Object.fromEntries(new FormData(form));
+    if(mode==="register" && fields.password!==fields.passwordConfirm){
+      setError("Mật khẩu nhập lại không khớp.");return;
+    }
+    delete fields.passwordConfirm;
     // Password is used for this HTTPS submission only, then cleared from the input.
     const password = fields.password; const field = form.elements.namedItem("password") as HTMLInputElement | null;
     if (field) field.value = "";
@@ -144,8 +148,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
   }
   return <>
-    <section className={styles.root} aria-label="Tài khoản Bơi Ếch">
-      <h1>{account ? "Tài khoản Bơi Ếch" : "Đăng nhập Bơi Ếch"}</h1>
+    <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
+      {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
+      <h1>{account ? "Tài khoản Bơi Ếch" : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
+      {!account?<p className={styles.authSubtitle}>{mode==="register" ? "Tạo tài khoản và gửi yêu cầu xét duyệt." : mode==="recover" ? "Sử dụng mã khôi phục an toàn đã được cấp." : "Đăng nhập để tiếp tục học tập và giảng dạy."}</p>:null}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {recovery && <section className={styles.recovery}><h2>Lưu mã khôi phục một lần</h2>
@@ -189,7 +195,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           <ManagerV2ReviewPanel/>
         </details>:null}
         {active&&v2?<VerifiedSyncSettings accountId={account.accountId}/>:null}
-        <details><summary>Thiết bị đã liên kết</summary>{devices.map(d=><div key={d.device_id}>
+        <details className={styles.profileDevices}><summary>Trang cá nhân · Bảo mật và thiết bị ({devices.filter(d=>!d.revoked).length}/3 đang liên kết)</summary><p>Quản lý tối đa 3 thiết bị; thu hồi thiết bị cũ tại đây. Thiết bị mới phải được xác nhận riêng.</p>{devices.map(d=><div key={d.device_id}>
           <span>{d.device_id.slice(0,12)} · {d.revoked?"Đã thu hồi":v2&&d.approved===0?"Chờ xác nhận":"Đã xác nhận"}</span>
           {v2 && !d.revoked && d.approved===0 && account.deviceApproved===true ? <form onSubmit={e=>{
             e.preventDefault();const el=e.currentTarget;const password=(new FormData(el)).get("password");
@@ -201,11 +207,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             onClick={()=>void run(async()=>{await send({action:"revoke-device",deviceId:d.device_id});await reload();broadcast();})}>Thu hồi thiết bị này</button>:null}
         </div>)}</details>
       </> : <>
-        <div className={styles.actions}>{([["login", "Đăng nhập"], ["register", "Đăng ký một lần"], ["claim", "Chuyển hồ sơ cũ"], ["recover", "Quên mật khẩu"],
-  ...(v2?[["devices","Gỡ máy cũ khi đủ 3 thiết bị"] as [Mode,string]]:[])] as [Mode,string][]).map(([id, label]) => <button type="button" key={id} aria-pressed={mode === id} disabled={busy} onClick={() => {setMode(id);setRecoveryDevices([]);}}>{label}</button>)}</div>
-        <form onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
+
+        <form className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
           <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy}/></label>
           <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login"||mode==="devices" ? 1 : 15} maxLength={1024} autoComplete={mode === "login"||mode==="devices" ? "current-password" : "new-password"} disabled={busy}/></label>
+          {mode==="register"?<label>Nhập lại mật khẩu<input name="passwordConfirm" type="password" required minLength={15} maxLength={1024} autoComplete="new-password" disabled={busy}/></label>:null}
+          {mode==="login"?<div className={styles.authInlineLinks}><button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("recover")}>Quên mật khẩu?</button></div>:null}
           {(mode === "recover" || mode==="devices") && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
           {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
             <select name="deviceId" required disabled={busy}>
@@ -221,6 +228,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
           <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
         </form>
+        <div className={styles.authFooter}>
+          {mode==="register"?<>Đã có tài khoản? <button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("login")}>Đăng nhập</button></>
+          :mode==="recover"?<>Đã nhớ mật khẩu? <button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("login")}>Trở về đăng nhập</button></>
+          :<>Chưa có tài khoản? <button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("register")}>Đăng ký</button></>}
+        </div>
+        <p className={styles.authFootnote}>Hồ sơ cũ được bảo toàn. Việc liên kết tài khoản cần xác minh quyền sở hữu trước khi chuyển dữ liệu.</p>
       </>}
     </section>
     {ready && active && !recovery ? <div key={account.accountId}>{children}</div> : null}
