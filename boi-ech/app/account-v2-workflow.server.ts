@@ -73,10 +73,23 @@ export class AccountV2Workflow {
     if (!["profile_required","changes_requested"].includes(s.stage) || !Number.isInteger(input.expectedRevision)
       || input.expectedRevision !== s.revision) bad("ACCOUNT_CAS_CONFLICT", 409);
     const family=field(input.familyName,60), given=field(input.givenName,60);
-    const code=field(input.personCode,32).toUpperCase(), className=field(input.className,80);
-    const raw=field(input.phone,32).replace(/[ ()-]/g,"");
-    const phone=raw.startsWith("+84")?"0"+raw.slice(3):raw;
-    if(!/^[A-Z0-9._-]+$/.test(code)|| !/^\+?[0-9]{7,16}$/.test(phone)) bad("PROFILE_INVALID",400);
+    const manager=s.role==="manager";
+    // Professional managers are identified by their verified account/P-256 key,
+    // never by an invented user-entered personal code.
+    const className=field(manager?input.facultyUnit:input.className,80);
+    const jobTitle=manager?field(input.jobTitle,120):"";
+    const jobPosition=manager?field(input.jobPosition,120):"";
+    const code=manager?"MGR_"+actor.storageDeviceId.slice(0,20).toUpperCase():field(input.personCode,32).toUpperCase();
+    // Contact was collected at registration. Do not ask the manager for it again,
+    // or confuse self-declared contact with a device approval proof.
+    const contact=manager?await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:string;value:string}>():null;
+    const raw=manager?(contact?.kind==="phone"?contact.value:""):field(input.phone,32);
+    const cleanPhone=raw.replace(/[ ()-]/g,"");
+    const phone=cleanPhone ? (cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone) : null;
+    // Persist SQL NULL when manager originally registered with email; empty string
+    // would collide under the legacy UNIQUE(device_access.phone) constraint.
+    if(!/^[A-Z0-9._-]+$/.test(code)|| (!manager&&!/^\+?[0-9]{7,16}$/.test(phone??""))) bad("PROFILE_INVALID",400);
     if (this.singleReview) {
       // One human review was recorded by firstReview(). User's completed profile
       // is the second *state transition*, NOT a second human approval.
@@ -102,6 +115,12 @@ export class AccountV2Workflow {
           AND first_review_by IS NOT NULL AND changes()=1`)
           .bind(actor.accountId,s.revision),
       ];
+      if(manager) statements.splice(1,0,this.db.prepare(`INSERT INTO account_manager_profiles
+        (account_id,faculty_unit,job_title,job_position)
+        SELECT ?,?,?,? WHERE changes()=1
+        ON CONFLICT(account_id) DO UPDATE SET faculty_unit=excluded.faculty_unit,
+          job_title=excluded.job_title,job_position=excluded.job_position,updated_at=CURRENT_TIMESTAMP`)
+        .bind(actor.accountId,className,jobTitle,jobPosition));
       if(s.role!=="manager"){
         statements.push(this.db.prepare(`INSERT INTO manager_device_assignments
           (target_device_id,manager_device_id,person_role)
@@ -190,6 +209,11 @@ export class AccountV2Workflow {
         WHERE device_id=? AND status='pending' AND EXISTS (
           SELECT 1 FROM account_onboarding WHERE account_id=? AND stage IN ('profile_required','changes_requested') AND revision=?)`)
         .bind(family+" "+given,family,given,code,className,phone,actor.storageDeviceId,actor.accountId,s.revision),
+      ...(manager?[this.db.prepare(`INSERT INTO account_manager_profiles
+        (account_id,faculty_unit,job_title,job_position) SELECT ?,?,?,? WHERE changes()=1
+        ON CONFLICT(account_id) DO UPDATE SET faculty_unit=excluded.faculty_unit,
+          job_title=excluded.job_title,job_position=excluded.job_position,updated_at=CURRENT_TIMESTAMP`)
+        .bind(actor.accountId,className,jobTitle,jobPosition)]:[]),
       this.db.prepare(`UPDATE account_onboarding SET stage='profile_review',revision=revision+1,
         profile_submitted_at=CURRENT_TIMESTAMP,last_review_note=NULL,updated_at=CURRENT_TIMESTAMP
         WHERE account_id=? AND revision=? AND stage IN ('profile_required','changes_requested') AND changes()=1`)
@@ -201,7 +225,7 @@ export class AccountV2Workflow {
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) bad("PROFILE_CONFLICT",409);
       throw error;
     });
-    if(Number(result[0].meta.changes)!==1 || Number(result[1].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT",409);
+    if(Number(result[0].meta.changes)!==1 || Number(result[manager?2:1].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT",409);
     return this.state(actor.accountId);
   }
   async requestChanges(authority: Authority, targetId: string, revision: unknown, reason: unknown) {

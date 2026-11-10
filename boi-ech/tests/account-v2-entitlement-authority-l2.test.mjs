@@ -5,7 +5,7 @@ import {accountStack} from "./helpers/account-stack.mjs";
 
 const owner={role:"owner",actor:"owner@fixture.invalid"};
 const profile=n=>({familyName:"Synthetic",givenName:"Tester",personCode:"ENTITLE"+n,
- className:"Lab class",phone:"090"+String(n).padStart(7,"0")});
+ className:"Lab class",phone:"090"+String(n).padStart(7,"0"),facultyUnit:"Training Department",jobTitle:"Instructor",jobPosition:"Unit Manager"});
 async function createActiveManager(f,n=801) {
  const manager=await f.register(n,"manager");
  await f.flow.firstReview({kind:"owner",actor:owner.actor},manager.account.accountId,1);

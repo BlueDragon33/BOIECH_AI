@@ -19,7 +19,7 @@ export function accountStack({v2=false,singleReview=false}={}){
  const register=async(n,role='learner')=>service.register({login:'fixture'+n,password:'Local-only unique passphrase '+n,role,personCode:'PERSON'+n,phone:'090'+String(n).padStart(7,'0'),familyName:'Synthetic',givenName:'Person',className:'Same class',privacyAccepted:true,publicKey:await key()},'fixture'+n);
  const post=(relative,payload)=>load(relative).POST(new Request('https://fixture.invalid/'+relative.replace('/route.ts',''),{method:'POST',headers:{origin:'https://fixture.invalid','content-type':'application/json'},body:JSON.stringify(payload)}));
  const get=relative=>load(relative).GET(new Request('https://fixture.invalid/'+relative.replace('/route.ts',''),{method:'GET'}));
- return{sqlite,db,service,flow,register,post,get,setCookie:value=>{cookie=value},
+ return{sqlite,db,service,flow,register,post,get,load,setCookie:value=>{cookie=value},
   setAccountMode:enabled=>{bindings.BOI_ECH_ACCOUNT_FIRST=String(enabled)},
   close:()=>sqlite.close()};
 }

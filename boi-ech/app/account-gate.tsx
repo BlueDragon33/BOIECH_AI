@@ -205,11 +205,33 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         {v2 && account.onboardingStage==="changes_requested" && account.onboardingNote ? <p role="status">
           Yêu cầu bổ sung của người xét duyệt: {account.onboardingNote}</p>:null}
         {v2 && account.deviceApproved!==false && ["profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
-          onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
-          <h2>Hoàn thiện hồ sơ cá nhân *</h2>
-          {([["familyName","Họ"],["givenName","Tên"],["personCode","Mã cá nhân"],["className","Lớp / đơn vị"],["phone","Số điện thoại"]] as const).map(([name,label])=><label key={name}>{label} <span aria-hidden="true">*</span>
-            <input name={name} required aria-required="true" maxLength={name==="phone"||name==="personCode"?32:80} disabled={busy}/></label>)}
-          <button type="submit" disabled={busy}>{singleReview?"Lưu hồ sơ và vào ứng dụng":"Gửi hồ sơ để duyệt lần hai"}</button>
+          className={styles.profileForm} onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
+          <header className={styles.profileHeading}>
+            <span className={styles.profileEyebrow}>BƯỚC 02 · HỒ SƠ ĐỊNH DANH</span>
+            <h2>{account.role==="manager"?"Hồ sơ Cán bộ quản lý":"Hoàn thiện hồ sơ cá nhân"}</h2>
+            <p>{account.role==="manager"
+              ?"Bổ sung thông tin công tác. Không cần mã cá nhân hoặc nhập lại số điện thoại; thông tin liên hệ đã có từ bước đăng ký."
+              :"Điền thông tin cần thiết để phân lớp và quản lý học tập."}</p>
+          </header>
+          <div className={styles.profileGrid}>
+            {(account.role==="manager"
+              ?([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["facultyUnit","Khoa / Đơn vị","text"],
+                ["jobTitle","Chức danh","text"],["jobPosition","Chức vụ","text"]] as const)
+              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["personCode","Mã học viên","text"],
+                ["className","Lớp / đơn vị","text"],["phone","Số điện thoại","tel"]] as const)
+            ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
+              <span>{label} <span className={styles.requiredMark} aria-label="Bắt buộc">*</span></span>
+              <input name={name} type={kind} required aria-required="true" minLength={name==="phone"?7:2}
+                maxLength={name==="phone"||name==="personCode"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
+                autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
+                placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
+                disabled={busy}/>
+            </label>)}
+          </div>
+          <footer className={styles.profileFooter}>
+            <p>Thông tin được lưu vào hồ sơ Bơi Ếch. Chỉ tài khoản đủ quyền mới được xem hoặc xử lý.</p>
+            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
+          </footer>
         </form> : null}
         <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void run(() => reload())}>Đồng bộ trạng thái</button>
           <button type="button" disabled={busy} onClick={() => void run(async () => { await send({ action: "rotate" }); await reload(); setNotice("Đã đổi vé phiên an toàn; tối đa 8 giờ kể từ khi đăng nhập."); })}>Gia hạn phiên</button>

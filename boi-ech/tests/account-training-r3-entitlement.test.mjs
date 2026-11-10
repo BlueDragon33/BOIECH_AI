@@ -11,7 +11,7 @@ const boardSql=source.match(/db\.prepare\(`(SELECT d\.device_id[\s\S]*?LIMIT 100
 assert.ok(boardSql,"read-only person status query not found");
 const owner={kind:"owner",actor:"owner@fixture.invalid"};
 const profile=n=>({familyName:"Guard",givenName:"Candidate",personCode:"R3TEST"+n,
- className:"Unit",phone:"090"+String(n).padStart(7,"0")});
+ className:"Unit",phone:"090"+String(n).padStart(7,"0"),facultyUnit:"Training Department",jobTitle:"Instructor",jobPosition:"Unit Manager"});
 async function activateManager(f,n){
  const m=await f.register(n,"manager");
  await f.flow.firstReview(owner,m.account.accountId,1);
