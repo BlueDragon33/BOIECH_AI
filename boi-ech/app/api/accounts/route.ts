@@ -9,9 +9,9 @@ const json = (data: unknown, cookie?: string) => Response.json(data, { headers: 
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
 export async function GET(request: Request) {
   try { const { service, token, config } = await accountRequest(request);
-    if (!token) return json({ enabled: true, account: null, accountV2: config.v2 });
+    if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview });
     const account = await service.session(token);
-    const onboarding = config.v2 ? await new AccountV2Workflow(await getCourseDatabase(),service).ownStatus(token) : null;
+    const onboarding = config.v2 ? await new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview).ownStatus(token) : null;
     const entitlement = config.v2 ? await new AccountEntitlementService(await getCourseDatabase()).read(account.accountId) : null;
     let canReadRegistrants=false;
     if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved&&entitlement?.active===true))) {
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       catch(error) { if(!(error instanceof AccountError)||error.code!=="ACCOUNT_PERMISSION_REQUIRED") throw error; }
     }
     // Only public account fields leave the server, never the principal/session hash.
-    return json({ enabled: true, accountV2: config.v2, account: { accountId: account.accountId, status: account.status, role: account.role,
+    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, account: { accountId: account.accountId, status: account.status, role: account.role,
       name: config.v2 && !account.deviceApproved ? null : account.name,
       storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
       // Account-first V2 duration is independent from retired device access expiry.
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       return json({ ok: true, ...safe }, sessionCookie(session));
     }
     if (config.v2) {
-      const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
+      const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
       if (p.action === "submit-profile") return json({ onboarding: await workflow.submitProfile(token,p) });
       if (p.action === "review-first") return json({ onboarding: await workflow.firstReview({kind:"manager",token},String(p.accountId),p.expectedRevision) });
