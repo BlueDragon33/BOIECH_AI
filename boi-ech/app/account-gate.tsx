@@ -25,7 +25,7 @@ async function send(body: Record<string, unknown>) {
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Chưa xác minh được thao tác tài khoản.");
-  return data as { recoveryCode?: string; accountId?: string; account?: Account;
+  return data as { recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
     devices?:Array<{device_id:string;approved:number;created_at:string}> };
 }
 function reloadPreservingPendingManagerInvite(token: string) {
@@ -138,6 +138,15 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       await reload(mode === "claim"); broadcast();
     });
   }
+  async function compareContact(form:HTMLFormElement) {
+    const fields=Object.fromEntries(new FormData(form));
+    await run(async()=>{
+      const result=await send({action:"contact-check",...fields});
+      setNotice(result.matched
+        ? "Thông tin liên hệ khớp. Thiết bị vẫn chưa được tin cậy: hãy xác nhận từ thiết bị cũ hoặc dùng mã khôi phục."
+        : "Thông tin liên hệ chưa khớp. Kiểm tra lại hoặc sử dụng quy trình khôi phục an toàn.");
+    });
+  }
   if (!enabled || bypass) return children;
   const active = account?.status === "approved" && (!account.expiresAt || Date.parse(account.expiresAt) > observedNow)
     && (!v2 || (account.onboardingStage==="active" && account.deviceApproved===true && account.entitlementActive===true));
@@ -174,12 +183,31 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             : "Chưa đủ điều kiện truy cập."
             : account.status === "pending" ? "Chờ duyệt tài khoản. Bạn chỉ cần đăng ký một lần; trạng thái sẽ dùng chung trên mọi thiết bị."
             : "Tài khoản đã bị khóa hoặc hết hạn. Liên hệ cán bộ có thẩm quyền."}</p>}
+        {v2&&account.deviceApproved===false?<form className={styles.deviceContactCheck}
+          onSubmit={e=>{e.preventDefault();void compareContact(e.currentTarget);}}>
+          <h2>Thiết bị mới · Đối chiếu liên hệ</h2>
+          <p>Nhập lại Email hoặc SĐT đã đăng ký. Đây chỉ là bước đối chiếu, không tự phê duyệt thiết bị.</p>
+          <div className={styles.contactMethods} aria-label="Loại liên hệ đã đăng ký">
+            <button type="button" aria-pressed={contactType==="email"} disabled={busy}
+              onClick={()=>setContactType("email")}>✉ Email</button>
+            <button type="button" aria-pressed={contactType==="phone"} disabled={busy}
+              onClick={()=>setContactType("phone")}>☎ Số điện thoại</button>
+          </div>
+          <input type="hidden" name="contactType" value={contactType}/>
+          <label>{contactType==="email"?"Email đã đăng ký *":"Số điện thoại đã đăng ký *"}
+            <input key={contactType} name="contactValue" required
+              type={contactType==="email"?"email":"tel"} autoComplete={contactType==="email"?"email":"tel"}
+              maxLength={254} disabled={busy}/>
+          </label>
+          <button type="submit" disabled={busy}>Đối chiếu liên hệ</button>
+          <p>Để mở dữ liệu, cần xác nhận từ thiết bị tin cậy hoặc mã khôi phục an toàn.</p>
+        </form>:null}
         {v2 && account.onboardingStage==="changes_requested" && account.onboardingNote ? <p role="status">
           Yêu cầu bổ sung của người xét duyệt: {account.onboardingNote}</p>:null}
         {v2 && account.deviceApproved!==false && ["profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
           onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
           <h2>Hoàn thiện hồ sơ cá nhân *</h2>
-          {([["familyName","Họ"],["givenName","Tên"],["personCode","Mã cá nhân"],["className","Lớp / đơn vị"],["phone","Số điện thoại"]] as const).map(([name,label])=><label key={name}>{label}
+          {([["familyName","Họ"],["givenName","Tên"],["personCode","Mã cá nhân"],["className","Lớp / đơn vị"],["phone","Số điện thoại"]] as const).map(([name,label])=><label key={name}>{label} <span aria-hidden="true">*</span>
             <input name={name} required aria-required="true" maxLength={name==="phone"||name==="personCode"?32:80} disabled={busy}/></label>)}
           <button type="submit" disabled={busy}>{singleReview?"Lưu hồ sơ và vào ứng dụng":"Gửi hồ sơ để duyệt lần hai"}</button>
         </form> : null}
