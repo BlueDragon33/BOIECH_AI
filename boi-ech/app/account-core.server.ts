@@ -395,6 +395,23 @@ export class AccountService {
     if(Number(result[0].meta.changes)!==1) fail("DEVICE_APPROVAL_CONFLICT",409);
     return {deviceId:targetId,approved:true};
   }
+  // Compare a self-declared contact on an UNTRUSTED device after password login.
+  // This proves neither mailbox/phone possession nor device ownership; it does
+  // NOT modify account_devices.approved, entitlements or session generation.
+  async compareRegisteredContact(token: string, kind: string, value: string, peer: string) {
+    if(!this.v2Enabled)fail("ACCOUNT_FEATURE_DISABLED",404);
+    const actor=await this.session(token);
+    if(actor.deviceApproved)fail("CONTACT_CHECK_NOT_REQUIRED",409);
+    await this.throttle(actor.accountId,peer,"contact-check",4);
+    const row=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:string;value:string}>();
+    const actual=digest((row?.kind??"missing")+"\u0000"+(row?.value??""));
+    const supplied=digest(kind+"\u0000"+value);
+    const matched=!!row && timingSafeEqual(Buffer.from(actual,"hex"),Buffer.from(supplied,"hex"));
+    await this.db.prepare("INSERT INTO account_audit(actor,action,target,purpose) VALUES(?,'account.contact.compared',?,?)")
+      .bind(actor.accountId,actor.deviceId,matched?"self-declared contact matched; device NOT trusted":"self-declared contact did not match").run();
+    return {matched,deviceApproved:false,verified:false};
+  }
   async recover(input: Record<string, unknown>, peer: string) {
     const login = loginName(input.login);
     await this.throttle(login, peer, "recover", 5);
