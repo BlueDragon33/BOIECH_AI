@@ -93,3 +93,31 @@ test("R4: UI never asks manager for personal code, and reset cannot run outside 
  assert.match(core,/owner.manager-intake.delete-verified/);
  assert.doesNotMatch(core,/PRAGMA foreign_keys=OFF|DROP TABLE|TRUNCATE/);
 });
+
+
+test("R4: cancelling an actual redeemed Owner invitation revokes token and frees only that test login",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const invitation=await f.service.issueManagerInvite(owner,1);
+  const keys=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
+  const publicKey=await crypto.subtle.exportKey("jwk",keys.publicKey);
+  const req={role:"manager",login:"r4cancelledinvite",password:"Very long fixture manager passphrase",
+   contactType:"email",contactValue:"test-only@fixture.invalid",
+   managerInviteToken:invitation.inviteToken,privacyAccepted:true,publicKey};
+  const m=await f.service.registerManagerWithInvite(req,"private-test-peer"),id=m.account.accountId;
+  await f.flow.firstReview({kind:"owner",actor:owner.actor},id,1);
+  const cancel=f.load("manager-local-reset.server.ts").cancelLocalPendingManager;
+  const result=await cancel(f.db,owner,id,2,id);
+  assert.equal(result.verified,true);
+  const old=f.sqlite.prepare("SELECT consumed_by,consumed_at_ms,revoked_at_ms FROM account_manager_invitations LIMIT 1").get();
+  assert.equal(old.consumed_by,null);assert.equal(old.consumed_at_ms,null);
+  assert.ok(old.revoked_at_ms>0,"old Owner invite is revoked, not reactivated");
+  await assert.rejects(()=>f.service.registerManagerWithInvite({...req,login:"anotherpending"},
+    "second-private-test-peer"),e=>e.code==="MANAGER_INVITATION_INVALID");
+  const fresh=await f.service.issueManagerInvite(owner,1);
+  const newAccount=await f.service.registerManagerWithInvite(
+    {...req,managerInviteToken:fresh.inviteToken},"new-private-test-peer");
+  assert.notEqual(newAccount.account.accountId,id);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM accounts").get().n,1);
+ }finally{f.close();}
+});
