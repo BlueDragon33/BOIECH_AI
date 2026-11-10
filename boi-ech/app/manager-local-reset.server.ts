@@ -52,7 +52,7 @@ export async function cancelLocalPendingManager(
    AND (SELECT COUNT(*) FROM account_devices WHERE account_id=?)=1
    AND NOT EXISTS(SELECT 1 FROM manager_device_assignments
      WHERE target_device_id=? OR manager_device_id=?)`)
-    .bind(id,expectedRevision,row.stage,id,id,id,id,id,id,id,device,device),
+    .bind(id,expectedRevision,row.stage,id,id,id,id,id,id,id,id,device,device),
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
    SELECT ?,'owner.manager-intake.cancelled',?,
     CASE WHEN changes()=1 THEN 'local test intake reset by exact id and CAS' ELSE NULL END`)
