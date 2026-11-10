@@ -38,7 +38,7 @@ jobs:
       BOI_ECH_BASE_URL: ${{ vars.BOI_ECH_PREVIEW_ORIGIN }}
       CONTROL_OWNER_EMAILS: ${{ vars.CONTROL_OWNER_EMAILS }}
       APPLICATION_MANAGEMENT_ACCESS_MODE: standalone
-      APPLICATION_MANAGEMENT_BUILD_REVISION: 070fc3f156052384fffdd6ef1c5da5420f9a56c3
+      APPLICATION_MANAGEMENT_BUILD_REVISION: 7f2e2e40fdae99cc483112c5eba94c59df74a4ec
       PREVIEW_BRIDGE_CONFIRMATION: ${{ inputs.bridge_confirmation }}
 
     steps:
@@ -57,12 +57,35 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: BlueDragon33/Application-Management
-          ref: 070fc3f156052384fffdd6ef1c5da5420f9a56c3
+          ref: 7f2e2e40fdae99cc483112c5eba94c59df74a4ec
           path: application-management-preview-source
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: "22.13.0"
+
+      - name: Fail-closed paired Account-first V2 source contract (before Preview writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const boi = fs.readFileSync("boi-ech/app/api/control/v2/account-summary/route.ts", "utf8");
+          const app = fs.readFileSync("application-management-preview-source/app/api/apps/boi-ech/access/route.ts", "utf8");
+          const view = fs.readFileSync("application-management-preview-source/app/boi-access-view.tsx", "utf8");
+          const contract = 'boi-account-summary.v2';
+          if (!boi.includes('contract: "' + contract + '"') ||
+              !boi.includes('export async function GET(') ||
+              !boi.includes('requireControlService(request)') ||
+              boi.includes('export async function POST(') ||
+              !app.includes('/api/control/v2/account-summary') ||
+              !app.includes('result.payload.contract !== "' + contract + '"') ||
+              !view.includes('data.contract === "' + contract + '"') ||
+              !view.includes('data.verified !== true')) {
+            throw new Error("Paired V2 source contract mismatch. STOP before D1 migration or Preview deployment.");
+          }
+          console.log("Paired BOIECH_AI x Application-Management V2 Preview source contract PASS (no remote writes).");
+          NODE
 
       - name: Detect preview readiness
         id: config
@@ -98,7 +121,7 @@ jobs:
       - name: Package App Preview
         working-directory: application-management-preview-source
         env:
-          GITHUB_SHA: 070fc3f156052384fffdd6ef1c5da5420f9a56c3
+          GITHUB_SHA: 7f2e2e40fdae99cc483112c5eba94c59df74a4ec
         run: npm run cloudflare:preview:prepare
 
       - name: Confirm approved D1 identities and retained access protection without remote writes

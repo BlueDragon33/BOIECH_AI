@@ -67,7 +67,7 @@ function view(row: Row): AccountView {
     className: row.class_name, expiresAt: row.access_expires_at };
 }
 export class AccountService {
-  constructor(private db: D1Database, private now: () => number = Date.now, private v2Enabled = false) {}
+  constructor(private db: D1Database, private now: () => number = Date.now, private v2Enabled = false, private singleReview = false) {}
   private audit(actor: string, action: string, target: string, purpose: string, conditional = false) {
     return this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,?${conditional ? " WHERE changes()=1" : ""}`)
       .bind(actor, action, target, purpose);
@@ -99,8 +99,28 @@ export class AccountService {
       entitlement,
       permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
-        (!row.access_expires_at || Date.parse(row.access_expires_at) > this.now()) && (!this.v2Enabled || entitlement?.active === true), expiresAt: p.expires_at })) };
+        (this.v2Enabled || !row.access_expires_at || Date.parse(row.access_expires_at) > this.now()) && (!this.v2Enabled || entitlement?.active === true), expiresAt: p.expires_at })) };
   }
+  async ownerManagerPage(after: unknown = "", pageLimit: unknown = 40) {
+    if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED",409);
+    if(typeof after !== "string" || (after && !ACCOUNT.test(after))
+      || !Number.isInteger(pageLimit) || (pageLimit as number)<1 || (pageLimit as number)>50)
+      fail("ACCOUNT_INPUT",400);
+    const limit=pageLimit as number;
+    const result=await this.db.prepare(`SELECT a.account_id AS accountId,
+      a.revision AS accountRevision,d.person_role AS role,d.learner_name AS name,
+      d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision
+      FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+      JOIN account_onboarding o ON o.account_id=a.account_id
+      WHERE d.person_role='manager' AND a.account_id>?
+      ORDER BY a.account_id LIMIT ?`).bind(after,limit+1)
+      .all<{accountId:string;accountRevision:number;role:string;name:string|null;
+        status:string;onboardingStage:string;onboardingRevision:number}>();
+    const rows=result.results??[],hasMore=rows.length>limit,managers=rows.slice(0,limit);
+    return {contract:"boi-manager-intake.v2" as const,verified:true,
+      managers,nextCursor:hasMore?managers[managers.length-1].accountId:null};
+  }
+
   async ownerList() {
     const result = await this.db.prepare(`SELECT a.account_id FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       WHERE d.person_role='manager' ORDER BY a.account_id LIMIT 101`).all<{ account_id: string }>();
@@ -186,7 +206,52 @@ export class AccountService {
     if (issued.deviceId !== keyId) fail("DEVICE_KEY_INVALID", 400);
     return { ...issued, recoveryCode };
   }
-  private async registerV2(input: Record<string, unknown>, login: string) {
+  // One-use secret only leaves this method once. Store/audit its digest, never plaintext.
+  async issueManagerInvite(owner: { actor: string; role: string }, expectedRevision: unknown) {
+    if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED", 409);
+    if (owner.role !== "owner" || !owner.actor || owner.actor === "system") fail("OWNER_REQUIRED");
+    if (!Number.isSafeInteger(expectedRevision) || (expectedRevision as number) < 1) fail("ACCOUNT_INPUT", 400);
+    const token = random(), inviteHash = digest(token), now = this.now(), expires = now + 24 * 60 * 60 * 1000;
+    try {
+      await this.db.batch([
+        this.db.prepare(`INSERT INTO account_manager_invitations(invite_hash,issued_by,issued_at_ms,expires_at_ms)
+          SELECT ?,?,?,? WHERE EXISTS(
+            SELECT 1 FROM account_admission_limits WHERE person_role='manager' AND revision=?
+          ) AND (SELECT COUNT(*) FROM account_manager_invitations
+            WHERE consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?)<20`)
+          .bind(inviteHash,owner.actor,now,expires,expectedRevision as number,now),
+        // A failed conditional insert aborts the whole batch via the NOT NULL audit column.
+        this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+          SELECT ?,'owner.manager-invite.issued',?,
+          CASE WHEN changes()=1 THEN 'one-use invitation; expires in 24 hours' ELSE NULL END`)
+          .bind(owner.actor,inviteHash),
+      ]);
+    } catch { fail("MANAGER_INVITATION_CONFLICT", 409); }
+    const readback=await this.db.prepare(`SELECT issued_by,expires_at_ms,consumed_at_ms
+      FROM account_manager_invitations WHERE invite_hash=?`)
+      .bind(inviteHash).first<{issued_by:string;expires_at_ms:number;consumed_at_ms:number|null}>();
+    if(!readback || readback.issued_by!==owner.actor || readback.expires_at_ms!==expires
+      || readback.consumed_at_ms!==null) fail("ACCOUNT_READBACK_FAILED", 503);
+    return { inviteToken:token, expiresAt:new Date(expires).toISOString(), verified:true };
+  }
+
+  async registerManagerWithInvite(input: Record<string,unknown>, peer:string) {
+    if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED", 409);
+    if(input.role !== "manager" || input.privacyAccepted!==true) fail("ACCOUNT_INPUT", 400);
+    const login=loginName(input.login);
+    await this.throttle(login,peer,"manager-register",3);
+    const secret=input.managerInviteToken;
+    if(typeof secret!=="string" || !/^[a-f0-9]{64}$/.test(secret))
+      fail("MANAGER_INVITATION_INVALID",409);
+    const inviteHash=digest(secret),now=this.now();
+    const available=await this.db.prepare(`SELECT 1 AS valid FROM account_manager_invitations
+      WHERE invite_hash=? AND consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?`)
+      .bind(inviteHash,now).first<{valid:number}>();
+    if(!available) fail("MANAGER_INVITATION_INVALID",409);
+    return this.registerV2(input,login,inviteHash);
+  }
+
+  private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string) {
     const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
     const verifier = await hashPassword(input.password), accountId = "acc_" + random();
     const storageId = random(), recoveryCode = random();
@@ -200,9 +265,26 @@ export class AccountService {
         this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
         this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
           .bind(accountId,verifier,digest(recoveryCode)),
-        this.audit(accountId, "registration.requested.v2", accountId, "profile only after first review"),
+        ...(typeof input.contactType==="string" && typeof input.contactValue==="string" ? [
+          this.db.prepare("INSERT INTO account_contacts(account_id,kind,value) VALUES(?,?,?)")
+            .bind(accountId,input.contactType,input.contactValue),
+        ] : []),
+        ...(inviteHash ? [
+          this.db.prepare(`UPDATE account_manager_invitations
+            SET consumed_by=?,consumed_at_ms=?,revision=revision+1
+            WHERE invite_hash=? AND consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?`)
+            .bind(accountId,this.now(),inviteHash,this.now()),
+          this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+            SELECT ?,'manager.invite.redeemed',?,
+            CASE WHEN changes()=1 THEN 'single-use token consumed atomically during registration' ELSE NULL END`)
+            .bind(accountId,inviteHash),
+        ] : []),
+        this.audit(accountId, "registration.requested.v2", accountId,
+          inviteHash ? "owner invitation; account remains pending" : "profile only after first review"),
       ]);
     } catch(error) {
+      if(inviteHash && error instanceof Error && /NOT NULL.*purpose|MANAGER_INVITATION/i.test(error.message))
+        fail("MANAGER_INVITATION_INVALID",409);
       if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED",409);
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
@@ -250,7 +332,8 @@ export class AccountService {
         await new AccountEntitlementService(this.db,this.now).assertActive(actor.accountId);
       }
       if (actor.status !== "approved") fail(actor.status === "blocked" ? "ACCOUNT_BLOCKED" : "ACCOUNT_PENDING");
-      if (actor.expiresAt && !(Date.parse(actor.expiresAt) > this.now())) fail("ACCOUNT_EXPIRED");
+      // V2 entitlement, not the retired device expiry, owns account duration.
+      if (!this.v2Enabled && actor.expiresAt && !(Date.parse(actor.expiresAt) > this.now())) fail("ACCOUNT_EXPIRED");
     }
     return actor;
   }
@@ -311,6 +394,23 @@ export class AccountService {
     const result=await this.db.batch(statements);
     if(Number(result[0].meta.changes)!==1) fail("DEVICE_APPROVAL_CONFLICT",409);
     return {deviceId:targetId,approved:true};
+  }
+  // Compare a self-declared contact on an UNTRUSTED device after password login.
+  // This proves neither mailbox/phone possession nor device ownership; it does
+  // NOT modify account_devices.approved, entitlements or session generation.
+  async compareRegisteredContact(token: string, kind: string, value: string, peer: string) {
+    if(!this.v2Enabled)fail("ACCOUNT_FEATURE_DISABLED",404);
+    const actor=await this.session(token);
+    if(actor.deviceApproved)fail("CONTACT_CHECK_NOT_REQUIRED",409);
+    await this.throttle(actor.accountId,peer,"contact-check",4);
+    const row=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:string;value:string}>();
+    const actual=digest((row?.kind??"missing")+"\u0000"+(row?.value??""));
+    const supplied=digest(kind+"\u0000"+value);
+    const matched=!!row && timingSafeEqual(Buffer.from(actual,"hex"),Buffer.from(supplied,"hex"));
+    await this.db.prepare("INSERT INTO account_audit(actor,action,target,purpose) VALUES(?,'account.contact.compared',?,?)")
+      .bind(actor.accountId,actor.deviceId,matched?"self-declared contact matched; device NOT trusted":"self-declared contact did not match").run();
+    return {matched,deviceApproved:false,verified:false};
   }
   async recover(input: Record<string, unknown>, peer: string) {
     const login = loginName(input.login);
@@ -403,11 +503,20 @@ export class AccountService {
     return {ok:true,deviceId:target,recoveryCode:nextCode};
   }
   async capability(actor: Principal, scope: string) {
+    // Public account snapshots can call capability() with a session() principal.
+    // Enforce V2 onboarding/device/entitlement even on that path.
+    if (this.v2Enabled) {
+      if (!actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
+      const row = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?")
+        .bind(actor.accountId).first<{stage:string}>();
+      if (row?.stage !== "active") fail("ACCOUNT_ONBOARDING_REQUIRED");
+      await new AccountEntitlementService(this.db,this.now).assertActive(actor.accountId);
+    }
     // Read owning rows freshly, not a role or a client-provided capability claim.
     const row = await this.db.prepare(`SELECT 1 AS allowed FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id
       WHERE a.account_id=? AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
-      AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      ${this.v2Enabled ? "AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)" : "AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)"}
       AND p.scope=? AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?)`)
       .bind(actor.accountId, scope, this.now()).first<{ allowed: number }>();
     if (!row) fail("ACCOUNT_PERMISSION_REQUIRED");
@@ -418,12 +527,16 @@ export class AccountService {
     if (row.person_role !== "manager") fail("TARGET_ROLE_FORBIDDEN");
     if (!Number.isSafeInteger(input.expectedRevision) || row.revision !== input.expectedRevision) fail("ACCOUNT_CAS_CONFLICT", 409);
     const op = input.operation;
+    if (this.v2Enabled && this.singleReview && op === "approve-manager") fail("ACCOUNT_REVIEW_SUPERSEDED",409);
     if (!["approve-manager", "management", "read-all"].includes(String(op))) fail("ACCOUNT_INPUT", 400);
     const enabled = op === "approve-manager" ? true : input.enabled;
     if (typeof enabled !== "boolean") fail("ACCOUNT_INPUT", 400);
     const expiry = input.expiresAt === undefined || input.expiresAt === null ? null : input.expiresAt;
     if (expiry !== null && (typeof expiry !== "number" || !Number.isSafeInteger(expiry) || expiry <= this.now() || expiry > this.now() + 366 * 86400000)) fail("ACCOUNT_INPUT", 400);
-    if (op === "approve-manager" ? (row.status !== "pending" || row.payment_status !== "unassigned" || row.access_group !== "unassigned") : enabled && (row.status !== "approved" || (row.access_expires_at && !(Date.parse(row.access_expires_at) > this.now())))) fail("ACCOUNT_STATE_CONFLICT", 409);
+    if (op === "approve-manager" ? (row.status !== "pending" || row.payment_status !== "unassigned" || row.access_group !== "unassigned") : enabled && (row.status !== "approved" || (!this.v2Enabled && row.access_expires_at && !(Date.parse(row.access_expires_at) > this.now())))) fail("ACCOUNT_STATE_CONFLICT", 409);
+    if (this.v2Enabled && enabled && op !== "approve-manager") {
+      await new AccountEntitlementService(this.db,this.now).assertActive(id);
+    }
     if (this.v2Enabled && op === "approve-manager") {
       const step = await this.db.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").bind(id).first<{stage:string}>();
       if (step?.stage !== "profile_review") fail("ACCOUNT_ONBOARDING_REQUIRED",409);
@@ -452,6 +565,8 @@ export class AccountService {
       VALUES(?,?,?,?,?) ON CONFLICT(account_id,scope) DO UPDATE SET enabled=excluded.enabled,expires_at=excluded.expires_at,granted_by=excluded.granted_by`)
       .bind(id, scope, enabled ? 1 : 0, expiry, owner.actor));
     try { await this.db.batch(statements); } catch (error) {
+      if (error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED", 409);
+      if (error instanceof Error && error.message.includes("ACCOUNT_ROLE_OR_POLICY_MISSING")) fail("ACCOUNT_POLICY_UNAVAILABLE", 503);
       if (error instanceof Error && /NOT NULL.*purpose/.test(error.message)) fail("ACCOUNT_CAS_CONFLICT", 409);
       throw error;
     }
@@ -459,17 +574,29 @@ export class AccountService {
     if (readback.revision !== row.revision + 1 || scopes.some(scope => {const p=readback.permissions.find(p=>p.scope===scope);return p?.configured!==enabled||p.expiresAt!==expiry;})) fail("ACCOUNT_READBACK_FAILED", 503);
     return readback;
   }
-  async reviewBoard(token: string) {
+  async reviewBoard(token: string, after: unknown = "", pageLimit: unknown = 50) {
+    if(this.v2Enabled && (typeof after!=="string" || (after && !ACCOUNT.test(after))
+      || !Number.isInteger(pageLimit) || (pageLimit as number)<1 || (pageLimit as number)>50))
+      fail("ACCOUNT_QUERY_LIMIT",400);
     const actor = await this.authorize(token);
     await this.capability(actor, "manager.approve.registration");
     const onboardingSelect = this.v2Enabled ? ",o.stage AS onboarding_stage,o.revision AS onboarding_revision,o.first_review_by" : "";
     const onboardingJoin = this.v2Enabled ? " LEFT JOIN account_onboarding o ON o.account_id=a.account_id" : "";
+    // Anonymous-profile requested rows form a bounded shared intake pool; after first review
+    // only the accepting manager may read the applicant's profile during second review.
+    const scopePending = this.v2Enabled ? " AND (o.stage='requested' OR o.first_review_by=?)" : "";
     const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect} FROM accounts a
       JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
-      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned' AND m.target_device_id IS NULL)
-       OR m.manager_device_id=? ORDER BY a.account_id LIMIT 201`).bind(actor.storageDeviceId)
+      WHERE ((d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
+        AND m.target_device_id IS NULL${scopePending})
+       OR m.manager_device_id=?)${this.v2Enabled ? " AND a.account_id>?" : ""}
+       ORDER BY a.account_id LIMIT ${this.v2Enabled ? "?" : "201"}`)
+       .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId,
+         ...(this.v2Enabled ? [after,(pageLimit as number)+1] : []))
        .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
-    if ((result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
+    if (!this.v2Enabled && (result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
+    const allRows=result.results??[],limit=this.v2Enabled?pageLimit as number:200;
+    const devices=allRows.slice(0,limit),hasMore=this.v2Enabled && allRows.length>limit;
     const counts = await this.db.prepare(`SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
       JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
       AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP) GROUP BY d.person_role`).all<{ person_role: string; used: number }>();
@@ -478,7 +605,8 @@ export class AccountService {
     return { managerDeviceId: actor.storageDeviceId, quotas: {
       learner: { limit: limits.learner_limit, used: counts.results?.find(c => c.person_role === "learner")?.used ?? 0 },
       teacher: { limit: limits.teacher_limit, used: counts.results?.find(c => c.person_role === "teacher")?.used ?? 0 },
-    }, devices: (result.results ?? []).map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
+    }, nextCursor:hasMore?devices[devices.length-1].account_id:null,
+    devices: devices.map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
       deviceCode: r.person_code, role: r.person_role, name: r.learner_name, personCode: r.person_code, className: r.class_name,
       status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.person_code&&r.learner_name&&r.phone&&r.class_name) : true,
       onboardingStage: r.onboarding_stage??null, onboardingRevision: r.onboarding_revision??null,
@@ -491,6 +619,7 @@ export class AccountService {
     const target = await this.row(targetId);
     if (!["learner", "teacher"].includes(target.person_role) || actor.accountId === targetId) fail("TARGET_ROLE_FORBIDDEN");
     if (!["approve", "block"].includes(action)) fail("ACCOUNT_INPUT", 400);
+    if (this.v2Enabled && this.singleReview && action === "approve") fail("ACCOUNT_REVIEW_SUPERSEDED",409);
     if (this.v2Enabled && action === "approve") {
       const step=await this.db.prepare("SELECT stage,first_review_by FROM account_onboarding WHERE account_id=?")
         .bind(targetId).first<{stage:string;first_review_by:string|null}>();
@@ -498,7 +627,8 @@ export class AccountService {
     }
     const guard = `EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id WHERE a.account_id=? AND d.person_role='manager'
-      AND d.status='approved' AND d.management_enabled=1 AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+      AND d.status='approved' AND d.management_enabled=1
+      ${this.v2Enabled ? "AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)" : "AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)"}
       AND p.scope='manager.approve.registration' AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?))`;
     const statements: D1PreparedStatement[] = [];
     if (action === "approve") {
@@ -523,6 +653,8 @@ export class AccountService {
     statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,CASE WHEN changes()=1 THEN ? ELSE NULL END`)
       .bind(actor.accountId, "registration." + action, targetId, "manager registration review"));
     try { await this.db.batch(statements); } catch (error) {
+      if (error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED", 409);
+      if (error instanceof Error && error.message.includes("ACCOUNT_ROLE_OR_POLICY_MISSING")) fail("ACCOUNT_POLICY_UNAVAILABLE", 503);
       if (error instanceof Error && /QUOTA/.test(error.message)) fail("ACCOUNT_QUOTA_REACHED", 409);
       if (error instanceof Error && /constraint|MANAGER_/i.test(error.message)) fail("ACCOUNT_REVIEW_CONFLICT", 409);
       throw error;
@@ -541,7 +673,8 @@ export class AccountService {
     const guard = `EXISTS(SELECT 1 FROM account_manager_permissions p JOIN accounts m ON m.account_id=p.account_id
       JOIN device_access md ON md.device_id=m.storage_device_id WHERE p.account_id=? AND p.scope='registrants.read.all'
       AND p.enabled=1 AND (p.expires_at IS NULL OR p.expires_at>?) AND md.person_role='manager' AND md.status='approved'
-      AND md.management_enabled=1 AND (md.access_expires_at IS NULL OR datetime(md.access_expires_at)>CURRENT_TIMESTAMP))`;
+      AND md.management_enabled=1
+      ${this.v2Enabled ? "AND EXISTS(SELECT 1 FROM account_entitlements e JOIN account_onboarding o ON o.account_id=e.account_id WHERE e.account_id=m.account_id AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP AND o.stage='active')" : "AND (md.access_expires_at IS NULL OR datetime(md.access_expires_at)>CURRENT_TIMESTAMP)"})`;
     const query = `SELECT a.account_id,d.learner_name,d.person_role,d.person_code,d.class_name,d.status FROM accounts a
       JOIN device_access d ON d.device_id=a.storage_device_id WHERE ${guard} ORDER BY a.account_id LIMIT ? OFFSET ?`;
     const result = await this.db.batch([

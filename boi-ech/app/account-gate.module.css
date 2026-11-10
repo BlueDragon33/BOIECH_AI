@@ -1,1 +1,91 @@
 .root{max-width:760px;margin:24px auto;padding:24px;background:#fff;color:#153344;border:1px solid #78909c;border-radius:16px;line-height:1.5}.root h1{font-size:1.4rem}.root form{display:grid;gap:14px}.root label{display:grid;gap:6px}.root input{min-height:44px;padding:10px;border:1px solid #607d8b;border-radius:8px;font:inherit;color:#153344;background:#fff}.root input[type=checkbox]{width:24px;min-height:24px}.root button{min-height:44px;padding:10px 16px;border:1px solid #07535b;border-radius:8px;background:#07535b;color:white;font:inherit;cursor:pointer}.root button:disabled{opacity:.65;cursor:wait}.root button:focus-visible,.root input:focus-visible{outline:3px solid #b65100;outline-offset:3px}.root button[aria-pressed=true]{background:#123443}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.error{color:#9f1717;font-weight:600}.pending{background:#fff3d5;padding:14px;color:#503600}.recovery{padding:16px;background:#edf7f5;border:2px solid #07535b}.recovery code{display:block;overflow-wrap:anywhere;margin:14px 0;font-size:1rem}.root details p{display:flex;gap:12px;align-items:center;flex-wrap:wrap}@media(max-width:600px){.root{margin:12px;padding:16px}.actions button{flex:1 1 40%}}
+
+/* Account-first auth UI: isolated to unauthenticated screens; in-account tools remain unchanged. */
+.authRoot{
+  position:relative;isolation:isolate;max-width:520px;margin:clamp(30px,7vh,90px) auto 45px;
+  padding:clamp(24px,4.5vw,46px);border:1px solid #d4e8ed;border-radius:26px;
+  background:linear-gradient(145deg,#ffffff 10%,#f7fcfd 84%);color:#173a48;
+  box-shadow:0 28px 76px #04445a29,0 6px 22px #06576a14;overflow:visible;
+}
+.authRoot::before{
+  content:"";position:absolute;z-index:-1;inset:14px -12px -14px 12px;
+  border-radius:27px;background:linear-gradient(145deg,#93e6ed77,#03668135);
+  transform:rotate(2.4deg);box-shadow:0 16px 36px #05536b18;pointer-events:none;
+}
+.authRoot::after{
+  content:"";position:absolute;inset:0 0 auto auto;width:175px;height:105px;
+  background:radial-gradient(ellipse at top right,#63d5d42e,transparent 70%);
+  border-radius:inherit;pointer-events:none;
+}
+.authRegister{max-width:610px;}
+.authBrand{display:flex;align-items:center;flex-wrap:wrap;gap:8px 11px;margin-bottom:24px}
+.authBrand strong{font-size:1.72rem;color:#064651;letter-spacing:-.04em}
+.authBrand small{width:100%;color:#577785;font-size:.68rem;letter-spacing:.065em;font-weight:650}
+.authMark{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;color:white;
+  background:linear-gradient(135deg,#13bda9,#08667b);box-shadow:0 4px 13px #0b9b9b31}
+.authRoot h1{margin:0 0 5px;font-size:clamp(1.9rem,4.7vw,2.45rem);line-height:1.14;
+  letter-spacing:-.045em;color:#073d49}
+.authSubtitle{margin:0 0 24px;color:#55717f;font-size:.96rem}
+.authRoot .authForm{display:grid;gap:16px}
+.authRoot .authForm>label{display:grid;gap:7px;color:#264d59;font-weight:600}
+.authRoot .authForm input:not([type=checkbox]),.authRoot .authForm select{
+  width:100%;min-height:50px;padding:12px 14px;border-radius:13px;
+  background:#f9fcfe;border:1px solid #b7d4df;color:#193f4c;outline:none;font:inherit;
+  box-shadow:0 2px 4px #0a5d6410;box-sizing:border-box;
+}
+.authRoot .authForm input:focus-visible,.authRoot .authForm select:focus-visible{
+  outline:3px solid #42bdb4;outline-offset:2px;border-color:#077f91}
+.authRoot .authInlineLinks{display:flex;justify-content:flex-end;margin-top:-7px}
+.authRoot .authTextLink{border:0;background:transparent;padding:3px;min-height:auto;border-radius:4px;
+  color:#087a90;text-decoration:underline;text-underline-offset:3px;font-weight:700;box-shadow:none}
+.authRoot .authTextLink:hover{color:#064956;background:transparent}
+.authRoot .authForm>button[type=submit]{min-height:52px;margin-top:3px;border:0;
+  border-radius:13px;color:#fff;font-weight:750;font-size:1.04rem;
+  background:linear-gradient(115deg,#05b7a3,#075369);box-shadow:0 11px 20px #007c871f}
+.authFooter{display:flex;justify-content:center;gap:7px;align-items:center;flex-wrap:wrap;
+  padding-top:15px;color:#4c6976;font-size:.94rem}
+.authFootnote{border-top:1px solid #d7e7eb;padding-top:13px;margin:19px 0 0;
+  color:#718b94;font-size:.79rem;line-height:1.5;text-align:center}
+.authRoot :global(.person-role-field){border:0;padding:5px 0;margin:0;min-width:0}
+.authRoot :global(.person-role-field legend){font-weight:750;color:#074d58;margin-bottom:9px}
+.authRoot :global(.person-role-field>div){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.authRoot :global(.person-role-field label){display:flex;gap:9px;align-items:center;
+  padding:12px;border:1px solid #c5dce4;border-radius:14px;cursor:pointer;background:#fbfdfe}
+.authRoot :global(.person-role-field label.selected){background:#e1f8f4;border-color:#0daea2}
+.authRoot :global(.person-role-field small){display:block;font-size:.74rem;color:#60808a}
+.authRoot :global(.person-role-field input){width:19px;min-height:19px;accent-color:#099c91}
+.profileDevices{margin-top:14px;padding:12px;border:1px solid #c8dee4;border-radius:12px}
+.profileDevices summary{cursor:pointer;font-weight:700}
+@media(max-width:560px){
+  .authRoot{margin:16px 12px 30px;padding:22px;border-radius:20px}
+  .authRoot::before{inset:10px -5px -9px 5px;border-radius:20px;transform:rotate(1deg)}
+  .authRoot :global(.person-role-field>div){grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){.authRoot *{scroll-behavior:auto}}
+
+.authRoot .contactChoice{display:grid;gap:11px;min-width:0;margin:0;padding:0;border:0}
+.authRoot .contactChoice legend{font-weight:700;color:#264d59;margin-bottom:8px}
+.authRoot .contactChoice legend span{color:#087a90}
+.authRoot .contactMethods{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.authRoot .contactMethods button{background:#f8fcfd;color:#245362;border:1px solid #bed7de;
+ border-radius:12px;min-height:46px;box-shadow:none;font-weight:650}
+.authRoot .contactMethods button[aria-pressed=true]{background:#e0f8f4;color:#075663;border-color:#0aa695}
+.authRoot .contactChoice>label{display:grid;gap:7px;color:#264d59;font-weight:600}
+.authRoot .contactChoice input:not([type=hidden]){width:100%;box-sizing:border-box;min-height:50px;
+ border:1px solid #b7d4df;border-radius:13px;padding:12px 14px;background:#f9fcfe;
+ color:#193f4c;font:inherit}
+.authRoot .contactChoice input:focus-visible{outline:3px solid #42bdb4;outline-offset:2px}
+.authRoot .contactChoice small{color:#647e87;font-size:.8rem;line-height:1.5}
+.deviceContactCheck{display:grid;gap:12px;padding:18px;margin:16px 0;border:1px solid #0d9a96;
+ border-radius:16px;background:#eefaf8;color:#164453}
+.deviceContactCheck h2{font-size:1.13rem;margin:0}
+.deviceContactCheck p{font-size:.88rem;line-height:1.5;margin:0;color:#3d6470}
+.deviceContactCheck .contactMethods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.deviceContactCheck .contactMethods button{background:#fff;color:#064f60;border:1px solid #bad8db;
+ border-radius:11px;min-height:44px;box-shadow:none}
+.deviceContactCheck .contactMethods button[aria-pressed=true]{background:#d4f6f0;border-color:#087f80}
+.deviceContactCheck label{font-weight:650;color:#164453}
+.deviceContactCheck input:not([type=hidden]){width:100%;box-sizing:border-box;min-height:44px;
+ border-radius:10px;border:1px solid #8ab7bf;background:#fff;padding:10px;color:#164453;font:inherit}
+.deviceContactCheck input:focus-visible,.deviceContactCheck button:focus-visible{outline:3px solid #0d9a96;outline-offset:3px}
+@media(max-width:560px){.deviceContactCheck{padding:12px}.deviceContactCheck .contactMethods{grid-template-columns:1fr 1fr}}

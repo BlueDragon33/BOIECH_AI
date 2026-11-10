@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);
     const input = JSON.parse(raw) as Record<string, unknown>;
     const service = await accountService();
-    const v2 = (await accountConfiguration()).v2;
+    const config = await accountConfiguration();
+    const v2 = config.v2;
     const entitlement = v2 ? new AccountEntitlementService(await getCourseDatabase()) : null;
     if (entitlement) {
       if (input.action === "list-entitlements") return controlResponse({accounts:await entitlement.list(owner)},200,request);
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
       if (input.action === "set-entitlement") return controlResponse({entitlement:await entitlement.change(owner,input)},200,request);
     }
     if (v2) {
-      const workflow = new AccountV2Workflow(await getCourseDatabase(),service);
+      const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
       if (input.action === "review-first") return controlResponse({ onboarding: await workflow.firstReview(
         {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision) },200,request);
       if (input.action === "review-changes") return controlResponse({ onboarding: await workflow.requestChanges(
@@ -33,6 +34,12 @@ export async function POST(request: Request) {
     }
     if (input.action === "capacity") return controlResponse(await readAccountCapacity(await getCourseDatabase(), owner), 200, request);
     if (input.action === "set-capacity") return controlResponse(await changeAccountCapacity(await getCourseDatabase(), owner, input), 200, request);
+    // Owner-only canonical Account-first V2 intake; this contract must not report
+    // an empty verified inbox while the V2 backend is not actually enabled.
+    if (input.action === "manager-inbox-v2") return controlResponse(
+      await service.ownerManagerPage(input.after ?? "",input.limit ?? 40),200,request);
+    if (input.action === "create-manager-invite") return controlResponse(
+      await service.issueManagerInvite(owner,input.expectedRevision),200,request);
     if (input.action === "list") return controlResponse({ accounts: await service.ownerList() }, 200, request);
     if (input.action === "read") return controlResponse(await service.ownerRead(String(input.accountId)), 200, request);
     if (input.action !== "command") throw new AccountError("ACCOUNT_INPUT", 400);

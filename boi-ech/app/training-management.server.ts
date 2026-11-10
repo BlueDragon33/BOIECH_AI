@@ -22,9 +22,17 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  const db=await trainingDatabase();
  const [rs,ps,ss]=await Promise.all([
  db.prepare('SELECT id,kind,name,parent_id AS parentId,capacity,required_teachers AS requiredTeachers,status,version FROM training_resources ORDER BY name LIMIT 1001').all<TrainingResource>(),
- db.prepare(`SELECT device_id AS id,learner_name AS name,person_code AS code,person_role AS role,COALESCE(class_name,'') AS className,status,
- CASE WHEN access_expires_at IS NOT NULL AND datetime(access_expires_at)<=CURRENT_TIMESTAMP THEN 1 ELSE 0 END AS expired,
- CASE WHEN registration_submitted_at IS NOT NULL THEN 1 ELSE 0 END AS registered FROM device_access WHERE person_role IN ('learner','teacher') ORDER BY learner_name LIMIT 1001`).all<TrainingPerson>(),
+ db.prepare(`SELECT d.device_id AS id,d.learner_name AS name,d.person_code AS code,d.person_role AS role,
+ COALESCE(d.class_name,'') AS className,d.status,
+ CASE WHEN e.account_id IS NOT NULL OR o.first_review_by IS NOT NULL THEN
+   CASE WHEN o.stage='active' AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP THEN 0 ELSE 1 END
+ ELSE CASE WHEN d.access_expires_at IS NOT NULL AND datetime(d.access_expires_at)<=CURRENT_TIMESTAMP THEN 1 ELSE 0 END END AS expired,
+ CASE WHEN d.registration_submitted_at IS NOT NULL THEN 1 ELSE 0 END AS registered
+ FROM device_access d
+ LEFT JOIN accounts a ON a.storage_device_id=d.device_id
+ LEFT JOIN account_onboarding o ON o.account_id=a.account_id
+ LEFT JOIN account_entitlements e ON e.account_id=a.account_id
+ WHERE d.person_role IN ('learner','teacher') ORDER BY d.learner_name LIMIT 1001`).all<TrainingPerson>(),
  db.prepare(`SELECT id,title,class_id AS classId,room_id AS roomId,teacher_id AS teacherId,starts_at AS startsAt,ends_at AS endsAt,status,version FROM training_sessions WHERE starts_at<? AND ends_at>? ORDER BY starts_at LIMIT 1001`).bind(to,from).all<TrainingSession>(),
  ]);
  if([rs,ps,ss].some(r=>(r.results?.length??0)>1000))fail("Khoảng xem có hơn 1.000 bản ghi. Thu hẹp thời gian hoặc liên hệ quản trị; chưa thể hiển thị tổng số đầy đủ.","TRAINING_RESULT_LIMIT",413);
@@ -93,12 +101,15 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   ? String(payload.action==="assign-person"?payload.personId:payload.teacherId):null;
  const authorityGuard=actor.accountId?`EXISTS(SELECT 1 FROM device_access a
   JOIN accounts ca ON ca.storage_device_id=a.device_id
+  JOIN account_onboarding o ON o.account_id=ca.account_id
+  JOIN account_entitlements e ON e.account_id=ca.account_id
   JOIN account_manager_permissions p ON p.account_id=ca.account_id
   JOIN account_sessions s ON s.account_id=ca.account_id
   JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
   JOIN account_credentials c ON c.account_id=ca.account_id AND c.generation=s.generation
   WHERE a.device_id=? AND a.person_role='manager' AND a.management_enabled=1 AND a.status='approved'
-  AND (a.access_expires_at IS NULL OR datetime(a.access_expires_at)>CURRENT_TIMESTAMP)
+  AND o.stage='active' AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
+  AND b.approved=1
   AND p.scope='manager.manage.assigned' AND p.enabled=1
   AND (p.expires_at IS NULL OR p.expires_at>(julianday('now')-2440587.5)*86400000)
   AND s.token_hash=? AND s.revoked=0 AND b.revoked=0
@@ -135,7 +146,18 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   for(const key of ids){const row=await db.prepare("SELECT name FROM training_resources WHERE id=? AND kind='class' AND status='active'").bind(key).first<{name:string}>();if(!row)fail("Lớp học chưa sẵn sàng.","TRAINING_RESOURCE_UNAVAILABLE",409);names.push(row.name);}
   const className=names.join("; ")||(target.role==="learner"?"Chưa phân lớp":"Chưa phân công");
   command={action,personId,classIds:ids,expectedClassName};
-  write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=? AND (?=0 OR (status='approved' AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))) AND ${authorityGuard}`).bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings);
+  write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=?
+    AND (?=0 OR (status='approved' AND (EXISTS(
+      SELECT 1 FROM accounts ca JOIN account_onboarding o ON o.account_id=ca.account_id
+      JOIN account_entitlements e ON e.account_id=ca.account_id
+      WHERE ca.storage_device_id=device_access.device_id
+      AND o.stage='active' AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)
+      OR (NOT EXISTS(SELECT 1 FROM accounts ca JOIN account_entitlements e ON e.account_id=ca.account_id
+        WHERE ca.storage_device_id=device_access.device_id)
+        AND NOT EXISTS(SELECT 1 FROM accounts ca JOIN account_onboarding o ON o.account_id=ca.account_id
+          WHERE ca.storage_device_id=device_access.device_id AND o.first_review_by IS NOT NULL)
+        AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))))) AND ${authorityGuard}`)
+    .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings);
  } else fail("Thao tác điều phối không hợp lệ.");
  const canonical=JSON.stringify(command);
  async function receipt(){return db.prepare("SELECT actor_id,payload_json FROM training_commands WHERE command_id=?").bind(commandId).first<{actor_id:string;payload_json:string}>();}

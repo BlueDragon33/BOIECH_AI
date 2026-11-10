@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkPreviewStack, installPreviewBridge } from "../scripts/preview-stack-remote.mjs";
+import { checkPreviewStack, installPreviewBridge, verifyV2SummaryLive } from "../scripts/preview-stack-remote.mjs";
 
 const account="f88a42260814230aa4a151abbfe5659d";
 const borrowed="4094a621-3b81-4533-9694-4a2103e03363";
@@ -31,6 +31,15 @@ function fixture(change=()=>{}) {
    throw new Error('unexpected provider operation');
   }
   if(String(url).endsWith('/api/control/status'))return Response.json({ok:true,application:'boi-ech',deployment:{revision:env.GITHUB_SHA,channel:'cloudflare-preview',paymentStorageReady:false}});
+  if(String(url).includes('/api/control/v2/account-summary')){
+    const token=init.headers?.authorization?.slice(7);
+    if(!token)return Response.json({code:'CONTROL_AUTH_REQUIRED'},{status:401});
+    if(token==='invalid-preview-ticket')return Response.json({code:'CONTROL_TICKET_FORBIDDEN'},{status:403});
+    if(init.headers?.['x-control-role']==='viewer')return Response.json({code:'ACCOUNT_SUMMARY_FORBIDDEN'},{status:403});
+    return Response.json({asOf:'2026-11-09T08:00:00.000Z',contract:'boi-account-summary.v2',verified:true,
+      counts:{totalAccounts:3,pending:1,active:1,suspended:0,expired:0,unverified:1}});
+  }
+  if(String(url).includes('/api/control/overview?'))return Response.json({code:'ACCOUNT_CONTROL_REQUIRED'},{status:409});
   if(String(url).endsWith('/__deployment'))return Response.json({error:'preview_access_required'},{status:401});
   throw new Error('unexpected destination');
  };
@@ -60,10 +69,24 @@ test('bridge installation needs exact action confirmation and only writes both n
  assert.equal(JSON.stringify(result).includes(secrets[0].text),false);
  assert.equal(result.boiRevision,env.GITHUB_SHA);
  assert.equal(result.appAnonymousStatus,401);
+ assert.equal(result.v2Summary.contract,'boi-account-summary.v2');
+ assert.deepEqual(result.v2Summary.statusChecks,[200,200,403,401,403,409]);
+ assert.equal(result.v2Summary.personalRowsReturned,false);
+ assert.equal(f.calls.filter(c=>c.method==='PUT').length,2,"read-only V2 verification must never write");
+
 });
 test('wrong account or post-deploy revision rejects before installing bridge credentials',async()=>{
  for(const badEnv of [{...env,CLOUDFLARE_ACCOUNT_ID:'wrong'},{...env,GITHUB_SHA:'c'.repeat(40)}]){
   const f=fixture();await assert.rejects(installPreviewBridge({...badEnv,PREVIEW_BRIDGE_CONFIRMATION:'INSTALL_PREVIEW_BRIDGE'},f.fetcher));
   assert.ok(f.calls.every(c=>c.method!=='PUT'));
  }
+});
+
+test('live V2 summary probe rejects unexpected personal data without mutating D1',async()=>{
+ const fetcher=async(url,init)=>{
+   assert.equal(init.method,'GET');
+   return Response.json({contract:'boi-account-summary.v2',verified:true,asOf:'2026-11-09T08:00:00.000Z',
+     counts:{totalAccounts:1,pending:0,active:1,suspended:0,expired:0,unverified:0},phone:'private'});
+ };
+ await assert.rejects(verifyV2SummaryLive('synthetic-test-secret',fetcher),/schema or aggregate/);
 });

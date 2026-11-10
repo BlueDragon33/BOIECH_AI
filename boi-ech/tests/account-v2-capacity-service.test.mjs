@@ -18,7 +18,8 @@ function fixture(){
  CREATE TABLE accounts(account_id TEXT PRIMARY KEY,storage_device_id TEXT,login TEXT);
  CREATE TABLE account_devices(account_id TEXT,device_id TEXT,public_key_jwk TEXT,revoked INTEGER DEFAULT 0,PRIMARY KEY(account_id,device_id));
  CREATE TABLE account_audit(actor TEXT,action TEXT,target TEXT,purpose TEXT);`);
- sqlite.exec(fs.readFileSync(new URL('../drizzle/0019_account_capacity.sql',import.meta.url),'utf8'));
+ for(const migration of ['0019_account_capacity.sql','0020_account_onboarding_v2.sql','0024_account_active_capacity.sql'])
+  sqlite.exec(fs.readFileSync(new URL('../drizzle/'+migration,import.meta.url),'utf8'));
  function prepare(sql){let args=[];return {bind(...a){args=a;return this},async all(){return {results:sqlite.prepare(sql).all(...args)}},_run(){const q=sqlite.prepare(sql);const x=q.run(...args);return {meta:{changes:Number(x.changes)}}}}}
  const db={prepare,async batch(stmts){sqlite.exec('BEGIN IMMEDIATE');try{let r=stmts.map(s=>s._run());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
  return {sqlite,db};
@@ -34,5 +35,21 @@ test('Owner reads actual 5/10/200 roster and can revise with CAS plus an audit t
   await assert.rejects(()=>changeAccountCapacity(f.db,owner,{role:'learner',accountLimit:221,expectedRevision:1}),/ACCOUNT_CAS_CONFLICT/);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit").get().n,1);
   assert.equal(f.sqlite.prepare("SELECT account_limit FROM account_admission_limits WHERE person_role='learner'").get().account_limit,220);
+ }finally{f.sqlite.close()}
+});
+
+test('Owner capacity excludes pending and legacy_hold, counts reserved active and suspended',async()=>{
+ const f=fixture();try{
+  f.sqlite.exec("INSERT INTO device_access(device_id,person_role) VALUES('m1','manager'),('m2','manager'),('m3','manager')");
+  f.sqlite.exec("INSERT INTO accounts(account_id,storage_device_id,login) VALUES('m1','m1','new1'),('m2','m2','new2'),('m3','m3',NULL)");
+  const first=await readAccountCapacity(f.db,owner);
+  assert.equal(first.limits.find(x=>x.role==='manager').used,0,'new and historical requests occupy zero active slots');
+  f.sqlite.exec("UPDATE account_onboarding SET stage='profile_required' WHERE account_id='m1'");
+  f.sqlite.exec("UPDATE account_onboarding SET stage='profile_review' WHERE account_id='m1'");
+  f.sqlite.exec("UPDATE account_onboarding SET stage='active' WHERE account_id='m1'");
+  f.sqlite.exec("UPDATE account_onboarding SET stage='suspended' WHERE account_id='m1'");
+  const second=await readAccountCapacity(f.db,owner);
+  assert.equal(second.limits.find(x=>x.role==='manager').used,1);
+  assert.equal(second.limits.find(x=>x.role==='manager').remaining,4);
  }finally{f.sqlite.close()}
 });
