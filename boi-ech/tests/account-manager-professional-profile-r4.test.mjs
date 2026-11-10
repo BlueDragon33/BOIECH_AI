@@ -50,7 +50,13 @@ test("R4: local Owner cancellation deletes ONLY a pending manager by exact ID an
   await assert.rejects(()=>cancel(f.db,{role:"manager",actor:"manager"},id,2,id),e=>e.code==="OWNER_REQUIRED");
   await assert.rejects(()=>cancel(f.db,owner,id,2,"wrong"),e=>e.code==="ACCOUNT_INPUT");
   await assert.rejects(()=>cancel(f.db,owner,id,1,id),e=>e.code==="ACCOUNT_RESET_NOT_ELIGIBLE");
-  const result=await cancel(f.db,owner,id,2,id);
+  const observedDb={...f.db,batch:async statements=>{
+   try{return await f.db.batch(statements);}catch(e){
+    console.error("R4_LOCAL_SQLITE_ROOT_CAUSE:",e instanceof Error?e.message:String(e));
+    throw e;
+   }
+  }};
+  const result=await cancel(observedDb,owner,id,2,id);
   assert.equal(result.verified,true);assert.equal(result.deletedAccountId,id);
   for(const table of ["accounts","account_devices","account_credentials","account_onboarding","account_sessions","account_contacts"]){
    const count=f.sqlite.prepare("SELECT COUNT(*) AS n FROM "+table+" WHERE account_id=?").get(id).n;
