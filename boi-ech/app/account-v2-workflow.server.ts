@@ -1,6 +1,7 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 import { AccountError, AccountService } from "./account-core.server";
 import { AccountEntitlementService } from "./account-entitlement.server";
+import { normalizeRegistrationContact } from "./account-contact.server";
 
 type Authority = { kind: "owner"; actor: string } | { kind: "manager"; token: string };
 type Stage = "requested" | "profile_required" | "profile_review" | "changes_requested" | "active" | "suspended" | "legacy_hold";
@@ -83,7 +84,17 @@ export class AccountV2Workflow {
     // Contact was collected at registration. Do not ask the manager for it again,
     // or confuse self-declared contact with a device approval proof.
     const contact=manager?await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
-      .bind(actor.accountId).first<{kind:string;value:string}>():null;
+      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>():null;
+    // Secondary details are optional and self-declared, never a security proof.
+    // The primary contact cannot be overwritten from this profile form.
+    let secondary:{kind:"email"|"phone";value:string}|null=null;
+    if(manager && input.secondaryContact!==undefined && input.secondaryContact!==null){
+      if(typeof input.secondaryContact!=="string") bad("ACCOUNT_CONTACT_INVALID",400);
+      if(input.secondaryContact.trim()){
+        if(!contact) bad("ACCOUNT_CONTACT_INVALID",400);
+        secondary=normalizeRegistrationContact(contact.kind==="email"?"phone":"email",input.secondaryContact);
+      }
+    }
     const raw=manager?(contact?.kind==="phone"?contact.value:""):field(input.phone,32);
     const cleanPhone=raw.replace(/[ ()-]/g,"");
     const phone=cleanPhone ? (cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone) : null;
@@ -121,6 +132,10 @@ export class AccountV2Workflow {
         ON CONFLICT(account_id) DO UPDATE SET faculty_unit=excluded.faculty_unit,
           job_title=excluded.job_title,job_position=excluded.job_position,updated_at=CURRENT_TIMESTAMP`)
         .bind(actor.accountId,className,jobTitle,jobPosition));
+      if(manager && secondary && contact) statements.splice(2,0,this.db.prepare(`UPDATE account_contacts
+        SET secondary_kind=?,secondary_value=?,updated_at=CURRENT_TIMESTAMP
+        WHERE account_id=? AND kind=? AND verified=0 AND changes()=1`)
+        .bind(secondary.kind,secondary.value,actor.accountId,contact.kind));
       if(s.role!=="manager"){
         statements.push(this.db.prepare(`INSERT INTO manager_device_assignments
           (target_device_id,manager_device_id,person_role)
@@ -214,6 +229,10 @@ export class AccountV2Workflow {
         ON CONFLICT(account_id) DO UPDATE SET faculty_unit=excluded.faculty_unit,
           job_title=excluded.job_title,job_position=excluded.job_position,updated_at=CURRENT_TIMESTAMP`)
         .bind(actor.accountId,className,jobTitle,jobPosition)]:[]),
+      ...(manager && secondary && contact ? [this.db.prepare(`UPDATE account_contacts SET
+        secondary_kind=?,secondary_value=?,updated_at=CURRENT_TIMESTAMP
+        WHERE account_id=? AND kind=? AND verified=0 AND changes()=1`)
+        .bind(secondary.kind,secondary.value,actor.accountId,contact.kind)] : []),
       this.db.prepare(`UPDATE account_onboarding SET stage='profile_review',revision=revision+1,
         profile_submitted_at=CURRENT_TIMESTAMP,last_review_note=NULL,updated_at=CURRENT_TIMESTAMP
         WHERE account_id=? AND revision=? AND stage IN ('profile_required','changes_requested') AND changes()=1`)
@@ -225,7 +244,7 @@ export class AccountV2Workflow {
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) bad("PROFILE_CONFLICT",409);
       throw error;
     });
-    if(Number(result[0].meta.changes)!==1 || Number(result[manager?2:1].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT",409);
+    if(Number(result[0].meta.changes)!==1 || Number(result[manager?(secondary?3:2):1].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT",409);
     return this.state(actor.accountId);
   }
   async requestChanges(authority: Authority, targetId: string, revision: unknown, reason: unknown) {
