@@ -2,7 +2,7 @@ import { AccountError } from "./account-core.server";
 
 // Self-declared contact. Neither this check nor knowing the value proves ownership.
 export type ContactKind = "email" | "phone";
-export function normalizeRegistrationContact(kind: unknown, raw: unknown) {
+export function normalizeRegistrationContact(kind: unknown, raw: unknown): {kind:ContactKind;value:string} {
   if (kind !== "email" && kind !== "phone") throw new AccountError("ACCOUNT_CONTACT_INVALID",400);
   if (typeof raw !== "string" || !raw.trim() || /[\x00-\x1f\x7f]/.test(raw)) {
     throw new AccountError("ACCOUNT_CONTACT_INVALID",400);
