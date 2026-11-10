@@ -106,3 +106,17 @@ test("R2: manager cannot change another manager's application; single-review fla
   assert.equal(f.flow?.singleReview,true);
  }finally{f.close();legacy.close()}
 });
+
+
+test("R2: offline Vite Worker binding explicitly forwards Account V2 + one-review flags",async()=>{
+ const {readFileSync}=await import("node:fs");
+ const cfg=readFileSync(new URL("../vite.config.ts",import.meta.url),"utf8");
+ const runtime=readFileSync(new URL("../app/account-runtime.server.ts",import.meta.url),"utf8");
+ const flagList=cfg.match(/const localVars = \[([\s\S]*?)\]\.reduce/);
+ assert.ok(flagList,"Vite must declare the local Worker bindings allowlist");
+ for(const name of ["BOI_ECH_ACCOUNT_FIRST","BOI_ECH_ACCOUNT_V2","BOI_ECH_SINGLE_REVIEW","BOI_ECH_ACCOUNT_ORIGIN","LOCAL_CONTROL_PLANE"]) {
+  assert.match(flagList[1],new RegExp('"' + name + '"'),name+" must reach cloudflare:workers env on localhost");
+  assert.match(runtime,new RegExp('values\\.' + name),"runtime must consume "+name);
+ }
+ assert.match(cfg,/if \(value\) values\[key\] = value/,"bindings stay opt-in; no global default change");
+});
