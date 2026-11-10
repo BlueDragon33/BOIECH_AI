@@ -58,5 +58,7 @@ test("R2: new-device contact form shows requested type and labels required profi
  assert.match(source,/Để mở dữ liệu, cần xác nhận từ thiết bị tin cậy/);
  assert.match(source,/\{label\} <span aria-hidden="true">\*<\/span>/);
  assert.match(core,/return \{matched,deviceApproved:false,verified:false\}/);
- assert.doesNotMatch(core,/async compareRegisteredContact[\s\S]*?async recover[\s\S]*?UPDATE account_devices SET approved=1/);
+ const compareMethod=core.slice(core.indexOf("async compareRegisteredContact"),core.indexOf("async recover("));
+ assert.ok(compareMethod.length>100);
+ assert.doesNotMatch(compareMethod,/UPDATE account_devices|INSERT INTO account_entitlements|SET approved=1/);
 });
