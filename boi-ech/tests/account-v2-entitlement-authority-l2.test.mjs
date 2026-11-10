@@ -86,6 +86,24 @@ test("V2 SQL assignment is denied if the learner is awaiting changes, not yet in
     .get(learner.account.storageDeviceId).n,0);
  } finally {f.close()}
 });
+test("V2 SQL assignment refuses a different manager from the recorded first reviewer",async()=>{
+ const f=accountStack({v2:true});
+ try {
+  const assigned=await createActiveManager(f,881);
+  const unrelated=await createActiveManager(f,882);
+  const learner=await f.register(883,"learner");
+  await f.flow.firstReview({kind:"manager",token:assigned.token},learner.account.accountId,1);
+  await f.flow.submitProfile(learner.token,{...profile(883),expectedRevision:2});
+  const sql="INSERT INTO manager_device_assignments(target_device_id,manager_device_id,person_role) VALUES(?,?,?)";
+  assert.throws(()=>f.sqlite.prepare(sql).run(
+    learner.account.storageDeviceId,unrelated.account.storageDeviceId,"learner"),
+    /MANAGER_APPROVAL_FORBIDDEN/);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM manager_device_assignments WHERE target_device_id=?")
+    .get(learner.account.storageDeviceId).n,0);
+  const approved=await f.service.review(assigned.token,learner.account.accountId,"approve");
+  assert.equal(approved.status,"approved");
+ } finally {f.close()}
+});
 test("V2 new trigger preserves V1 legacy expiry guard for non-V2 staged intake",async()=>{
  const f=accountStack({v2:false});
  try{
