@@ -1,4 +1,5 @@
 import { AccountError } from "../../account-core.server";
+import { normalizeRegistrationContact } from "../../account-contact.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
@@ -43,6 +44,13 @@ export async function POST(request: Request) {
     if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
     if (config.v2 && p.action === "recover-lost-device") return json(await service.recoverLostDevice(p,peer));
     if (config.v2 && p.action === "approve-recovered-device") return json(await service.approveRecoveredDevice(p,peer));
+    // Only public account intake is required to supply one self-declared contact.
+    // Do NOT send OTP, or treat matching this string as proof of a trusted device.
+    if (config.v2 && (p.action === "register" || p.action === "manager-register")) {
+      const contact=normalizeRegistrationContact(p.contactType,p.contactValue);
+      p.contactType=contact.kind;
+      p.contactValue=contact.value;
+    }
     // Public Bơi Ếch intake is only for learners/teachers. Manager requests must
     // enter the existing App-Management Owner-controlled workflow, never via this API.
     if (p.action === "register" && p.role === "manager") throw new AccountError("MANAGER_OWNER_INTAKE_REQUIRED", 403);
