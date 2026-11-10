@@ -78,6 +78,7 @@ export function accountErrorResponse(error: unknown) {
     ACCOUNT_REVIEW_SUPERSEDED: "Đã sử dụng quy trình duyệt một lần; không tồn tại duyệt vòng hai.",
     PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, mã, đơn vị và số điện thoại.",
     ACCOUNT_CONTACT_INVALID: "Chọn Email hoặc SĐT hợp lệ để đăng ký. Không yêu cầu xác minh khi đăng ký.",
+    CONTACT_CHECK_NOT_REQUIRED: "Thiết bị hiện tại đã tin cậy, không cần đối chiếu liên hệ.",
     PROFILE_CONFLICT: "Mã cá nhân hoặc số điện thoại đã được sử dụng. Kiểm tra lại với cán bộ.",
     ACCOUNT_SCOPE_FORBIDDEN: "Không có quyền xử lý hồ sơ ngoài phạm vi được giao.",
     ACCOUNT_SWITCHED: "Phiên tài khoản đã đổi. Hãy tải lại và kiểm tra dữ liệu trước khi đồng bộ.",
