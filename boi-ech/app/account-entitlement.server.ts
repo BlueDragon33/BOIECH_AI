@@ -40,18 +40,23 @@ export class AccountEntitlementService {
     if (!Number.isInteger(row.default_days) || row.default_days < 1 || row.default_days > 365) throw new AccountEntitlementError("ACCOUNT_ACCESS_POLICY_UNAVAILABLE",503);
     return row.default_days;
   }
-  async grantOnApproval(accountId: string, role: string) {
-    // Return a prepared statement to execute IN the caller's existing second-review D1 batch.
-    // Never grant during registration or first review.
+  async grantOnApproval(accountId: string, role: string, source: "approval:second"|"profile:completed" = "approval:second") {
+    // Return a prepared statement for an existing atomic D1 batch.
+    // Never grant at signup or first human review; R2 grants on profile completion.
     this.accountId(accountId);
     const days=await this.defaultDays(role);
     const activatedAt=new Date(this.now()).toISOString();
     const expiresAt=new Date(this.now()+days*86400000).toISOString();
+    // Legacy second-review paths historically tolerate a duplicate grant.
+    // The new one-review profile activation MUST fail inside D1 batch on a
+    // preexisting entitlement, so all preceding ACTIVE/status updates roll back.
+    // Never throw solely from post-batch meta.changes after a successful commit.
+    const legacyDedup=source==="approval:second"?" ON CONFLICT(account_id) DO NOTHING":"";
     return this.db.prepare(`INSERT INTO account_entitlements(account_id,state,activated_at,expires_at,changed_by)
       SELECT ?,'active',?,?,? WHERE EXISTS (
         SELECT 1 FROM account_onboarding WHERE account_id=? AND stage='active'
-      ) ON CONFLICT(account_id) DO NOTHING`)
-      .bind(accountId,activatedAt,expiresAt,"approval:second",accountId);
+      )${legacyDedup}`)
+      .bind(accountId,activatedAt,expiresAt,source,accountId);
   }
   async read(accountId: unknown) {
     const id=this.accountId(accountId);

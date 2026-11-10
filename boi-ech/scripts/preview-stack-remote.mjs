@@ -58,6 +58,48 @@ export async function checkPreviewStack(env = process.env, fetcher = fetch, depl
   return { boiWorker: BOI, appWorker: APP, boiD1: policy.name, appD1: APP_D1 };
 }
 
+/**
+ * Post-deploy LIVE read-only API contract checks. Never request private rows or
+ * mutate D1. The same credential is installed on the two protected Preview
+ * Workers only; no response bodies or secret values are logged on failure.
+ */
+export async function verifyV2SummaryLive(secret, fetcher = fetch) {
+  const boiOrigin = `https://${BOI}.boiech-ai.workers.dev`;
+  const appOrigin = `https://${APP}.boiech-ai.workers.dev`;
+  const url = `${boiOrigin}/api/control/v2/account-summary`;
+  const seen = [];
+  const request = async (path, role, bearer, expected) => {
+    const headers = { origin: appOrigin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+      ...(role ? { "x-control-role": role } : {}) };
+    const response = await fetcher(path, {
+      method: "GET", headers, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000),
+    });
+    if (response.status !== expected) throw new Error(`Preview V2 control authorization/readback mismatch: expected HTTP ${expected}, got ${response.status}.`);
+    seen.push(expected);
+    return response;
+  };
+  const aggregate = await (await request(url, "owner", secret, 200)).json();
+  const validKeys = ["asOf", "contract", "counts", "verified"];
+  const countKeys = ["totalAccounts", "pending", "active", "suspended", "expired", "unverified"];
+  const counts = aggregate?.counts;
+  if (!aggregate || Object.keys(aggregate).sort().join("|") !== validKeys.sort().join("|")
+      || aggregate.contract !== "boi-account-summary.v2" || aggregate.verified !== true
+      || !Number.isFinite(Date.parse(aggregate.asOf ?? "")) || !counts ||
+      Object.keys(counts).sort().join("|") !== countKeys.sort().join("|") ||
+      countKeys.some(key => !Number.isSafeInteger(counts[key]) || counts[key] < 0 || counts[key] > counts.totalAccounts)) {
+    throw new Error("Live Preview V2 account-summary schema or aggregate evidence does not match the reviewed contract.");
+  }
+  await request(url, "publisher", secret, 200);
+  await request(url, "viewer", secret, 403);
+  await request(url, "owner", null, 401);
+  await request(url, "owner", "invalid-preview-ticket", 403);
+  // Explicit proof that V2 disables the legacy registry endpoint rather than
+  // reopening private device/payment access through the central adapter.
+  await request(`${boiOrigin}/api/control/overview?activityDays=0`, "owner", secret, 409);
+  return { contract: "boi-account-summary.v2", verified: true, statusChecks: seen,
+    totalAccountsVerified: true, personalRowsReturned: false };
+}
+
 export async function installPreviewBridge(env = process.env, fetcher = fetch) {
   if (env.PREVIEW_BRIDGE_CONFIRMATION !== "INSTALL_PREVIEW_BRIDGE") throw new Error("INSTALL_PREVIEW_BRIDGE confirmation is required to create or rotate the shared credential on the two named Preview Workers.");
   const result = await checkPreviewStack(env, fetcher, true);
@@ -76,8 +118,9 @@ export async function installPreviewBridge(env = process.env, fetcher = fetch) {
     headers:{accept:"application/json"}, redirect:"error", signal:AbortSignal.timeout(20_000),
   });
   if (appResponse.status !== 401 || (await appResponse.json()).error !== "preview_access_required") throw new Error("App Preview anonymous access protection check failed.");
+  const v2Summary = await verifyV2SummaryLive(secret, fetcher);
   await checkPreviewStack(env, fetcher, true);
-  return {...result, boiRevision:status.deployment.revision, appRevision:env.APPLICATION_MANAGEMENT_BUILD_REVISION, appAnonymousStatus:appResponse.status, bridgeInstalled:true, acceptance:"Owner/MFA/account/device business acceptance remains separate"};
+  return {...result, boiRevision:status.deployment.revision, appRevision:env.APPLICATION_MANAGEMENT_BUILD_REVISION, appAnonymousStatus:appResponse.status, v2Summary, bridgeInstalled:true, acceptance:"Owner/MFA/account/device business acceptance remains separate"};
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
