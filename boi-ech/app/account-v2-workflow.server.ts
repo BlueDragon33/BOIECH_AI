@@ -86,8 +86,10 @@ export class AccountV2Workflow {
       .bind(actor.accountId).first<{kind:string;value:string}>():null;
     const raw=manager?(contact?.kind==="phone"?contact.value:""):field(input.phone,32);
     const cleanPhone=raw.replace(/[ ()-]/g,"");
-    const phone=cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone;
-    if(!/^[A-Z0-9._-]+$/.test(code)|| (!manager&&!/^\+?[0-9]{7,16}$/.test(phone))) bad("PROFILE_INVALID",400);
+    const phone=cleanPhone ? (cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone) : null;
+    // Persist SQL NULL when manager originally registered with email; empty string
+    // would collide under the legacy UNIQUE(device_access.phone) constraint.
+    if(!/^[A-Z0-9._-]+$/.test(code)|| (!manager&&!/^\+?[0-9]{7,16}$/.test(phone??""))) bad("PROFILE_INVALID",400);
     if (this.singleReview) {
       // One human review was recorded by firstReview(). User's completed profile
       // is the second *state transition*, NOT a second human approval.
