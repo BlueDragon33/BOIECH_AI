@@ -89,3 +89,42 @@
  border-radius:10px;border:1px solid #8ab7bf;background:#fff;padding:10px;color:#164453;font:inherit}
 .deviceContactCheck input:focus-visible,.deviceContactCheck button:focus-visible{outline:3px solid #0d9a96;outline-offset:3px}
 @media(max-width:560px){.deviceContactCheck{padding:12px}.deviceContactCheck .contactMethods{grid-template-columns:1fr 1fr}}
+
+
+/* Manager profile: compact, responsive form—not the legacy one-field-per-row layout. */
+.root .profileForm{
+ display:grid;gap:20px;margin:22px 0;padding:clamp(18px,3vw,28px);
+ border:1px solid #d6e3ef;border-radius:20px;background:linear-gradient(155deg,#fff,#f7fafc);
+ box-shadow:0 12px 35px #16396012;
+}
+.profileHeading{display:grid;gap:7px;padding-bottom:17px;border-bottom:1px solid #dfebf4;}
+.profileEyebrow{color:#287698;font-size:.72rem;font-weight:850;letter-spacing:.1em;}
+.profileHeading h2{margin:0;font-size:clamp(1.25rem,2vw,1.55rem);line-height:1.25;color:#102f55;}
+.profileHeading p{margin:0;color:#5c7086;font-size:.91rem;line-height:1.6;}
+.profileGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px 18px;min-width:0;}
+.profileField,.profileFieldWide{display:grid;gap:7px;min-width:0;font-size:.91rem;font-weight:650;color:#213f5a;}
+.profileFieldWide{grid-column:1/-1;}
+.requiredMark{color:#b64335;}
+.root .profileForm input{
+ width:100%;min-width:0;min-height:48px;padding:11px 13px;box-sizing:border-box;
+ border:1px solid #c5d4e5;border-radius:11px;background:#fff;color:#16334d;
+ box-shadow:0 1px 2px #123a5d0a;font:inherit;font-weight:450;
+}
+.root .profileForm input::placeholder{color:#91a0af;font-size:.88rem;}
+.root .profileForm input:hover{border-color:#7eabc8;}
+.root .profileForm input:focus-visible{
+ outline:3px solid #a5d8e8;outline-offset:2px;border-color:#167c9b;
+}
+.profileFooter{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+ padding-top:18px;border-top:1px solid #e1eaf2;}
+.profileFooter p{margin:0;flex:1 1 230px;font-size:.82rem;color:#637b90;line-height:1.5;}
+.root .profileFooter button{min-width:200px;min-height:47px;border:0;border-radius:11px;
+ background:linear-gradient(115deg,#1468aa,#10536c);color:#fff;font-weight:780;}
+@media(max-width:580px){
+ .root .profileForm{margin:16px 0;padding:17px;border-radius:16px;gap:16px;}
+ .profileGrid{grid-template-columns:1fr;gap:13px;}
+ .profileFieldWide{grid-column:auto;}
+ .profileFooter{align-items:stretch;}
+ .root .profileFooter button{width:100%;min-width:0;}
+}
+@media(prefers-reduced-motion:reduce){.root .profileForm *{transition:none;}}
