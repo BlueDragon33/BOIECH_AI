@@ -26,3 +26,11 @@ test("R5: paired preview workflow pins exactly approved APP #387 and never impli
  assert.doesNotMatch(wf,/80c400f6d4805b25fe21d2334afcbeaf3313f1b5/);
  assert.match(wf,/INSTALL_PREVIEW_BRIDGE/);
 });
+
+test("R5: failed account list/readback cannot display an old actionable manager inbox",()=>{
+ const panel=src("../app/manager-v2-review-panel.tsx");
+ assert.match(panel,/catch\(e\)\{if\(mounted\.current\)\{setBoard\(null\);setError\(e instanceof Error\?e\.message:"Không tải được hồ sơ\."\);\}\}/);
+ assert.match(panel,/catch\(e\)\{if\(mounted\.current\)\{setBoard\(null\);setError\(e instanceof Error\?e\.message:"Thao tác chưa xác nhận; cần đồng bộ lại trước khi tiếp tục\."\);\}\}/);
+ assert.match(panel,/\{error\?<p role="alert">\{error\}<\/p>:null\}/);
+ assert.match(panel,/\{!board\?<p>/);
+});
