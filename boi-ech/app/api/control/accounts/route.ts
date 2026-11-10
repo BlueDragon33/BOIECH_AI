@@ -1,4 +1,5 @@
 import { AccountError } from "../../../account-core.server";
+import { cancelLocalPendingManager } from "../../../manager-local-reset.server";
 import { AccountEntitlementService } from "../../../account-entitlement.server";
 import { readAccountCapacity, changeAccountCapacity } from "../../../account-capacity.server";
 import { AccountV2Workflow } from "../../../account-v2-workflow.server";
@@ -24,6 +25,15 @@ export async function POST(request: Request) {
       if (input.action === "set-entitlement-policy") return controlResponse({policy:await entitlement.setPolicy(owner,input)},200,request);
       if (input.action === "read-entitlement") return controlResponse({entitlement:await entitlement.read(input.accountId)},200,request);
       if (input.action === "set-entitlement") return controlResponse({entitlement:await entitlement.change(owner,input)},200,request);
+    }
+    if (input.action === "cancel-pending-manager-local") {
+      const runtime=(await import("cloudflare:workers")).env as unknown as Record<string,unknown>;
+      const url=new URL(request.url);
+      if(runtime.LOCAL_CONTROL_PLANE!=="true" || !["localhost","127.0.0.1"].includes(url.hostname)
+        ||config.origin!==url.origin||!v2||!config.singleReview)
+        throw new AccountError("ACCOUNT_RESET_LOCAL_ONLY",403);
+      return controlResponse(await cancelLocalPendingManager(
+        await getCourseDatabase(),owner,input.accountId,input.expectedRevision,input.confirmation),200,request);
     }
     if (v2) {
       const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
