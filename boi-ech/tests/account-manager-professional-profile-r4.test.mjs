@@ -24,7 +24,7 @@ test("R4: manager completes five professional fields WITHOUT person code or repe
   assert.equal(row.job_position,"Unit manager");
   const device=f.sqlite.prepare("SELECT person_code,phone,learner_name FROM device_access WHERE device_id=?").get(m.account.storageDeviceId);
   assert.match(device.person_code,/^MGR_[A-F0-9]{20}$/);
-  assert.equal(device.phone,"");
+  assert.equal(device.phone,null,"email-only manager must not reserve an empty unique phone");
   assert.equal(device.learner_name,"Nguyen Dinh Nam");
   assert.equal((await f.service.ownerRead(id)).entitlement.active,true);
  }finally{f.close();}
