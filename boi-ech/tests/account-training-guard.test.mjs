@@ -9,6 +9,13 @@ test('actual final training SQL denies expired capability and revoked sessions a
   f.sqlite.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash,generation) VALUES(?,'unused-test-verifier','unused-test-recovery',1)").run(id);
   f.sqlite.prepare('INSERT INTO account_devices(account_id,device_id,public_key_jwk) VALUES(?,?,?)').run(id,device.deviceId,JSON.stringify(key.publicKey));
   f.sqlite.prepare('INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at) VALUES(?,?,?,1,?,?)').run(hash,id,device.deviceId,now+60000,now+60000);
+  // A V2 management session must be backed by ACTIVE onboarding,
+  // an independently active entitlement and an approved P-256 device.
+  f.sqlite.prepare("UPDATE account_onboarding SET stage='profile_review',first_review_by='owner@fixture.invalid' WHERE account_id=?").run(id);
+  f.sqlite.prepare("UPDATE account_onboarding SET stage='active' WHERE account_id=?").run(id);
+  f.sqlite.prepare("INSERT INTO account_entitlements(account_id,state,activated_at,expires_at,changed_by) VALUES(?,'active',?,?,?)")
+    .run(id,new Date(now).toISOString(),new Date(now+86400000).toISOString(),'owner@fixture.invalid');
+  f.sqlite.prepare("UPDATE account_devices SET approved=1 WHERE account_id=? AND device_id=?").run(id,device.deviceId);
   f.sqlite.prepare("INSERT INTO account_manager_permissions(account_id,scope,enabled,expires_at,granted_by) VALUES(?,'manager.manage.assigned',1,?,'fixture')").run(id,now-1000);
   const source=fs.readFileSync(new URL('../app/training-management.server.ts',import.meta.url),'utf8');const match=source.match(/const authorityGuard=actor\.accountId\?`([\s\S]*?)`:AUTH_GUARD/);assert.ok(match,'production authority SQL must be present');
   const guard=new Function('scopedTarget','return `'+match[1]+'`;')(null);

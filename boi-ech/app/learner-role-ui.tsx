@@ -242,6 +242,10 @@ function LearnerDashboard({ snapshot }: { snapshot: LearnerSnapshot }) {
           <div className={styles.heroActions}>
             <button className={styles.goldButton} onClick={clickContinue}>Tiếp tục học <span>→</span></button>
             <button className={styles.ghostButton} onClick={() => window.location.assign("/phan-tich-video")}><Icon name="video"/> Phân tích video</button>
+            {snapshot.completed===8 ? <button type="button" className={styles.ghostButton}
+              onClick={() => clickOriginalNav("Dữ liệu")}>
+              <Icon name="shield"/> Xem khu chứng chỉ cuối khóa
+            </button> : null}
           </div>
           <div className={styles.heroMotto}><i/> KỶ LUẬT · KỸ THUẬT · TIẾN BỘ · TỰ TIN</div>
         </div>
@@ -256,6 +260,7 @@ function LearnerDashboard({ snapshot }: { snapshot: LearnerSnapshot }) {
         <main className={styles.primaryColumn}>
           <section className={styles.overviewPanel}>
             <header><div><span>Tổng quan học tập</span><h2>Hành trình của {snapshot.givenName}</h2></div><small>{snapshot.onlineLabel}</small></header>
+            {snapshot.completed===8 ? <p role="status">Đã đạt 8/8 bài theo tiến độ. Mở khu chứng chỉ để máy chủ kiểm tra điều kiện cấp, in hoặc lưu PDF.</p> : null}
             <div className={styles.metrics}>
               <article><Icon name="book"/><div><strong>{snapshot.completed}/8</strong><span>Bài đã đạt</span><small>{8 - snapshot.completed > 0 ? `Còn ${8 - snapshot.completed} bài trong lộ trình` : "Đã hoàn thành lộ trình"}</small></div></article>
               <article><MetricRing value={snapshot.coursePercent} label="Toàn khóa"/><div><strong>{snapshot.coursePercent}%</strong><span>Tiến độ toàn khóa</span><small>{unlocked}/8 bài hiện có thể mở</small></div></article>
