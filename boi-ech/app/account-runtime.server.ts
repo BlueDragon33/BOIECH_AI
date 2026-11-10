@@ -75,6 +75,7 @@ export function accountErrorResponse(error: unknown) {
     ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa hoàn tất hai lần phê duyệt.",
     ACCOUNT_ONBOARDING_MISSING: "Trạng thái xét duyệt chưa được xác minh; hãy liên hệ quản trị.",
     PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, mã, đơn vị và số điện thoại.",
+    ACCOUNT_CONTACT_INVALID: "Chọn Email hoặc SĐT hợp lệ để đăng ký. Không yêu cầu xác minh khi đăng ký.",
     PROFILE_CONFLICT: "Mã cá nhân hoặc số điện thoại đã được sử dụng. Kiểm tra lại với cán bộ.",
     ACCOUNT_SCOPE_FORBIDDEN: "Không có quyền xử lý hồ sơ ngoài phạm vi được giao.",
     ACCOUNT_SWITCHED: "Phiên tài khoản đã đổi. Hãy tải lại và kiểm tra dữ liệu trước khi đồng bộ.",
