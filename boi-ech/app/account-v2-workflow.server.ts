@@ -138,7 +138,7 @@ export class AccountV2Workflow {
               SELECT 1 FROM account_onboarding o JOIN account_entitlements e
                 ON e.account_id=o.account_id
               WHERE o.account_id=? AND o.stage='active' AND e.state='active')
-            ON CONFLICT(account_id,scope) DO NOTHING`)
+`)
             .bind(actor.accountId,scope,s.first_review_by,actor.accountId));
         }
       }
