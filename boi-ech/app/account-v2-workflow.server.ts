@@ -37,15 +37,25 @@ export class AccountV2Workflow {
     if (actor.accountId === targetId || actor.role !== "manager") bad("TARGET_ROLE_FORBIDDEN");
     await this.accounts.capability(actor, "manager.approve.registration");
     // Authorization repeated inside the final UPDATE; revocation races fail closed.
+    // Recheck the very same session/device/credential generation INSIDE the
+    // final D1 CAS, not just in authorize() before a possible concurrent revoke.
+    // The bound hash is never exposed to the client or audit log.
     const guard = `EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id
-      WHERE a.account_id=? AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
+      JOIN account_sessions s ON s.account_id=a.account_id
+      JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+      JOIN account_credentials c ON c.account_id=a.account_id AND c.generation=s.generation
+      WHERE a.account_id=? AND s.token_hash=? AND s.device_id=?
+      AND s.revoked=0 AND b.revoked=0 AND b.approved=1
+      AND s.expires_at>(julianday('now')-2440587.5)*86400000
+      AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
+      AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
       AND EXISTS(SELECT 1 FROM account_onboarding o WHERE o.account_id=a.account_id AND o.stage='active')
       AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id
         AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)
       AND p.scope='manager.approve.registration' AND p.enabled=1
       AND (p.expires_at IS NULL OR p.expires_at>(unixepoch()*1000)))`;
-    return { id: actor.accountId, guard, values: [actor.accountId] };
+    return { id: actor.accountId, guard, values: [actor.accountId,actor.sessionHash,actor.deviceId] };
   }
   async firstReview(authority: Authority, targetId: string, revision: unknown) {
     const target = await this.state(targetId);
