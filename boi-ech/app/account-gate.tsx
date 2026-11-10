@@ -45,6 +45,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
+  const [contactType,setContactType]=useState<"email"|"phone">("email");
   const [recovery, setRecovery] = useState(""), [notice, setNotice] = useState("");
   const [managerInvite,setManagerInvite]=useState("");
   const managerInviteRef=useRef("");
@@ -212,6 +213,20 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy}/></label>
           <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login"||mode==="devices" ? 1 : 15} maxLength={1024} autoComplete={mode === "login"||mode==="devices" ? "current-password" : "new-password"} disabled={busy}/></label>
           {mode==="register"?<label>Nhập lại mật khẩu<input name="passwordConfirm" type="password" required minLength={15} maxLength={1024} autoComplete="new-password" disabled={busy}/></label>:null}
+          {mode==="register"?<fieldset className={styles.contactChoice}>
+            <legend>Thông tin liên hệ <span aria-hidden="true">*</span></legend>
+            <div className={styles.contactMethods} aria-label="Chọn phương thức liên hệ">
+              <button type="button" aria-pressed={contactType==="email"} onClick={()=>setContactType("email")} disabled={busy}>✉ Email</button>
+              <button type="button" aria-pressed={contactType==="phone"} onClick={()=>setContactType("phone")} disabled={busy}>☎ Số điện thoại</button>
+            </div>
+            <input type="hidden" name="contactType" value={contactType}/>
+            <label>{contactType==="email"?"Địa chỉ email *":"Số điện thoại *"}
+              <input key={contactType} name="contactValue" type={contactType==="email"?"email":"tel"}
+                placeholder={contactType==="email"?"ten@gmail.com":"+84 / +7 ..."}
+                autoComplete={contactType==="email"?"email":"tel"} required maxLength={254} disabled={busy}/>
+            </label>
+            <small>Chỉ lưu liên hệ đã cung cấp; không gửi mã xác minh lúc đăng ký.</small>
+          </fieldset>:null}
           {mode==="login"?<div className={styles.authInlineLinks}><button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("recover")}>Quên mật khẩu?</button></div>:null}
           {(mode === "recover" || mode==="devices") && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
           {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
