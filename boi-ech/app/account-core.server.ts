@@ -67,7 +67,7 @@ function view(row: Row): AccountView {
     className: row.class_name, expiresAt: row.access_expires_at };
 }
 export class AccountService {
-  constructor(private db: D1Database, private now: () => number = Date.now, private v2Enabled = false) {}
+  constructor(private db: D1Database, private now: () => number = Date.now, private v2Enabled = false, private singleReview = false) {}
   private audit(actor: string, action: string, target: string, purpose: string, conditional = false) {
     return this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose) SELECT ?,?,?,?${conditional ? " WHERE changes()=1" : ""}`)
       .bind(actor, action, target, purpose);
@@ -510,6 +510,7 @@ export class AccountService {
     if (row.person_role !== "manager") fail("TARGET_ROLE_FORBIDDEN");
     if (!Number.isSafeInteger(input.expectedRevision) || row.revision !== input.expectedRevision) fail("ACCOUNT_CAS_CONFLICT", 409);
     const op = input.operation;
+    if (this.v2Enabled && this.singleReview && op === "approve-manager") fail("ACCOUNT_REVIEW_SUPERSEDED",409);
     if (!["approve-manager", "management", "read-all"].includes(String(op))) fail("ACCOUNT_INPUT", 400);
     const enabled = op === "approve-manager" ? true : input.enabled;
     if (typeof enabled !== "boolean") fail("ACCOUNT_INPUT", 400);
@@ -601,6 +602,7 @@ export class AccountService {
     const target = await this.row(targetId);
     if (!["learner", "teacher"].includes(target.person_role) || actor.accountId === targetId) fail("TARGET_ROLE_FORBIDDEN");
     if (!["approve", "block"].includes(action)) fail("ACCOUNT_INPUT", 400);
+    if (this.v2Enabled && this.singleReview && action === "approve") fail("ACCOUNT_REVIEW_SUPERSEDED",409);
     if (this.v2Enabled && action === "approve") {
       const step=await this.db.prepare("SELECT stage,first_review_by FROM account_onboarding WHERE account_id=?")
         .bind(targetId).first<{stage:string;first_review_by:string|null}>();
