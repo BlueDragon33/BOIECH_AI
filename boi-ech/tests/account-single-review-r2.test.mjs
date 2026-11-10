@@ -101,7 +101,7 @@ test("R2: manager cannot change another manager's application; single-review fla
  try{
   const manager=await f.register(9241,"manager");
   await assert.rejects(()=>f.flow.firstReview({kind:"manager",token:manager.token},manager.account.accountId,1),
-    e=>["ACCOUNT_ONBOARDING_REQUIRED","ACCOUNT_PENDING"].includes(e.code));
+    e=>e.code==="TARGET_ROLE_FORBIDDEN"&&e.status===403);
   assert.equal(legacy.flow?.singleReview,false);
   assert.equal(f.flow?.singleReview,true);
  }finally{f.close();legacy.close()}
