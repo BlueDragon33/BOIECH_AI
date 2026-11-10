@@ -265,6 +265,10 @@ export class AccountService {
         this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
         this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
           .bind(accountId,verifier,digest(recoveryCode)),
+        ...(typeof input.contactType==="string" && typeof input.contactValue==="string" ? [
+          this.db.prepare("INSERT INTO account_contacts(account_id,kind,value) VALUES(?,?,?)")
+            .bind(accountId,input.contactType,input.contactValue),
+        ] : []),
         ...(inviteHash ? [
           this.db.prepare(`UPDATE account_manager_invitations
             SET consumed_by=?,consumed_at_ms=?,revision=revision+1
