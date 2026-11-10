@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {accountStack} from "./helpers/account-stack.mjs";
 
 const profile=n=>({familyName:"Synthetic",givenName:"Owner-tested",personCode:"TEST"+n,
- className:"Group A",phone:"090"+String(n).padStart(7,"0")});
+ className:"Group A",phone:"090"+String(n).padStart(7,"0"),facultyUnit:"Training Department",jobTitle:"Instructor",jobPosition:"Unit Manager"});
 
 async function activateManager(f,n){
  const user=await f.register(n,"manager");
