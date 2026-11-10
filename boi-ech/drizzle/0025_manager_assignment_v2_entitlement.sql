@@ -12,20 +12,32 @@ BEFORE INSERT ON manager_device_assignments BEGIN
       AND m.person_role='manager' AND m.management_enabled=1
       AND m.status='approved' AND m.registration_submitted_at IS NOT NULL
       AND (
+        -- A manager with ANY V2 entitlement stays on the V2 branch even
+        -- when the target returns to changes_requested; never fall back to
+        -- a still-valid legacy device expiry to bypass second review.
         CASE WHEN EXISTS(
-          SELECT 1 FROM accounts t
-            JOIN account_onboarding ot ON ot.account_id=t.account_id
-          WHERE t.storage_device_id=NEW.target_device_id AND ot.stage='profile_review'
+          SELECT 1 FROM accounts ma JOIN account_entitlements e
+            ON e.account_id=ma.account_id
+          WHERE ma.storage_device_id=m.device_id
+        ) OR EXISTS(
+          SELECT 1 FROM accounts t JOIN account_onboarding ot
+            ON ot.account_id=t.account_id
+          WHERE t.storage_device_id=NEW.target_device_id
+            AND ot.first_review_by IS NOT NULL
         ) THEN EXISTS(
           SELECT 1 FROM accounts ma
             JOIN account_onboarding om ON om.account_id=ma.account_id
             JOIN account_entitlements e ON e.account_id=ma.account_id
             JOIN account_manager_permissions p ON p.account_id=ma.account_id
+            JOIN accounts t ON t.storage_device_id=NEW.target_device_id
+            JOIN account_onboarding ot ON ot.account_id=t.account_id
           WHERE ma.storage_device_id=m.device_id
             AND om.stage='active' AND e.state='active'
             AND datetime(e.expires_at)>CURRENT_TIMESTAMP
             AND p.scope='manager.approve.registration' AND p.enabled=1
             AND (p.expires_at IS NULL OR p.expires_at>(unixepoch()*1000))
+            AND ot.stage='profile_review'
+            AND ot.first_review_by=ma.account_id
         ) ELSE (m.access_expires_at IS NULL
           OR datetime(m.access_expires_at)>CURRENT_TIMESTAMP)
         END
