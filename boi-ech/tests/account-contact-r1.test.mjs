@@ -22,7 +22,7 @@ test("R1: email-only registration is stored as unverified and never sends OTP",a
   assert.equal(data.account.status,"pending");
   assert.equal(f.sqlite.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").get(data.account.accountId).stage,"requested");
   const contact=f.sqlite.prepare("SELECT kind,value,verified FROM account_contacts WHERE account_id=?").get(data.account.accountId);
-  assert.deepEqual(contact,{kind:"email",value:"student@gmail.com",verified:0});
+  assert.equal(contact.kind,"email");assert.equal(contact.value,"student@gmail.com");assert.equal(contact.verified,0);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_entitlements").get().n,0);
  }finally{f.close()}
 });
@@ -33,7 +33,7 @@ test("R1: phone-only registration accepts international formats but never treats
   assert.equal(response.status,200);
   const data=await response.json();
   const c=f.sqlite.prepare("SELECT kind,value,verified FROM account_contacts WHERE account_id=?").get(data.account.accountId);
-  assert.deepEqual(c,{kind:"phone",value:"+79991234567",verified:0});
+  assert.equal(c.kind,"phone");assert.equal(c.value,"+79991234567");assert.equal(c.verified,0);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_devices WHERE account_id=? AND approved=1").get(data.account.accountId).n,1);
   const invalid=await f.post("api/accounts/route.ts",{...payload(103,"phone","000"),publicKey:await publicKey()});
   assert.equal(invalid.status,400);
