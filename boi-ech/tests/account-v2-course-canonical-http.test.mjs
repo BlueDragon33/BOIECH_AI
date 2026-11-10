@@ -7,7 +7,7 @@ async function newKey(){
  return crypto.subtle.exportKey('jwk',pair.publicKey);
 }
 const profile=n=>({familyName:'Synthetic',givenName:'Person',personCode:'PERSON'+n,
- className:'Same class',phone:'090'+String(n).padStart(7,'0')});
+ className:'Same class',phone:'090'+String(n).padStart(7,'0'),facultyUnit:"Training Department",jobTitle:"Instructor",jobPosition:"Unit Manager"});
 async function approveFirstManager(f){
  const manager=await f.register(100,'manager');
  await f.flow.firstReview({kind:'owner',actor:'owner@fixture.invalid'},manager.account.accountId,1);
