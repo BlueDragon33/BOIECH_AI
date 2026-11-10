@@ -14,6 +14,7 @@ export async function accountConfiguration() {
   }
   const enabled = values.BOI_ECH_ACCOUNT_FIRST === "true";
   const v2 = enabled && values.BOI_ECH_ACCOUNT_V2 === "true";
+  const singleReview = v2 && values.BOI_ECH_SINGLE_REVIEW === "true";
   const origin = typeof values.BOI_ECH_ACCOUNT_ORIGIN === "string" ? values.BOI_ECH_ACCOUNT_ORIGIN : "";
   if (enabled) {
     let valid = false;
@@ -21,7 +22,7 @@ export async function accountConfiguration() {
       (values.LOCAL_CONTROL_PLANE === "true" && ["localhost", "127.0.0.1"].includes(u.hostname))); } catch { /* fail closed */ }
     if (!valid) throw new AccountError("ACCOUNT_ORIGIN_UNCONFIGURED", 503);
   }
-  return { enabled, origin, v2 };
+  return { enabled, origin, v2, singleReview };
 }
 export function sameOrigin(origin: string | null, expected: string, contentType: string | null, requireJson = true) {
   if (!origin || origin !== expected || (requireJson && !contentType?.toLowerCase().startsWith("application/json"))) throw new AccountError("ACCOUNT_CSRF_REJECTED", 403);
@@ -29,7 +30,7 @@ export function sameOrigin(origin: string | null, expected: string, contentType:
 export async function accountService() {
   const config = await accountConfiguration();
   if (!config.enabled) throw new AccountError("ACCOUNT_FEATURE_DISABLED", 404);
-  return new AccountService(await getCourseDatabase(), Date.now, config.v2);
+  return new AccountService(await getCourseDatabase(), Date.now, config.v2, config.singleReview);
 }
 export async function accountCookieToken() { return (await cookies()).get(ACCOUNT_COOKIE)?.value ?? ""; }
 export function sessionCookie(token: string) {
@@ -72,8 +73,9 @@ export function accountErrorResponse(error: unknown) {
     DEVICE_LIMIT_REACHED: "Đã đủ 3 thiết bị. Hãy dùng máy đã xác nhận để gỡ máy cũ hoặc mã khôi phục an toàn.",
     DEVICE_APPROVAL_REQUIRED: "Thiết bị mới đang chờ xác nhận từ một thiết bị tin cậy.",
     DEVICE_APPROVAL_CONFLICT: "Thiết bị đã thay đổi trạng thái; tải lại trước khi duyệt.",
-    ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa hoàn tất hai lần phê duyệt.",
+    ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa được duyệt hoặc chưa hoàn tất hồ sơ bắt buộc.",
     ACCOUNT_ONBOARDING_MISSING: "Trạng thái xét duyệt chưa được xác minh; hãy liên hệ quản trị.",
+    ACCOUNT_REVIEW_SUPERSEDED: "Đã sử dụng quy trình duyệt một lần; không tồn tại duyệt vòng hai.",
     PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, mã, đơn vị và số điện thoại.",
     ACCOUNT_CONTACT_INVALID: "Chọn Email hoặc SĐT hợp lệ để đăng ký. Không yêu cầu xác minh khi đăng ký.",
     PROFILE_CONFLICT: "Mã cá nhân hoặc số điện thoại đã được sử dụng. Kiểm tra lại với cán bộ.",
