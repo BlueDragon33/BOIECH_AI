@@ -22,11 +22,19 @@ test("V9 V2 review has independent learner/teacher tabs with verified request co
  assert.match(panel,/readback\(person\.accountId\)/);
  assert.doesNotMatch(panel,/Mã: \{person\.accountId/);
 });
-test("V9 account settings and P-256 devices appear only inside personal settings for ACTIVE account",()=>{
- const gate=read("account-gate.tsx");
- assert.match(gate,/accountSettings=\{accountPanel\}/);
- assert.match(gate,/\{active\?<details className=\{styles\.profileDevices\}/);
- assert.match(gate,/Trang cá nhân · Cài đặt và bảo mật/);
+test("V9 account settings open one Premium popup, not an in-page footer",()=>{
+ const gate=read("account-gate.tsx"),manager=read("manager-workspace.tsx"),profile=read("account-profile-dialog.tsx");
+ assert.match(gate,/AccountProfileDialog open=\{profileOpen\}/);
+ assert.match(gate,/onOpenAccount=\{\(\)=>setProfileOpen\(true\)\}/);
+ assert.match(gate,/onLogout=\{\(\)=>void logoutAccount\(\)\}/);
+ assert.doesNotMatch(gate,/<details className=\{styles\.managerAccountTools\}>/);
+ assert.match(gate,/id:"security",label:"Bảo mật cá nhân"/);
+ assert.match(gate,/id:"devices",label:"Bảo mật và thiết bị"/);
+ assert.match(manager,/aria-label="Mở menu tài khoản Cán bộ quản lý"/);
+ assert.match(manager,/Đăng xuất tài khoản/);
+ assert.doesNotMatch(manager,/accountSettings\?\<section/);
+ assert.match(profile,/role="dialog" aria-modal="true"/);
+ assert.match(profile,/event\.key==="Escape"/);
  assert.doesNotMatch(gate,/Gia hạn phiên/);
  assert.doesNotMatch(gate,/Hàng chờ xét duyệt học viên và giảng viên · Account-first V2/);
 });
