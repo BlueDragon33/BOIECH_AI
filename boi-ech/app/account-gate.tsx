@@ -499,7 +499,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   return <>
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
       <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
-        onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}/>
+        onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
+        accountName={account.name||"Cán bộ quản lý"}/>
     </div> : null}
     {!managerDashboard && ready && active && !recovery && account ? <div key={account.accountId}>{children}</div> : null}
     {!managerDashboard && ready && active && pathname!=="/" && account?
