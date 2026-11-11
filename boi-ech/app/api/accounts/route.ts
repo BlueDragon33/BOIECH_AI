@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     }
     // Only reveal the registration CONTACT KIND (not its value), and only to the
     // owning authenticated, trusted device. This selects the opposite UI field.
-    const primaryContact=config.v2 && account.role==="manager" && account.deviceApproved
+    const primaryContact=config.v2 && account.deviceApproved
       ? await (await getCourseDatabase()).prepare("SELECT kind FROM account_contacts WHERE account_id=?")
         .bind(account.accountId).first<{kind:"email"|"phone"}>() : null;
     // Only public account fields leave the server, never the principal/session hash.
