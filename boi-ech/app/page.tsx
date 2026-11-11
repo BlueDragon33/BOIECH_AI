@@ -685,7 +685,7 @@ function splitLegacyLearnerName(value: string | null | undefined) {
  * Approximate RGB brightness can select white text on a pale custom card.
  * Always use a foreground with >=4.5:1 contrast against a valid #RRGGBB. */
 function colorLuminance(value: string): number | null {
-  const match = /^#([\\da-f]{2})([\\da-f]{2})([\\da-f]{2})$/i.exec(value);
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(value);
   if (!match) return null;
   const channels = match.slice(1).map(channel => Number.parseInt(channel, 16) / 255);
   const linear = channels.map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
