@@ -76,7 +76,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
   // Stage, role, revision, owner and permission are all revalidated in D1.
   if(!singleReview||locked.current||!board||person.onboardingStage!=="requested"
    ||person.status!=="pending"||!Number.isInteger(person.onboardingRevision))return;
-  if(!window.confirm(`Duyệt ${displayRole(person.role)} ${person.name||person.accountId}? Người dùng sẽ phải bổ sung hồ sơ trước khi được kích hoạt.`))return;
+  if(!window.confirm(`Duyệt ${displayRole(person.role)} ${person.name||person.accountId}? Nếu hồ sơ đã khai đầy đủ, người dùng chỉ cần xác nhận kích hoạt; nếu còn thiếu, người dùng bổ sung sau khi duyệt.`))return;
   locked.current=true;setBusy(true);setError("");setNotice("");
   try{
    const response=await command({action:"review-first",accountId:person.accountId,
@@ -85,7 +85,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
      ||response.onboarding.revision!==Number(person.onboardingRevision)+1)
     throw new Error("Máy chủ chưa xác nhận quyết định duyệt một lần.");
    const verified=await readback(person.accountId);
-   if(mounted.current){setBoard(verified);setNotice("Đã duyệt một lần và đọc lại đúng hồ sơ từ D1. Người dùng đang chờ hoàn thiện hồ sơ; chưa kích hoạt tài khoản.");}
+   if(mounted.current){setBoard(verified);setNotice("Đã duyệt một lần và đọc lại đúng hồ sơ từ D1. Hồ sơ khai trước được giữ nguyên; người dùng có thể xác nhận kích hoạt khi đủ điều kiện. Chưa cấp quyền truy cập.");}
   }catch(e){
    // An uncertain write must never show a stale queue or encourage retry.
    if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Không xác minh được quyết định duyệt. Kiểm tra nhật ký trước khi làm lại.");}
