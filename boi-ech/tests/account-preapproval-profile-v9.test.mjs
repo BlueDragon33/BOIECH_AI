@@ -84,3 +84,19 @@ test("V9 manager invitation role retains separate Owner approval; no manager-inv
    .get(applicant.account.accountId).stage,"requested");
  }finally{f.close()}
 });
+
+test("V9 Owner all-role directory reads pending profile only via privileged service, no authority mutation",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const pending=await f.register(10141,"teacher");
+  await f.flow.saveProfileDraft(pending.token,{familyName:"Giang vien",givenName:"Moi",className:"Lop hoc",phone:"",expectedRevision:1});
+  const directory=await f.service.ownerAllAccounts("",40);
+  assert.equal(directory.verified,true);
+  const person=directory.accounts.find(x=>x.accountId===pending.account.accountId);
+  assert.equal(person?.registrationProfile?.givenName,"Moi");
+  assert.equal(person?.onboardingStage,"requested");
+  assert.equal(person?.status,"pending");
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit WHERE action='account.review.first'")
+    .get().n,0);
+ }finally{f.close()}
+});
