@@ -11,7 +11,9 @@ export async function GET(request: Request) {
   try { const { service, token, config } = await accountRequest(request);
     if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview });
     const account = await service.session(token);
-    const onboarding = config.v2 ? await new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview).ownStatus(token) : null;
+    const workflow=config.v2?new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview):null;
+    const onboarding = workflow ? await workflow.ownStatus(token) : null;
+    const profileDraft=workflow && account.deviceApproved ? await workflow.ownProfileDraft(token) : null;
     const entitlement = config.v2 ? await new AccountEntitlementService(await getCourseDatabase()).read(account.accountId) : null;
     let canReadRegistrants=false;
     if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved&&entitlement?.active===true))) {
@@ -34,6 +36,8 @@ export async function GET(request: Request) {
       deviceId: account.deviceId, deviceApproved: account.deviceApproved,
       onboardingStage: onboarding?.stage ?? null, onboardingRevision: onboarding?.revision ?? null,
       onboardingNote: onboarding?.reviewNote ?? null,
+      profileDraftReady:profileDraft?.ready===true,
+      profileDraftFields:profileDraft?.fields??null,
       canReadRegistrants }, devices: await service.devices(token) });
   } catch (error) { return accountErrorResponse(error); }
 }
@@ -83,6 +87,8 @@ export async function POST(request: Request) {
     if (config.v2) {
       const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
+      if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
+      if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
       if (p.action === "submit-profile") return json({ onboarding: await workflow.submitProfile(token,p) });
       if (p.action === "review-first") return json({ onboarding: await workflow.firstReview({kind:"manager",token},String(p.accountId),p.expectedRevision) });
       if (p.action === "review-changes") return json({ onboarding: await workflow.requestChanges(
