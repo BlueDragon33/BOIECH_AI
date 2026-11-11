@@ -134,10 +134,6 @@ function StudentNavigation({ snapshot }: { snapshot: StudentSnapshot }) {
   );
 }
 
-function Capability({ icon, title, text, onClick }: { icon: string; title: string; text: string; onClick: () => void }) {
-  return <button className="student-capability" onClick={onClick}><span><StudentIcon name={icon}/></span><strong>{title}</strong><small>{text}</small><i>→</i></button>;
-}
-
 function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot; openLesson: (index: number) => void }) {
   const percent = Math.round((snapshot.completedLessons / Math.max(1, snapshot.totalLessons)) * 100);
   const remaining = Math.max(0, snapshot.totalLessons - snapshot.completedLessons);
@@ -161,19 +157,6 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
           <div className="swimmer-mark"><span/><span/><i/></div>
           <div className="hero-water-line"/>
           <blockquote>“Kỹ thuật tốt hơn.<br/>Phiên bản tốt hơn<br/>của chính bạn.”</blockquote>
-        </div>
-      </section>
-
-      <section className="student-capabilities">
-        <header><div><span>QUYỀN CỦA HỌC VIÊN</span><h2>Những gì bạn có thể làm</h2></div><p>Mọi thao tác dưới đây dùng đúng quyền học viên đã đăng ký trên thiết bị này.</p></header>
-        <div>
-          <Capability icon="roadmap" title="Xem lộ trình học" text="8 bài theo thứ tự mở khóa" onClick={() => { ensureOverview(); scrollStudentTarget("student-learning-roadmap"); }}/>
-          <Capability icon="lessons" title="Học từng bài" text="Nội dung, hình và tiêu chí đạt" onClick={() => clickOriginalNav(ORIGINAL_NAV.lessons)}/>
-          <Capability icon="practice" title="Thực hành" text="Bài tập riêng theo từng bài" onClick={() => clickOriginalNav(ORIGINAL_NAV.practice)}/>
-          <Capability icon="upload" title="Tải video của mình" text="Phân tích kỹ thuật ngay trên máy" onClick={() => window.location.assign("/phan-tich-video")}/>
-          <Capability icon="results" title="Xem kết quả" text="Tiến độ và dữ liệu cá nhân" onClick={() => clickOriginalNav(ORIGINAL_NAV.results)}/>
-          <Capability icon="ai" title="Hỏi Frog AI" text="Trợ giảng có nguồn dẫn" onClick={() => clickOriginalNav(ORIGINAL_NAV.ai)}/>
-          <Capability icon="test" title="Ôn tập & kiểm tra" text="Đủ 8/10 mới hoàn thành bài" onClick={() => clickOriginalNav(ORIGINAL_NAV.test)}/>
         </div>
       </section>
 
