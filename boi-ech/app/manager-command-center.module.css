@@ -75,3 +75,17 @@
 .roomContextActions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
 .commandCenter .roomContextActions button{white-space:nowrap}
 @media(max-width:520px){.roomContextActions{width:100%;justify-content:flex-start}.roomContextHeading{align-items:flex-start;flex-direction:column}}
+
+/* V9 — Real source-backed drilldown: a building contains room icons,
+   room contains scheduled class icons, class contains scoped person icons. */
+.hierarchySection{padding:12px 0;border-bottom:1px solid rgba(139,184,240,.18)}
+.hierarchyHint{font-size:.76rem;color:#c5d7f7}
+.classIconGrid,.personIconGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:9px;margin:10px 0}
+.commandCenter .classIcon,.commandCenter .personIcon{display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;justify-content:center;
+ min-height:97px;border:1px solid rgba(111,182,240,.45);border-radius:12px;background:linear-gradient(155deg,#1a3979,#252f75);color:#eef6ff;padding:11px 8px}
+.commandCenter .classIcon[aria-pressed="true"]{border-color:#7bdfff;box-shadow:0 0 0 2px #3888d7;background:linear-gradient(155deg,#3a409e,#174a86)}
+.commandCenter .classIcon strong,.commandCenter .personIcon strong{font-size:.82rem;overflow-wrap:anywhere}
+.commandCenter .classIcon small,.commandCenter .personIcon small{font-size:.72rem;color:#c7daf3}
+.commandCenter .classIcon:focus-visible,.commandCenter .personIcon:focus-visible{outline:3px solid #8ceafd;outline-offset:2px}
+.memberHeading{margin:13px 0 4px;font-size:.88rem;color:#e7ecff}
+@media(max-width:480px){.classIconGrid,.personIconGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
