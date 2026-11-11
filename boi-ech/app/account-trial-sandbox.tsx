@@ -30,7 +30,8 @@ export default function AccountTrialSandbox({lease,onExit,onExpired}:Props){
   const anchor=useRef({server:lease.serverNowMs,mono:0});
   const ended=useRef(false);
   const onExpiredRef=useRef(onExpired);
-  onExpiredRef.current=onExpired;
+  // Synchronize the latest callback after commit; never mutate a ref during render.
+  useEffect(()=>{onExpiredRef.current=onExpired;},[onExpired]);
   const expires=lease.expiresAtMs??0;
   useEffect(()=>{
     // The clock starts from an authenticated server anchor; wall-clock changes
