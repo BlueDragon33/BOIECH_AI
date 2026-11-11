@@ -39,6 +39,9 @@ test("V8 reviewer and training manager authorize same trusted principal inside D
  assert.match(train,/managerStorageDeviceId=canonical\.storage_device_id/);
  assert.match(train,/visibleSessions=sessions\.filter/);
  assert.match(train,/unassignedLearners:visiblePeople\.filter/);
+ const core=read("account-core.server.ts");
+ assert.match(core,/const quotaSQL = this\.v2Enabled/);
+ assert.match(core,/JOIN account_entitlements e ON e\.account_id=a\.account_id/);
 });
 test("V8 profile completion does not silently ignore duplicate entitlement or manager grant",()=>{
  const entitlement=read("account-entitlement.server.ts"),workflow=read("account-v2-workflow.server.ts");
