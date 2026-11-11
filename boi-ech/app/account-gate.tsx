@@ -7,14 +7,14 @@ import VerifiedSyncSettings from "./verified-sync-settings";
 import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { RegistrationRoles } from "./registration-roles";
-import { portableCredential, portableManagerProof, preparePortableAccount } from "./multi-account-switcher";
+import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
   storageDeviceId?:string|null; primaryContactKind?:"email"|"phone"|null;
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
   onboardingNote?: string|null; entitlementActive?: boolean; profileDraftReady?:boolean;
   profileDraftFields?:Record<string,string>|null;
-  canReadRegistrants?: boolean };
+  canReadRegistrants?: boolean; securityQuestionConfigured?:boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
 function accountNetworkError(error: unknown) {
@@ -29,7 +29,7 @@ async function send(body: Record<string, unknown>) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Chưa xác minh được thao tác tài khoản.");
   return data as { recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
-    devices?:Array<{device_id:string;approved:number;created_at:string}>;trial?:TrialLease };
+    devices?:Array<{device_id:string;approved:number;created_at:string}>;trial?:TrialLease;challenge?:string };
 }
 function reloadPreservingPendingManagerInvite(token: string) {
   const oneUseFragment=/^[a-f0-9]{64}$/.test(token) ? "#manager-invite="+token : "";
@@ -53,11 +53,13 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [contactType,setContactType]=useState<"email"|"phone">("email");
+  const [recoveryMethod,setRecoveryMethod]=useState<"code"|"question">("code");
   const [recovery, setRecovery] = useState(""), [notice, setNotice] = useState("");
   const [managerInvite,setManagerInvite]=useState("");
   const managerInviteRef=useRef("");
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
+  const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
     const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
@@ -121,7 +123,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // Password is used for this HTTPS submission only, then cleared from the input.
     const password = fields.password; const field = form.elements.namedItem("password") as HTMLInputElement | null;
     if (field) field.value = "";
+    const answerInput=form.elements.namedItem("securityAnswer") as HTMLInputElement|null;
+    if(answerInput) answerInput.value="";
     await run(async () => {
+      if(mode==="recover"&&v2&&recoveryMethod==="question"){
+        const login=String(fields.login||"").trim().toLowerCase();
+        const challenge=await send({action:"security-recovery-challenge",login});
+        const proof=await portableChildhoodRecoveryProof(login,challenge.challenge||"");
+        const result=await send({...fields,password,...proof,action:"security-recover",login});
+        setRecovery(result.recoveryCode??"");setMode("login");
+        setNotice("Đã đặt lại mật khẩu bằng câu trả lời và khóa P-256 gốc. Tất cả phiên cũ bị thu hồi; lưu mã khôi phục mới.");
+        await reload();broadcast();return;
+      }
       const key = mode === "recover" || mode==="devices" ? {} : await portableCredential(mode === "claim");
       if(mode==="devices"){
         const action=recoveryDevices.length ? fields.approvePending==="on" ? "approve-recovered-device" : "recover-lost-device" : "recovery-devices";
