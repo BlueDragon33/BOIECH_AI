@@ -169,8 +169,8 @@ export class AccountService {
     if ((result.results?.length ?? 0) > 100) fail("ACCOUNT_RESULT_LIMIT", 413);
     return Promise.all((result.results ?? []).map(r => this.ownerRead(r.account_id)));
   }
-  async limitSecurityRecoveryAttempt(login: string, peer: string) {
-    await this.throttle(login,peer,"recovery-question",3);
+  async limitSecurityRecoveryAttempt(login: string, peer: string, phase: "challenge"|"recover" = "recover") {
+    await this.throttle(login,peer,"recovery-question-"+phase,phase==="challenge"?8:3);
   }
   private async throttle(login: string, peer: string, kind: string, maximum = 6) {
     const now = this.now(), window = 15 * 60 * 1000;
