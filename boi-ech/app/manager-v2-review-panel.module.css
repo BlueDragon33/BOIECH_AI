@@ -22,3 +22,7 @@
 .pager{margin-top:14px}
 @media(max-width:750px){.groups{grid-template-columns:1fr}.root{padding:14px}}
 @media(max-width:480px){.entry{align-items:stretch;flex-direction:column}.entry button{width:100%}.head button{width:100%}}
+
+.roleTabs{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 12px;border-bottom:1px solid rgba(149,181,245,.25);padding-bottom:12px}
+.root .roleTabs button{background:rgba(29,48,99,.7);border-color:rgba(149,181,245,.3);color:#dce7ff;flex:1;min-width:140px;text-align:center}
+.root .roleTabs button[aria-selected="true"],.root .roleTabs .selectedRole{background:linear-gradient(120deg,#0d6897,#5045c4);border-color:#7de2fa;color:#fff;box-shadow:0 4px 16px rgba(48,127,228,.2)}
