@@ -94,8 +94,16 @@ export class AccountService {
     const onboarding = this.v2Enabled ? await this.db.prepare(
       "SELECT stage,revision,last_review_note FROM account_onboarding WHERE account_id=?").bind(id)
       .first<{stage:string;revision:number;last_review_note:string|null}>() : null;
+    const profileDraft=this.v2Enabled?await this.db.prepare("SELECT profile_json,updated_at FROM account_profile_drafts WHERE account_id=?")
+      .bind(id).first<{profile_json:string;updated_at:string}>():null;
+    const contacts=this.v2Enabled?await this.db.prepare("SELECT kind,value,secondary_kind,secondary_value FROM account_contacts WHERE account_id=?")
+      .bind(id).first<{kind:string;value:string;secondary_kind:string|null;secondary_value:string|null}>():null;
     return { ...view(row), onboardingStage: onboarding?.stage??null, onboardingRevision: onboarding?.revision??null,
       reviewNote: onboarding?.last_review_note??null,
+      registrationProfile:profileDraft?JSON.parse(profileDraft.profile_json):null,
+      registrationProfileUpdatedAt:profileDraft?.updated_at??null,
+      registrationContact:contacts?{kind:contacts.kind,value:contacts.value,
+        secondaryKind:contacts.secondary_kind,secondaryValue:contacts.secondary_value}:null,
       entitlement,
       permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
@@ -108,14 +116,17 @@ export class AccountService {
       fail("ACCOUNT_INPUT",400);
     const limit=pageLimit as number;
     const result=await this.db.prepare(`SELECT a.account_id AS accountId,
-      a.revision AS accountRevision,d.person_role AS role,d.learner_name AS name,
-      d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision
+      a.revision AS accountRevision,d.person_role AS role,
+      COALESCE(d.learner_name,trim(json_extract(pd.profile_json,'$.familyName')||' '||json_extract(pd.profile_json,'$.givenName'))) AS name,
+      d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision,
+      pd.updated_at AS profileDraftUpdatedAt
       FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_onboarding o ON o.account_id=a.account_id
+      LEFT JOIN account_profile_drafts pd ON pd.account_id=a.account_id
       WHERE d.person_role='manager' AND a.account_id>?
       ORDER BY a.account_id LIMIT ?`).bind(after,limit+1)
       .all<{accountId:string;accountRevision:number;role:string;name:string|null;
-        status:string;onboardingStage:string;onboardingRevision:number}>();
+        status:string;onboardingStage:string;onboardingRevision:number;profileDraftUpdatedAt:string|null}>();
     const rows=result.results??[],hasMore=rows.length>limit,managers=rows.slice(0,limit);
     return {contract:"boi-manager-intake.v2" as const,verified:true,
       managers,nextCursor:hasMore?managers[managers.length-1].accountId:null};
