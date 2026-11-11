@@ -237,11 +237,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             {(account.role==="manager"
               ?([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["facultyUnit","Khoa / Đơn vị","text"],
                 ["jobTitle","Chức danh","text"],["jobPosition","Chức vụ","text"]] as const)
-              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["className","Lớp / đơn vị","text"],["phone","Số điện thoại","tel"]] as const)
+              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["className","Lớp / đơn vị","text"],["phone","Số điện thoại bổ sung","tel"]] as const).filter(([name])=>name!=="phone"||account.primaryContactKind!=="phone")
             ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
-              <span>{label} <span className={styles.requiredMark} aria-label="Bắt buộc">*</span></span>
-              <input name={name} type={kind} defaultValue={account.profileDraftFields?.[name]??""} required aria-required="true" minLength={name==="phone"?7:2}
-                maxLength={name==="phone"||name==="personCode"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
+              <span>{label} {name==="phone"?<small>(không bắt buộc)</small>:<span className={styles.requiredMark} aria-label="Bắt buộc">*</span>}</span>
+              <input name={name} type={kind} defaultValue={account.profileDraftFields?.[name]??""} required={name!=="phone"} aria-required={name!=="phone"} minLength={name==="phone"?7:2}
+                maxLength={name==="phone"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
                 autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
                 disabled={busy}/>
