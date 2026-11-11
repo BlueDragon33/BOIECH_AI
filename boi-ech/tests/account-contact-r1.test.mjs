@@ -11,7 +11,7 @@ async function publicKey(){
 function payload(n,contactType,contactValue){
  return {action:"register",role:"learner",login:"r1contact"+n,
   password:"A private passphrase for R1 "+n,
-  privacyAccepted:true,contactType,contactValue};
+  privacyAccepted:true,securityAnswer:"Tuoi nho cua toi",contactType,contactValue};
 }
 test("R1: email-only registration is stored as unverified and never sends OTP",async()=>{
  const f=accountStack({v2:true});
@@ -70,7 +70,10 @@ test("R1: UX stays on distinct login/register screens, with a contact icon switc
  assert.match(gate,/name="contactValue"/);
  assert.match(gate,/name="contactType"/);
  assert.match(gate,/onClick=\{\(\)=>setMode\("recover"\)\}/);
- assert.match(gate,/className=\{styles.profileDevices\}/);
+ assert.match(gate,/AccountProfileDialog/);
+ const profile=read("../app/account-profile-dialog.tsx");
+ assert.match(profile,/id:"overview"\|"security"\|"devices"\|"sync"/);
+  assert.match(gate,/id:"devices"/);
  assert.doesNotMatch(gate,/"Đăng ký một lần"|"Chuyển hồ sơ cũ"|"Gỡ máy cũ khi đủ 3 thiết bị"/);
  assert.match(css,/\.authRoot \.contactMethods button\[aria-pressed=true\]/);
  assert.match(api,/normalizeRegistrationContact\(p.contactType,p.contactValue\)/);

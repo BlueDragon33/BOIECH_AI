@@ -1,56 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-
-const manager = fs.readFileSync(new URL("../app/teacher-roster-manager.tsx", import.meta.url), "utf8");
-
-test("roster sync guards teacher role before deriving identity or calling roster API", () => {
-  const syncStart = manager.indexOf("const syncRoster = async");
-  const syncEnd = manager.indexOf("const mutate = async", syncStart);
-  const syncBlock = manager.slice(syncStart, syncEnd);
-  const syncGuard = syncBlock.indexOf('document.body.dataset.teacherRoleUi !== "active"');
-  const syncRequest = syncBlock.indexOf('requestRoster(deviceId, "list")');
-  assert.ok(syncGuard >= 0);
-  assert.ok(syncRequest > syncGuard);
-
-  const ensureStart = manager.indexOf("const ensureTeacherDeviceSynced = async () => {");
-  const ensureEnd = manager.indexOf("const updateMounts", ensureStart);
-  const ensureBlock = manager.slice(ensureStart, ensureEnd);
-  const ensureGuard = ensureBlock.indexOf('document.body.dataset.teacherRoleUi !== "active"');
-  const derive = ensureBlock.indexOf("deriveDeviceId()");
-  assert.ok(ensureGuard >= 0);
-  assert.ok(derive > ensureGuard);
+const source=fs.readFileSync(new URL("../app/teacher-roster-manager.tsx",import.meta.url),"utf8");
+test("V9 roster guards the teacher role before any signed fetch",()=>{
+ assert.match(source,/document\.body\.dataset\.teacherRoleUi!=="active"/);
+ assert.match(source,/readApprovedRoster\(id\)/);
+ assert.match(source,/if\(data\.canManage!==false\)/);
 });
-
-test("leaving teacher role clears roster state and invalidates in-flight requests", () => {
-  assert.match(manager, /syncGenerationRef\.current \+= 1/);
-  assert.match(manager, /clearRosterState\(\)/);
-  assert.match(manager, /setData\(\{ roster: \[\], counts: \{ pending: 0, approved: 0, blocked: 0 \}, syncedAt: "" \}\)/);
-  assert.match(manager, /teacherActiveRef\.current = false/);
+test("V9 role change purges data and stale requests",()=>{
+ assert.match(source,/generation\.current\+\+;device\.current="";busy\.current=false/);
+ assert.match(source,/setData\(EMPTY\)/);
+ assert.match(source,/epoch!==generation\.current/);
 });
-
-test("account switching detects device identity changes immediately", () => {
-  assert.match(manager, /changedDevice = Boolean\(deviceIdRef\.current && deviceIdRef\.current !== deviceId\)/);
-  assert.match(manager, /attributeFilter: \["data-teacher-role-ui", "class", "title", "data-device-id"\]/);
-  assert.match(manager, /syncedDeviceRef\.current !== deviceId/);
-  assert.match(manager, /deviceIdRef\.current = deviceId/);
+test("V9 device switch clears previous account records before fetching new roster",()=>{
+ assert.match(source,/liveDevice!==device\.current/);
+ assert.match(source,/generation\.current\+\+;device\.current="";busy\.current=false/);
 });
-
-test("generation guards prevent stale account responses from replacing the current roster", () => {
-  assert.match(manager, /const generation = syncGenerationRef\.current/);
-  assert.match(manager, /generation !== syncGenerationRef\.current \|\| deviceIdRef\.current !== deviceId/);
-  assert.match(manager, /if \(generation === syncGenerationRef\.current\)/);
+test("V9 request and status are scoped to assigned approved teacher learners",()=>{
+ assert.match(source,/body:JSON\.stringify\(\{action:"list",deviceId,challenge:challenge\.challenge,signature\}\)/);
+ assert.match(source,/data\.roster\.some\(person=>person\.status!=="approved"\)/);
 });
-
-test("only one roster request is allowed at a time for the active account", () => {
-  assert.match(manager, /if \(syncingRef\.current\) return;/);
-  assert.match(manager, /const alreadySynced = await ensureTeacherDeviceSynced\(\)/);
-  assert.match(manager, /if \(!alreadySynced\) await syncRoster\("auto"\)/);
-  assert.doesNotMatch(manager, /ensureTeacherDeviceSynced\(\)\.then\(\(\) => void syncRoster/);
+test("V9 background update retains one 60-second timer",()=>{
+ assert.match(source,/window\.setInterval\(\(\)=>\{if\(document\.body\.dataset\.teacherRoleUi==="active"\)void sync\(\);\},60000\)/);
+ assert.match(source,/window\.addEventListener\("focus",onVisible\)/);
 });
-
-test("visible-tab auto refresh remains at the requested 60-second cadence", () => {
-  assert.match(manager, /window\.setInterval\([\s\S]*60_000/);
-  assert.match(manager, /document\.visibilityState === "visible"/);
-  assert.match(manager, /document\.addEventListener\("visibilitychange", onVisible\)/);
+test("V9 teacher roster has no old mutate UI or pending approval count",()=>{
+ assert.doesNotMatch(source,/const mutate = async|requestRoster\(deviceId, action/);
+ assert.doesNotMatch(source,/canManage=\{data\.canManage !== false\}/);
+ assert.doesNotMatch(source,/Phê duyệt<\/button>|Loại khỏi lớp<\/button>/);
 });

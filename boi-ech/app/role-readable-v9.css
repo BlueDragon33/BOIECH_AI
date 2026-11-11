@@ -1,0 +1,1093 @@
+/*
+ * V9 accessibility/legibility reconciliation — scoped to authenticated roles.
+ * The canonical appearance control in page.tsx sets --font-adjust (0/2/4px)
+ * and appearance data attributes. Do not fork preference state.
+ * Loaded LAST so historical 6–11px visual reference values cannot win.
+ */
+
+/* I. Teacher: all navigation content remains reachable inside a short viewport. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell .sidebar{
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior-y:contain;
+  scrollbar-gutter:stable;
+  height:100dvh!important;
+  max-height:100dvh!important;
+  min-height:0!important;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .sidebar::after{
+  display:none!important; /* old diagonal ornament crosses the bottom menu */
+}
+body[data-teacher-role-ui="active"] .teacher-role-nav-mount{
+  min-height:max-content!important;
+  height:auto!important;
+  flex:0 0 auto!important;
+  overflow:visible!important;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .teacher-role-nav{
+  min-height:0!important;
+  height:auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  grid-template-rows:none!important;
+  gap:10px!important;
+  padding:13px 10px 28px!important;
+  align-content:initial!important;
+}
+body[data-teacher-role-ui="active"] .teacher-role-nav-list{
+  display:grid!important;
+  grid-auto-rows:minmax(49px,auto);
+  gap:5px!important;
+  min-width:0;
+  flex:none;
+}
+body[data-teacher-role-ui="active"] .teacher-role-nav-list button{
+  grid-template-columns:24px minmax(0,1fr)!important;
+  min-height:49px!important;
+  height:auto!important;
+  padding:10px 12px!important;
+  gap:10px!important;
+  text-align:left;
+  align-items:center;
+  overflow:visible!important;
+}
+body[data-teacher-role-ui="active"] .teacher-role-nav-list button span{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+body[data-teacher-role-ui="active"] .teacher-nav-brand-note,
+body[data-teacher-role-ui="active"] .teacher-editor-shortcut,
+body[data-teacher-role-ui="active"] .teacher-nav-quote,
+body[data-teacher-role-ui="active"] .teacher-nav-profile{
+  margin-top:0!important;
+  align-self:stretch!important;
+  min-width:0;
+  height:auto!important;
+  flex:0 0 auto!important;
+}
+body[data-teacher-role-ui="active"] .teacher-nav-quote{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.55!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+  padding:12px 10px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-nav-profile small,
+body[data-teacher-role-ui="active"] .teacher-editor-shortcut small,
+body[data-teacher-role-ui="active"] .teacher-nav-brand-note small{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-teacher-role-ui="active"] .teacher-nav-profile strong,
+body[data-teacher-role-ui="active"] .teacher-editor-shortcut strong{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+  overflow-wrap:anywhere;
+}
+
+/* II. Teacher appearance — restore the original working shared control. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"]
+.app-shell .main-area > .topbar .topbar-actions > button.appearance-trigger{
+  display:inline-flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  align-items:center!important;
+  justify-content:center;
+  gap:7px;
+  flex:0 0 auto;
+  min-width:0;
+  min-height:44px!important;
+  padding:8px 12px!important;
+  border:1px solid #72bdd9!important;
+  border-radius:12px!important;
+  background:linear-gradient(125deg,#173e67,#263c79)!important;
+  color:#f0fbff!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  font-weight:800;
+  cursor:pointer;
+}
+body[data-teacher-role-ui="active"] .topbar-actions{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  min-width:0;
+}
+body[data-teacher-role-ui="active"] .teacher-appearance-shortcut{
+  display:grid;
+  grid-template-columns:24px minmax(0,1fr) auto;
+  align-items:center;
+  gap:11px;
+  min-height:58px;
+  padding:10px 13px;
+  border:1px solid #5fbfd08a;
+  border-radius:12px;
+  color:#ebfaff;
+  background:linear-gradient(120deg,#174b73,#323776);
+  cursor:pointer;
+  text-align:left;
+  font:inherit;
+  width:100%;
+}
+.teacher-appearance-shortcut svg{width:22px;height:22px;color:#94eff4}
+.teacher-appearance-shortcut>span:nth-of-type(1){display:grid;gap:3px;min-width:0}
+body[data-teacher-role-ui="active"] .teacher-appearance-shortcut strong{
+  font-size:calc(14px + var(--font-adjust,0px));
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-appearance-shortcut small{
+  color:#b5d7ee;
+  font-size:calc(11px + var(--font-adjust,0px));
+  line-height:1.45;
+}
+body[data-teacher-role-ui="active"] .teacher-appearance-shortcut:hover{
+  border-color:#98f0ee;
+  box-shadow:inset 3px 0 0 #8cf4e8;
+}
+body[data-teacher-role-ui="active"] .teacher-appearance-shortcut:focus-visible{
+  outline:3px solid #94f4ff;
+  outline-offset:3px;
+}
+body[data-teacher-role-ui="active"] .appearance-panel{
+  z-index:150!important;
+  max-width:min(420px,calc(100vw - 16px));
+  max-height:calc(100dvh - 20px);
+  overflow-y:auto;
+}
+body[data-teacher-role-ui="active"] .appearance-panel button,
+body[data-teacher-role-ui="active"] .appearance-panel label{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+
+/* III. Teacher overview: remove miniature reference-fit typography. */
+body[data-teacher-role-ui="active"] .teacher-dashboard{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.5;
+}
+body[data-teacher-role-ui="active"] .teacher-white-card,
+body[data-teacher-role-ui="active"] .teacher-rail-card{
+  min-width:0;
+  height:auto!important;
+  max-height:none!important;
+  border-radius:var(--ui-radius,14px)!important;
+  background:var(--card-background,#fff)!important;
+}
+body[data-teacher-role-ui="active"] .teacher-white-card>header,
+body[data-teacher-role-ui="active"] .teacher-rail-card>header{
+  min-height:56px!important;
+  height:auto!important;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:14px 16px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-white-card>header>div,
+body[data-teacher-role-ui="active"] .teacher-rail-card>header>div{min-width:0}
+body[data-teacher-role-ui="active"] .teacher-white-card>header strong,
+body[data-teacher-role-ui="active"] .teacher-rail-card>header strong{
+  font-size:calc(19px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+  overflow-wrap:anywhere;
+  color:var(--card-ink,#173c5e)!important;
+}
+body[data-teacher-role-ui="active"] .teacher-white-card>header small,
+body[data-teacher-role-ui="active"] .teacher-rail-card>header small{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+  color:var(--card-muted,#607b91)!important;
+}
+body[data-teacher-role-ui="active"] .teacher-white-card>header button,
+body[data-teacher-role-ui="active"] .teacher-rail-card>header button{
+  min-height:42px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  white-space:normal;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:12px!important;
+  padding:13px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-action{
+  display:grid!important;
+  grid-template-columns:46px minmax(0,1fr)!important;
+  align-items:center!important;
+  min-height:102px!important;
+  height:auto!important;
+  gap:12px!important;
+  padding:13px!important;
+  border-radius:12px!important;
+  background:color-mix(in srgb,var(--card-background,#fff) 95%,var(--accent-color,#168dc2) 5%)!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-action>span{
+  width:44px!important;height:44px!important;border-radius:12px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-action>span svg{
+  width:24px!important;height:24px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-action>div{min-width:0}
+body[data-teacher-role-ui="active"] .teacher-capability-action strong{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+  color:var(--card-ink,#183a5a)!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-action small{
+  display:block;
+  margin-top:6px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.48!important;
+  color:var(--card-muted,#607c90)!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-class-summary .teacher-metric{
+  min-height:96px!important;height:auto!important;
+  padding:13px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-metric>div>strong{
+  font-size:calc(27px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-metric>div>span{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+}
+body[data-teacher-role-ui="active"] .teacher-metric>div>small{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-teacher-role-ui="active"] .teacher-task-list span,
+body[data-teacher-role-ui="active"] .teacher-monitor-list strong,
+body[data-teacher-role-ui="active"] .teacher-alert-list strong,
+body[data-teacher-role-ui="active"] .teacher-analysis-copy strong,
+body[data-teacher-role-ui="active"] .teacher-table td,
+body[data-teacher-role-ui="active"] .teacher-table th,
+body[data-teacher-role-ui="active"] .teacher-student strong,
+body[data-teacher-role-ui="active"] .teacher-row-action,
+body[data-teacher-role-ui="active"] .teacher-rail-empty{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-task-list button,
+body[data-teacher-role-ui="active"] .teacher-monitor-list button,
+body[data-teacher-role-ui="active"] .teacher-alert-list button{
+  height:auto!important;
+  min-height:45px!important;
+  align-items:center;
+}
+body[data-teacher-role-ui="active"] .teacher-task-list small,
+body[data-teacher-role-ui="active"] .teacher-monitor-list small,
+body[data-teacher-role-ui="active"] .teacher-analysis-copy small,
+body[data-teacher-role-ui="active"] .teacher-analysis-copy p,
+body[data-teacher-role-ui="active"] .teacher-watch-tools span,
+body[data-teacher-role-ui="active"] .teacher-table .teacher-cell-note,
+body[data-teacher-role-ui="active"] .teacher-page>header p{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-table-wrap{
+  max-width:100%;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body[data-teacher-role-ui="active"] .teacher-table th,
+body[data-teacher-role-ui="active"] .teacher-table td{
+  padding:12px!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-dashboard button:focus-visible,
+body[data-teacher-role-ui="active"] .teacher-role-nav button:focus-visible{
+  outline:3px solid #1aa4c4;
+  outline-offset:2px;
+}
+
+/* IV. Learner: lesson cards and supporting panels respond to ALL 3 text sizes. */
+body[data-student-role-ui="active"] .student-dashboard{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.55;
+}
+body[data-student-role-ui="active"] .student-learning-card,
+body[data-student-role-ui="active"] .student-goals-card,
+body[data-student-role-ui="active"] .student-progress-card,
+body[data-student-role-ui="active"] .student-video-card{
+  min-width:0;
+  height:auto!important;
+  background:var(--card-background,#fff);
+  border-radius:var(--ui-radius,14px);
+}
+body[data-student-role-ui="active"] .student-lesson-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:13px!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button{
+  min-height:230px!important;
+  height:auto!important;
+  padding:0 15px 16px!important;
+  overflow-wrap:anywhere;
+  line-height:1.45;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button.locked{
+  opacity:.83!important; /* locked remains distinguishable but text is legible */
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button>small{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button>strong{
+  min-height:0!important;
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+  margin-top:7px!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button>p{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  color:#4e6879!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button footer{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+  margin-top:auto;
+}
+body[data-student-role-ui="active"] .student-learning-card header button,
+body[data-student-role-ui="active"] .student-video-copy button,
+body[data-student-role-ui="active"] .student-role-nav-list button span{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-goals-card li,
+body[data-student-role-ui="active"] .student-progress-card p,
+body[data-student-role-ui="active"] .student-profile-card p,
+body[data-student-role-ui="active"] .student-video-copy p,
+body[data-student-role-ui="active"] .student-video-flow strong,
+body[data-student-role-ui="active"] .student-video-flow small,
+body[data-student-role-ui="active"] .student-mini-stats span{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.55!important;
+}
+body[data-student-role-ui="active"] .student-mini-stats strong,
+body[data-student-role-ui="active"] .student-goals-card h3{
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid button:focus-visible{
+  outline:3px solid var(--accent-color,#1ba5c0);
+  outline-offset:3px;
+}
+
+/* V. Responsive: automatic breathing room rather than shrinking type. */
+@media(max-width:1450px){
+  body[data-student-role-ui="active"] .student-lesson-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+}
+@media(max-width:1080px){
+  body[data-student-role-ui="active"] .student-lesson-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-capability-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+}
+@media(max-width:700px){
+  body[data-teacher-role-ui="active"] .teacher-capability-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-white-card>header,
+  body[data-teacher-role-ui="active"] .teacher-rail-card>header{
+    padding:12px!important;
+  }
+  body[data-student-role-ui="active"] .student-lesson-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .sidebar{
+    height:100dvh!important;
+    max-height:100dvh!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-teacher-role-ui="active"] .teacher-capability-action,
+ body[data-student-role-ui="active"] .student-lesson-grid button{transition:none!important}
+}
+
+/* VI. Appearance controls must also change density and remain contrast-safe. */
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-density="compact"] .teacher-capability-action{
+  min-height:84px!important;
+  padding:10px!important;
+  gap:9px!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-density="compact"] .teacher-capability-grid{
+  gap:8px!important;
+  padding:9px!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-density="compact"] .student-lesson-grid>button{
+  min-height:195px!important;
+  padding-bottom:12px!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-white-card,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-capability-action,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-metric{
+  background:color-mix(in srgb,var(--card-background,#0b314b) 93%,#147db9 7%)!important;
+  color:var(--card-ink,#eaf7ff)!important;
+  border-color:#4d7492!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-capability-action strong,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-white-card>header strong,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-metric>div>span{
+  color:var(--card-ink,#eaf7ff)!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-capability-action small,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-white-card>header small,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-metric>div>small{
+  color:var(--card-muted,#b8d6e2)!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table th,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table td{
+  color:#e4f0f8!important;
+  background:#143b58!important;
+  border-color:#54718a!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-mini-stats>div{
+  background:#123850!important;
+  color:#e7f6ff!important;
+  border-color:#527c92!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button>strong,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button>p,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button footer,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button>small{
+  color:#d9f0f9!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-goals-card h3,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-goals-card li,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-progress-card p,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-mini-stats strong,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-mini-stats span{
+  color:#e3f4ff!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button.locked>small{
+  color:#12685f!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button.locked>small{
+  color:#8ce8d9!important;
+}
+
+/*
+ * VII. Screenshot follow-up: real learner home feature/adaptive cards and
+ * teacher Learners/Tasks/Reports. These use DIFFERENT components from lessons
+ * and the Overview grid; do not emulate font scaling with CSS zoom/transform.
+ */
+
+/* Adaptive learner model: header, plan buttons, competency labels and status. */
+body[data-student-role-ui="active"] .student-adaptive-coach{
+  min-width:0;
+  font-size:calc(15px + var(--font-adjust,0px))!important;
+  line-height:1.5;
+  background:var(--card-background,#fff);
+  border-radius:var(--ui-radius,14px)!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach>header{
+  grid-template-columns:minmax(0,1fr) minmax(130px,165px);
+  gap:14px;
+  min-width:0;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach h2{
+  font-size:calc(25px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach>header p,
+body[data-student-role-ui="active"] .student-adaptive-stale,
+body[data-student-role-ui="active"] .student-adaptive-coach>footer>span{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  color:#526e80!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach :is(
+  .student-adaptive-heading span,
+  .student-adaptive-average>span,
+  .student-adaptive-alerts>span
+),body[data-student-role-ui="active"] .student-adaptive-coach>header>div:first-child>span{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-heading strong{
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-heading button,
+body[data-student-role-ui="active"] .student-adaptive-coach>footer button{
+  min-height:42px!important;
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+  padding:9px 12px!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-body{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(250px,.65fr);
+  gap:14px;
+  padding:15px;
+  min-width:0;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:11px!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid>button{
+  min-width:0;
+  min-height:175px!important;
+  height:auto!important;
+  padding:15px!important;
+  overflow-wrap:anywhere;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid span,
+body[data-student-role-ui="active"] .student-adaptive-plan-grid em{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid strong{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid p{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  color:#526e80!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-insight{
+  min-width:0;
+  padding:15px;
+  gap:11px;
+}
+body[data-student-role-ui="active"] .student-adaptive-score span,
+body[data-student-role-ui="active"] .student-adaptive-competencies>div,
+body[data-student-role-ui="active"] .student-adaptive-competencies strong,
+body[data-student-role-ui="active"] .student-adaptive-alerts p,
+body[data-student-role-ui="active"] .student-adaptive-stable{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-competencies>div{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  grid-template-columns:minmax(65px,.75fr) minmax(44px,.4fr) minmax(0,1fr)!important;
+  min-height:28px;
+  gap:9px;
+}
+body[data-student-role-ui="active"] .student-adaptive-score strong,
+body[data-student-role-ui="active"] .student-adaptive-average>strong{
+  font-size:calc(30px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-loading>strong,
+body[data-student-role-ui="active"] .student-adaptive-error>strong{
+  font-size:calc(18px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-loading>span,
+body[data-student-role-ui="active"] .student-adaptive-error>span,
+body[data-student-role-ui="active"] .student-adaptive-error>p,
+body[data-student-role-ui="active"] .student-adaptive-error>button{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-density="compact"] .student-adaptive-plan-grid>button{
+  min-height:151px!important;padding:11px!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-coach{
+  background:#113750!important;color:#e6f5fa!important;border-color:#668b9b!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-coach :is(
+ h2,p,strong,small,.student-adaptive-heading strong,.student-adaptive-plan-grid p,.student-adaptive-plan-grid strong
+){color:#e6f5fa!important}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-insight,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-plan-grid>button,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-score{
+  background:#184561!important;color:#e4f3fb!important;border-color:#668b9b!important;
+}
+
+/* Teacher three named tabs share a real feature workspace, not the overview. */
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern){
+  min-width:0;
+  display:grid;
+  gap:15px;
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header{
+  min-height:0!important;
+  height:auto!important;
+  padding:20px!important;
+  overflow:visible!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header>span:not([data-teacher-sync-mount]){
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header h1{
+  font-size:calc(30px + var(--font-adjust,0px))!important;
+  line-height:1.25!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header p{
+  font-size:calc(15px + var(--font-adjust,0px))!important;
+  line-height:1.55!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-class-scope-bar{
+  min-width:0;
+  height:auto!important;
+  flex-wrap:wrap;
+  gap:12px;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-class-scope-bar :is(span,small,label,select){
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-class-scope-bar strong{
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-primary-link,
+body[data-teacher-role-ui="active"] .teacher-page .teacher-export-button{
+  min-height:44px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  padding:10px 14px!important;
+  white-space:normal;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-roster-sync-compact{
+  flex-wrap:wrap;
+  min-width:0;
+  gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-sync-compact :is(span,small),
+body[data-teacher-role-ui="active"] .teacher-roster-manager>header :is(span,p),
+body[data-teacher-role-ui="active"] .teacher-roster-summary span,
+body[data-teacher-role-ui="active"] .teacher-roster-empty{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  white-space:normal!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager>header{
+  flex-wrap:wrap;
+  gap:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager>header h2{
+  font-size:calc(22px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager :is(button,input),
+body[data-teacher-role-ui="active"] .teacher-roster-sync-compact>button,
+body[data-teacher-role-ui="active"] .teacher-roster-status{
+  min-height:38px;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary{
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr))!important;
+  gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary strong{
+  font-size:calc(23px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table-wrap,
+body[data-teacher-role-ui="active"] .teacher-table-wrap{
+  min-width:0;
+  max-width:100%;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table :is(th,td,strong,small),
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table :is(th,td,strong,small){
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table :is(th,td){
+  padding:12px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table td small,
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table td small{
+  color:#587284!important;
+}
+
+/* Tasks: intervention cards in the independent L8 UI. */
+body[data-teacher-role-ui="active"] .teacher-smart-interventions,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics{
+  min-width:0;
+  height:auto!important;
+  overflow:visible!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions>header,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics>header{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:wrap;
+  gap:14px;
+  padding:18px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions h2,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics h2{
+  font-size:calc(23px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions>header p,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics>header p,
+body[data-teacher-role-ui="active"] .teacher-smart-empty p,
+body[data-teacher-role-ui="active"] .teacher-loop-empty p{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.55!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions>header :is(span,strong),
+body[data-teacher-role-ui="active"] .teacher-learning-analytics>header>div:first-child>span{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-grid{
+  gap:13px;
+  padding:14px;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card{
+  min-width:0;
+  height:auto!important;
+  padding:17px;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card>header{
+  flex-wrap:wrap;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card :is(
+ p,ul,li,small,footer span,header>span,header>b
+){
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card :is(h3,header strong){
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card footer{
+  flex-wrap:wrap;gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card footer button{
+  min-height:42px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+  padding:9px 12px!important;
+}
+
+/* Reports: actual L7 timeline and evidence, not just page header. */
+body[data-teacher-role-ui="active"] .teacher-loop-summary{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-summary article,
+body[data-teacher-role-ui="active"] .teacher-loop-card,
+body[data-teacher-role-ui="active"] .teacher-loop-evidence{
+  min-width:0;
+  padding:15px!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-summary strong{
+  font-size:calc(26px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-summary span,
+body[data-teacher-role-ui="active"] .teacher-loop-evidence :is(span,small,i),
+body[data-teacher-role-ui="active"] .teacher-loop-card :is(
+ small,blockquote,.teacher-loop-note,.teacher-loop-status,footer span
+){
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>header{
+  flex-wrap:wrap;gap:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>header strong,
+body[data-teacher-role-ui="active"] .teacher-loop-evidence strong{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>footer{
+  flex-wrap:wrap;gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>footer button{
+  min-height:42px!important;
+  padding:9px 12px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+
+/* Layout beats shrinking fonts: fewer columns at narrower widths. */
+@media(max-width:1500px){
+ body[data-student-role-ui="active"] .student-capabilities>div{
+   grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:1180px){
+ body[data-student-role-ui="active"] .student-adaptive-body{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-loop-summary{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:950px){
+ body[data-student-role-ui="active"] .student-capabilities>div,
+ body[data-student-role-ui="active"] .student-adaptive-plan-grid,
+ body[data-teacher-role-ui="active"] .teacher-smart-grid{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-loop-evidence-grid{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+}
+@media(max-width:620px){
+ body[data-student-role-ui="active"] .student-capabilities>div,
+ body[data-student-role-ui="active"] .student-adaptive-plan-grid,
+ body[data-teacher-role-ui="active"] .teacher-smart-grid,
+ body[data-teacher-role-ui="active"] .teacher-loop-summary{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-coach>header{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-coach>footer{
+   flex-wrap:wrap;gap:10px;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-coach>footer>div{
+   flex-wrap:wrap;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-competencies>div{
+   grid-template-columns:minmax(55px,.8fr) 45px minmax(0,1fr)!important;
+ }
+}
+
+
+/* VIII. Real home navigation is already in the sidebar. Remove the duplicate
+   tile walls from both student and teacher; keep all underlying destinations. */
+body[data-student-role-ui="active"] .student-dashboard{
+  min-width:0;
+  padding-top:clamp(12px,1.6vw,20px);
+}
+body[data-student-role-ui="active"] .student-hero{
+  min-height:260px;
+}
+body[data-student-role-ui="active"] .student-hero-copy{
+  padding:clamp(22px,2.3vw,33px)!important;
+}
+body[data-student-role-ui="active"] .student-hero-visual{
+  min-height:260px;
+}
+body[data-student-role-ui="active"] .student-hero-trust{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.45;
+}
+body[data-student-role-ui="active"] .student-teacher-inbox-mount:empty{
+  display:none;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach-mount:not(:empty),
+body[data-student-role-ui="active"] .student-teacher-inbox-mount:not(:empty){
+  display:block;
+  margin-top:14px;
+  min-width:0;
+}
+body[data-teacher-role-ui="active"] .teacher-upper-grid{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  min-width:0;
+  gap:0!important;
+}
+body[data-teacher-role-ui="active"] .teacher-upper-grid>.teacher-class-summary{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+}
+/* A single scrollable sidebar remains usable; the visible extra rail is gone. */
+body[data-student-role-ui="active"] .sidebar,
+body[data-teacher-role-ui="active"] .sidebar{
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  scrollbar-width:none!important;
+  -ms-overflow-style:none;
+  scrollbar-gutter:auto!important;
+}
+body[data-student-role-ui="active"] .sidebar::-webkit-scrollbar,
+body[data-teacher-role-ui="active"] .sidebar::-webkit-scrollbar{
+  display:none!important;
+  width:0!important;
+  height:0!important;
+}
+body[data-student-role-ui="active"] .student-role-nav-mount{
+  min-height:max-content!important;
+  height:auto!important;
+  flex:0 0 auto!important;
+}
+body[data-student-role-ui="active"] .student-role-nav{
+  min-height:max-content;
+  height:auto;
+  padding-bottom:20px;
+}
+body[data-student-role-ui="active"] .topbar-actions,
+body[data-teacher-role-ui="active"] .topbar-actions{
+  scrollbar-width:none!important;
+  -ms-overflow-style:none;
+}
+body[data-student-role-ui="active"] .topbar-actions::-webkit-scrollbar,
+body[data-teacher-role-ui="active"] .topbar-actions::-webkit-scrollbar{
+  display:none!important;
+  width:0!important;
+  height:0!important;
+}
+@media(max-width:860px){
+  body[data-student-role-ui="active"] .student-hero{min-height:0}
+  body[data-student-role-ui="active"] .student-hero-visual{min-height:0}
+}
+
+/* Teacher and learner: fixed full sidebar with independently scrollable role
+   navigation. The brand never scrolls away with the right-hand content. */
+body[data-student-role-ui="active"] .app-shell>.sidebar{
+ position:fixed!important;top:0!important;bottom:0!important;left:0!important;
+ height:100dvh!important;max-height:100dvh!important;
+ overflow:hidden!important;display:flex!important;flex-direction:column!important;
+ overscroll-behavior:contain;box-sizing:border-box
+}
+body[data-student-role-ui="active"] .app-shell>.sidebar>.brand-row,
+body[data-teacher-role-ui="active"] .app-shell>.sidebar>.brand-row{
+ flex:0 0 auto!important;position:relative;z-index:1
+}
+body[data-student-role-ui="active"] .app-shell>.sidebar>.student-role-nav-mount,
+body[data-teacher-role-ui="active"] .app-shell>.sidebar>.teacher-role-nav-mount{
+ display:flex!important;flex:1 1 auto!important;height:auto!important;min-height:0!important;
+ overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;
+ scrollbar-width:none!important;-ms-overflow-style:none;
+}
+body[data-student-role-ui="active"] .student-role-nav-mount::-webkit-scrollbar,
+body[data-teacher-role-ui="active"] .teacher-role-nav-mount::-webkit-scrollbar{display:none!important;width:0!important}
+body[data-student-role-ui="active"] .app-shell .student-role-nav,
+body[data-teacher-role-ui="active"] .app-shell .teacher-role-nav{
+ min-height:max-content!important;height:auto!important;width:100%;
+ flex:0 0 auto;overflow:visible!important
+}
+
+/*
+ * V9.3 teacher shell corrective: keep ONE layout model.
+ * Teacher desktop uses a true two-column grid with a STICKY sidebar occupying
+ * the grid column. Do not apply fixed positioning: that removed the sidebar
+ * from the grid but left its column behind, crushing/overlapping main content.
+ * Learner remains the original fixed-sidebar/block model.
+ */
+@media(min-width:881px){
+ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell{
+   display:grid!important;
+   grid-template-columns:var(--td8-sidebar,220px) minmax(0,1fr)!important;
+   align-items:start!important;
+   width:100%!important;
+   min-width:0!important;
+ }
+ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell>.sidebar{
+   position:sticky!important;
+   inset:auto!important;
+   top:0!important;
+   left:auto!important;
+   bottom:auto!important;
+   align-self:start!important;
+   width:var(--td8-sidebar,220px)!important;
+   max-width:100%!important;
+   height:100dvh!important;
+   max-height:100dvh!important;
+   overflow:hidden!important;
+   display:flex!important;
+   flex-direction:column!important;
+   transform:none!important;
+ }
+ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell>.main-area{
+   width:100%!important;
+   max-width:100%!important;
+   min-width:0!important;
+   margin-left:0!important;
+   grid-column:2;
+ }
+}
+@media(max-width:880px){
+ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell{
+   display:block!important;
+   width:100%!important;
+   min-width:0!important;
+ }
+ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell>.sidebar{
+   position:fixed!important;
+   inset:0 auto 0 0!important;
+   width:min(88vw,320px)!important;
+   height:100dvh!important;
+   max-height:100dvh!important;
+   overflow:hidden!important;
+   display:flex!important;
+   flex-direction:column!important;
+ }
+ body[data-teacher-role-ui="active"][data-teacher-blueprint="active"] .app-shell>.main-area{
+   width:100%!important;
+   min-width:0!important;
+   margin-left:0!important;
+ }
+}
+/* The brand is pinned. Scroll the navigation mount, not the entire sidebar. */
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"]
+.app-shell>.sidebar>.teacher-role-nav-mount{
+ min-height:0!important;
+ height:auto!important;
+ flex:1 1 auto!important;
+ overflow-y:auto!important;
+ overflow-x:hidden!important;
+ overscroll-behavior:contain;
+ scrollbar-width:none!important;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"]
+.app-shell>.sidebar>.teacher-role-nav-mount::-webkit-scrollbar{display:none!important;width:0!important}
+/* Remove the obsolete injected teacher command-bar controls even after HMR. */
+body[data-teacher-role-ui="active"] .topbar-actions>
+:is(.teacher-topbar-refresh,.teacher-topbar-sync,.teacher-mode-badge,.teacher-alert-shortcut){
+ display:none!important;
+}
+body[data-teacher-role-ui="active"][data-teacher-blueprint="active"]
+.main-area>.topbar{
+ display:flex!important;
+ flex-direction:row!important;
+ flex-wrap:wrap!important;
+ align-items:center!important;
+ justify-content:space-between!important;
+ gap:10px!important;
+ grid-template-columns:none!important;
+ min-width:0!important;
+}
+body[data-teacher-role-ui="active"] .teacher-role-search-mount{
+ flex:1 1 270px!important;
+ width:auto!important;
+ max-width:560px!important;
+ min-width:min(100%,220px)!important;
+}
+body[data-teacher-role-ui="active"] .topbar-actions{
+ flex:0 1 auto!important;
+ min-width:0!important;
+ max-width:100%!important;
+ margin-left:auto!important;
+ display:flex!important;
+ flex-wrap:wrap!important;
+ align-items:center!important;
+ justify-content:flex-end!important;
+ overflow-x:visible!important;
+ gap:8px!important;
+}
+body[data-teacher-role-ui="active"] .topbar-actions>.learner-chip{
+ flex:0 1 auto!important;
+ min-width:0!important;
+ max-width:min(100%,300px)!important;
+}
+body[data-teacher-role-ui="active"] .topbar-actions>.appearance-trigger{
+ flex:0 0 auto!important;
+ min-height:42px!important;
+}
+@media(max-width:1150px){
+ body[data-teacher-role-ui="active"] .teacher-role-search-mount{
+   flex-basis:100%!important;
+   max-width:100%!important;
+ }
+ body[data-teacher-role-ui="active"] .topbar-actions{
+   width:100%!important;
+   justify-content:flex-end!important;
+ }
+}

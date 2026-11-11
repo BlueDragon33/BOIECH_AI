@@ -681,11 +681,32 @@ function splitLegacyLearnerName(value: string | null | undefined) {
   };
 }
 
-function darkBackground(value: string) {
+/* WCAG 2.x contrast computation for user-editable appearance backgrounds.
+ * Approximate RGB brightness can select white text on a pale custom card.
+ * Always use a foreground with >=4.5:1 contrast against a valid #RRGGBB. */
+function colorLuminance(value: string): number | null {
   const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(value);
-  if (!match) return false;
-  const [red, green, blue] = match.slice(1).map((channel) => Number.parseInt(channel, 16));
-  return (red * 299 + green * 587 + blue * 114) / 1000 < 142;
+  if (!match) return null;
+  const channels = match.slice(1).map(channel => Number.parseInt(channel, 16) / 255);
+  const linear = channels.map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+}
+function contrastRatio(foreground: string, background: string) {
+  const first = colorLuminance(foreground), second = colorLuminance(background);
+  if (first === null || second === null) return 1;
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+function darkBackground(value: string) {
+  const luminance = colorLuminance(value);
+  return luminance !== null && luminance < 0.179;
+}
+function readableForeground(background: string, lightText: string, darkText: string) {
+  const preferred = darkBackground(background) ? lightText : darkText;
+  if (contrastRatio(preferred, background) >= 4.5) return preferred;
+  const alternative = preferred === lightText ? darkText : lightText;
+  if (contrastRatio(alternative, background) >= 4.5) return alternative;
+  return contrastRatio("#ffffff", background) >= contrastRatio("#000000", background)
+    ? "#ffffff" : "#000000";
 }
 
 function InstallAppButton({ install }: { install: () => void }) {
@@ -1389,13 +1410,41 @@ export default function Home() {
     window.localStorage.setItem("boi-ech-appearance-v1", JSON.stringify(appearance));
   }, [appearance, appearanceReady]);
 
+  // Both learner and teacher reuse ONE canonical appearance panel and
+  // persisted preferences; teacher sidebar never has a separate fake control.
+  useEffect(() => {
+    const openAppearance = () => setAppearanceOpen(true);
+    window.addEventListener("boi:appearance:open", openAppearance);
+    return () => window.removeEventListener("boi:appearance:open", openAppearance);
+  }, []);
+
   useEffect(() => {
     if (!appearanceOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAppearanceOpen(false);
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const dialog = document.getElementById("appearance-panel");
+    const controls = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])'
+    ) ?? []).filter(element => element.getClientRects().length > 0);
+    controls()[0]?.focus();
+    const onDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setAppearanceOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const focusable = controls();
+      if (!focusable.length) return;
+      if (event.shiftKey && document.activeElement === focusable[0]) {
+        event.preventDefault(); focusable[focusable.length - 1].focus();
+      } else if (!event.shiftKey && document.activeElement === focusable[focusable.length - 1]) {
+        event.preventDefault(); focusable[0].focus();
+      }
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", onDialogKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
   }, [appearanceOpen]);
 
   useEffect(() => {
@@ -1446,9 +1495,6 @@ export default function Home() {
   const learnerGivenName = deviceAccess?.learnerGivenName?.trim() || legacyProfileName.learnerGivenName || "Học viên";
   const learnerFullName = deviceAccess?.learnerName?.trim() || [deviceAccess?.learnerFamilyName, learnerGivenName].filter(Boolean).join(" ");
   const learnerInitial = learnerGivenName.slice(0, 1).toUpperCase();
-  const usesDarkBackground = darkBackground(appearance.background);
-  const usesDarkContent = darkBackground(appearance.contentBackground);
-  const usesDarkCard = darkBackground(appearance.cardBackground);
   const activeLessonCanSubmit = canSubmitLesson(progress.completed, selectedLesson);
   const activeSubmissionReady = activeLessonAnswered === activeQuestions.length && activeLessonCanSubmit;
   const activeSubmissionStatus = activeLessonAnswered < activeQuestions.length
@@ -1776,12 +1822,12 @@ export default function Home() {
         "--accent-color": appearance.accent,
         "--ui-radius": `${appearance.radius}px`,
         "--ui-density": appearance.density === "compact" ? "0.88" : "1",
-        "--page-ink": usesDarkBackground ? "#f4fbfb" : "#102b3f",
-        "--page-muted": usesDarkBackground ? "#cee2e4" : "#5d7282",
-        "--content-ink": usesDarkContent ? "#f4fbfb" : "#123b61",
-        "--content-muted": usesDarkContent ? "#bad0da" : "#657d8d",
-        "--card-ink": usesDarkCard ? "#f4fbfb" : "#173c5e",
-        "--card-muted": usesDarkCard ? "#bdd0da" : "#718899",
+        "--page-ink": readableForeground(appearance.background, "#f4fbfb", "#102b3f"),
+        "--page-muted": readableForeground(appearance.background, "#cee2e4", "#5d7282"),
+        "--content-ink": readableForeground(appearance.contentBackground, "#f4fbfb", "#123b61"),
+        "--content-muted": readableForeground(appearance.contentBackground, "#bad0da", "#657d8d"),
+        "--card-ink": readableForeground(appearance.cardBackground, "#f4fbfb", "#173c5e"),
+        "--card-muted": readableForeground(appearance.cardBackground, "#bdd0da", "#718899"),
         "--site-font": fontStack,
         "--font-adjust": `${appearance.textSize}px`,
       } as React.CSSProperties}
@@ -1820,7 +1866,7 @@ export default function Home() {
           <div className="breadcrumb"><span>Môn học độc lập</span><i /> <strong>{navItems.find((item) => item.id === section)?.label}</strong></div>
           <div className="topbar-actions">
             <button className={`network-state ${networkOnline ? "online" : "offline"}`} onClick={() => void flushOfflineQueue()} title={usingOfflineLesson ? "Nội dung đang được mở từ bộ nhớ thiết bị" : undefined}><i />{networkOnline ? pendingSyncCount > 0 ? `Đồng bộ ${pendingSyncCount} mục` : "Đã kết nối" : `Học offline${pendingSyncCount > 0 ? ` · ${pendingSyncCount} mục chờ` : ""}`}</button>
-            <div className="learner-chip" title={`${learnerFullName} · ${deviceAccess.personCode ?? ""}`}><span>{learnerInitial}</span><div><small>{deviceAccess.personRole === "teacher" ? "Giảng viên" : "Học viên"}</small><strong>Chào {learnerGivenName}</strong></div></div>
+            <button type="button" className="learner-chip" title="Mở Trang cá nhân và bảo mật" aria-label="Mở Trang cá nhân và bảo mật" onClick={()=>window.dispatchEvent(new Event("boi:account:open"))}><span>{learnerInitial}</span><div><small>{deviceAccess.personRole === "teacher" ? "Giảng viên" : "Học viên"}</small><strong>Chào {learnerGivenName}</strong></div></button>
             <div className="top-status"><span className="status-dot" /> {section === "tong-quan" ? `${completedLessonCount}/8 bài đã đạt` : section === "ai-hoc-tap" ? "AI có nguồn dẫn" : section === "thuc-hanh" ? `Đang luyện Bài ${selectedLesson}` : `Bài ${selectedLesson} đang mở`}</div>
             <span className={`payment-access-status ${deviceAccess.accessGroup}`}>{deviceAccess.paymentStatus === "paid_verified" ? "Đã trả phí" : deviceAccess.paymentStatus === "free_approved" ? "Miễn phí" : "Chưa thanh toán"}</span>
             {deviceAccess.personRole === "teacher" && deviceAccess.personalEditEnabled && officialContent ? <div className="personal-content-actions"><button className="personal-edit-trigger" onClick={() => setLocalStudioOpen(true)}><span>{hasLocalOverride ? "Đang dùng bản riêng" : "Sửa bản riêng"}</span><b>Bài {selectedLesson}</b></button>{hasLocalOverride ? <button className="personal-reset-trigger" onClick={() => void confirmResetPersonalContent()} title="Xóa bản sửa cục bộ và dùng lại nội dung máy chủ"><span>↺</span> Bản máy chủ</button> : null}</div> : null}

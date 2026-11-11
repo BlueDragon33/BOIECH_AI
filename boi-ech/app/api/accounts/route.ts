@@ -4,15 +4,21 @@ import { accountRequest, accountErrorResponse, sessionCookie } from "../../accou
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
 import { AccountEntitlementService } from "../../account-entitlement.server";
+import { AccountTrialService } from "../../account-trial.server";
+import { AccountSecurityQuestionService } from "../../account-security-question.server";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
 export async function GET(request: Request) {
   try { const { service, token, config } = await accountRequest(request);
-    if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview });
+    if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial });
     const account = await service.session(token);
-    const onboarding = config.v2 ? await new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview).ownStatus(token) : null;
+    const workflow=config.v2?new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview):null;
+    const onboarding = workflow ? await workflow.ownStatus(token) : null;
+    const profileDraft=workflow && account.deviceApproved ? await workflow.ownProfileDraft(token) : null;
     const entitlement = config.v2 ? await new AccountEntitlementService(await getCourseDatabase()).read(account.accountId) : null;
+    const question=config.v2 && account.deviceApproved
+      ? await new AccountSecurityQuestionService(await getCourseDatabase(),service).status(token) : null;
     let canReadRegistrants=false;
     if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved&&entitlement?.active===true))) {
       try { await service.capability(account,"registrants.read.all"); canReadRegistrants=true; }
@@ -20,11 +26,11 @@ export async function GET(request: Request) {
     }
     // Only reveal the registration CONTACT KIND (not its value), and only to the
     // owning authenticated, trusted device. This selects the opposite UI field.
-    const primaryContact=config.v2 && account.role==="manager" && account.deviceApproved
+    const primaryContact=config.v2 && account.deviceApproved
       ? await (await getCourseDatabase()).prepare("SELECT kind FROM account_contacts WHERE account_id=?")
         .bind(account.accountId).first<{kind:"email"|"phone"}>() : null;
     // Only public account fields leave the server, never the principal/session hash.
-    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, account: { accountId: account.accountId, status: account.status, role: account.role,
+    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial, account: { accountId: account.accountId, status: account.status, role: account.role,
       primaryContactKind:primaryContact?.kind??null,
       name: config.v2 && !account.deviceApproved ? null : account.name,
       storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
@@ -34,6 +40,9 @@ export async function GET(request: Request) {
       deviceId: account.deviceId, deviceApproved: account.deviceApproved,
       onboardingStage: onboarding?.stage ?? null, onboardingRevision: onboarding?.revision ?? null,
       onboardingNote: onboarding?.reviewNote ?? null,
+      profileDraftReady:profileDraft?.ready===true,
+      profileDraftFields:profileDraft?.fields??null,
+      securityQuestionConfigured:question?.configured===true,
       canReadRegistrants }, devices: await service.devices(token) });
   } catch (error) { return accountErrorResponse(error); }
 }
@@ -47,6 +56,12 @@ export async function POST(request: Request) {
     // Peer identity is supplied by the trusted edge; never accept an arbitrary payload identity.
     const peer = request.headers.get("cf-connecting-ip") ?? "unavailable-edge-peer";
     if (p.action === "legacy-challenge") return json(await createDeviceChallenge(p.deviceId, true));
+    if(config.v2 && p.action==="security-recovery-challenge")
+      return json(await new AccountSecurityQuestionService(await getCourseDatabase(),service).challenge(p.login,peer));
+    if(config.v2 && p.action==="security-recover")
+      return json({ok:true,...await new AccountSecurityQuestionService(await getCourseDatabase(),service).recover(p,peer)},sessionCookie(""));
+    if(config.v2 && p.action==="security-question-set")
+      return json({securityQuestion:await new AccountSecurityQuestionService(await getCourseDatabase(),service).change(token,p.password,p.securityAnswer)});
     if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
     if (config.v2 && p.action === "contact-check") {
       const c=normalizeRegistrationContact(p.contactType,p.contactValue);
@@ -60,6 +75,8 @@ export async function POST(request: Request) {
     // Only public account intake is required to supply one self-declared contact.
     // Do NOT send OTP, or treat matching this string as proof of a trusted device.
     if (config.v2 && (p.action === "register" || p.action === "manager-register")) {
+      if(typeof p.securityAnswer!=="string"||p.securityAnswer.trim().length<2)
+        throw new AccountError("SECURITY_ANSWER_INVALID",400);
       const contact=normalizeRegistrationContact(p.contactType,p.contactValue);
       p.contactType=contact.kind;
       p.contactValue=contact.value;
@@ -82,7 +99,15 @@ export async function POST(request: Request) {
     }
     if (config.v2) {
       const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
+      if ((p.action === "trial-status" || p.action === "trial-start") && !config.uiTrial)
+        throw new AccountError("TRIAL_FEATURE_DISABLED",404);
+      if (p.action === "trial-status" || p.action === "trial-start") {
+        const trial=new AccountTrialService(await getCourseDatabase(),service);
+        return json({trial:p.action === "trial-start" ? await trial.start(token) : await trial.status(token)});
+      }
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
+      if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
+      if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
       if (p.action === "submit-profile") return json({ onboarding: await workflow.submitProfile(token,p) });
       if (p.action === "review-first") return json({ onboarding: await workflow.firstReview({kind:"manager",token},String(p.accountId),p.expectedRevision) });
       if (p.action === "review-changes") return json({ onboarding: await workflow.requestChanges(

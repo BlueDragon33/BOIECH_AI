@@ -21,7 +21,8 @@ test("teacher topbar removes learner-course controls without deleting their logi
   assert.match(css, /\.topbar-actions > \.editor-request-link/);
   assert.match(css, /display:\s*none\s*!important/);
   assert.match(css, /\.network-state\.online i/);
-  assert.match(blueprint, /badge\.textContent = "Giảng viên Pro"/);
+  assert.doesNotMatch(blueprint, /badge\.textContent = "Giảng viên Pro"/);
+  assert.match(blueprint, /removeLegacyTopbarTools\(\)/);
 });
 
 test("teacher desktop composition follows sidebar center supervision rail reference", () => {

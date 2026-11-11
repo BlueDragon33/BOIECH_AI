@@ -11,8 +11,14 @@ if (!tool) {
 const logPath = process.env.WRANGLER_LOG_PATH || ".wrangler/wrangler.log";
 mkdirSync(dirname(logPath), { recursive: true });
 
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(npx, ["--no-install", tool, ...args], {
+// Node >=22 on Windows cannot spawn .cmd shims directly (spawn EINVAL).
+// npm sets npm_execpath for npm-run scripts; run npm's JS CLI through Node.
+const npmCli = process.env.npm_execpath;
+if (!npmCli) {
+  console.error("Missing npm_execpath. Run this command through npm run dev/start.");
+  process.exit(1);
+}
+const child = spawn(process.execPath, [npmCli, "exec", "--no", "--", tool, ...args], {
   stdio: "inherit",
   env: {
     ...process.env,
@@ -22,7 +28,7 @@ const child = spawn(npx, ["--no-install", tool, ...args], {
 });
 
 child.on("error", (error) => {
-  console.error(`Failed to start ${tool}:`, error.message);
+  console.error(`Failed to launch ${tool} via local npm CLI:`, error.message);
   process.exitCode = 1;
 });
 

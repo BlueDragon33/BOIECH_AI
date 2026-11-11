@@ -1,79 +1,140 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
-type Person={accountId:string;role:"learner"|"teacher";name:string|null;personCode:string|null;
+import styles from "./manager-v2-review-panel.module.css";
+
+type Role="learner"|"teacher";
+type Person={accountId:string;role:Role;name:string|null;personCode:string|null;
  className:string|null;status:"pending"|"approved"|"blocked";registrationComplete:boolean;
  onboardingStage:string|null;onboardingRevision:number|null;firstReviewMine:boolean;assignedToMe:boolean};
 type Board={devices:Person[];nextCursor:string|null;quotas:{learner:{limit:number;used:number};teacher:{limit:number;used:number}}};
-async function command(payload:Record<string,unknown>){
- const response=await fetch("/api/accounts",{method:"POST",credentials:"same-origin",cache:"no-store",
-  headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
- const data=await response.json() as {board?:Board;onboarding?:{stage:string};account?:{status:string};error?:string};
- if(!response.ok)throw new Error(data.error??"Thao tác chưa được xác nhận.");
- return data;
+type Reply={board?:Board;onboarding?:{stage:string;revision:number};error?:string;code?:string};
+
+async function command(payload:Record<string,unknown>):Promise<Reply>{
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),15000);
+ try{
+  const response=await fetch("/api/accounts",{method:"POST",credentials:"same-origin",cache:"no-store",
+   signal:controller.signal,headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
+  const data=await response.json().catch(()=>null) as Reply|null;
+  if(!response.ok||!data||typeof data!=="object")
+   throw new Error(data?.error||data?.code||`Không xác minh được phản hồi máy chủ (HTTP ${response.status}).`);
+  return data;
+ }finally{clearTimeout(timer);}
 }
+function verifiedBoard(data:Reply):Board{
+ const board=data.board;
+ if(!board||!Array.isArray(board.devices)||typeof board.quotas?.learner?.used!=="number"
+  ||typeof board.quotas?.teacher?.used!=="number"
+  ||(board.nextCursor!==null && typeof board.nextCursor!=="string"))
+  throw new Error("Bảng xét duyệt chưa được máy chủ xác thực.");
+ return board;
+}
+async function readback(accountId:string):Promise<Board>{
+ // The applicant may be outside page one. Never show success until the
+ // authoritative manager-scoped inbox confirms the exact account and stage.
+ const seen=new Set<string>();let after="",first:Board|null=null;
+ for(let page=0;page<25;page++){
+  const current=verifiedBoard(await command({action:"review-list",after,limit:50}));
+  if(!first)first=current;
+  const found=current.devices.find(p=>p.accountId===accountId);
+  if(found){
+   if(found.onboardingStage!=="profile_required"||found.firstReviewMine!==true)
+    throw new Error("Trạng thái hoặc cán bộ tiếp nhận không khớp khi đọc lại D1.");
+   return first;
+  }
+  if(!current.nextCursor||seen.has(current.nextCursor))break;
+  seen.add(current.nextCursor);after=current.nextCursor;
+ }
+ throw new Error("Duyệt đã gửi nhưng không đọc lại được hồ sơ theo đúng phạm vi. Không tự thực hiện lại; hãy đồng bộ và kiểm tra nhật ký.");
+}
+const displayRole=(role:Role)=>role==="teacher"?"Giảng viên":"Học viên";
+
 export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?:boolean}){
- const [board,setBoard]=useState<Board|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
- const [notice,setNotice]=useState("");
+ const [board,setBoard]=useState<Board|null>(null);
+ const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [roleFilter,setRoleFilter]=useState<Role>("learner");
  const mounted=useRef(true),locked=useRef(false);
  const refresh=useCallback(async(after="")=>{
   if(locked.current)return;
-  locked.current=true;setBusy(true);setError("");
-  try{const data=await command({action:"review-list",after,limit:50});
-    if(!data.board||!Array.isArray(data.board.devices))throw new Error("Chưa có bảng xét duyệt xác thực.");
-    if(mounted.current)setBoard(current=>after&&current
-      ? {...data.board!,devices:[...current.devices.filter(a=>!data.board!.devices.some(b=>b.accountId===a.accountId)),
-         ...data.board!.devices]} : data.board!);
-  }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}
-  finally{locked.current=false;if(mounted.current)setBusy(false);}
- },[]);
- useEffect(()=>{mounted.current=true;void Promise.resolve().then(()=>{if(mounted.current)return refresh();});return()=>{mounted.current=false};},[refresh]);
- async function decide(person:Person,action:"review-first"|"review"|"review-changes"){
-  if(locked.current)return;
-  if(singleReview && action!=="review-first")return;
-  const label=action==="review-first"?(singleReview?"duyệt tài khoản":"duyệt tài khoản lần một"):action==="review"?"kích hoạt lần hai":"yêu cầu bổ sung";
-  if(!window.confirm(`Xác nhận ${label} cho ${person.name??person.accountId}?`))return;
-  let reason="";
-  if(action==="review-changes"){reason=window.prompt("Nội dung cần bổ sung (không ghi dữ liệu nhạy cảm):","")??"";
-    if(reason.trim().length<3)return;}
   locked.current=true;setBusy(true);setError("");setNotice("");
   try{
-   const result=await command({action,accountId:person.accountId,expectedRevision:person.onboardingRevision,
-     ...(action==="review"?{operation:"approve"}:{}),...(action==="review-changes"?{reason}: {})});
-   if(action==="review-first"&&result.onboarding?.stage!=="profile_required")throw new Error("Duyệt lần một chưa được máy chủ xác nhận.");
-   if(action==="review"&&result.account?.status!=="approved")throw new Error("Duyệt lần hai chưa được máy chủ xác nhận.");
-   if(action==="review-changes"&&result.onboarding?.stage!=="changes_requested")throw new Error("Yêu cầu bổ sung chưa được máy chủ xác nhận.");
-   const data=await command({action:"review-list"});if(!data.board)throw new Error("Cần đồng bộ lại trạng thái.");
-   if(mounted.current){setBoard(data.board);setNotice("Đã thực hiện và đọc lại trạng thái máy chủ.");}
-  }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Thao tác chưa xác nhận.");}
-  finally{locked.current=false;if(mounted.current)setBusy(false);}
+   const page=verifiedBoard(await command({action:"review-list",after,limit:50}));
+   if(mounted.current)setBoard(old=>after&&old?{
+    ...page,devices:[...old.devices.filter(a=>!page.devices.some(b=>b.accountId===a.accountId)),...page.devices]
+   }:page);
+  }catch(e){
+   if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}
+  }finally{locked.current=false;if(mounted.current)setBusy(false);}
+ },[]);
+ useEffect(()=>{
+  if(!singleReview)return;
+  mounted.current=true;
+  queueMicrotask(()=>{if(mounted.current)void refresh();});
+  return()=>{mounted.current=false;};
+ },[refresh,singleReview]);
+ async function approve(person:Person){
+  // Stage, role, revision, owner and permission are all revalidated in D1.
+  if(!singleReview||locked.current||!board||person.onboardingStage!=="requested"
+   ||person.status!=="pending"||!Number.isInteger(person.onboardingRevision))return;
+  if(!window.confirm(`Duyệt ${displayRole(person.role)} ${person.name||person.accountId}? Nếu hồ sơ đã khai đầy đủ, người dùng chỉ cần xác nhận kích hoạt; nếu còn thiếu, người dùng bổ sung sau khi duyệt.`))return;
+  locked.current=true;setBusy(true);setError("");setNotice("");
+  try{
+   const response=await command({action:"review-first",accountId:person.accountId,
+    expectedRevision:person.onboardingRevision});
+   if(response.onboarding?.stage!=="profile_required"
+     ||response.onboarding.revision!==Number(person.onboardingRevision)+1)
+    throw new Error("Máy chủ chưa xác nhận quyết định duyệt một lần.");
+   const verified=await readback(person.accountId);
+   if(mounted.current){setBoard(verified);setNotice("Đã duyệt một lần và đọc lại đúng hồ sơ từ D1. Hồ sơ khai trước được giữ nguyên; người dùng có thể xác nhận kích hoạt khi đủ điều kiện. Chưa cấp quyền truy cập.");}
+  }catch(e){
+   // An uncertain write must never show a stale queue or encourage retry.
+   if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Không xác minh được quyết định duyệt. Kiểm tra nhật ký trước khi làm lại.");}
+  }finally{locked.current=false;if(mounted.current)setBusy(false);}
  }
- const pending=board?.devices.filter(x=>x.status==="pending")??[];
- return <section aria-label={singleReview?"Duyệt tài khoản một lần":"Duyệt tài khoản hai giai đoạn"} style={{marginBlock:"1rem"}}>
-  <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"1rem"}}>
-   <div><h2>{singleReview?"Xét duyệt tài khoản — Một lần duyệt":"Xét duyệt tài khoản — Hai giai đoạn"}</h2><p>Cán bộ chỉ duyệt học viên và giảng viên. Mọi thao tác được kiểm tra quyền trên máy chủ.</p></div>
-   <button type="button" disabled={busy} onClick={()=>void refresh()}>Đồng bộ</button>
+ if(!singleReview)return <p role="alert" className={styles.error}>Chế độ duyệt một lần chưa được xác minh. Không cấp quyền hoặc tiếp nhận hồ sơ.</p>;
+ const scoped=board?.devices.filter(p=>p.role===roleFilter)??[];
+ const pending=scoped.filter(p=>p.status==="pending"&&p.onboardingStage==="requested");
+ const progress=scoped.filter(p=>p.onboardingStage!=="requested");
+ return <section className={styles.root} aria-label="Duyệt học viên và giảng viên — một lần">
+  <header className={styles.head}>
+   <div><h2>Xét duyệt tài khoản · Một lần duyệt</h2><p>Chỉ cán bộ có quyền trong Bơi Ếch mới duyệt Học viên/Giảng viên. Duyệt chưa cấp quyền sử dụng khi hồ sơ chưa hoàn tất.</p></div>
+   <button type="button" disabled={busy} onClick={()=>void refresh()}>Đồng bộ D1</button>
   </header>
-  {board?<p>Học viên đã duyệt: {board.quotas.learner.used}/{board.quotas.learner.limit} · Giảng viên: {board.quotas.teacher.used}/{board.quotas.teacher.limit}</p>:null}
-  {error?<p role="alert">{error}</p>:null}{notice?<p role="status">{notice}</p>:null}
-  {!board?<p>{busy?"Đang đọc dữ liệu…":"Chưa có dữ liệu được xác minh."}</p>:null}
-  {board && !pending.length?<p>Không có tài khoản chờ duyệt.</p>:null}
-  {pending.map(person=><article key={person.accountId} style={{border:"1px solid var(--border,#777)",borderRadius:12,padding:12,marginBlock:8}}>
-   <strong>{person.name||"Tài khoản chưa khai hồ sơ"} · {person.role==="teacher"?"Giảng viên":"Học viên"}</strong>
-   <p style={{fontSize:13}}>{person.personCode||person.accountId.slice(0,14)} · {person.className||"Chưa có lớp"} ·
-    {person.onboardingStage==="requested"?" Chờ duyệt":
-     person.onboardingStage==="profile_required"?" Đang khai hồ sơ":
-     person.onboardingStage==="profile_review"?(singleReview?" Đang hoàn thiện":" Chờ duyệt lần 2"):
-     person.onboardingStage==="changes_requested"?" Cần bổ sung":" Chưa rõ trạng thái"}</p>
-   {person.onboardingStage==="requested" ? <button disabled={busy} onClick={()=>void decide(person,"review-first")}>{singleReview?"Duyệt tài khoản":"Duyệt lần 1"}</button>:null}
-   {!singleReview&&person.onboardingStage==="profile_review"&&person.firstReviewMine&&person.registrationComplete?
-    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-     <button disabled={busy} onClick={()=>void decide(person,"review")}>Duyệt lần 2 — Kích hoạt</button>
-     <button disabled={busy} onClick={()=>void decide(person,"review-changes")}>Yêu cầu bổ sung</button>
-    </div>:null}
-   {!singleReview&&person.onboardingStage==="profile_review"&&!person.firstReviewMine?
-     <p>Hồ sơ đã được một cán bộ khác tiếp nhận; không có quyền duyệt vòng hai.</p>:null}
-  </article>)}
-  {board?.nextCursor?<button type="button" disabled={busy} onClick={()=>void refresh(board.nextCursor!)}>
-    Tải thêm yêu cầu đang chờ</button>:null}
+  <div className={styles.roleTabs} role="tablist" aria-label="Phân loại hồ sơ kiểm duyệt">
+   {([["learner","Học viên"],["teacher","Giảng viên"]] as const).map(([role,label])=><button
+    type="button" key={role} role="tab" aria-selected={roleFilter===role} aria-controls="boi-manager-approval-list"
+    className={roleFilter===role?styles.selectedRole:undefined} onClick={()=>setRoleFilter(role)}>{label} · {board?.devices.filter(p=>p.role===role&&p.onboardingStage==="requested").length??"—"} chờ</button>)}
+  </div>
+  {board?<p className={styles.meta}>Đang sử dụng: {board.quotas.learner.used}/{board.quotas.learner.limit} Học viên · {board.quotas.teacher.used}/{board.quotas.teacher.limit} Giảng viên · {pending.length} hồ sơ chờ trên trang đang xem</p>:null}
+  {error?<p role="alert" className={styles.error}>{error}</p>:null}
+  {notice?<p role="status" className={styles.success}>{notice}</p>:null}
+  {!board?<p className={styles.empty}>{busy?"Đang đọc danh sách có xác thực…":"Chưa có dữ liệu được xác minh. Không coi lỗi kết nối là 0 hồ sơ."}</p>:null}
+  {board?<div id="boi-manager-approval-list" role="tabpanel" className={styles.groups}>
+   <section className={styles.group} aria-label="Hồ sơ chờ duyệt"><h3>{roleFilter==="teacher"?"Giảng viên":"Học viên"} · Chờ tiếp nhận</h3>
+    {pending.map(person=><article className={styles.entry} key={person.accountId}>
+     <div className={styles.details}><strong>{person.name||"Hồ sơ chưa khai"} · {displayRole(person.role)}</strong>
+      <small>{person.className||"Chưa phân lớp"}</small>
+      <span className={styles.status}>Chờ duyệt đúng một lần</span></div>
+     <button type="button" disabled={busy||board.quotas[person.role].used>=board.quotas[person.role].limit}
+      onClick={()=>void approve(person)}>Duyệt hồ sơ</button>
+    </article>)}
+    {!pending.length?<p className={styles.empty}>Không có hồ sơ mới chờ duyệt trên trang này (đã đọc được dữ liệu).</p>:null}
+   </section>
+   <section className={styles.group} aria-label="Hồ sơ đang xử lý"><h3>{roleFilter==="teacher"?"Giảng viên":"Học viên"} · Đã tiếp nhận / đang hoàn thiện</h3>
+    {progress.map(person=><article className={styles.entry} key={person.accountId}>
+     <div className={styles.details}><strong>{person.name||person.accountId.slice(0,14)} · {displayRole(person.role)}</strong>
+      <span className={styles.status}>{person.onboardingStage==="profile_required"?"Đã duyệt · Chờ người dùng điền hồ sơ":
+       person.onboardingStage==="active"?"Đã kích hoạt · Theo dõi thời hạn":
+       person.onboardingStage==="suspended"?"Tạm khóa":
+       person.onboardingStage==="profile_review"?"Hồ sơ cũ cần đối soát":
+       person.onboardingStage==="changes_requested"?"Cần bổ sung hồ sơ":"Cần kiểm tra trạng thái"}</span>
+      <small>{person.firstReviewMine?"Đang thuộc cán bộ tiếp nhận này":"Không có quyền thay đổi hồ sơ này"}</small>
+     </div>
+    </article>)}
+    {!progress.length?<p className={styles.empty}>Chưa có hồ sơ đã tiếp nhận trong trang đang xem.</p>:null}
+   </section>
+  </div>:null}
+  {board?.nextCursor?<button type="button" className={styles.pager} disabled={busy}
+   onClick={()=>void refresh(board.nextCursor!)}>Tải thêm hồ sơ</button>:null}
  </section>;
 }

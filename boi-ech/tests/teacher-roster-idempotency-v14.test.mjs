@@ -1,20 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-
-const route = fs.readFileSync(new URL("../app/api/teacher/roster/route.ts", import.meta.url), "utf8");
-
-test("duplicate teacher roster mutations are no-ops", () => {
-  assert.match(route, /action === "approve" && target\.status === "approved"/);
-  assert.match(route, /action === "remove" && target\.status === "blocked"/);
-  assert.match(route, /if \(alreadyInRequestedState\) \{[\s\S]*?return response\(await listRoster\(teacherClasses, canManage\)\);[\s\S]*?\}/);
+const route=fs.readFileSync(new URL("../app/api/teacher/roster/route.ts",import.meta.url),"utf8");
+test("V9 teacher mutations cannot be replayed: no mutation branch exists",()=>{
+ assert.match(route,/if\(payload\.action!=="list"\)/);
+ assert.match(route,/ACCOUNT_REVIEW_MANAGER_REQUIRED/);
+ assert.doesNotMatch(route,/UPDATE device_access|DELETE FROM device_access|INSERT INTO course_audit_log/);
 });
-
-test("idempotency guard runs before mutation and audit writes", () => {
-  const guard = route.indexOf("if (alreadyInRequestedState)");
-  const mutation = route.indexOf('if (action === "approve")', guard + 1);
-  const audit = route.indexOf("INSERT INTO course_audit_log");
-  assert.ok(guard >= 0, "idempotency guard missing");
-  assert.ok(mutation > guard, "mutation must follow idempotency guard");
-  assert.ok(audit > mutation, "audit must happen only after a real mutation");
+test("V9 teacher roster has no legacy idempotency or arbitrary state-write path",()=>{
+ assert.doesNotMatch(route,/alreadyInRequestedState|teacher_roster_approved|teacher_roster_removed/);
+ assert.match(route,/status='approved'/);
+ assert.match(route,/verifyDeviceRequest\(payload,false\)/);
 });

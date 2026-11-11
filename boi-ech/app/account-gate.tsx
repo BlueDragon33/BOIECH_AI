@@ -3,17 +3,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import RegistrantReader from "./registrant-reader";
 import ManagerWorkspace from "./manager-workspace";
+import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialog";
 import VerifiedSyncSettings from "./verified-sync-settings";
+import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { RegistrationRoles } from "./registration-roles";
-import ManagerV2ReviewPanel from "./manager-v2-review-panel";
-import { portableCredential, portableManagerProof, preparePortableAccount } from "./multi-account-switcher";
+import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
   storageDeviceId?:string|null; primaryContactKind?:"email"|"phone"|null;
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
-  onboardingNote?: string|null; entitlementActive?: boolean;
-  canReadRegistrants?: boolean };
+  onboardingNote?: string|null; entitlementActive?: boolean; profileDraftReady?:boolean;
+  profileDraftFields?:Record<string,string>|null;
+  canReadRegistrants?: boolean; securityQuestionConfigured?:boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
 function accountNetworkError(error: unknown) {
@@ -28,7 +30,7 @@ async function send(body: Record<string, unknown>) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Chưa xác minh được thao tác tài khoản.");
   return data as { recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
-    devices?:Array<{device_id:string;approved:number;created_at:string}> };
+    devices?:Array<{device_id:string;approved:number;created_at:string}>;trial?:TrialLease;challenge?:string };
 }
 function reloadPreservingPendingManagerInvite(token: string) {
   const oneUseFragment=/^[a-f0-9]{64}$/.test(token) ? "#manager-invite="+token : "";
@@ -44,20 +46,27 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [account, setAccount] = useState<Account | null>(null), [devices, setDevices] = useState<Device[]>([]);
   const [v2,setV2]=useState(false);
   const [singleReview,setSingleReview]=useState(false);
+  const [trialEnabled,setTrialEnabled]=useState(false);
+  const [trial,setTrial]=useState<TrialLease|null>(null);
+  const [trialUsed,setTrialUsed]=useState(false);
+  const [profileOpen,setProfileOpen]=useState(false);
+  const closeProfile=useCallback(()=>setProfileOpen(false),[]);
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [contactType,setContactType]=useState<"email"|"phone">("email");
+  const [recoveryMethod,setRecoveryMethod]=useState<"code"|"question">("code");
   const [recovery, setRecovery] = useState(""), [notice, setNotice] = useState("");
   const [managerInvite,setManagerInvite]=useState("");
   const managerInviteRef=useRef("");
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
+  const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
-    const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; error?: string };
-    if (mounted.current) { setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true); }
+    const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
+    if (mounted.current) { setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true); setTrialEnabled(data.accountUiTrial === true); }
     if (!response.ok) {
       if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
       throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
@@ -102,6 +111,25 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     const channel = new BroadcastChannel("boiech-account-auth"); channel.onmessage = refresh;
     return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh); channel.close(); };
   }, [enabled, bypass, reload]);
+  useEffect(()=>{
+    if(!ready||!v2||!singleReview||!account?.accountId||
+      account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
+      account.deviceApproved!==true)return;
+    const key=account.accountId+":"+account.onboardingRevision;
+    if(attemptedAutoActivation.current.has(key))return;
+    attemptedAutoActivation.current.add(key);
+    // Exactly one server-side human review has happened. The canonical
+    // complete profile is already stored in D1, so there is no second review.
+    void send({action:"profile-draft-activate"})
+      .then(async()=>{await reload();if(mounted.current)setNotice("Hồ sơ đã tự kích hoạt sau lần duyệt duy nhất.");})
+      .catch(e=>{if(mounted.current)setError(accountNetworkError(e));});
+  },[ready,v2,singleReview,account?.accountId,account?.onboardingStage,
+     account?.profileDraftReady,account?.onboardingRevision,account?.deviceApproved,reload]);
+  useEffect(()=>{
+    const open=()=>setProfileOpen(true);
+    window.addEventListener("boi:account:open",open);
+    return()=>window.removeEventListener("boi:account:open",open);
+  },[]);
   async function run(action: () => Promise<void>) {
     if (lock.current) return; lock.current = true; setBusy(true); setError(""); setNotice("");
     try { await action(); } catch (e) { if (mounted.current) setError(accountNetworkError(e)); }
@@ -117,7 +145,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // Password is used for this HTTPS submission only, then cleared from the input.
     const password = fields.password; const field = form.elements.namedItem("password") as HTMLInputElement | null;
     if (field) field.value = "";
+    const answerInput=form.elements.namedItem("securityAnswer") as HTMLInputElement|null;
+    if(answerInput) answerInput.value="";
     await run(async () => {
+      if(mode==="recover"&&v2&&recoveryMethod==="question"){
+        const login=String(fields.login||"").trim().toLowerCase();
+        const challenge=await send({action:"security-recovery-challenge",login});
+        const proof=await portableChildhoodRecoveryProof(login,challenge.challenge||"");
+        const result=await send({...fields,password,...proof,action:"security-recover",login});
+        setRecovery(result.recoveryCode??"");setMode("login");
+        setNotice("Đã đặt lại mật khẩu bằng câu trả lời và khóa P-256 gốc. Tất cả phiên cũ bị thu hồi; lưu mã khôi phục mới.");
+        await reload();broadcast();return;
+      }
       const key = mode === "recover" || mode==="devices" ? {} : await portableCredential(mode === "claim");
       if(mode==="devices"){
         const action=recoveryDevices.length ? fields.approvePending==="on" ? "approve-recovered-device" : "recover-lost-device" : "recovery-devices";
@@ -162,14 +201,111 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
-      await send({...fields,action:"submit-profile",expectedRevision:account?.onboardingRevision});
+      const pending=account?.onboardingStage==="requested";
+      await send({...fields,action:pending?"profile-draft-save":"submit-profile",expectedRevision:account?.onboardingRevision});
       await reload();
-      setNotice(singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Hồ sơ đã gửi chờ duyệt lần thứ hai. Chưa có quyền sử dụng chức năng chính.");
+      setNotice(pending?"Đã lưu hồ sơ để cán bộ có thể kiểm duyệt. Khi được duyệt, bạn sẽ không phải nhập lại thông tin.":singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Đã gửi hồ sơ để xét duyệt.");
     });
   }
+  async function openTrial(){
+    await run(async()=>{
+      const status=await send({action:"trial-status"});
+      const lease=status.trial?.state==="available"?(await send({action:"trial-start"})).trial:status.trial;
+      if(!lease||lease.state!=="active"){
+        if(lease?.state==="expired")setTrialUsed(true);
+        throw new Error(lease?.state==="expired"?"Lượt trải nghiệm 8 giờ đã hết, không thể gia hạn.":"Không xác minh được thời hạn thử trên máy chủ.");
+      }
+      if(lease.role!==account?.role)throw new Error("Vai trò thử không khớp với tài khoản.");
+      setTrial(lease);
+    });
+  }
+  async function logoutAccount(){
+    await run(async()=>{
+      // Keep the current validated UI usable if network logout fails.
+      await send({action:"logout"});
+      closeProfile();setReady(false);setRecovery("");recoveryOwner.current="";
+      broadcast();
+      reloadPreservingPendingManagerInvite(managerInviteRef.current);
+    });
+  }
+  const profileSections:ProfileSection[]=[
+    {id:"overview",label:"Thông tin tài khoản",hint:"Trạng thái tài khoản và quyền sử dụng",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.profileSummary}>
+          <span className={styles.profileLargeAvatar}>{(account?.name?.trim()[0]||"B").toLocaleUpperCase("vi")}</span>
+          <div><small>HỒ SƠ ĐÃ XÁC THỰC</small><h3>{account?.name||"Tài khoản Bơi Ếch"}</h3>
+            <p>{account?.role==="manager"?"Cán bộ quản lý":account?.role==="teacher"?"Giảng viên":"Học viên"}</p></div>
+        </div>
+        <div className={styles.settingDataGrid}>
+          <div><small>Trạng thái tài khoản</small><strong>{active?"Đang hoạt động":"Chờ kích hoạt"}</strong></div>
+          <div><small>Quyền truy cập</small><strong>{account?.entitlementActive?"Đã xác nhận thời hạn":"Chưa xác nhận"}</strong></div>
+          <div><small>Thời hạn truy cập</small><strong>{account?.expiresAt?
+            new Intl.DateTimeFormat("vi-VN",{dateStyle:"medium"}).format(new Date(account.expiresAt)):"Chưa có dữ liệu"}</strong></div>
+          <div><small>Thiết bị liên kết</small><strong>{devices.filter(d=>!d.revoked).length}/3</strong></div>
+        </div>
+        <div className={styles.settingInfo}>Thông tin nhận dạng nội bộ không cần nhập hoặc hiển thị.
+          Muốn thay đổi mật khẩu/quản lý thiết bị, mở các mục Bảo mật và thiết bị bên trái.</div>
+        {active&&account?.canReadRegistrants?<RegistrantReader/>:null}
+      </div>},
+    {id:"security",label:"Bảo mật cá nhân",hint:"Khôi phục mật khẩu và bảo vệ tài khoản",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.settingSectionTitle}><span>◆</span><div><h3>Câu hỏi khôi phục mật khẩu</h3>
+          <p>Tên lúc nhỏ của bạn là gì?</p></div></div>
+        <div className={styles.settingInfo}>{account?.securityQuestionConfigured?"Câu trả lời đã được thiết lập và mã hóa một chiều bằng scrypt.":"Chưa có câu trả lời bảo mật cho tài khoản này."}
+          {" "}Đáp án cũ không thể xem lại; bạn có thể thiết lập câu trả lời mới bên dưới.</div>
+        <form className={styles.securityUpdateForm} onSubmit={e=>{
+          e.preventDefault();const form=e.currentTarget;const fields=Object.fromEntries(new FormData(form));
+          void run(async()=>{
+            await send({action:"security-question-set",password:fields.currentPassword,securityAnswer:fields.securityAnswer});
+            form.reset();await reload();setNotice("Đã cập nhật câu trả lời khôi phục.");
+          });
+        }}>
+          <label>Mật khẩu hiện tại<input name="currentPassword" type="password" required autoComplete="current-password" disabled={busy}/></label>
+          <label>Câu trả lời mới<input name="securityAnswer" type="password" minLength={2} maxLength={120}
+            required autoComplete="new-password" disabled={busy} placeholder="Nhập tên lúc nhỏ"/></label>
+          <button type="submit" disabled={busy}>Lưu câu trả lời bảo mật</button>
+        </form>
+        <p className={styles.securityFinePrint}>Khôi phục bằng câu hỏi còn yêu cầu khóa P-256 trên thiết bị tin cậy gốc;
+          nếu mất thiết bị, hãy dùng mã khôi phục một lần đã cấp.</p>
+        {error?<p role="alert" className={styles.error}>{error}</p>:null}
+        {notice?<p role="status" className={styles.settingSuccess}>{notice}</p>:null}
+      </div>},
+    {id:"devices",label:"Bảo mật và thiết bị",hint:"Kiểm tra tối đa ba thiết bị tin cậy",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.settingSectionTitle}><span>▣</span><div><h3>Thiết bị đã liên kết</h3>
+          <p>{devices.filter(d=>!d.revoked).length}/3 thiết bị · Dữ liệu lấy từ phiên hiện tại</p></div></div>
+        <div className={styles.deviceList}>{devices.map(device=><article className={styles.deviceItem} key={device.device_id}>
+          <div><strong>Thiết bị {device.device_id.slice(0,8).toUpperCase()}</strong>
+            <small>{device.revoked?"Đã thu hồi":v2&&device.approved===0?"Đang chờ xác nhận":"Thiết bị tin cậy"}
+              {" · "}{device.created_at}</small></div>
+          {!device.revoked&&v2&&device.approved===0&&account?.deviceApproved===true?
+            <form onSubmit={e=>{e.preventDefault();const el=e.currentTarget;const password=new FormData(el).get("password");
+              void run(async()=>{await send({action:"approve-device",deviceId:device.device_id,password});
+                el.reset();await reload();setNotice("Đã xác nhận thiết bị mới.");});}}>
+              <label>Mật khẩu xác nhận<input name="password" type="password" required autoComplete="current-password" disabled={busy}/></label>
+              <button disabled={busy} type="submit">Xác nhận thiết bị</button>
+            </form>:null}
+          {!device.revoked&&(!v2||account?.deviceApproved===true)?
+            <button type="button" className={styles.revokeButton} disabled={busy}
+              onClick={()=>{if(window.confirm("Thu hồi thiết bị này? Các phiên của thiết bị sẽ bị vô hiệu hóa."))void run(async()=>{
+                await send({action:"revoke-device",deviceId:device.device_id});await reload();broadcast();
+              });}}>Thu hồi</button>:null}
+        </article>)}</div>
+        {!devices.length?<p role="status">Không đọc được thiết bị nào từ máy chủ.</p>:null}
+        {error?<p role="alert" className={styles.error}>{error}</p>:null}
+        {notice?<p role="status" className={styles.settingSuccess}>{notice}</p>:null}
+      </div>},
+    {id:"sync",label:"Đồng bộ dữ liệu",hint:"Theo dõi và thiết lập dữ liệu được đồng bộ",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.settingSectionTitle}><span>↻</span><div><h3>Đồng bộ có xác minh</h3>
+          <p>Thực hiện trong phạm vi quyền và thiết bị của tài khoản.</p></div></div>
+        {active&&v2&&account?<VerifiedSyncSettings accountId={account.accountId}/>:
+          <p>Đồng bộ chỉ khả dụng sau khi tài khoản được kích hoạt.</p>}
+      </div>}
+  ];
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
       {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
-      <h1>{account ? "Tài khoản Bơi Ếch" : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
+      <h1>{account ? (account.onboardingStage==="requested"?"Hồ sơ đăng ký đang chờ xét duyệt":"Tài khoản Bơi Ếch") : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
       {!account?<p className={styles.authSubtitle}>{mode==="register" ? "Tạo tài khoản và gửi yêu cầu xét duyệt." : mode==="recover" ? "Sử dụng mã khôi phục an toàn đã được cấp." : "Đăng nhập để tiếp tục học tập và giảng dạy."}</p>:null}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {notice && <p role="status">{notice}</p>}
@@ -183,7 +319,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         {!active && <p role="status" className={styles.pending}>
           {v2 ? account.deviceApproved===false ? "Thiết bị mới chưa được xác nhận. Hãy phê duyệt từ thiết bị đã tin cậy trước khi mở dữ liệu."
             : account.onboardingStage==="requested" ? "Đã tiếp nhận đăng ký. Đang chờ người có thẩm quyền phê duyệt."
-            : account.onboardingStage==="profile_required" ? singleReview?"Đã được duyệt. Điền đủ hồ sơ bắt buộc để kích hoạt và vào ứng dụng.":"Đã duyệt lần một. Hãy hoàn thiện hồ sơ để gửi duyệt lần hai."
+            : account.onboardingStage==="profile_required" ? singleReview?(account.profileDraftReady?"Đã được duyệt. Hồ sơ khai trước đã lưu; chỉ cần xác nhận kích hoạt.":"Đã được duyệt. Điền đủ hồ sơ bắt buộc để kích hoạt và vào ứng dụng."):"Đã duyệt lần một. Hãy hoàn thiện hồ sơ để gửi duyệt lần hai."
             : account.onboardingStage==="profile_review" ? "Hồ sơ đang được xét duyệt lần hai."
             : account.onboardingStage==="changes_requested" ? "Hồ sơ cần bổ sung. Hãy cập nhật và gửi lại."
             : account.onboardingStage==="legacy_hold" ? "Hồ sơ cũ cần được đối chiếu trước khi chuyển sang V2."
@@ -191,6 +327,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             : "Chưa đủ điều kiện truy cập."
             : account.status === "pending" ? "Chờ duyệt tài khoản. Bạn chỉ cần đăng ký một lần; trạng thái sẽ dùng chung trên mọi thiết bị."
             : "Tài khoản đã bị khóa hoặc hết hạn. Liên hệ cán bộ có thẩm quyền."}</p>}
+        {v2 && account.onboardingStage==="requested" ? <section className={styles.pendingJourney} aria-label="Tiến độ đăng ký">
+          <div className={styles.pendingTitle}><span aria-hidden="true">◎</span><div><h2>Yêu cầu đang được xử lý</h2>
+           <p>Tài khoản đã được tiếp nhận. Học viên và Giảng viên sẽ do Cán bộ quản lý có quyền xét duyệt; Cán bộ quản lý do Owner duyệt.</p></div></div>
+          <ol className={styles.pendingSteps}><li data-state="done">Đã đăng ký</li><li data-state={account.profileDraftReady?"done":undefined}>{account.profileDraftReady?"Đã lưu hồ sơ":"Khai hồ sơ"}</li><li data-state="current">Đang chờ xét duyệt</li><li>Kích hoạt tài khoản</li></ol>
+          <p className={styles.pendingHelp}>Bạn có thể đồng bộ trạng thái mà không đăng ký lại. Hồ sơ và thời hạn sử dụng được kiểm tra tại máy chủ.</p>
+        </section> : null}
         {v2&&account.deviceApproved===false?<form className={styles.deviceContactCheck}
           onSubmit={e=>{e.preventDefault();void compareContact(e.currentTarget);}}>
           <h2>Thiết bị mới · Đối chiếu liên hệ</h2>
@@ -212,10 +354,15 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         </form>:null}
         {v2 && account.onboardingStage==="changes_requested" && account.onboardingNote ? <p role="status">
           Yêu cầu bổ sung của người xét duyệt: {account.onboardingNote}</p>:null}
-        {v2 && account.deviceApproved!==false && ["profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
+        {v2 && account.onboardingStage==="profile_required" && account.profileDraftReady ? <section role="status" className={styles.savedProfile}>
+          <h2>Hồ sơ đã lưu trước khi xét duyệt</h2><p>Không cần nhập lại. Hãy xác nhận kích hoạt sau khi hồ sơ đã được phê duyệt một lần.</p>
+          <button type="button" disabled={busy} onClick={()=>void run(async()=>{await send({action:"profile-draft-activate"});await reload();setNotice("Đã kích hoạt bằng hồ sơ đã lưu và xác nhận trạng thái máy chủ.");})}>Kích hoạt bằng hồ sơ đã lưu</button>
+        </section>:null}
+        {v2 && account.deviceApproved!==false && ["requested","profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
+          key={`${account.accountId}:${account.onboardingStage}:${account.profileDraftReady}`}
           className={styles.profileForm} onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
           <header className={styles.profileHeading}>
-            <span className={styles.profileEyebrow}>BƯỚC 02 · HỒ SƠ ĐỊNH DANH</span>
+            <span className={styles.profileEyebrow}>{account.onboardingStage==="requested"?"BƯỚC 01 · KHAI HỒ SƠ TRƯỚC KHI DUYỆT":"BƯỚC 02 · HỒ SƠ ĐỊNH DANH"}</span>
             <h2>{account.role==="manager"?"Hồ sơ Cán bộ quản lý":"Hoàn thiện hồ sơ cá nhân"}</h2>
             <p>{account.role==="manager"
               ?"Bổ sung thông tin công tác và phương thức liên hệ còn thiếu. Không cần mã cá nhân hoặc nhập lại liên hệ đã đăng ký."
@@ -225,12 +372,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             {(account.role==="manager"
               ?([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["facultyUnit","Khoa / Đơn vị","text"],
                 ["jobTitle","Chức danh","text"],["jobPosition","Chức vụ","text"]] as const)
-              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["personCode","Mã học viên","text"],
-                ["className","Lớp / đơn vị","text"],["phone","Số điện thoại","tel"]] as const)
+              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["className","Lớp / đơn vị","text"],["phone","Số điện thoại bổ sung","tel"]] as const).filter(([name])=>name!=="phone"||account.primaryContactKind!=="phone")
             ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
-              <span>{label} <span className={styles.requiredMark} aria-label="Bắt buộc">*</span></span>
-              <input name={name} type={kind} required aria-required="true" minLength={name==="phone"?7:2}
-                maxLength={name==="phone"||name==="personCode"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
+              <span>{label} {name==="phone"?<small>(không bắt buộc)</small>:<span className={styles.requiredMark} aria-label="Bắt buộc">*</span>}</span>
+              <input name={name} type={kind} defaultValue={account.profileDraftFields?.[name]??""} required={name!=="phone"} aria-required={name!=="phone"} minLength={name==="phone"?7:2}
+                maxLength={name==="phone"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
                 autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
                 disabled={busy}/>
@@ -248,34 +394,23 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           </div>
           <footer className={styles.profileFooter}>
             <p>Thông tin được lưu vào hồ sơ Bơi Ếch. Chỉ tài khoản đủ quyền mới được xem hoặc xử lý.</p>
-            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
+            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":account.onboardingStage==="requested"?"Lưu hồ sơ để cán bộ xét duyệt":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
           </footer>
         </form> : null}
+        {v2&&singleReview&&trialEnabled&&!trialUsed&&!active&&account.deviceApproved===true&&
+         ["requested","profile_required","changes_requested"].includes(account.onboardingStage||"")?
+          <section className={styles.trialInvitation}><div><strong>Trải nghiệm thử giao diện — 8 giờ</strong>
+            <p>Thời hạn máy chủ cấp một lần. Không cấp quyền tài khoản, không dùng dữ liệu thật hoặc AI; nội dung thử chỉ ở bộ nhớ và sẽ bị xóa khi hết hạn.</p></div>
+            <button type="button" disabled={busy} onClick={()=>void openTrial()}>Mở trải nghiệm thử 8 giờ</button></section>:null}
+        {trialUsed&&!active?<p role="status">Lượt trải nghiệm thử đã kết thúc. Hồ sơ đăng ký và quyền xét duyệt vẫn được giữ nguyên.</p>:null}
         <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void run(() => reload())}>Đồng bộ trạng thái</button>
-          <button type="button" disabled={busy} onClick={() => void run(async () => { await send({ action: "rotate" }); await reload(); setNotice("Đã đổi vé phiên an toàn; tối đa 8 giờ kể từ khi đăng nhập."); })}>Gia hạn phiên</button>
           <button type="button" disabled={busy} onClick={() => void run(async () => { setReady(false); setRecovery(""); recoveryOwner.current=""; await send({ action: "logout" }); broadcast();
             // Keep a pending one-use invitation ONLY in the URL fragment during the
             // cross-account navigation. Fragments are not sent in HTTP requests, and
             // the mount effect immediately scrubs the token from the address bar.
             // Never persist it in local/session storage or put it in the query string.
             reloadPreservingPendingManagerInvite(managerInviteRef.current); })}>Đăng xuất / đổi tài khoản</button></div>
-        {active&&account.canReadRegistrants?<RegistrantReader/>:null}
-        {active&&v2&&account.role==="manager"?<details>
-          <summary>Hàng chờ xét duyệt học viên và giảng viên · Account-first V2</summary>
-          <ManagerV2ReviewPanel singleReview={singleReview}/>
-        </details>:null}
-        {active&&v2?<VerifiedSyncSettings accountId={account.accountId}/>:null}
-        <details className={styles.profileDevices}><summary>Trang cá nhân · Bảo mật và thiết bị ({devices.filter(d=>!d.revoked).length}/3 đang liên kết)</summary><p>Quản lý tối đa 3 thiết bị; thu hồi thiết bị cũ tại đây. Thiết bị mới phải được xác nhận riêng.</p>{devices.map(d=><div key={d.device_id}>
-          <span>{d.device_id.slice(0,12)} · {d.revoked?"Đã thu hồi":v2&&d.approved===0?"Chờ xác nhận":"Đã xác nhận"}</span>
-          {v2 && !d.revoked && d.approved===0 && account.deviceApproved===true ? <form onSubmit={e=>{
-            e.preventDefault();const el=e.currentTarget;const password=(new FormData(el)).get("password");
-            void run(async()=>{await send({action:"approve-device",deviceId:d.device_id,password});
-              el.reset();await reload();setNotice("Đã xác nhận thiết bị mới.");});
-          }}><label>Nhập lại mật khẩu để xác nhận thiết bị<input name="password" type="password" required autoComplete="current-password" disabled={busy}/></label>
-          <button type="submit" disabled={busy}>Xác nhận thiết bị này</button></form>:null}
-          {!d.revoked && (!v2 || account.deviceApproved===true) ? <button type="button" disabled={busy}
-            onClick={()=>void run(async()=>{await send({action:"revoke-device",deviceId:d.device_id});await reload();broadcast();})}>Thu hồi thiết bị này</button>:null}
-        </div>)}</details>
+
       </> : <>
 
         <form key={mode} className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
@@ -297,7 +432,14 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <small>Chỉ lưu liên hệ đã cung cấp; không gửi mã xác minh lúc đăng ký.</small>
           </fieldset>:null}
           {mode==="login"?<div className={styles.authInlineLinks}><button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("recover")}>Quên mật khẩu?</button></div>:null}
-          {(mode === "recover" || mode==="devices") && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          {mode==="recover"&&v2?<fieldset className={styles.contactChoice}><legend>Chọn cách khôi phục mật khẩu</legend>
+            <div className={styles.contactMethods}><button type="button" aria-pressed={recoveryMethod==="code"} onClick={()=>setRecoveryMethod("code")}>Mã khôi phục</button>
+            <button type="button" aria-pressed={recoveryMethod==="question"} onClick={()=>setRecoveryMethod("question")}>Tên lúc nhỏ + thiết bị gốc</button></div>
+            <small>Chỉ câu trả lời bảo mật không đủ khôi phục. Cần khóa P-256 trong trình duyệt gốc; nếu mất thiết bị, dùng mã khôi phục một lần.</small>
+          </fieldset>:null}
+          {(mode==="devices" || mode==="recover"&&(!v2||recoveryMethod==="code")) && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          {mode==="recover"&&v2&&recoveryMethod==="question"?<label>Tên lúc nhỏ của bạn là gì?
+            <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="off" disabled={busy}/></label>:null}
           {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
             <select name="deviceId" required disabled={busy}>
               {recoveryDevices.map(d=><option key={d.device_id} value={d.device_id}>{d.device_id.slice(0,16)} · {d.created_at}</option>)}
@@ -307,10 +449,13 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
           {mode === "register" && <>{managerInvite
            ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; tài khoản vẫn phải chờ Owner duyệt và hoàn thiện hồ sơ.</p>
-           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["personCode", "Mã học viên / cán bộ / giảng viên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt, bạn hoàn thiện hồ sơ bắt buộc để vào ứng dụng.</p>}
+           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?<p role="alert">Đăng ký mới yêu cầu Account-first V2. Hiện hệ thống chưa bật V2; không thể tạo hồ sơ bằng biểu mẫu cũ.</p>:<p>Chỉ tạo tài khoản và thiết lập bảo mật tại bước này. Sau một lần duyệt, bổ sung hồ sơ là được kích hoạt ngay, không duyệt lại.</p>}
+             {v2?<label>Câu hỏi bảo mật: Tên lúc nhỏ của bạn là gì?
+               <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="new-password" disabled={busy}/>
+               <small>Hãy ghi nhớ đáp án. Đáp án được mã băm, không thể xem lại; có thể thay đổi tại Trang cá nhân.</small></label>:null}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
-          <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
+          <button type="submit" disabled={busy||(mode==="register"&&!v2)}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
         </form>
         <div className={styles.authFooter}>
           {mode==="register"?<>Đã có tài khoản? <button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("login")}>Đăng nhập</button></>
@@ -320,13 +465,26 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         <p className={styles.authFootnote}>Hồ sơ cũ được bảo toàn. Việc liên kết tài khoản cần xác minh quyền sở hữu trước khi chuyển dữ liệu.</p>
       </>}
     </section>;
+  if(ready&&account&&!active&&trial?.state==="active"&&account.role===trial.role){
+    return <AccountTrialSandbox key={account.accountId} lease={trial}
+      onExit={()=>setTrial(null)}
+      onExpired={()=>{setTrial(null);setTrialUsed(true);void reload().catch(e=>setError(accountNetworkError(e)));}}/>;
+  }
   return <>
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
-      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}/>
+      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
+        onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
+        accountName={account.name||"Cán bộ quản lý"}/>
     </div> : null}
-    {managerDashboard?<details className={styles.managerAccountTools}>
-      <summary>Tài khoản, bảo mật và đăng xuất</summary>{accountPanel}
-    </details>:accountPanel}
-    {ready && active && !recovery && !managerDashboard && account ? <div key={account.accountId}>{children}</div> : null}
+    {!managerDashboard && ready && active && !recovery && account ? <div key={account.accountId}>{children}</div> : null}
+    {!managerDashboard && ready && active && pathname!=="/" && account?
+      <button type="button" className={styles.accountCornerButton} onClick={()=>setProfileOpen(true)}
+        aria-label="Mở Trang cá nhân và bảo mật">Trang cá nhân</button>:null}
+    {!managerDashboard && !(ready && active && account) ? accountPanel : null}
+    {ready&&active&&account?<AccountProfileDialog open={profileOpen}
+      name={account.name||"Tài khoản Bơi Ếch"}
+      role={account.role==="manager"?"manager":account.role==="teacher"?"teacher":"learner"}
+      sections={profileSections} onClose={closeProfile}
+      onLogout={()=>void logoutAccount()} busy={busy}/>:null}
   </>;
 }

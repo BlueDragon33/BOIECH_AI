@@ -49,15 +49,19 @@ test("appearance settings control page content card accent density and radius", 
   assert.match(css, /\.topbar-actions > \.appearance-trigger\s*\{[\s\S]*display:\s*inline-flex\s*!important/);
 });
 
-test("teacher command bar refresh and roster sync actions are functional", () => {
+test("legacy toolbar injection is retired while data refresh handlers remain intact", () => {
   assert.match(blueprint, /teacher-topbar-refresh/);
-  assert.match(blueprint, /boi-ech:teacher-refresh/);
+  assert.doesNotMatch(blueprint, /dispatchEvent\(new CustomEvent\("boi-ech:teacher-refresh"\)\)/);
+  assert.match(blueprint, /removeLegacyTopbarTools/);
   assert.match(blueprint, /teacher-topbar-sync/);
-  assert.match(blueprint, /boi-ech:teacher-roster-sync/);
+  assert.doesNotMatch(blueprint, /dispatchEvent\(new CustomEvent\("boi-ech:teacher-roster-sync"\)\)/);
+  assert.doesNotMatch(blueprint, /badge\.textContent = "Giảng viên Pro"/);
   assert.match(shell, /addEventListener\("boi-ech:teacher-refresh"/);
   assert.match(shell, /removeEventListener\("boi-ech:teacher-refresh"/);
-  assert.match(roster, /addEventListener\("boi-ech:teacher-roster-sync"/);
-  assert.match(roster, /removeEventListener\("boi-ech:teacher-roster-sync"/);
+  assert.match(roster, /async function readApprovedRoster\(deviceId:string\)/);
+  assert.match(roster, /data.canManage!==false/);
+  assert.match(roster, /window.setInterval\(/);
+  assert.doesNotMatch(roster, /dispatchEvent\(new CustomEvent\("boi-ech:teacher-roster-sync"/);
 });
 
 test("V29 remains a presentation and interaction layer without scoring contracts", () => {

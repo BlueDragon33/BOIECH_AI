@@ -38,15 +38,91 @@ export class AccountV2Workflow {
     if (actor.accountId === targetId || actor.role !== "manager") bad("TARGET_ROLE_FORBIDDEN");
     await this.accounts.capability(actor, "manager.approve.registration");
     // Authorization repeated inside the final UPDATE; revocation races fail closed.
+    // Authorization is repeated inside the final D1 CAS to close a session,
+    // device or password-generation revocation race after authorize().
     const guard = `EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_manager_permissions p ON p.account_id=a.account_id
-      WHERE a.account_id=? AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
+      JOIN account_sessions s ON s.account_id=a.account_id
+      JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+      JOIN account_credentials c ON c.account_id=a.account_id AND c.generation=s.generation
+      WHERE a.account_id=? AND s.token_hash=? AND s.device_id=?
+      AND s.revoked=0 AND b.revoked=0 AND b.approved=1
+      AND s.expires_at>(julianday('now')-2440587.5)*86400000
+      AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
+      AND d.person_role='manager' AND d.status='approved' AND d.management_enabled=1
       AND EXISTS(SELECT 1 FROM account_onboarding o WHERE o.account_id=a.account_id AND o.stage='active')
       AND EXISTS(SELECT 1 FROM account_entitlements e WHERE e.account_id=a.account_id
         AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP)
       AND p.scope='manager.approve.registration' AND p.enabled=1
       AND (p.expires_at IS NULL OR p.expires_at>(unixepoch()*1000)))`;
-    return { id: actor.accountId, guard, values: [actor.accountId] };
+    return { id: actor.accountId, guard, values: [actor.accountId,actor.sessionHash,actor.deviceId] };
+  }
+  // Registration information is kept in canonical D1, not in trial storage.
+  // Only the owner of a trusted registered device may save or later activate it.
+  async ownProfileDraft(token: string) {
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved) bad("DEVICE_APPROVAL_REQUIRED",403);
+    const row=await this.db.prepare("SELECT profile_json FROM account_profile_drafts WHERE account_id=?")
+      .bind(actor.accountId).first<{profile_json:string}>();
+    return row?{ready:true,fields:JSON.parse(row.profile_json) as Record<string,string>}:{ready:false,fields:null};
+  }
+  async saveProfileDraft(token:string,input:Record<string,unknown>) {
+    if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved)bad("DEVICE_APPROVAL_REQUIRED",403);
+    const state=await this.state(actor.accountId);
+    if(state.stage!=="requested"||state.status!=="pending"
+       ||!Number.isInteger(input.expectedRevision)||input.expectedRevision!==state.revision)
+      bad("ACCOUNT_CAS_CONFLICT",409);
+    const familyName=field(input.familyName,60),givenName=field(input.givenName,60);
+    const manager=state.role==="manager";
+    const common={familyName,givenName};
+    const fields=manager
+      ? {...common,facultyUnit:field(input.facultyUnit,80),jobTitle:field(input.jobTitle,120),
+         jobPosition:field(input.jobPosition,120),
+         ...(typeof input.secondaryContact==="string"&&input.secondaryContact.trim()
+           ? {secondaryContact:field(input.secondaryContact,254)}:{})}
+      : {...common,className:field(input.className,80),phone:typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):""};
+    const json=JSON.stringify(fields);
+    if(json.length>2048)bad("PROFILE_INVALID",400);
+    const res=await this.db.batch([
+      this.db.prepare(`INSERT INTO account_profile_drafts(account_id,profile_json)
+        SELECT ?,? WHERE EXISTS(
+          SELECT 1 FROM account_onboarding o
+          JOIN account_sessions s ON s.account_id=o.account_id
+          JOIN account_devices d ON d.account_id=s.account_id AND d.device_id=s.device_id
+          JOIN account_credentials c ON c.account_id=o.account_id AND c.generation=s.generation
+          WHERE o.account_id=? AND o.stage='requested' AND o.revision=?
+            AND s.token_hash=? AND s.device_id=? AND s.revoked=0
+            AND s.expires_at>(julianday('now')-2440587.5)*86400000
+            AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
+            AND d.approved=1 AND d.revoked=0)
+        ON CONFLICT(account_id) DO UPDATE SET profile_json=excluded.profile_json,
+          revision=account_profile_drafts.revision+1,updated_at=CURRENT_TIMESTAMP`)
+        .bind(actor.accountId,json,actor.accountId,state.revision,actor.sessionHash,actor.deviceId),
+      this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+        SELECT ?,'account.profile.draft.saved',?,
+          CASE WHEN changes()=1 THEN 'preapproval canonical profile retained; no access grant'
+            ELSE NULL END`).bind(actor.accountId,actor.accountId)
+    ]).catch(error=>{
+      if(error instanceof Error && /NOT NULL|constraint|ACCOUNT_CAS|CHECK/i.test(error.message))
+        bad("ACCOUNT_CAS_CONFLICT",409);
+      throw error;
+    });
+    if(Number(res[0].meta.changes)!==1)bad("ACCOUNT_CAS_CONFLICT",409);
+    return {saved:true,stage:"requested",revision:state.revision};
+  }
+  async activateProfileDraft(token:string) {
+    if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved)bad("DEVICE_APPROVAL_REQUIRED",403);
+    const state=await this.state(actor.accountId);
+    if(state.stage!=="profile_required")bad("ACCOUNT_CAS_CONFLICT",409);
+    const row=await this.db.prepare("SELECT profile_json FROM account_profile_drafts WHERE account_id=?")
+      .bind(actor.accountId).first<{profile_json:string}>();
+    if(!row)bad("PROFILE_DRAFT_MISSING",409);
+    const profile=JSON.parse(row.profile_json) as Record<string,unknown>;
+    return this.submitProfile(token,{...profile,expectedRevision:state.revision});
   }
   async firstReview(authority: Authority, targetId: string, revision: unknown) {
     const target = await this.state(targetId);
@@ -80,11 +156,12 @@ export class AccountV2Workflow {
     const className=field(manager?input.facultyUnit:input.className,80);
     const jobTitle=manager?field(input.jobTitle,120):"";
     const jobPosition=manager?field(input.jobPosition,120):"";
-    const code=manager?"MGR_"+actor.storageDeviceId.slice(0,20).toUpperCase():field(input.personCode,32).toUpperCase();
+    // Internal stable database reference only: never ask a teacher or learner for a personal code.
+    const code=(manager?"MGR_":s.role==="teacher"?"GV_":"HV_")+actor.storageDeviceId.slice(0,20).toUpperCase();
     // Contact was collected at registration. Do not ask the manager for it again,
     // or confuse self-declared contact with a device approval proof.
-    const contact=manager?await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
-      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>():null;
+    const contact=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>();
     // Secondary details are optional and self-declared, never a security proof.
     // The primary contact cannot be overwritten from this profile form.
     let secondary:{kind:"email"|"phone";value:string}|null=null;
@@ -95,12 +172,12 @@ export class AccountV2Workflow {
         secondary=normalizeRegistrationContact(contact.kind==="email"?"phone":"email",input.secondaryContact);
       }
     }
-    const raw=manager?(contact?.kind==="phone"?contact.value:""):field(input.phone,32);
+    const raw=contact?.kind==="phone"?contact.value:(typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):"");
     const cleanPhone=raw.replace(/[ ()-]/g,"");
     const phone=cleanPhone ? (cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone) : null;
     // Persist SQL NULL when manager originally registered with email; empty string
     // would collide under the legacy UNIQUE(device_access.phone) constraint.
-    if(!/^[A-Z0-9._-]+$/.test(code)|| (!manager&&!/^\+?[0-9]{7,16}$/.test(phone??""))) bad("PROFILE_INVALID",400);
+    if(!/^[A-Z0-9._-]+$/.test(code)|| (phone&&!/^\+?[0-9]{7,16}$/.test(phone))) bad("PROFILE_INVALID",400);
     if (this.singleReview) {
       // One human review was recorded by firstReview(). User's completed profile
       // is the second *state transition*, NOT a second human approval.
@@ -172,7 +249,7 @@ export class AccountV2Workflow {
               SELECT 1 FROM account_onboarding o JOIN account_entitlements e
                 ON e.account_id=o.account_id
               WHERE o.account_id=? AND o.stage='active' AND e.state='active')
-            ON CONFLICT(account_id,scope) DO NOTHING`)
+            `)
             .bind(actor.accountId,scope,s.first_review_by,actor.accountId));
         }
       }

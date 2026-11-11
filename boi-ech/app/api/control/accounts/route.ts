@@ -50,6 +50,8 @@ export async function POST(request: Request) {
       await service.ownerManagerPage(input.after ?? "",input.limit ?? 40),200,request);
     if (input.action === "create-manager-invite") return controlResponse(
       await service.issueManagerInvite(owner,input.expectedRevision),200,request);
+    if (input.action === "list-all") return controlResponse(
+      await service.ownerAllAccounts(input.after ?? "",input.limit ?? 40),200,request);
     if (input.action === "list") return controlResponse({ accounts: await service.ownerList() }, 200, request);
     if (input.action === "read") return controlResponse(await service.ownerRead(String(input.accountId)), 200, request);
     if (input.action !== "command") throw new AccountError("ACCOUNT_INPUT", 400);

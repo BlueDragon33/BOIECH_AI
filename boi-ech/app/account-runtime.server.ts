@@ -15,6 +15,7 @@ export async function accountConfiguration() {
   const enabled = values.BOI_ECH_ACCOUNT_FIRST === "true";
   const v2 = enabled && values.BOI_ECH_ACCOUNT_V2 === "true";
   const singleReview = v2 && values.BOI_ECH_SINGLE_REVIEW === "true";
+  const uiTrial = singleReview && values.BOI_ECH_UI_TRIAL === "true";
   const origin = typeof values.BOI_ECH_ACCOUNT_ORIGIN === "string" ? values.BOI_ECH_ACCOUNT_ORIGIN : "";
   if (enabled) {
     let valid = false;
@@ -22,7 +23,7 @@ export async function accountConfiguration() {
       (values.LOCAL_CONTROL_PLANE === "true" && ["localhost", "127.0.0.1"].includes(u.hostname))); } catch { /* fail closed */ }
     if (!valid) throw new AccountError("ACCOUNT_ORIGIN_UNCONFIGURED", 503);
   }
-  return { enabled, origin, v2, singleReview };
+  return { enabled, origin, v2, singleReview, uiTrial };
 }
 export function sameOrigin(origin: string | null, expected: string, contentType: string | null, requireJson = true) {
   if (!origin || origin !== expected || (requireJson && !contentType?.toLowerCase().startsWith("application/json"))) throw new AccountError("ACCOUNT_CSRF_REJECTED", 403);
@@ -67,19 +68,25 @@ export function accountErrorResponse(error: unknown) {
     MANAGER_INVITATION_CONFLICT: "Chính sách hoặc số lượng thư mời đã thay đổi. Owner cần đồng bộ lại rồi tạo mã mới.",
     ACCOUNT_V2_REQUIRED: "Tính năng tài khoản V2 chưa được xác minh trên hệ thống đang dùng.",
     PASSWORD_POLICY: "Mật khẩu cần ít nhất 15 ký tự và tối đa 1.024 ký tự.",
+    SECURITY_ANSWER_INVALID: "Hãy nhập câu trả lời Tên lúc nhỏ của bạn (từ 2 đến 120 ký tự).",
     REGISTRATION_UNAVAILABLE: "Không thể tạo hồ sơ này. Nếu đã đăng ký, hãy đăng nhập hoặc dùng khôi phục.",
     ACCOUNT_CAPACITY_REACHED: "Loại tài khoản này đã đủ số lượng. Đăng ký mới tạm dừng để bảo vệ hệ thống; hãy liên hệ cán bộ phụ trách.",
     ACCOUNT_POLICY_UNAVAILABLE: "Chính sách giới hạn tài khoản chưa sẵn sàng. Chưa tạo hồ sơ nào.",
     DEVICE_LIMIT_REACHED: "Đã đủ 3 thiết bị. Hãy dùng máy đã xác nhận để gỡ máy cũ hoặc mã khôi phục an toàn.",
     DEVICE_APPROVAL_REQUIRED: "Thiết bị mới đang chờ xác nhận từ một thiết bị tin cậy.",
+    TRIAL_FEATURE_DISABLED: "Chế độ thử chưa được bật trên môi trường này.",
+    TRIAL_NOT_ELIGIBLE: "Tài khoản không còn thuộc trạng thái đủ điều kiện trải nghiệm thử.",
+    TRIAL_EXPIRED: "Lượt trải nghiệm 8 giờ đã hết hạn, không thể gia hạn.",
+    TRIAL_ROLE_CONFLICT: "Vai trò thử không khớp với hồ sơ đăng ký.",
+    TRIAL_CLOCK_UNAVAILABLE: "Không xác nhận được đồng hồ máy chủ; đã khóa chế độ thử.",
     DEVICE_APPROVAL_CONFLICT: "Thiết bị đã thay đổi trạng thái; tải lại trước khi duyệt.",
     ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa được duyệt hoặc chưa hoàn tất hồ sơ bắt buộc.",
     ACCOUNT_ONBOARDING_MISSING: "Trạng thái xét duyệt chưa được xác minh; hãy liên hệ quản trị.",
     ACCOUNT_REVIEW_SUPERSEDED: "Đã sử dụng quy trình duyệt một lần; không tồn tại duyệt vòng hai.",
-    PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, mã, đơn vị và số điện thoại.",
+    PROFILE_INVALID: "Thông tin hồ sơ chưa hợp lệ. Kiểm tra họ tên, đơn vị hoặc lớp và liên hệ bổ sung.",
     ACCOUNT_CONTACT_INVALID: "Chọn Email hoặc SĐT hợp lệ để đăng ký. Không yêu cầu xác minh khi đăng ký.",
     CONTACT_CHECK_NOT_REQUIRED: "Thiết bị hiện tại đã tin cậy, không cần đối chiếu liên hệ.",
-    PROFILE_CONFLICT: "Mã cá nhân hoặc số điện thoại đã được sử dụng. Kiểm tra lại với cán bộ.",
+    PROFILE_CONFLICT: "Thông tin hồ sơ hoặc số điện thoại bổ sung đã bị trùng. Kiểm tra lại với cán bộ.",
     ACCOUNT_SCOPE_FORBIDDEN: "Không có quyền xử lý hồ sơ ngoài phạm vi được giao.",
     ACCOUNT_SWITCHED: "Phiên tài khoản đã đổi. Hãy tải lại và kiểm tra dữ liệu trước khi đồng bộ.",
     SYNC_CONSENT_REQUIRED: "Thiết bị chưa được bạn xác nhận quyền đồng bộ cho loại dữ liệu này.",

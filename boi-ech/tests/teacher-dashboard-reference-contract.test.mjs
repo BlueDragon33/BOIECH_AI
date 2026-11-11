@@ -24,7 +24,6 @@ test('teacher topbar has real learner search with Ctrl K shortcut', () => {
 
 test('teacher dashboard exposes actionable supervision surfaces', () => {
   for (const label of [
-    'Những gì giảng viên có thể làm',
     'Tổng quan lớp phụ trách',
     'Danh sách học viên cần chú ý',
     'Phân tích gần đây cần xem',
@@ -32,6 +31,9 @@ test('teacher dashboard exposes actionable supervision surfaces', () => {
     'Cảnh báo nhanh',
     'Bảng kiểm giám sát AI',
   ]) assert.ok(shell.includes(label), `missing ${label}`);
+  // The former 8-button shortcut wall duplicated sidebar navigation and
+  // was removed by Owner request; keep actual class/workflow controls.
+  assert.doesNotMatch(shell, /Những gì giảng viên có thể làm|<CapabilityGrid/);
   assert.match(shell, /onSelect=\{setSelectedLearner\}/);
   assert.match(shell, /openTeacherEditor/);
 });

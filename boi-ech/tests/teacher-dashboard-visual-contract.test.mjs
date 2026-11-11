@@ -27,17 +27,11 @@ test("teacher hero and command bar use reference visual hierarchy", () => {
   assert.ok(shell.includes("Theo dõi kỹ thuật · Đưa phản hồi · Nâng cao thành tích"));
 });
 
-test("teacher capability labels match the instructor reference without inventing new services", () => {
-  for (const label of [
-    "Theo dõi lớp học",
-    "Xem tiến độ học viên",
-    "Duyệt video phân tích",
-    "Gửi nhận xét chuyên môn",
-    "Giao bài tập luyện tập",
-    "So sánh kết quả trước/sau",
-    "Theo dõi mức tin cậy AI",
-    "Xuất báo cáo lớp",
-  ]) assert.ok(shell.includes(label), label);
+test("teacher retains actual navigation without obsolete shortcut wall",()=>{
+ for(const label of ["Tổng quan","Lớp học","Học viên","Bài tập","Báo cáo","Tin nhắn","Lịch dạy","Hồ sơ chuyên môn","Phân tích video"]){
+  assert.ok(shell.includes('label: "'+label+'"'),label);
+ }
+ assert.doesNotMatch(shell,/Những gì giảng viên có thể làm/);
 });
 
 test("teacher visual V5 is presentation-only", () => {

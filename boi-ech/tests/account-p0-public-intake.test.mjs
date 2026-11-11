@@ -31,7 +31,9 @@ test('P0: public registration UI has only learner and teacher radio; Owner manag
  assert.match(gate,/Không kết nối được máy chủ tài khoản/);
  assert.match(gate,/tránh trùng yêu cầu/);
  assert.doesNotMatch(gate,/setTimeout\([^)]*send\(/);
- assert.match(gate,/<ManagerV2ReviewPanel(?:\s+singleReview=\{singleReview\})?\/>/);
+ const review=read("../app/manager-approval-panel.tsx");
+ assert.match(review,/<ManagerV2ReviewPanel singleReview=\{true\}\/>/);
+ assert.match(gate,/<ManagerWorkspace/);
 });
 test('P0: actual HTTP registration ingress has a server-side manager deny, not UI-only protection',()=>{
  const route=read('../app/api/accounts/route.ts');
@@ -61,7 +63,10 @@ test("L2 auth UX: simple login, separate registration and contextual password re
 test("L2 account UX: linked devices stay in authenticated account area and manager invites retain their path",()=>{
  const gate=read('../app/account-gate.tsx');
  assert.match(gate,/account \? styles\.root :/);
- assert.match(gate,/className=\{styles\.profileDevices\}/);
+ assert.match(gate,/AccountProfileDialog/);
+ const profile=read("../app/account-profile-dialog.tsx");
+ assert.match(profile,/id:"overview"\|"security"\|"devices"\|"sync"/);
+ assert.match(gate,/id:"devices"/);
  assert.match(gate,/Thu hồi thiết bị này/);
  assert.match(gate,/managerInviteRef\.current=invite;setManagerInvite\(invite\)/);
  assert.match(gate,/includeManager=\{false\}/);

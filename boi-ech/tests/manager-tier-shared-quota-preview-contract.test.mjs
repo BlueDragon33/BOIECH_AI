@@ -38,9 +38,12 @@ test("preview reads only literal fixture; its buttons cannot call mutation API",
  assert.match(panel,/if\(previewOnly \|\| !getProof\)throw/);
  assert.match(panel,/if\(previewOnly\)\{setNotice\(/);
  assert.match(panel,/disabled=\{busy\|\|previewOnly/);
- assert.match(workspace,/data-manager-preview="read-only"/);
- assert.match(workspace,/<ManagerApprovalPanel previewOnly\/>/);
- assert.match(workspace,/Xem thử không cần cấp quyền/);
+ const preview=read("app/xem-thu-can-bo-quan-ly/page.tsx");
+ assert.match(preview,/DEMO_BOARD:TrainingBoard/);
+ assert.match(preview,/<ManagerApprovalPanel previewOnly\/>/);
+ assert.match(preview,/onCommand=\{async\(\)=>\{setNotice\(/);
+ assert.match(preview,/KHÔNG ĐỒNG BỘ D1/);
+ assert.doesNotMatch(preview,/fetch\(|createTrainingClient\(/);
 });
 test("blanket auto-approval is disabled for migration into manager-tier review",()=>{
  assert.match(sql,/UPDATE access_automation_settings SET auto_confirm_new_devices=0/);

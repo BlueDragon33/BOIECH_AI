@@ -47,10 +47,14 @@ export class AccountEntitlementService {
     const days=await this.defaultDays(role);
     const activatedAt=new Date(this.now()).toISOString();
     const expiresAt=new Date(this.now()+days*86400000).toISOString();
+    // V2 one-review activation MUST fail within the D1 batch on a duplicate
+    // entitlement. Post-commit meta.changes failure must not leave ACTIVE behind.
+    // Preserve the existing deduplicated legacy second-review contract.
+    const legacyDedup=source==="approval:second"?" ON CONFLICT(account_id) DO NOTHING":"";
     return this.db.prepare(`INSERT INTO account_entitlements(account_id,state,activated_at,expires_at,changed_by)
       SELECT ?,'active',?,?,? WHERE EXISTS (
         SELECT 1 FROM account_onboarding WHERE account_id=? AND stage='active'
-      ) ON CONFLICT(account_id) DO NOTHING`)
+      )${legacyDedup}`)
       .bind(accountId,activatedAt,expiresAt,source,accountId);
   }
   async read(accountId: unknown) {

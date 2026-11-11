@@ -42,6 +42,21 @@ export async function verifyPassword(password: unknown, verifier: string) {
   const actual = await derive(password, match[1]);
   return timingSafeEqual(actual, Buffer.from(match[2], "hex"));
 }
+// Knowledge answers are not credentials by themselves: recovery also requires
+// proof from the previously trusted P-256 registration device.
+function normalizeChildhoodName(value: unknown) {
+  if (typeof value !== "string" || /[\x00-\x1f]/.test(value)) fail("SECURITY_ANSWER_INVALID",400);
+  const name=value.normalize("NFC").trim().replace(/\s+/g," ").toLocaleLowerCase("vi");
+  if ([...name].length<2 || name.length>120) fail("SECURITY_ANSWER_INVALID",400);
+  return "boi-ech:childhood-name:v1:"+name;
+}
+export async function hashSecurityAnswer(value: unknown) {
+  return hashPassword(normalizeChildhoodName(value));
+}
+export async function verifySecurityAnswer(value: unknown, verifier:string) {
+  try {return await verifyPassword(normalizeChildhoodName(value),verifier);}
+  catch{return false;}
+}
 export async function deviceKeyId(value: unknown) {
   if (!value || typeof value !== "object") fail("DEVICE_KEY_INVALID", 400);
   const k = value as JsonWebKey;
@@ -94,8 +109,16 @@ export class AccountService {
     const onboarding = this.v2Enabled ? await this.db.prepare(
       "SELECT stage,revision,last_review_note FROM account_onboarding WHERE account_id=?").bind(id)
       .first<{stage:string;revision:number;last_review_note:string|null}>() : null;
+    const profileDraft=this.v2Enabled?await this.db.prepare("SELECT profile_json,updated_at FROM account_profile_drafts WHERE account_id=?")
+      .bind(id).first<{profile_json:string;updated_at:string}>():null;
+    const contacts=this.v2Enabled?await this.db.prepare("SELECT kind,value,secondary_kind,secondary_value FROM account_contacts WHERE account_id=?")
+      .bind(id).first<{kind:string;value:string;secondary_kind:string|null;secondary_value:string|null}>():null;
     return { ...view(row), onboardingStage: onboarding?.stage??null, onboardingRevision: onboarding?.revision??null,
       reviewNote: onboarding?.last_review_note??null,
+      registrationProfile:profileDraft?JSON.parse(profileDraft.profile_json):null,
+      registrationProfileUpdatedAt:profileDraft?.updated_at??null,
+      registrationContact:contacts?{kind:contacts.kind,value:contacts.value,
+        secondaryKind:contacts.secondary_kind,secondaryValue:contacts.secondary_value}:null,
       entitlement,
       permissions: (caps.results ?? []).map(p => ({ scope: p.scope, configured: p.enabled === 1,
       effective: p.enabled === 1 && (!p.expires_at || p.expires_at > this.now()) && row.status === "approved" && row.management_enabled === 1 &&
@@ -108,24 +131,46 @@ export class AccountService {
       fail("ACCOUNT_INPUT",400);
     const limit=pageLimit as number;
     const result=await this.db.prepare(`SELECT a.account_id AS accountId,
-      a.revision AS accountRevision,d.person_role AS role,d.learner_name AS name,
-      d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision
+      a.revision AS accountRevision,d.person_role AS role,
+      COALESCE(d.learner_name,trim(json_extract(pd.profile_json,'$.familyName')||' '||json_extract(pd.profile_json,'$.givenName'))) AS name,
+      d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision,
+      pd.updated_at AS profileDraftUpdatedAt
       FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_onboarding o ON o.account_id=a.account_id
+      LEFT JOIN account_profile_drafts pd ON pd.account_id=a.account_id
       WHERE d.person_role='manager' AND a.account_id>?
       ORDER BY a.account_id LIMIT ?`).bind(after,limit+1)
       .all<{accountId:string;accountRevision:number;role:string;name:string|null;
-        status:string;onboardingStage:string;onboardingRevision:number}>();
+        status:string;onboardingStage:string;onboardingRevision:number;profileDraftUpdatedAt:string|null}>();
     const rows=result.results??[],hasMore=rows.length>limit,managers=rows.slice(0,limit);
     return {contract:"boi-manager-intake.v2" as const,verified:true,
       managers,nextCursor:hasMore?managers[managers.length-1].accountId:null};
   }
 
+  // Owner-only control bridge: read-only, cursor-bounded visibility across
+  // ALL roles. Does not grant any teacher/learner approval power to APP.
+  async ownerAllAccounts(after:unknown="",limit:unknown=40){
+    if(!this.v2Enabled)fail("ACCOUNT_V2_REQUIRED",409);
+    if(typeof after!=="string" || (after&&!ACCOUNT.test(after))
+       ||!Number.isInteger(limit)||(limit as number)<1||(limit as number)>50)
+      fail("ACCOUNT_QUERY_LIMIT",400);
+    const data=await this.db.prepare(`SELECT a.account_id FROM accounts a
+      WHERE a.account_id>? ORDER BY a.account_id LIMIT ?`)
+      .bind(after,(limit as number)+1).all<{account_id:string}>();
+    const rows=data.results??[],hasMore=rows.length>(limit as number);
+    const page=rows.slice(0,limit as number);
+    return {verified:true,contract:"boi-owner-accounts-all.v1" as const,
+      accounts:await Promise.all(page.map(row=>this.ownerRead(row.account_id))),
+      nextCursor:hasMore?page[page.length-1].account_id:null};
+  }
   async ownerList() {
     const result = await this.db.prepare(`SELECT a.account_id FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       WHERE d.person_role='manager' ORDER BY a.account_id LIMIT 101`).all<{ account_id: string }>();
     if ((result.results?.length ?? 0) > 100) fail("ACCOUNT_RESULT_LIMIT", 413);
     return Promise.all((result.results ?? []).map(r => this.ownerRead(r.account_id)));
+  }
+  async limitSecurityRecoveryAttempt(login: string, peer: string, phase: "challenge"|"recover" = "recover") {
+    await this.throttle(login,peer,"recovery-question-"+phase,phase==="challenge"?8:3);
   }
   private async throttle(login: string, peer: string, kind: string, maximum = 6) {
     const now = this.now(), window = 15 * 60 * 1000;
@@ -176,13 +221,14 @@ export class AccountService {
     await this.throttle(login, peer, "register", 5);
     if (input.privacyAccepted !== true || !["learner", "manager", "teacher"].includes(String(input.role))) fail("ACCOUNT_INPUT", 400);
     if (this.v2Enabled) return this.registerV2(input, login);
-    const role = String(input.role), code = bounded(input.personCode, 32).toUpperCase();
+    const role = String(input.role);
     const rawPhone = bounded(input.phone, 32).replace(/[ ()-]/g, "");
     const phone = rawPhone.startsWith("+84") ? "0" + rawPhone.slice(3) : rawPhone;
     const family = bounded(input.familyName, 60), given = bounded(input.givenName, 60), className = bounded(input.className, 80);
-    if (!/^[A-Z0-9._-]+$/.test(code) || !/^[+0-9 ()-]{7,32}$/.test(phone)) fail("ACCOUNT_INPUT", 400);
+    if (!/^[+0-9 ()-]{7,32}$/.test(phone)) fail("ACCOUNT_INPUT", 400);
     const keyId = await deviceKeyId(input.publicKey), password = await hashPassword(input.password);
     const accountId = "acc_" + random(), storageId = random(), recoveryCode = random();
+    const code=(role==="manager"?"MGR_":role==="teacher"?"GV_":"HV_")+storageId.slice(0,20).toUpperCase();
     // Storage anchor is independent of login-device keys. Existing foreign-key consumers remain untouched.
     try {
       await this.db.batch([
@@ -254,6 +300,10 @@ export class AccountService {
   private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string) {
     const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
     const verifier = await hashPassword(input.password), accountId = "acc_" + random();
+    // Existing accounts/tests remain valid without a question; the new V9 UI
+    // requires one when creating an account. The secret is never returned.
+    const securityVerifier = typeof input.securityAnswer === "string" && input.securityAnswer.trim()
+      ? await hashSecurityAnswer(input.securityAnswer) : null;
     const storageId = random(), recoveryCode = random();
     try {
       await this.db.batch([
@@ -265,6 +315,9 @@ export class AccountService {
         this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
         this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
           .bind(accountId,verifier,digest(recoveryCode)),
+        ...(securityVerifier ? [this.db.prepare(
+          "INSERT INTO account_recovery_questions(account_id,answer_verifier) VALUES(?,?)"
+        ).bind(accountId,securityVerifier)] : []),
         ...(typeof input.contactType==="string" && typeof input.contactValue==="string" ? [
           this.db.prepare("INSERT INTO account_contacts(account_id,kind,value) VALUES(?,?,?)")
             .bind(accountId,input.contactType,input.contactValue),
@@ -581,25 +634,40 @@ export class AccountService {
     const actor = await this.authorize(token);
     await this.capability(actor, "manager.approve.registration");
     const onboardingSelect = this.v2Enabled ? ",o.stage AS onboarding_stage,o.revision AS onboarding_revision,o.first_review_by" : "";
+    const draftSelect=this.v2Enabled ? ",json_extract(pd.profile_json,'$.familyName') AS draft_family,json_extract(pd.profile_json,'$.givenName') AS draft_given,json_extract(pd.profile_json,'$.className') AS draft_class" : "";
+    const draftJoin=this.v2Enabled ? " LEFT JOIN account_profile_drafts pd ON pd.account_id=a.account_id" : "";
     const onboardingJoin = this.v2Enabled ? " LEFT JOIN account_onboarding o ON o.account_id=a.account_id" : "";
     // Anonymous-profile requested rows form a bounded shared intake pool; after first review
     // only the accepting manager may read the applicant's profile during second review.
     const scopePending = this.v2Enabled ? " AND (o.stage='requested' OR o.first_review_by=?)" : "";
-    const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect} FROM accounts a
-      JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
+    const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect}${draftSelect} FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}${draftJoin}
       WHERE ((d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
         AND m.target_device_id IS NULL${scopePending})
        OR m.manager_device_id=?)${this.v2Enabled ? " AND a.account_id>?" : ""}
        ORDER BY a.account_id LIMIT ${this.v2Enabled ? "?" : "201"}`)
        .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId,
          ...(this.v2Enabled ? [after,(pageLimit as number)+1] : []))
-       .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
+       .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null; draft_family?:string|null; draft_given?:string|null; draft_class?:string|null }>();
     if (!this.v2Enabled && (result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
     const allRows=result.results??[],limit=this.v2Enabled?pageLimit as number:200;
     const devices=allRows.slice(0,limit),hasMore=this.v2Enabled && allRows.length>limit;
-    const counts = await this.db.prepare(`SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
-      JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
-      AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP) GROUP BY d.person_role`).all<{ person_role: string; used: number }>();
+    // V2 quotas are counted from canonical ACTIVE account entitlements, NOT the
+    // retired legacy access_expires_at. V1 retains its historical device policy.
+    const quotaSQL = this.v2Enabled
+      ? `SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used
+         FROM manager_device_assignments m
+         JOIN device_access d ON d.device_id=m.target_device_id
+         JOIN accounts a ON a.storage_device_id=d.device_id
+         JOIN account_onboarding o ON o.account_id=a.account_id
+         JOIN account_entitlements e ON e.account_id=a.account_id
+         WHERE d.status='approved' AND o.stage='active' AND e.state='active'
+           AND datetime(e.expires_at)>CURRENT_TIMESTAMP GROUP BY d.person_role`
+      : `SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
+         JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
+         AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+         GROUP BY d.person_role`;
+    const counts = await this.db.prepare(quotaSQL).all<{ person_role: string; used: number }>();
     const limits = await this.db.prepare("SELECT learner_limit,teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'").first<{ learner_limit: number; teacher_limit: number }>();
     if (!limits) fail("ACCOUNT_QUOTA_MISSING", 503);
     return { managerDeviceId: actor.storageDeviceId, quotas: {
@@ -607,8 +675,8 @@ export class AccountService {
       teacher: { limit: limits.teacher_limit, used: counts.results?.find(c => c.person_role === "teacher")?.used ?? 0 },
     }, nextCursor:hasMore?devices[devices.length-1].account_id:null,
     devices: devices.map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
-      deviceCode: r.person_code, role: r.person_role, name: r.learner_name, personCode: r.person_code, className: r.class_name,
-      status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.person_code&&r.learner_name&&r.phone&&r.class_name) : true,
+      deviceCode: r.person_code, role: r.person_role, name: r.learner_name||(r.draft_family&&r.draft_given?`${r.draft_family} ${r.draft_given}`:null), personCode: r.person_code, className: r.class_name||r.draft_class,
+      status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.draft_family&&r.draft_given||r.learner_name&&r.class_name) : true,
       onboardingStage: r.onboarding_stage??null, onboardingRevision: r.onboarding_revision??null,
       firstReviewMine: r.first_review_by===actor.accountId,
       assignedToMe: r.manager_device_id === actor.storageDeviceId })) };

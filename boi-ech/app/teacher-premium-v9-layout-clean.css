@@ -1,0 +1,133 @@
+/*
+ * V9 scoped teacher overview reconciliation.
+ * Imported AFTER historical V8/V29/V30/V37 layers to prevent competing
+ * viewport locks or 3-column overflow. Does not style learner/manager pages.
+ */
+body[data-teacher-role-ui="active"] .app-shell[data-person-role="teacher"] .main-area,
+body[data-teacher-role-ui="active"] .app-shell[data-person-role="teacher"] .teacher-role-dashboard-mount,
+body[data-teacher-role-ui="active"] .app-shell[data-person-role="teacher"] .teacher-dashboard {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-person-role="teacher"] .teacher-dashboard {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  padding: clamp(12px, 2vw, 25px) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-overview-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(285px, 335px) !important;
+  gap: clamp(12px, 1.6vw, 22px) !important;
+  align-items: start !important;
+  width: 100%;
+  min-width: 0;
+}
+body[data-teacher-role-ui="active"] .teacher-overview-main,
+body[data-teacher-role-ui="active"] .teacher-right-rail,
+body[data-teacher-role-ui="active"] .teacher-upper-grid,
+body[data-teacher-role-ui="active"] .teacher-lower-grid {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+body[data-teacher-role-ui="active"] .teacher-overview-main {
+  display: grid;
+  align-content: start;
+  gap: clamp(12px,1.5vw,20px);
+}
+body[data-teacher-role-ui="active"] .teacher-hero {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(185px, 34%) !important;
+  min-width: 0;
+  min-height: 220px;
+  height: auto !important;
+  max-width: 100%;
+}
+body[data-teacher-role-ui="active"] .teacher-hero-copy,
+body[data-teacher-role-ui="active"] .teacher-hero-art {
+  min-width: 0;
+  max-width: 100%;
+}
+body[data-teacher-role-ui="active"] .teacher-hero-copy h1 {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.45rem, 2.3vw, 2.3rem) !important;
+  line-height: 1.18 !important;
+}
+body[data-teacher-role-ui="active"] .teacher-upper-grid,
+body[data-teacher-role-ui="active"] .teacher-lower-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: start;
+  gap: clamp(12px,1.5vw,18px) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-right-rail {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-content: start;
+  gap: 14px;
+}
+body[data-teacher-role-ui="active"] .teacher-white-card,
+body[data-teacher-role-ui="active"] .teacher-rail-card,
+body[data-teacher-role-ui="active"] .teacher-metric,
+body[data-teacher-role-ui="active"] .teacher-class-summary,
+body[data-teacher-role-ui="active"] .teacher-analysis-queue {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+body[data-teacher-role-ui="active"] .teacher-table-wrap,
+body[data-teacher-role-ui="active"] .teacher-analysis-queue-list {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+body[data-teacher-role-ui="active"] .teacher-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px;
+}
+body[data-teacher-role-ui="active"] .teacher-class-summary .teacher-class-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+@media (max-width: 1479px) {
+  body[data-teacher-role-ui="active"] .teacher-overview-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-right-rail {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+}
+@media (max-width: 850px) {
+  body[data-teacher-role-ui="active"] .teacher-right-rail {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-hero {
+    grid-template-columns: minmax(0,1fr) !important;
+    min-height: 0;
+  }
+  body[data-teacher-role-ui="active"] .teacher-hero-copy h1 {
+    font-size: clamp(1.35rem, 5vw, 2rem) !important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-hero-art {
+    min-height: 145px;
+  }
+  body[data-teacher-role-ui="active"] .teacher-class-summary .teacher-class-metrics {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 540px) {
+  body[data-teacher-role-ui="active"] .teacher-capability-grid {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-white-card,
+  body[data-teacher-role-ui="active"] .teacher-rail-card {
+    padding: 14px !important;
+  }
+  body[data-teacher-role-ui="active"] .teacher-dashboard {
+    padding: 10px !important;
+  }
+}
