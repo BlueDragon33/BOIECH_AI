@@ -28,7 +28,7 @@
 .authSubtitle{margin:0 0 24px;color:#55717f;font-size:.96rem}
 .authRoot .authForm{display:grid;gap:16px}
 .authRoot .authForm>label{display:grid;gap:7px;color:#264d59;font-weight:600}
-.authRoot .authForm input:not([type=checkbox]),.authRoot .authForm select{
+.authRoot .authForm input:not([type=checkbox],[type=radio]),.authRoot .authForm select{
   width:100%;min-height:50px;padding:12px 14px;border-radius:13px;
   background:#f9fcfe;border:1px solid #b7d4df;color:#193f4c;outline:none;font:inherit;
   box-shadow:0 2px 4px #0a5d6410;box-sizing:border-box;
@@ -50,10 +50,10 @@
 .authRoot :global(.person-role-field legend){font-weight:750;color:#074d58;margin-bottom:9px}
 .authRoot :global(.person-role-field>div){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .authRoot :global(.person-role-field label){display:flex;gap:9px;align-items:center;
-  padding:12px;border:1px solid #c5dce4;border-radius:14px;cursor:pointer;background:#fbfdfe}
-.authRoot :global(.person-role-field label.selected){background:#e1f8f4;border-color:#0daea2}
-.authRoot :global(.person-role-field small){display:block;font-size:.74rem;color:#60808a}
-.authRoot :global(.person-role-field input){width:19px;min-height:19px;accent-color:#099c91}
+  padding:12px;border:1px solid #c5dce4;border-radius:14px;cursor:pointer;background:#fbfdfe;color:#264d59}
+.authRoot :global(.person-role-field label.selected){background:#e1f8f4;border-color:#0daea2;color:#064651}
+.authRoot :global(.person-role-field small){display:block;font-size:.74rem;color:#4c6976}
+.authRoot :global(.person-role-field input){flex:none;width:19px;height:19px;min-height:19px;padding:0;accent-color:#099c91}
 .profileDevices{margin-top:14px;padding:12px;border:1px solid #c8dee4;border-radius:12px}
 .profileDevices summary{cursor:pointer;font-weight:700}
 @media(max-width:560px){
