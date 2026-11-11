@@ -5,6 +5,7 @@ import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase }
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
 import { AccountEntitlementService } from "../../account-entitlement.server";
 import { AccountTrialService } from "../../account-trial.server";
+import { AccountSecurityQuestionService } from "../../account-security-question.server";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
     const onboarding = workflow ? await workflow.ownStatus(token) : null;
     const profileDraft=workflow && account.deviceApproved ? await workflow.ownProfileDraft(token) : null;
     const entitlement = config.v2 ? await new AccountEntitlementService(await getCourseDatabase()).read(account.accountId) : null;
+    const question=config.v2 && account.deviceApproved
+      ? await new AccountSecurityQuestionService(await getCourseDatabase(),service).status(token) : null;
     let canReadRegistrants=false;
     if(account.role==="manager"&&account.status==="approved"&&(!config.v2||(onboarding?.stage==="active"&&account.deviceApproved&&entitlement?.active===true))) {
       try { await service.capability(account,"registrants.read.all"); canReadRegistrants=true; }
@@ -39,6 +42,7 @@ export async function GET(request: Request) {
       onboardingNote: onboarding?.reviewNote ?? null,
       profileDraftReady:profileDraft?.ready===true,
       profileDraftFields:profileDraft?.fields??null,
+      securityQuestionConfigured:question?.configured===true,
       canReadRegistrants }, devices: await service.devices(token) });
   } catch (error) { return accountErrorResponse(error); }
 }
@@ -52,6 +56,12 @@ export async function POST(request: Request) {
     // Peer identity is supplied by the trusted edge; never accept an arbitrary payload identity.
     const peer = request.headers.get("cf-connecting-ip") ?? "unavailable-edge-peer";
     if (p.action === "legacy-challenge") return json(await createDeviceChallenge(p.deviceId, true));
+    if(config.v2 && p.action==="security-recovery-challenge")
+      return json(await new AccountSecurityQuestionService(await getCourseDatabase(),service).challenge(p.login,peer));
+    if(config.v2 && p.action==="security-recover")
+      return json({ok:true,...await new AccountSecurityQuestionService(await getCourseDatabase(),service).recover(p,peer)},sessionCookie(""));
+    if(config.v2 && p.action==="security-question-set")
+      return json({securityQuestion:await new AccountSecurityQuestionService(await getCourseDatabase(),service).change(token,p.password,p.securityAnswer)});
     if (config.v2 && p.action === "recovery-devices") return json(await service.recoveryDeviceList(p,peer));
     if (config.v2 && p.action === "contact-check") {
       const c=normalizeRegistrationContact(p.contactType,p.contactValue);
