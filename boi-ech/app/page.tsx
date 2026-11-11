@@ -705,8 +705,8 @@ function readableForeground(background: string, lightText: string, darkText: str
   if (contrastRatio(preferred, background) >= 4.5) return preferred;
   const alternative = preferred === lightText ? darkText : lightText;
   if (contrastRatio(alternative, background) >= 4.5) return alternative;
-  return contrastRatio("#ffffff", background) >= contrastRatio("#081525", background)
-    ? "#ffffff" : "#081525";
+  return contrastRatio("#ffffff", background) >= contrastRatio("#000000", background)
+    ? "#ffffff" : "#000000";
 }
 
 function InstallAppButton({ install }: { install: () => void }) {
