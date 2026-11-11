@@ -1030,3 +1030,9 @@ body { font-size: calc(16px + var(--font-adjust, 0px)); line-height: 1.65; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+
+/* V9: the existing learner/teacher identity chip is now the actual account trigger. */
+.topbar-actions button.learner-chip{appearance:none;font:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
+.topbar-actions button.learner-chip:hover{border-color:#2294bb;box-shadow:0 6px 19px #168bb52e;transform:translateY(-1px)}
+.topbar-actions button.learner-chip:focus-visible{outline:3px solid #28b7ce;outline-offset:3px}
