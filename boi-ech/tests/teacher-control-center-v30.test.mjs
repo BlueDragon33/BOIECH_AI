@@ -24,14 +24,19 @@ test("V30 supports multiple admin-assigned classes without broadening teacher ac
   assert.match(deviceManager, /Lớp Giảng viên phụ trách/);
   assert.match(deviceManager, /Lưu lớp phụ trách/);
 
-  for (const source of [overview, action, roster]) {
+  for (const source of [overview, action]) {
     assert.match(source, /teacherClassNames\(teacher\.className\)/);
     assert.match(source, /classPlaceholders/);
     assert.match(source, /\.bind\([^\n]*\.\.\.teacherClasses/);
   }
   assert.match(overview, /classes: teacherClasses/);
   assert.match(action, /learner\.class_name \|\| teacherClasses\[0\]/);
-  assert.match(roster, /target\.class_name \|\| teacherClasses\[0\]/);
+  assert.match(roster, /teacherClassNames\(teacher\.className\)/);
+  assert.match(roster, /const placeholders=classes\.map/);
+  assert.match(roster, /lower\(trim\(class_name\)\) IN \(\$\{placeholders\}\)/);
+  assert.match(roster, /\.bind\(\.\.\.classes\.map/);
+  assert.match(roster, /if\(payload\.action!=="list"\)/);
+  assert.doesNotMatch(roster, /UPDATE device_access|DELETE FROM device_access/);
 });
 
 test("V30 class page is a real multi-class control center backed by learner data", () => {

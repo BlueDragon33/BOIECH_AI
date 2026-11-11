@@ -58,8 +58,10 @@ test("legacy toolbar injection is retired while data refresh handlers remain int
   assert.doesNotMatch(blueprint, /badge\.textContent = "Giảng viên Pro"/);
   assert.match(shell, /addEventListener\("boi-ech:teacher-refresh"/);
   assert.match(shell, /removeEventListener\("boi-ech:teacher-refresh"/);
-  assert.match(roster, /addEventListener\("boi-ech:teacher-roster-sync"/);
-  assert.match(roster, /removeEventListener\("boi-ech:teacher-roster-sync"/);
+  assert.match(roster, /async function readApprovedRoster\(deviceId:string\)/);
+  assert.match(roster, /data.canManage!==false/);
+  assert.match(roster, /window.setInterval\(/);
+  assert.doesNotMatch(roster, /dispatchEvent\(new CustomEvent\("boi-ech:teacher-roster-sync"/);
 });
 
 test("V29 remains a presentation and interaction layer without scoring contracts", () => {

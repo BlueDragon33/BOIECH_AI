@@ -573,6 +573,7 @@ body[data-student-role-ui="active"] .student-adaptive-stable{
   line-height:1.5!important;
 }
 body[data-student-role-ui="active"] .student-adaptive-competencies>div{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
   grid-template-columns:minmax(65px,.75fr) minmax(44px,.4fr) minmax(0,1fr)!important;
   min-height:28px;
   gap:9px;
