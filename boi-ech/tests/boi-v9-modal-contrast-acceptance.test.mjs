@@ -86,7 +86,7 @@ test("named premium text/background pairs pass AA contrast",()=>{
 });
 
 test("Multi-account switcher remains centered with readable formerly faint labels",()=>{
- const css=source("multi-account-switcher.css");
+ const css=read("multi-account-switcher.css");
  assert.match(css,/\.multi-account-overlay\s*\{[\s\S]*?place-items:\s*center/);
  assert.match(roleCss,/\.multi-account-dialog\{\s*max-width:calc\(100vw - 20px\)!important/);
  assert.match(roleCss,/\.multi-account-copy small,\.multi-account-copy em,\.multi-account-add small\{/);
