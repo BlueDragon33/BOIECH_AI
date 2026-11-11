@@ -320,7 +320,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           {v2 ? account.deviceApproved===false ? "Thiết bị mới chưa được xác nhận. Hãy phê duyệt từ thiết bị đã tin cậy trước khi mở dữ liệu."
             : account.onboardingStage==="requested" ? "Đã tiếp nhận đăng ký. Đang chờ người có thẩm quyền phê duyệt."
             : account.onboardingStage==="profile_required" ? singleReview?(account.profileDraftReady?"Đã được duyệt. Hồ sơ khai trước đã lưu; chỉ cần xác nhận kích hoạt.":"Đã được duyệt. Điền đủ hồ sơ bắt buộc để kích hoạt và vào ứng dụng."):"Đã duyệt lần một. Hãy hoàn thiện hồ sơ để gửi duyệt lần hai."
-            : account.onboardingStage==="profile_review" ? "Hồ sơ đang được xét duyệt lần hai."
+            : account.onboardingStage==="profile_review" ? (singleReview ? "Hồ sơ đã qua lần duyệt đầu. Xác nhận lại thông tin để hoàn tất kích hoạt." : "Hồ sơ đang được xét duyệt lần hai.")
             : account.onboardingStage==="changes_requested" ? "Hồ sơ cần bổ sung. Hãy cập nhật và gửi lại."
             : account.onboardingStage==="legacy_hold" ? "Hồ sơ cũ cần được đối chiếu trước khi chuyển sang V2."
             : account.onboardingStage==="active" && account.entitlementActive===false ? "Thời hạn tài khoản đã hết, chưa được cấp hoặc tài khoản đang tạm khóa. Hãy liên hệ Owner để kiểm tra và gia hạn trong Application-Management."
@@ -358,7 +358,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           <h2>Hồ sơ đã lưu trước khi xét duyệt</h2><p>Không cần nhập lại. Hãy xác nhận kích hoạt sau khi hồ sơ đã được phê duyệt một lần.</p>
           <button type="button" disabled={busy} onClick={()=>void run(async()=>{await send({action:"profile-draft-activate"});await reload();setNotice("Đã kích hoạt bằng hồ sơ đã lưu và xác nhận trạng thái máy chủ.");})}>Kích hoạt bằng hồ sơ đã lưu</button>
         </section>:null}
-        {v2 && account.deviceApproved!==false && ["requested","profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
+        {v2 && account.deviceApproved!==false && (["requested","profile_required","changes_requested"].includes(account.onboardingStage||"")
+          || (singleReview && account.onboardingStage==="profile_review")) ? <form
           key={`${account.accountId}:${account.onboardingStage}:${account.profileDraftReady}`}
           className={styles.profileForm} onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
           <header className={styles.profileHeading}>
@@ -374,8 +375,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
                 ["jobTitle","Chức danh","text"],["jobPosition","Chức vụ","text"]] as const)
               :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["className","Lớp / đơn vị","text"],["phone","Số điện thoại bổ sung","tel"]] as const).filter(([name])=>name!=="phone"||account.primaryContactKind!=="phone")
             ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
-              <span>{label} {name==="phone"?<small>(không bắt buộc)</small>:<span className={styles.requiredMark} aria-label="Bắt buộc">*</span>}</span>
-              <input name={name} type={kind} defaultValue={account.profileDraftFields?.[name]??""} required={name!=="phone"} aria-required={name!=="phone"} minLength={name==="phone"?7:2}
+              <span>{label} {name==="phone"&&!singleReview?<small>(không bắt buộc)</small>:<span className={styles.requiredMark} aria-label="Bắt buộc">*</span>}</span>
+              <input name={name} type={kind} defaultValue={account.profileDraftFields?.[name]??""} required={name!=="phone"||singleReview} aria-required={name!=="phone"||singleReview} minLength={name==="phone"?7:2}
                 maxLength={name==="phone"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
                 autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}

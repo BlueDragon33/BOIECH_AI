@@ -64,7 +64,17 @@ export class AccountV2Workflow {
     if(!actor.deviceApproved) bad("DEVICE_APPROVAL_REQUIRED",403);
     const row=await this.db.prepare("SELECT profile_json FROM account_profile_drafts WHERE account_id=?")
       .bind(actor.accountId).first<{profile_json:string}>();
-    return row?{ready:true,fields:JSON.parse(row.profile_json) as Record<string,string>}:{ready:false,fields:null};
+    if (row) return { ready: true, fields: JSON.parse(row.profile_json) as Record<string, string> };
+    if (!this.singleReview || actor.status !== "pending") return { ready: false, fields: null };
+    const fields = await this.db.prepare(`SELECT d.learner_family_name AS familyName, d.learner_given_name AS givenName,
+      d.class_name AS className, d.phone AS phone, p.faculty_unit AS facultyUnit,
+      p.job_title AS jobTitle, p.job_position AS jobPosition
+      FROM account_onboarding o JOIN accounts a ON a.account_id=o.account_id
+      JOIN device_access d ON d.device_id=a.storage_device_id
+      LEFT JOIN account_manager_profiles p ON p.account_id=a.account_id
+      WHERE a.account_id=? AND o.stage IN ('profile_review','changes_requested') AND o.first_review_by IS NOT NULL`)
+      .bind(actor.accountId).first<Record<string, string>>();
+    return { ready: false, fields };
   }
   async saveProfileDraft(token:string,input:Record<string,unknown>) {
     if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
@@ -147,7 +157,8 @@ export class AccountV2Workflow {
   async submitProfile(token: string, input: Record<string, unknown>) {
     const actor = await this.accounts.session(token);
     const s = await this.state(actor.accountId);
-    if (!["profile_required","changes_requested"].includes(s.stage) || !Number.isInteger(input.expectedRevision)
+    const submittedBeforeSwitch = this.singleReview && s.stage === "profile_review";
+    if ((!["profile_required","changes_requested"].includes(s.stage) && !submittedBeforeSwitch) || !Number.isInteger(input.expectedRevision)
       || input.expectedRevision !== s.revision) bad("ACCOUNT_CAS_CONFLICT", 409);
     const family=field(input.familyName,60), given=field(input.givenName,60);
     const manager=s.role==="manager";
@@ -177,11 +188,11 @@ export class AccountV2Workflow {
     const phone=cleanPhone ? (cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone) : null;
     // Persist SQL NULL when manager originally registered with email; empty string
     // would collide under the legacy UNIQUE(device_access.phone) constraint.
-    if(!/^[A-Z0-9._-]+$/.test(code)|| (phone&&!/^\+?[0-9]{7,16}$/.test(phone))) bad("PROFILE_INVALID",400);
+    if(!/^[A-Z0-9._-]+$/.test(code)|| (phone&&!/^\+?[0-9]{7,16}$/.test(phone)) || (this.singleReview&&!manager&&!phone)) bad("PROFILE_INVALID",400);
     if (this.singleReview) {
       // One human review was recorded by firstReview(). User's completed profile
       // is the second *state transition*, NOT a second human approval.
-      if(s.stage!=="profile_required" || s.status!=="pending" || !s.first_review_by
+      if(s.status!=="pending" || !s.first_review_by
         || !actor.deviceApproved) bad("ACCOUNT_ONBOARDING_REQUIRED",403);
       const entitled=await new AccountEntitlementService(this.db).grantOnApproval(
         actor.accountId,s.role,"profile:completed");
@@ -190,18 +201,28 @@ export class AccountV2Workflow {
           person_code=?,class_name=?,phone=?,registration_submitted_at=CURRENT_TIMESTAMP,
           updated_at=CURRENT_TIMESTAMP
           WHERE device_id=? AND status='pending' AND EXISTS(
-            SELECT 1 FROM account_onboarding WHERE account_id=?
-            AND stage='profile_required' AND revision=? AND first_review_by IS NOT NULL)`)
+            SELECT 1 FROM account_onboarding o
+            JOIN account_sessions s ON s.account_id=o.account_id
+            JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+            JOIN account_credentials c ON c.account_id=o.account_id AND c.generation=s.generation
+            WHERE o.account_id=? AND o.stage=? AND o.revision=? AND o.first_review_by IS NOT NULL
+            AND s.token_hash=? AND s.device_id=? AND s.revoked=0 AND b.approved=1 AND b.revoked=0
+            AND s.expires_at>(julianday('now')-2440587.5)*86400000
+            AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000)`)
           .bind(family+" "+given,family,given,code,className,phone,
-            actor.storageDeviceId,actor.accountId,s.revision),
-        // Reuse the audited 0025 manager-assignment guard within the *same* D1
-        // transaction. profile_review is never committed or exposed as a step.
-        this.db.prepare(`UPDATE account_onboarding SET stage='profile_review',
+            actor.storageDeviceId,actor.accountId,s.stage,s.revision,actor.sessionHash,actor.deviceId),
+        this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+          SELECT ?,'account.profile.confirmed',?,
+          CASE WHEN changes()=1 THEN 'trusted device confirmed the reviewed profile' ELSE NULL END`)
+          .bind(actor.accountId,actor.accountId),
+        // Reuse the audited 0025 assignment guard. For a profile already in this
+        // stage, advance its revision without firing the stage-transition trigger.
+        this.db.prepare(`UPDATE account_onboarding SET ${submittedBeforeSwitch ? "" : "stage='profile_review',"}
           revision=revision+1,profile_submitted_at=CURRENT_TIMESTAMP,
           last_review_note=NULL,updated_at=CURRENT_TIMESTAMP
-          WHERE account_id=? AND revision=? AND stage='profile_required'
+          WHERE account_id=? AND revision=? AND stage=?
           AND first_review_by IS NOT NULL AND changes()=1`)
-          .bind(actor.accountId,s.revision),
+          .bind(actor.accountId,s.revision,s.stage),
       ];
       if(manager) statements.splice(1,0,this.db.prepare(`INSERT INTO account_manager_profiles
         (account_id,faculty_unit,job_title,job_position)
@@ -278,8 +299,7 @@ export class AccountV2Workflow {
         ) THEN 'single human review + complete profile + atomic activation'
           ELSE NULL END`)
         .bind(actor.accountId,actor.accountId,actor.accountId));
-      let result;
-      try{result=await this.db.batch(statements);}
+      try{await this.db.batch(statements);}
       catch(error){
         if(error instanceof Error && /ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(error.message))
           bad("ACCOUNT_CAPACITY_REACHED",409);
@@ -289,10 +309,9 @@ export class AccountV2Workflow {
           bad("PROFILE_CONFLICT",409);
         throw error;
       }
-      if(result.some((r,i)=>i<result.length-1 && Number(r.meta.changes)!==1))
-        bad("ACCOUNT_CAS_CONFLICT",409);
       const after=await this.state(actor.accountId);
-      if(after.stage!=="active" || after.status!=="approved")bad("ACCOUNT_READBACK_FAILED",503);
+      if(after.stage!=="active" || after.status!=="approved" || after.revision!==s.revision+2)
+        bad("ACCOUNT_READBACK_FAILED",503);
       return after;
     }
     const result=await this.db.batch([

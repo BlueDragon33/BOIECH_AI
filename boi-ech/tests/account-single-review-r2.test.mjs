@@ -75,6 +75,48 @@ test("R2: incomplete profile and stale CAS never create an ACTIVE seat",async()=
   assert.equal(f.sqlite.prepare("SELECT status FROM device_access WHERE device_id=?").get(manager.account.storageDeviceId).status,"pending");
  }finally{f.close()}
 });
+test("A pending profile from two-review mode needs a trusted user's confirmation after switching", async () => {
+ const f = accountStack({ v2: true });
+ try {
+  const manager = await approvedManager(f, 9291);
+  const id = manager.account.accountId;
+  const submitted = await f.flow.submitProfile(manager.token, { ...profile(9291), expectedRevision: 2 });
+  assert.equal(submitted.stage, "profile_review");
+  const { AccountV2Workflow } = f.load("account-v2-workflow.server.ts");
+  const singleReview = new AccountV2Workflow(f.db, f.service, true);
+  assert.equal((await singleReview.ownStatus(manager.token)).stage, "profile_review");
+  const historical = await singleReview.ownProfileDraft(manager.token);
+  assert.equal(historical.ready, false);
+  assert.equal(historical.fields.familyName, profile(9291).familyName);
+  assert.equal(historical.fields.facultyUnit, profile(9291).facultyUnit);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_entitlements WHERE account_id=?").get(id).n, 0);
+  await assert.rejects(() => singleReview.submitProfile(manager.token, { ...profile(9291), expectedRevision: 2 }), e => e.code === "ACCOUNT_CAS_CONFLICT");
+  const batch = f.db.batch.bind(f.db);
+  f.db.batch = async statements => (await batch(statements)).map(result => ({
+   ...result, meta: { ...result.meta, changes: result.meta.changes + 1 },
+  }));
+  const confirmed = await singleReview.submitProfile(manager.token, { ...profile(9291), expectedRevision: submitted.revision });
+  assert.equal(confirmed.stage, "active");
+  assert.equal((await f.service.ownerRead(id)).entitlement.active, true);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit WHERE target=? AND action='account.review.first'").get(id).n, 1);
+ } finally { f.close(); }
+});
+
+test("Single-review activation rolls back if the user session is revoked before the batch", async () => {
+ const f = accountStack({ v2: true, singleReview: true });
+ try {
+  const manager = await approvedManager(f, 9292);
+  const id = manager.account.accountId;
+  const batch = f.db.batch.bind(f.db);
+  f.db.batch = statements => {
+   f.sqlite.prepare("UPDATE account_sessions SET revoked=1 WHERE account_id=?").run(id);
+   return batch(statements);
+  };
+  await assert.rejects(() => f.flow.submitProfile(manager.token, { ...profile(9292), expectedRevision: 2 }));
+  assert.equal(f.sqlite.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").get(id).stage, "profile_required");
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_entitlements WHERE account_id=?").get(id).n, 0);
+ } finally { f.close(); }
+});
 test("R2: revoked manager entitlement blocks learner activation and rolls back ALL profile writes",async()=>{
  const f=accountStack({v2:true,singleReview:true});
  try{
