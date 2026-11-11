@@ -57,7 +57,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
   {tab==="overview"?<>
     <section className={styles.appGrid} aria-label="Ứng dụng điều phối">{apps.map(a=><button type="button" data-app={a.id} key={a.id} onClick={()=>selectTab(a.id)}><AppIcon name={a.id}/><span className={styles.appLabel}>{a.label}</span><small>{count(a.id)===null?a.description:`${count(a.id)} ${a.id==="schedule"?"buổi":a.id==="people"?"hồ sơ":a.id==="class"?"lớp":a.id==="room"?"phòng":"tòa"}`}</small></button>)}</section>
     <ManagerCommandCenter board={board} busy={busy} onNavigate={next=>{
-      if(next==="review"){selectTab("people");setFilter("review");}
+      if(next==="review"){selectTab("approval");}
       else selectTab(next);
     }} onOpenDetail={setDetail} onAssignPerson={assignPerson} onCreateResource={newResource}
       onCreateSession={(roomId,classId)=>editSession(undefined,roomId,classId)}/>
