@@ -102,12 +102,12 @@
 .commandCenter .hierarchyBreadcrumb button[aria-current="page"]{background:#5447a0;border-color:#a1a8ff}
 .hierarchyBreadcrumb>span{color:#91eaff;font-size:.83rem;overflow-wrap:anywhere}
 .campus{display:block!important;min-width:0;min-height:300px!important;height:auto!important;
- overflow:hidden!important;padding:clamp(12px,2.3vw,25px)!important}
+ overflow:hidden!important;height:clamp(340px,55vh,560px)!important;max-height:560px;padding:clamp(12px,2.3vw,25px)!important}
 .campusBuildingGrid{position:relative;z-index:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,164px),1fr));
- align-items:center;gap:14px;max-height:480px;overflow:auto;padding:14px 7px;min-width:0}
+ align-items:center;gap:14px;height:100%;max-height:100%;overflow:auto;padding:14px 7px;min-width:0}
 .campusBuildingGrid .buildingNode[data-index]{transform:none!important}
 .hierarchyWorkspace{position:relative;z-index:1;display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr);
- gap:clamp(9px,1.5vw,17px);width:100%;max-width:100%;min-width:0;align-items:stretch}
+ gap:clamp(9px,1.5vw,17px);height:100%;max-height:100%;width:100%;max-width:100%;min-width:0;align-items:stretch}
 .compactRail{display:flex;flex-direction:column;align-items:stretch;gap:9px;min-width:0;max-height:530px;
  padding:11px 7px;border:1px solid #6e9ce27c;border-radius:15px;
  background:linear-gradient(160deg,#0e3064f5,#171e53f5);overflow-y:auto;overscroll-behavior:contain}
@@ -120,7 +120,7 @@
 .compactRail>button>span:first-child{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;
  background:linear-gradient(135deg,#378ac9,#6957cd)!important;color:#fff!important}
 .compactRail>button>span:last-child{font-size:.72rem;font-weight:750;max-width:100%;overflow-wrap:anywhere}
-.focusedContent{min-width:0;display:grid;align-content:start;gap:12px;padding:clamp(11px,1.8vw,20px);
+.focusedContent{min-width:0;display:grid;align-content:start;gap:12px;max-height:100%;overflow-y:auto;overscroll-behavior:contain;padding:clamp(11px,1.8vw,20px);
  border:1px solid #80a5df91;border-radius:17px;
  background:linear-gradient(130deg,#1b4385e8,#20296bd9);max-width:100%}
 .focusHeading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;min-width:0}
@@ -201,7 +201,9 @@
  .roomWorkspace{grid-template-columns:minmax(75px,98px) minmax(0,1fr)}
  .focusIconGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,122px),1fr))}
 }
+.commandCenter .campus:focus-within{outline-color:#81eaff}
 @media(max-width:660px){
+ .campus{height:clamp(430px,68dvh,620px)!important;max-height:none}
  .hierarchyWorkspace,.roomWorkspace{grid-template-columns:minmax(0,1fr)}
  .compactRail{flex-direction:row;align-items:stretch;max-width:100%;max-height:none;overflow-x:auto;overflow-y:hidden;
   gap:7px;padding:8px;scroll-snap-type:x proximity}
