@@ -104,7 +104,11 @@ export class AccountV2Workflow {
         SELECT ?,'account.profile.draft.saved',?,
           CASE WHEN changes()=1 THEN 'preapproval canonical profile retained; no access grant'
             ELSE NULL END`).bind(actor.accountId,actor.accountId)
-    ]);
+    ]).catch(error=>{
+      if(error instanceof Error && /NOT NULL|constraint|ACCOUNT_CAS|CHECK/i.test(error.message))
+        bad("ACCOUNT_CAS_CONFLICT",409);
+      throw error;
+    });
     if(Number(res[0].meta.changes)!==1)bad("ACCOUNT_CAS_CONFLICT",409);
     return {saved:true,stage:"requested",revision:state.revision};
   }
