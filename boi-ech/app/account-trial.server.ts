@@ -50,7 +50,7 @@ export class AccountTrialService {
     // INSERT OR IGNORE makes simultaneous requests and re-logins share the
     // FIRST lease; the unique account PK forbids any refresh of its expiry.
     // Revalidate the principal in SQL to close revoke/role/stage races.
-    const result=await this.db.prepare(`INSERT OR IGNORE INTO account_ui_trials
+    const results=await this.db.batch([this.db.prepare(`INSERT OR IGNORE INTO account_ui_trials
       (account_id,role,issued_device_id,started_at_ms,expires_at_ms)
       SELECT a.account_id,d.person_role,s.device_id,
         CAST(unixepoch('now') AS INTEGER)*1000,
@@ -66,12 +66,16 @@ export class AccountTrialService {
         AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
         AND d.status='pending' AND o.stage IN ('requested','profile_required','changes_requested')
         AND d.person_role IN ('learner','teacher','manager')`)
-      .bind(actor.accountId,actor.sessionHash,actor.deviceId).run();
+      .bind(actor.accountId,actor.sessionHash,actor.deviceId),
+      this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+        SELECT ?,'account.trial.issued',?,'one-time UI sandbox 8h, no grants'
+        WHERE changes()=1`).bind(actor.accountId,actor.accountId),
+    ]);
     const lease=await this.readLease(actor.accountId,role);
     if(lease.state==="available")fail("ACCOUNT_CAS_CONFLICT",409);
     // Do not report success for an expired/replayed lease.
     if(lease.state==="expired")fail("TRIAL_EXPIRED",409);
-    if(result.meta.changes!==0 && result.meta.changes!==1)fail("ACCOUNT_READBACK_FAILED",503);
+    if(results[0].meta.changes!==0 && results[0].meta.changes!==1)fail("ACCOUNT_READBACK_FAILED",503);
     return lease;
   }
 }
