@@ -414,3 +414,66 @@ body[data-student-role-ui="active"] .student-lesson-grid button:focus-visible{
  body[data-teacher-role-ui="active"] .teacher-capability-action,
  body[data-student-role-ui="active"] .student-lesson-grid button{transition:none!important}
 }
+
+/* VI. Appearance controls must also change density and remain contrast-safe. */
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-density="compact"] .teacher-capability-action{
+  min-height:84px!important;
+  padding:10px!important;
+  gap:9px!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-density="compact"] .teacher-capability-grid{
+  gap:8px!important;
+  padding:9px!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-density="compact"] .student-lesson-grid>button{
+  min-height:195px!important;
+  padding-bottom:12px!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-white-card,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-capability-action,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-metric{
+  background:color-mix(in srgb,var(--card-background,#0b314b) 93%,#147db9 7%)!important;
+  color:var(--card-ink,#eaf7ff)!important;
+  border-color:#4d7492!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-capability-action strong,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-white-card>header strong,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-metric>div>span{
+  color:var(--card-ink,#eaf7ff)!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-capability-action small,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-white-card>header small,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-metric>div>small{
+  color:var(--card-muted,#b8d6e2)!important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table th,
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table td{
+  color:#e4f0f8!important;
+  background:#143b58!important;
+  border-color:#54718a!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-mini-stats>div{
+  background:#123850!important;
+  color:#e7f6ff!important;
+  border-color:#527c92!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button>strong,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button>p,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button footer,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button>small{
+  color:#d9f0f9!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-goals-card h3,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-goals-card li,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-progress-card p,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-mini-stats strong,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-mini-stats span{
+  color:#e3f4ff!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button.locked>small{
+  color:#12685f!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button.locked>small{
+  color:#8ce8d9!important;
+}
