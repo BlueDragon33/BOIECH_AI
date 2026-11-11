@@ -348,7 +348,8 @@ test("accepts only short-lived signed browser tickets from the exact configured 
   assert.match(auth, /TOKEN_AUDIENCE = "boi-ech-control"/);
   assert.match(auth, /TOKEN_ISSUER = "quan-ly-hoc-tap"/);
   assert.match(auth, /name: "HMAC", hash: "SHA-256"/);
-  assert.match(auth, /expiresAt > Date\.now\(\) \+ 10 \* 60 \* 1000/);
+  assert.match(auth, /const maxTtl = audience === ACCOUNT_CONTROL_AUDIENCE \? 60_000 : 10 \* 60_000/);
+  assert.match(auth, /expiresAt > Date\.now\(\) \+ maxTtl/);
   assert.match(auth, /access-control-allow-origin/);
   assert.doesNotMatch(auth, /access-control-allow-origin[^\n]*\*/);
   assert.match(overview, /export function OPTIONS/);

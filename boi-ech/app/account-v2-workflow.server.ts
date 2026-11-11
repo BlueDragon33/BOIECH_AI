@@ -185,7 +185,7 @@ export class AccountV2Workflow {
         for(const scope of ["manager.approve.registration","manager.manage.assigned"]){
           statements.push(this.db.prepare(`INSERT INTO account_manager_permissions
             (account_id,scope,enabled,expires_at,granted_by)
-            SELECT ?,?,1,NULL,? WHERE EXISTS(
+            SELECT ?,?,1,NULL,? WHERE changes()=1 AND EXISTS(
               SELECT 1 FROM account_onboarding o JOIN account_entitlements e
                 ON e.account_id=o.account_id
               WHERE o.account_id=? AND o.stage='active' AND e.state='active')
@@ -193,16 +193,16 @@ export class AccountV2Workflow {
             .bind(actor.accountId,scope,s.first_review_by,actor.accountId));
         }
       }
-      // Fail the whole transaction if a conditional statement returned zero or
-      // if any critical relationship is absent; no partial ACTIVE, seat or grant.
+      // The statement chain and required audit purpose roll back a no-op CAS or
+      // missing relationship inside D1. Read back state after the transaction.
       statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
         SELECT ?,'account.profile.activated',?,
-        CASE WHEN EXISTS(
+        CASE WHEN changes()=1 AND EXISTS(
           SELECT 1 FROM accounts a
           JOIN device_access d ON d.device_id=a.storage_device_id
           JOIN account_onboarding o ON o.account_id=a.account_id
           JOIN account_entitlements e ON e.account_id=a.account_id
-          WHERE a.account_id=? AND d.status='approved' AND o.stage='active'
+          WHERE a.account_id=? AND d.status='approved' AND o.stage='active' AND o.revision=?
             AND o.first_review_by IS NOT NULL
             AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
             AND (d.person_role='manager' AND d.management_enabled=1
@@ -217,22 +217,22 @@ export class AccountV2Workflow {
                   AND reviewer.account_id=o.first_review_by)))
         ) THEN 'single human review + complete profile + atomic activation'
           ELSE NULL END`)
-        .bind(actor.accountId,actor.accountId,actor.accountId));
-      let result;
-      try{result=await this.db.batch(statements);}
+        .bind(actor.accountId,actor.accountId,actor.accountId,s.revision+2));
+      try{await this.db.batch(statements);}
       catch(error){
         if(error instanceof Error && /ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(error.message))
           bad("ACCOUNT_CAPACITY_REACHED",409);
         if(error instanceof Error && /MANAGER_APPROVAL_FORBIDDEN/.test(error.message))
           bad("ACCOUNT_SCOPE_FORBIDDEN",403);
+        if(error instanceof Error && /NOT NULL.*account_audit\.purpose/i.test(error.message))
+          bad("ACCOUNT_CAS_CONFLICT",409);
         if(error instanceof Error && /UNIQUE|constraint|NOT NULL|ACCOUNT_REVIEW/i.test(error.message))
           bad("PROFILE_CONFLICT",409);
         throw error;
       }
-      if(result.some((r,i)=>i<result.length-1 && Number(r.meta.changes)!==1))
-        bad("ACCOUNT_CAS_CONFLICT",409);
       const after=await this.state(actor.accountId);
-      if(after.stage!=="active" || after.status!=="approved")bad("ACCOUNT_READBACK_FAILED",503);
+      if(after.stage!=="active" || after.status!=="approved" || after.revision!==s.revision+2)
+        bad("ACCOUNT_READBACK_FAILED",503);
       return after;
     }
     const result=await this.db.batch([

@@ -63,3 +63,17 @@ test("applicant revocation before profile commit keeps the account pending witho
   assertUnchanged(f,manager);
  }finally{f.close();}
 });
+
+test("committed single-review activation is acknowledged from readback instead of D1 change metadata",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const manager=await pendingApprovedOwner(f,9404);
+  const batch=f.db.batch.bind(f.db);
+  f.db.batch=async statements=>(await batch(statements)).map(result=>({...result,meta:{...result.meta,changes:0}}));
+  const result=await f.flow.submitProfile(manager.token,profile());
+  assert.equal(result.stage,"active");
+  assert.equal(result.revision,4);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM account_audit WHERE target=? AND action='account.profile.activated'")
+    .get(manager.account.accountId).count,1);
+ }finally{f.close();}
+});

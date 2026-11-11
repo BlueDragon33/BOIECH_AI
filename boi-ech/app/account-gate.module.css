@@ -59,6 +59,7 @@
 @media(max-width:560px){
   .authRoot{margin:16px 12px 30px;padding:22px;border-radius:20px}
   .authRoot::before{inset:10px -5px -9px 5px;border-radius:20px;transform:rotate(1deg)}
+  .authRegister::before{inset-inline-end:4px}
   .authRoot :global(.person-role-field>div){grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.authRoot *{scroll-behavior:auto}}
