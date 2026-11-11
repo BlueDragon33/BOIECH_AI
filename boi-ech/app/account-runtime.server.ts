@@ -68,6 +68,7 @@ export function accountErrorResponse(error: unknown) {
     MANAGER_INVITATION_CONFLICT: "Chính sách hoặc số lượng thư mời đã thay đổi. Owner cần đồng bộ lại rồi tạo mã mới.",
     ACCOUNT_V2_REQUIRED: "Tính năng tài khoản V2 chưa được xác minh trên hệ thống đang dùng.",
     PASSWORD_POLICY: "Mật khẩu cần ít nhất 15 ký tự và tối đa 1.024 ký tự.",
+    SECURITY_ANSWER_INVALID: "Hãy nhập câu trả lời Tên lúc nhỏ của bạn (từ 2 đến 120 ký tự).",
     REGISTRATION_UNAVAILABLE: "Không thể tạo hồ sơ này. Nếu đã đăng ký, hãy đăng nhập hoặc dùng khôi phục.",
     ACCOUNT_CAPACITY_REACHED: "Loại tài khoản này đã đủ số lượng. Đăng ký mới tạm dừng để bảo vệ hệ thống; hãy liên hệ cán bộ phụ trách.",
     ACCOUNT_POLICY_UNAVAILABLE: "Chính sách giới hạn tài khoản chưa sẵn sàng. Chưa tạo hồ sơ nào.",
