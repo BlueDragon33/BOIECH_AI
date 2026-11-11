@@ -51,8 +51,11 @@ export function roomNeedsAttention(board:TrainingBoard,roomId:string,windowSessi
   return !klass||klass.status!=="active"||klass.state==="overloaded"||klass.missingTeachers>0||!teacher||teacher.role!=="teacher"||!eligible(teacher)||!classNames(teacher.className).some(name=>classKey(name)===classKey(klass.name));
  });
 }
-function membersOfClass(people:TrainingPerson[],resource:TrainingResource){
- return people.filter(person=>(person.role==="teacher"?classNames(person.className):[person.className]).some(name=>classKey(name)===classKey(resource.name)));
+function membersOfClass(board:TrainingBoard,resource:TrainingResource){
+ const scheduledTeacherIds=new Set(sessionsInWindow(board).filter(session=>session.classId===resource.id).map(session=>session.teacherId));
+ return board.people.filter(person=>person.role==="teacher"
+   ? scheduledTeacherIds.has(person.id)||classNames(person.className).some(name=>classKey(name)===classKey(resource.name))
+   : [person.className].some(name=>classKey(name)===classKey(resource.name)));
 }
 const formatTime=(value:string)=>new Intl.DateTimeFormat("vi-VN",{hour:"2-digit",minute:"2-digit"}).format(new Date(value));
 const formatDate=(value:string)=>new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(value));
@@ -148,7 +151,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
  const selectedRoomSessions=selectedRoom?activeSessions.filter(session=>session.roomId===selectedRoom.id):[];
  const roomClasses=selectedRoom?classesInRoom(board,selectedRoom.id):[];
  const selectedClass=roomClasses.find(resource=>resource.id===classId)||null;
- const selectedMembers=selectedClass?membersOfClass(board.people,selectedClass):[];
+ const selectedMembers=selectedClass?membersOfClass(board,selectedClass):[];
  const blockedOrExpired=board.people.filter(person=>person.status==="blocked"||person.expired);
  const teacherCount=board.people.filter(person=>person.role==="teacher").length;
  const learnerCount=board.people.filter(person=>person.role==="learner").length;
