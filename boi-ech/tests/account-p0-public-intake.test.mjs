@@ -65,7 +65,8 @@ test("L2 account UX: linked devices stay in authenticated account area and manag
  assert.match(gate,/account \? styles\.root :/);
  assert.match(gate,/AccountProfileDialog/);
  const profile=read("../app/account-profile-dialog.tsx");
- assert.match(profile,/Bảo mật và thiết bị/);
+ assert.match(profile,/id:"overview"\|"security"\|"devices"\|"sync"/);
+ assert.match(gate,/id:"devices"/);
  assert.match(gate,/Thu hồi thiết bị này/);
  assert.match(gate,/managerInviteRef\.current=invite;setManagerInvite\(invite\)/);
  assert.match(gate,/includeManager=\{false\}/);

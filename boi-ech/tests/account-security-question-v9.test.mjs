@@ -43,13 +43,13 @@ test("V9 question alone cannot recover password; wrong answer and wrong original
  try{
   const user=await registerWithSigningKey(f,17002),service=svc(f);
   const nonce=await service.challenge(user.login,"fixture-peer-q");
-  await assert.rejects(()=>service.recover({login:user.login,
+  await assert.rejects(async()=>service.recover({login:user.login,
     securityAnswer:"Sai",password:"New password safe 123",challenge:nonce.challenge,
     signature:"invalid-signature"},"fixture-peer-q"),
     e=>e.status===401);
   const second=await service.challenge(user.login,"fixture-peer-q");
   const goodSignature=await proof(user,second.challenge);
-  await assert.rejects(()=>service.recover({login:user.login,
+  await assert.rejects(async()=>service.recover({login:user.login,
     securityAnswer:"Sai",password:"New password safe 123",...goodSignature},"fixture-peer-q"),
     e=>e.status===401&&e.code==="AUTH_FAILED");
   const after=f.sqlite.prepare("SELECT generation FROM account_credentials WHERE account_id=?")
@@ -72,7 +72,7 @@ test("V9 trusted original P-256 plus normalized answer recovers and revokes prev
   const newSession=await f.service.login({login:user.login,password:"New password safe 123",
     publicKey:user.publicKey},"fixture-login-new");
   assert.ok(newSession.token);
-  await assert.rejects(()=>service.recover({login:user.login,
+  await assert.rejects(async()=>service.recover({login:user.login,
     securityAnswer:"Bé Bông",password:"Next password safe 123",
     ...(await proof(user,next.challenge))},"fixture-peer-q2"),e=>e.status===401);
  }finally{f.close();}
@@ -85,7 +85,7 @@ test("V9 cannot recover after original P-256 device was revoked",async()=>{
   const next=await service.challenge(user.login,"fixture-peer-revoked");
   f.sqlite.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=?")
     .run(user.account.account.accountId);
-  await assert.rejects(()=>service.recover({login:user.login,securityAnswer:"Bé Bông",
+  await assert.rejects(async()=>service.recover({login:user.login,securityAnswer:"Bé Bông",
     password:"New password safe 123",...(await proof(user,next.challenge))},"fixture-peer-revoked"),
     e=>e.status===401);
  }finally{f.close();}
