@@ -57,6 +57,69 @@ export class AccountV2Workflow {
       AND (p.expires_at IS NULL OR p.expires_at>(unixepoch()*1000)))`;
     return { id: actor.accountId, guard, values: [actor.accountId,actor.sessionHash,actor.deviceId] };
   }
+  // Registration information is kept in canonical D1, not in trial storage.
+  // Only the owner of a trusted registered device may save or later activate it.
+  async ownProfileDraft(token: string) {
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved) bad("DEVICE_APPROVAL_REQUIRED",403);
+    const row=await this.db.prepare("SELECT profile_json FROM account_profile_drafts WHERE account_id=?")
+      .bind(actor.accountId).first<{profile_json:string}>();
+    return row?{ready:true,fields:JSON.parse(row.profile_json) as Record<string,string>}:{ready:false,fields:null};
+  }
+  async saveProfileDraft(token:string,input:Record<string,unknown>) {
+    if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved)bad("DEVICE_APPROVAL_REQUIRED",403);
+    const state=await this.state(actor.accountId);
+    if(state.stage!=="requested"||state.status!=="pending"
+       ||!Number.isInteger(input.expectedRevision)||input.expectedRevision!==state.revision)
+      bad("ACCOUNT_CAS_CONFLICT",409);
+    const familyName=field(input.familyName,60),givenName=field(input.givenName,60);
+    const manager=state.role==="manager";
+    const common={familyName,givenName};
+    const fields=manager
+      ? {...common,facultyUnit:field(input.facultyUnit,80),jobTitle:field(input.jobTitle,120),
+         jobPosition:field(input.jobPosition,120),
+         ...(typeof input.secondaryContact==="string"&&input.secondaryContact.trim()
+           ? {secondaryContact:field(input.secondaryContact,254)}:{})}
+      : {...common,className:field(input.className,80),phone:field(input.phone,32)};
+    const json=JSON.stringify(fields);
+    if(json.length>2048)bad("PROFILE_INVALID",400);
+    const res=await this.db.batch([
+      this.db.prepare(`INSERT INTO account_profile_drafts(account_id,profile_json)
+        SELECT ?,? WHERE EXISTS(
+          SELECT 1 FROM account_onboarding o
+          JOIN account_sessions s ON s.account_id=o.account_id
+          JOIN account_devices d ON d.account_id=s.account_id AND d.device_id=s.device_id
+          JOIN account_credentials c ON c.account_id=o.account_id AND c.generation=s.generation
+          WHERE o.account_id=? AND o.stage='requested' AND o.revision=?
+            AND s.token_hash=? AND s.device_id=? AND s.revoked=0
+            AND s.expires_at>(julianday('now')-2440587.5)*86400000
+            AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
+            AND d.approved=1 AND d.revoked=0)
+        ON CONFLICT(account_id) DO UPDATE SET profile_json=excluded.profile_json,
+          revision=account_profile_drafts.revision+1,updated_at=CURRENT_TIMESTAMP`)
+        .bind(actor.accountId,json,actor.accountId,state.revision,actor.sessionHash,actor.deviceId),
+      this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+        SELECT ?,'account.profile.draft.saved',?,
+          CASE WHEN changes()=1 THEN 'preapproval canonical profile retained; no access grant'
+            ELSE NULL END`).bind(actor.accountId,actor.accountId)
+    ]);
+    if(Number(res[0].meta.changes)!==1)bad("ACCOUNT_CAS_CONFLICT",409);
+    return {saved:true,stage:"requested",revision:state.revision};
+  }
+  async activateProfileDraft(token:string) {
+    if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved)bad("DEVICE_APPROVAL_REQUIRED",403);
+    const state=await this.state(actor.accountId);
+    if(state.stage!=="profile_required")bad("ACCOUNT_CAS_CONFLICT",409);
+    const row=await this.db.prepare("SELECT profile_json FROM account_profile_drafts WHERE account_id=?")
+      .bind(actor.accountId).first<{profile_json:string}>();
+    if(!row)bad("PROFILE_DRAFT_MISSING",409);
+    const profile=JSON.parse(row.profile_json) as Record<string,unknown>;
+    return this.submitProfile(token,{...profile,expectedRevision:state.revision});
+  }
   async firstReview(authority: Authority, targetId: string, revision: unknown) {
     const target = await this.state(targetId);
     // Check reviewer authorization before returning a stage/revision conflict.
