@@ -597,9 +597,22 @@ export class AccountService {
     if (!this.v2Enabled && (result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
     const allRows=result.results??[],limit=this.v2Enabled?pageLimit as number:200;
     const devices=allRows.slice(0,limit),hasMore=this.v2Enabled && allRows.length>limit;
-    const counts = await this.db.prepare(`SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
-      JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
-      AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP) GROUP BY d.person_role`).all<{ person_role: string; used: number }>();
+    // V2 quotas are counted from canonical ACTIVE account entitlements, NOT the
+    // retired legacy access_expires_at. V1 retains its historical device policy.
+    const quotaSQL = this.v2Enabled
+      ? `SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used
+         FROM manager_device_assignments m
+         JOIN device_access d ON d.device_id=m.target_device_id
+         JOIN accounts a ON a.storage_device_id=d.device_id
+         JOIN account_onboarding o ON o.account_id=a.account_id
+         JOIN account_entitlements e ON e.account_id=a.account_id
+         WHERE d.status='approved' AND o.stage='active' AND e.state='active'
+           AND datetime(e.expires_at)>CURRENT_TIMESTAMP GROUP BY d.person_role`
+      : `SELECT d.person_role,COUNT(DISTINCT d.device_id) AS used FROM manager_device_assignments m
+         JOIN device_access d ON d.device_id=m.target_device_id WHERE d.status='approved'
+         AND (d.access_expires_at IS NULL OR datetime(d.access_expires_at)>CURRENT_TIMESTAMP)
+         GROUP BY d.person_role`;
+    const counts = await this.db.prepare(quotaSQL).all<{ person_role: string; used: number }>();
     const limits = await this.db.prepare("SELECT learner_limit,teacher_limit FROM manager_approval_limits WHERE scope='manager-tier'").first<{ learner_limit: number; teacher_limit: number }>();
     if (!limits) fail("ACCOUNT_QUOTA_MISSING", 503);
     return { managerDeviceId: actor.storageDeviceId, quotas: {
