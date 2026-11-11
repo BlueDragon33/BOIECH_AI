@@ -148,7 +148,7 @@ export default function TeacherClassWorkspace({
       <div>
         <span>LỚP HỌC CỦA TÔI</span>
         <h1>Lớp học của tôi</h1>
-        <p>Quản lý nhiều lớp học, theo dõi tiến độ và xử lý đúng lớp đang phụ trách.</p>
+        <p>Theo dõi các lớp được Cán bộ quản lý phân công và tiến độ học tập trong phạm vi chuyên môn.</p>
         <small>{summaries.length} lớp · {totalLearners} học viên · {totalSupport} cần hỗ trợ</small>
         <span data-teacher-sync-mount="class"/>
       </div>
@@ -206,7 +206,7 @@ export default function TeacherClassWorkspace({
               <button type="button" className="teacher-class-card-editor" onClick={() => { onSelectedClassChange(item.name); onOpenEditor(item.name); }}>✎ Biên tập nội dung bài giảng <span>›</span></button>
             </article>;
           })}
-          {!summaries.length ? <div className="teacher-class-empty">Chưa có lớp nào được phân. Quản trị cần cập nhật “Lớp Giảng viên phụ trách” trong quản lý thiết bị.</div> : null}
+          {!summaries.length ? <div className="teacher-class-empty">Chưa có lớp nào được phân. Cán bộ quản lý cần phân công lớp cho Giảng viên qua hệ thống điều phối.</div> : null}
           {summaries.length > 0 && visibleSummaries.length === 0 ? <div className="teacher-class-empty">Không có lớp phù hợp với bộ lọc hiện tại. Hãy đổi trạng thái lọc hoặc từ khóa tìm kiếm.</div> : null}
         </div>
       </main>
