@@ -260,7 +260,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             // Never persist it in local/session storage or put it in the query string.
             reloadPreservingPendingManagerInvite(managerInviteRef.current); })}>Đăng xuất / đổi tài khoản</button></div>
         {active&&account.canReadRegistrants?<RegistrantReader/>:null}
-        {active&&v2&&account.role==="manager"?<details>
+        {active&&v2&&account.role==="manager"&&!managerDashboard?<details>
           <summary>Hàng chờ xét duyệt học viên và giảng viên · Account-first V2</summary>
           <ManagerV2ReviewPanel singleReview={singleReview}/>
         </details>:null}
@@ -322,7 +322,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     </section>;
   return <>
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
-      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}/>
+      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
+        accountReviews={<ManagerV2ReviewPanel singleReview={singleReview}/>}/>
     </div> : null}
     {managerDashboard?<details className={styles.managerAccountTools}>
       <summary>Tài khoản, bảo mật và đăng xuất</summary>{accountPanel}

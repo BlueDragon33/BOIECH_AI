@@ -23,7 +23,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
     if(mounted.current)setBoard(current=>after&&current
       ? {...data.board!,devices:[...current.devices.filter(a=>!data.board!.devices.some(b=>b.accountId===a.accountId)),
          ...data.board!.devices]} : data.board!);
-  }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}
+  }catch(e){if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  },[]);
  useEffect(()=>{mounted.current=true;void Promise.resolve().then(()=>{if(mounted.current)return refresh();});return()=>{mounted.current=false};},[refresh]);
@@ -44,7 +44,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
    if(action==="review-changes"&&result.onboarding?.stage!=="changes_requested")throw new Error("Yêu cầu bổ sung chưa được máy chủ xác nhận.");
    const data=await command({action:"review-list"});if(!data.board)throw new Error("Cần đồng bộ lại trạng thái.");
    if(mounted.current){setBoard(data.board);setNotice("Đã thực hiện và đọc lại trạng thái máy chủ.");}
-  }catch(e){if(mounted.current)setError(e instanceof Error?e.message:"Thao tác chưa xác nhận.");}
+  }catch(e){if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Thao tác chưa xác nhận; cần đồng bộ lại trước khi tiếp tục.");}}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  }
  const pending=board?.devices.filter(x=>x.status==="pending")??[];
