@@ -1389,6 +1389,14 @@ export default function Home() {
     window.localStorage.setItem("boi-ech-appearance-v1", JSON.stringify(appearance));
   }, [appearance, appearanceReady]);
 
+  // Both learner and teacher reuse ONE canonical appearance panel and
+  // persisted preferences; teacher sidebar never has a separate fake control.
+  useEffect(() => {
+    const openAppearance = () => setAppearanceOpen(true);
+    window.addEventListener("boi:appearance:open", openAppearance);
+    return () => window.removeEventListener("boi:appearance:open", openAppearance);
+  }, []);
+
   useEffect(() => {
     if (!appearanceOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
