@@ -75,6 +75,8 @@ export async function POST(request: Request) {
     // Only public account intake is required to supply one self-declared contact.
     // Do NOT send OTP, or treat matching this string as proof of a trusted device.
     if (config.v2 && (p.action === "register" || p.action === "manager-register")) {
+      if(typeof p.securityAnswer!=="string"||p.securityAnswer.trim().length<2)
+        throw new AccountError("SECURITY_ANSWER_INVALID",400);
       const contact=normalizeRegistrationContact(p.contactType,p.contactValue);
       p.contactType=contact.kind;
       p.contactValue=contact.value;
