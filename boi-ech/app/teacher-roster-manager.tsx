@@ -1,483 +1,146 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import {useCallback,useEffect,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 
-type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
-type RosterStatus = "pending" | "approved" | "blocked";
-type RosterItem = {
-  name: string;
-  personCode: string;
-  className: string;
-  status: RosterStatus;
-  registrationComplete: boolean;
-  createdAt: string;
-  approvedAt: string | null;
-  blockedAt: string | null;
-  lastSeenAt: string;
-};
-type RosterResponse = {
-  canManage?: boolean;
-  roster: RosterItem[];
-  counts: { pending: number; approved: number; blocked: number };
-  syncedAt: string;
-  changed?: { action: "approve" | "remove"; personCode: string; name: string };
-  error?: string;
-};
-
-function text(node: Element | null | undefined) {
-  return (node?.textContent ?? "").replace(/\s+/g, " ").trim();
+type Credential={version:2;privateKey:CryptoKey|null;publicKey:JsonWebKey};
+type RosterItem={name:string;personCode:string;className:string;status:"approved";lastSeenAt:string};
+type RosterResponse={canManage:false;roster:RosterItem[];counts:{pending:0;approved:number;blocked:0};
+  syncedAt:string;error?:string};
+const EMPTY:RosterResponse={canManage:false,roster:[],counts:{pending:0,approved:0,blocked:0},syncedAt:""};
+function clock(v:string|null){
+  if(!v)return "Chưa đồng bộ";
+  const date=new Date(v);
+  return Number.isNaN(date.getTime())?"Chưa đồng bộ":
+    new Intl.DateTimeFormat("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}).format(date);
 }
-
-function base64Url(bytes: Uint8Array) {
-  let binary = "";
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap", 4);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+async function credential(){
+  const db=await new Promise<IDBDatabase>((ok,no)=>{
+    const request=indexedDB.open(document.documentElement.dataset.accountLocalDatabase||"boi-ech-doc-lap",4);
+    request.onsuccess=()=>ok(request.result);request.onerror=()=>no(request.error);
   });
+  try{return await new Promise<Credential|undefined>((ok,no)=>{
+    const request=db.transaction("thiet-bi","readonly").objectStore("thiet-bi").get("chinh");
+    request.onsuccess=()=>ok(request.result as Credential|undefined);
+    request.onerror=()=>no(request.error);
+  });}finally{db.close();}
 }
-
-async function readCredential() {
-  const db = await openDb();
-  return new Promise<StoredDeviceCredential | undefined>((resolve, reject) => {
-    const request = db.transaction("thiet-bi", "readonly").objectStore("thiet-bi").get("chinh");
-    request.onsuccess = () => resolve(request.result as StoredDeviceCredential | undefined);
-    request.onerror = () => reject(request.error);
-  });
+async function deviceIdFromKey(){
+  const shell=document.querySelector<HTMLElement>(".app-shell");
+  const direct=shell?.getAttribute("data-device-id")??"";
+  if(/^[a-f0-9]{64}$/i.test(direct))return direct;
+  const key=await credential();if(!key?.publicKey)return "";
+  const p=key.publicKey;
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(
+    JSON.stringify({kty:p.kty,crv:p.crv,x:p.x,y:p.y})));
+  return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("");
 }
-
-async function deriveDeviceId() {
-  const shell = document.querySelector<HTMLElement>(".app-shell");
-  const direct = shell?.getAttribute("data-device-id") ?? "";
-  if (/^[a-f0-9]{64}$/i.test(direct)) return direct;
-  const credential = await readCredential();
-  if (!credential?.publicKey || !crypto.subtle) return "";
-  const canonical = JSON.stringify({
-    kty: credential.publicKey.kty,
-    crv: credential.publicKey.crv,
-    x: credential.publicKey.x,
-    y: credential.publicKey.y,
-  });
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
-  return [...new Uint8Array(digest)].map((item) => item.toString(16).padStart(2, "0")).join("");
-}
-
-async function signedProof(deviceId: string) {
-  const credential = await readCredential();
-  if (!credential?.privateKey) throw new Error("Không tìm thấy khóa ký của thiết bị Giảng viên.");
-  const response = await fetch("/api/device", {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "challenge", deviceId }),
-  });
-  const data = await response.json() as { challenge?: string; error?: string };
-  if (!response.ok || !data.challenge) throw new Error(data.error ?? "Không thể tạo phiên xác thực Giảng viên.");
-  const message = new TextEncoder().encode(`boi-ech:${deviceId}:${data.challenge}`);
-  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message);
-  return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) };
-}
-
-async function requestRoster(deviceId: string, action: "list" | "approve" | "remove", personCode = "") {
-  const proof = await signedProof(deviceId);
-  const response = await fetch("/api/teacher/roster", {
-    method: "POST",
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...proof, action, personCode }),
-  });
-  const data = await response.json() as RosterResponse;
-  if (!response.ok) throw new Error(data.error ?? "Không thể đồng bộ học viên.");
+async function readApprovedRoster(deviceId:string){
+  const key=await credential();
+  if(!key?.privateKey)throw new Error("Không tìm thấy khóa P-256 của Giảng viên.");
+  const challengeResponse=await fetch("/api/device",{method:"POST",credentials:"same-origin",cache:"no-store",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({action:"challenge",deviceId})});
+  const challenge=await challengeResponse.json() as {challenge?:string;error?:string};
+  if(!challengeResponse.ok||!challenge.challenge)throw new Error(challenge.error||"Không xác minh được thiết bị.");
+  const bytes=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key.privateKey,
+    new TextEncoder().encode(`boi-ech:${deviceId}:${challenge.challenge}`));
+  const binary=[...new Uint8Array(bytes)].map(b=>String.fromCharCode(b)).join("");
+  const signature=btoa(binary).replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
+  const response=await fetch("/api/teacher/roster",{method:"POST",credentials:"same-origin",cache:"no-store",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({action:"list",deviceId,challenge:challenge.challenge,signature})});
+  const data=await response.json() as RosterResponse;
+  if(!response.ok)throw new Error(data.error??"Không thể đồng bộ danh sách học viên.");
+  if(data.canManage!==false)throw new Error("Máy chủ không xác nhận được chế độ chỉ đọc.");
+  if(data.roster.some(person=>person.status!=="approved"))
+    throw new Error("Máy chủ trả hồ sơ ngoài phạm vi học viên đã duyệt.");
   return data;
 }
-
-function shortTime(value: string | null) {
-  if (!value) return "Chưa đồng bộ";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Chưa đồng bộ"
-    : new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(date);
+function CompactSync({loading,syncedAt,onSync}:{loading:boolean;syncedAt:string;onSync:()=>void}){
+  return <div className="teacher-roster-sync-compact" data-teacher-roster-ui>
+    <div><small>Tự đồng bộ 60 giây · Chỉ đọc</small><span>{clock(syncedAt)}</span></div>
+    <button type="button" disabled={loading} onClick={onSync}>{loading?"Đang đồng bộ…":"Đồng bộ dữ liệu"}</button>
+  </div>;
 }
-
-function statusLabel(status: RosterStatus) {
-  if (status === "approved") return "Đang học";
-  if (status === "blocked") return "Đã loại";
-  return "Chờ duyệt";
-}
-
-function rosterIdentitySignature(items: RosterItem[]) {
-  return items.map((item) => item.personCode).filter(Boolean).sort().join("|");
-}
-
-function countNewRosterMembers(previousSignature: string, items: RosterItem[]) {
-  if (!previousSignature) return 0;
-  const previous = new Set(previousSignature.split("|").filter(Boolean));
-  return items.reduce((count, item) => count + (item.personCode && !previous.has(item.personCode) ? 1 : 0), 0);
-}
-
-function approvedSignature(items: RosterItem[]) {
-  return items.filter((item) => item.status === "approved").map((item) => item.personCode).sort().join("|");
-}
-
-function CompactSync({
-  loading,
-  syncedAt,
-  pending,
-  changedCount,
-  onSync,
-}: {
-  loading: boolean;
-  syncedAt: string | null;
-  pending: number;
-  changedCount: number;
-  onSync: () => void;
-}) {
-  return (
-    <div className="teacher-roster-sync-compact" data-teacher-roster-ui>
-      <div>
-        <small>Tự cập nhật 60 giây</small>
-        <span>{shortTime(syncedAt)}{changedCount ? ` · +${changedCount} mới` : ""}</span>
-      </div>
-      {pending > 0 ? <b title="Học viên chờ duyệt">{pending}</b> : null}
-      <button type="button" onClick={onSync} disabled={loading}>
-        {loading ? "Đang đồng bộ…" : "Đồng bộ dữ liệu"}
-      </button>
+function RosterPanel({data,loading,error,onSync}:{data:RosterResponse;loading:boolean;error:string;onSync:()=>void}){
+  const [query,setQuery]=useState("");
+  const term=query.trim().toLocaleLowerCase("vi");
+  const listed=data.roster.filter(person=>!term||
+    [person.name,person.className].join(" ").toLocaleLowerCase("vi").includes(term));
+  return <section className="teacher-roster-manager" data-teacher-roster-ui>
+    <header><div><span>DANH SÁCH HỌC VIÊN ĐÃ DUYỆT</span><h2>Theo dõi lớp phụ trách</h2>
+      <p>Chỉ xem học viên đã được Cán bộ quản lý duyệt và phân công đúng lớp.
+        Giảng viên không thể duyệt, loại, khóa hay khôi phục tài khoản học viên.</p></div>
+      <button type="button" disabled={loading} onClick={onSync}>{loading?"Đang đồng bộ…":"Đồng bộ dữ liệu"}</button>
+    </header>
+    <div className="teacher-roster-summary">
+      <div><strong>{data.counts.approved}</strong><span>Học viên đã duyệt</span></div>
+      <div className="synced"><strong>{clock(data.syncedAt)}</strong><span>Lần đồng bộ cuối</span></div>
     </div>
-  );
+    <div className="teacher-roster-toolbar"><input value={query} onChange={e=>setQuery(e.target.value)}
+      placeholder="Tìm theo tên hoặc lớp" aria-label="Tìm học viên đã duyệt"/></div>
+    {error?<p className="teacher-roster-error" role="alert">{error}</p>:null}
+    <div className="teacher-roster-table-wrap"><table className="teacher-roster-table">
+      <thead><tr><th>Học viên</th><th>Lớp phụ trách</th><th>Trạng thái</th><th>Hoạt động gần nhất</th></tr></thead>
+      <tbody>{listed.map(person=><tr key={person.personCode||person.name}>
+        <td><strong>{person.name}</strong></td><td>{person.className||"Chưa có lớp"}</td>
+        <td><span className="teacher-roster-status approved">Đang học</span></td>
+        <td>{clock(person.lastSeenAt)}</td>
+      </tr>)}</tbody>
+    </table>
+    {!listed.length?<div className="teacher-roster-empty">Không có học viên đã duyệt phù hợp trong phạm vi lớp.</div>:null}
+    </div>
+  </section>;
 }
-
-function RosterPanel({
-  roster,
-  counts,
-  loading,
-  error,
-  syncedAt,
-  onSync,
-  onAction,
-  canManage,
-}: {
-  roster: RosterItem[];
-  counts: RosterResponse["counts"];
-  loading: boolean;
-  error: string;
-  syncedAt: string | null;
-  onSync: () => void;
-  onAction: (action: "approve" | "remove", item: RosterItem) => void;
-  canManage: boolean;
-}) {
-  const [filter, setFilter] = useState<"all" | RosterStatus>("all");
-  const [query, setQuery] = useState("");
-  const visible = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("vi");
-    return roster.filter((item) => {
-      const statusMatch = filter === "all" || item.status === filter;
-      const queryMatch = !needle || [item.name, item.personCode, item.className].join(" ").toLocaleLowerCase("vi").includes(needle);
-      return statusMatch && queryMatch;
-    });
-  }, [filter, query, roster]);
-
-  return (
-    <section className="teacher-roster-manager" data-teacher-roster-ui>
-      <header>
-        <div>
-          <span>QUẢN LÝ HỌC VIÊN</span>
-          <h2>Đồng bộ & quyền lớp phụ trách</h2>
-          <p>{canManage ? "Giảng viên chỉ phê duyệt hoặc loại học viên thuộc đúng lớp của mình. “Loại” là khóa có thể khôi phục, không xóa dữ liệu." : "Giảng viên theo dõi học viên thuộc lớp phụ trách. Cán bộ quản lý xét duyệt và quản lý quyền truy cập tài khoản."}</p>
-        </div>
-        <button type="button" onClick={onSync} disabled={loading}>{loading ? "Đang đồng bộ…" : "Đồng bộ dữ liệu"}</button>
-      </header>
-      <div className="teacher-roster-summary">
-        <div><strong>{counts.approved}</strong><span>Đang học</span></div>
-        <div className="pending"><strong>{counts.pending}</strong><span>Chờ duyệt</span></div>
-        <div className="blocked"><strong>{counts.blocked}</strong><span>Đã loại</span></div>
-        <div className="synced"><strong>{shortTime(syncedAt)}</strong><span>Lần đồng bộ cuối</span></div>
-      </div>
-      <div className="teacher-roster-toolbar">
-        <div className="teacher-roster-filters">
-          {([
-            ["all", `Tất cả (${roster.length})`],
-            ["pending", `Chờ duyệt (${counts.pending})`],
-            ["approved", `Đang học (${counts.approved})`],
-            ["blocked", `Đã loại (${counts.blocked})`],
-          ] as const).map(([value, label]) => (
-            <button key={value} type="button" className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{label}</button>
-          ))}
-        </div>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm tên hoặc mã học viên…" aria-label="Tìm học viên trong danh sách quản lý"/>
-      </div>
-      {error ? <p className="teacher-roster-error" role="alert">{error}</p> : null}
-      <div className="teacher-roster-table-wrap">
-        <table className="teacher-roster-table">
-          <thead><tr><th>Học viên</th><th>Mã</th><th>Trạng thái</th><th>Gần nhất</th><th>Thao tác</th></tr></thead>
-          <tbody>
-            {visible.map((item) => (
-              <tr key={item.personCode}>
-                <td><strong>{item.name}</strong><small>{item.className}</small></td>
-                <td>{item.personCode}</td>
-                <td><span className={`teacher-roster-status ${item.status}`}>{statusLabel(item.status)}</span></td>
-                <td>{shortTime(item.lastSeenAt)}</td>
-                <td>
-                  {!canManage ? <span>Cán bộ quản lý xét duyệt</span> : item.status === "pending" ? (
-                    <button type="button" className="approve" disabled={loading || !item.registrationComplete} onClick={() => onAction("approve", item)}>
-                      {item.registrationComplete ? "Phê duyệt" : "Thiếu hồ sơ"}
-                    </button>
-                  ) : item.status === "approved" ? (
-                    <button type="button" className="remove" disabled={loading} onClick={() => onAction("remove", item)}>Loại khỏi lớp</button>
-                  ) : (
-                    <button type="button" className="restore" disabled={loading} onClick={() => onAction("approve", item)}>Khôi phục</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!visible.length ? <div className="teacher-roster-empty">Không có học viên phù hợp với bộ lọc hiện tại.</div> : null}
-      </div>
-    </section>
-  );
-}
-
-export default function TeacherRosterManager() {
-  const [compactMounts, setCompactMounts] = useState<HTMLElement[]>([]);
-  const [panelMount, setPanelMount] = useState<HTMLElement | null>(null);
-  const [data, setData] = useState<RosterResponse>({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [changedCount, setChangedCount] = useState(0);
-  const deviceIdRef = useRef("");
-  const syncedDeviceRef = useRef("");
-  const rosterIdentitySignatureRef = useRef("");
-  const approvedSignatureRef = useRef("");
-  const syncingRef = useRef(false);
-  const teacherActiveRef = useRef(false);
-  const syncGenerationRef = useRef(0);
-
-  const clearRosterState = () => {
-    deviceIdRef.current = "";
-    syncedDeviceRef.current = "";
-    rosterIdentitySignatureRef.current = "";
-    approvedSignatureRef.current = "";
-    syncingRef.current = false;
-    setData({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
-    setChangedCount(0);
-    setError("");
-    setLoading(false);
-  };
-
-  const syncRoster = async (
-    source: "manual" | "auto" | "mutation" = "manual",
-    forcedDeviceId = "",
-  ) => {
-    if (document.body.dataset.teacherRoleUi !== "active") return;
-    if (syncingRef.current) return;
-    const generation = syncGenerationRef.current;
-    syncingRef.current = true;
-    setLoading(true);
-    if (source !== "auto") setError("");
-    try {
-      const deviceId = forcedDeviceId || deviceIdRef.current || await deriveDeviceId();
-      if (!deviceId) throw new Error("Chưa xác định được thiết bị Giảng viên.");
-      if (generation !== syncGenerationRef.current || document.body.dataset.teacherRoleUi !== "active") return;
-      deviceIdRef.current = deviceId;
-      const next = await requestRoster(deviceId, "list");
-      if (generation !== syncGenerationRef.current || deviceIdRef.current !== deviceId) return;
-      const nextRosterIdentitySignature = rosterIdentitySignature(next.roster);
-      const nextApprovedSignature = approvedSignature(next.roster);
-      if (rosterIdentitySignatureRef.current && nextRosterIdentitySignature !== rosterIdentitySignatureRef.current) {
-        const additions = countNewRosterMembers(rosterIdentitySignatureRef.current, next.roster);
-        if (additions > 0) setChangedCount((current) => current + additions);
-      }
-      if (approvedSignatureRef.current && nextApprovedSignature !== approvedSignatureRef.current) {
-        window.dispatchEvent(new CustomEvent("boi-ech:teacher-roster-changed"));
-      }
-      rosterIdentitySignatureRef.current = nextRosterIdentitySignature;
-      approvedSignatureRef.current = nextApprovedSignature;
-      syncedDeviceRef.current = deviceId;
-      setData(next);
-    } catch (caught) {
-      if (generation === syncGenerationRef.current && source !== "auto") {
-        setError(caught instanceof Error ? caught.message : "Không thể đồng bộ học viên.");
-      }
-    } finally {
-      if (generation === syncGenerationRef.current) {
-        syncingRef.current = false;
-        setLoading(false);
-      }
-    }
-  };
-
-  const mutate = async (action: "approve" | "remove", item: RosterItem) => {
-    if (data.canManage === false) return;
-    if (document.body.dataset.teacherRoleUi !== "active") return;
-    if (action === "remove") {
-      const confirmed = window.confirm(`Loại ${item.name} khỏi lớp? Học viên sẽ bị khóa truy cập nhưng có thể được khôi phục sau.`);
-      if (!confirmed) return;
-    }
-    if (syncingRef.current) return;
-    const generation = syncGenerationRef.current;
-    syncingRef.current = true;
-    setLoading(true);
-    setError("");
-    try {
-      const deviceId = deviceIdRef.current || await deriveDeviceId();
-      if (!deviceId) throw new Error("Chưa xác định được thiết bị Giảng viên.");
-      if (generation !== syncGenerationRef.current || document.body.dataset.teacherRoleUi !== "active") return;
-      deviceIdRef.current = deviceId;
-      const next = await requestRoster(deviceId, action, item.personCode);
-      if (generation !== syncGenerationRef.current || deviceIdRef.current !== deviceId) return;
-      rosterIdentitySignatureRef.current = rosterIdentitySignature(next.roster);
-      approvedSignatureRef.current = approvedSignature(next.roster);
-      syncedDeviceRef.current = deviceId;
-      setData(next);
-      setChangedCount(0);
-      window.dispatchEvent(new CustomEvent("boi-ech:teacher-roster-changed", { detail: next.changed }));
-    } catch (caught) {
-      if (generation === syncGenerationRef.current) {
-        setError(caught instanceof Error ? caught.message : "Không thể cập nhật quyền học viên.");
-      }
-    } finally {
-      if (generation === syncGenerationRef.current) {
-        syncingRef.current = false;
-        setLoading(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (window.location.pathname !== "/") return;
-    let timer = 0;
-    let interval = 0;
-
-    const resetForInactiveRole = () => {
-      if (!teacherActiveRef.current && !deviceIdRef.current && !syncedDeviceRef.current) return;
-      teacherActiveRef.current = false;
-      syncGenerationRef.current += 1;
-      clearRosterState();
+export default function TeacherRosterManager(){
+  const [mounts,setMounts]=useState<HTMLElement[]>([]);
+  const [panel,setPanel]=useState<HTMLElement|null>(null);
+  const [data,setData]=useState<RosterResponse>(EMPTY);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const generation=useRef(0),busy=useRef(false),device=useRef("");
+  const sync=useCallback(async()=>{
+    if(document.body.dataset.teacherRoleUi!=="active"||busy.current)return;
+    const epoch=generation.current;
+    busy.current=true;setLoading(true);setError("");
+    try{
+      const id=await deviceIdFromKey();
+      if(!id)throw new Error("Không tìm thấy thiết bị Giảng viên đã được xác thực.");
+      const result=await readApprovedRoster(id);
+      if(epoch!==generation.current||document.body.dataset.teacherRoleUi!=="active")return;
+      device.current=id;setData(result);
+    }catch(e){if(epoch===generation.current)setError(e instanceof Error?e.message:"Không đồng bộ được học viên.");}
+    finally{if(epoch===generation.current){busy.current=false;setLoading(false);}}
+  },[]);
+  useEffect(()=>{
+    if(location.pathname!=="/")return;
+    let timer=0;
+    const align=()=>{
+      timer=0;
+      const active=document.body.dataset.teacherRoleUi==="active";
+      const items=active?[...document.querySelectorAll<HTMLElement>("[data-teacher-sync-mount]")]:[];
+      const panelNode=active?document.querySelector<HTMLElement>("[data-teacher-roster-manager-mount]"):null;
+      setMounts(prev=>prev.length===items.length&&prev.every((node,i)=>node===items[i])?prev:items);
+      setPanel(prev=>prev===panelNode?prev:panelNode);
+      if(active&&!device.current&&!busy.current)void sync();
+      if(!active&&device.current){generation.current++;device.current="";setData(EMPTY);setError("");}
     };
-
-    const ensureTeacherDeviceSynced = async () => {
-      if (document.body.dataset.teacherRoleUi !== "active") return false;
-      const deviceId = await deriveDeviceId().catch(() => "");
-      if (!deviceId || document.body.dataset.teacherRoleUi !== "active") return false;
-      const changedDevice = Boolean(deviceIdRef.current && deviceIdRef.current !== deviceId);
-      const needsInitialSync = syncedDeviceRef.current !== deviceId;
-      if (changedDevice) {
-        syncGenerationRef.current += 1;
-        syncingRef.current = false;
-        deviceIdRef.current = deviceId;
-        syncedDeviceRef.current = "";
-        rosterIdentitySignatureRef.current = "";
-        approvedSignatureRef.current = "";
-        setData({ roster: [], counts: { pending: 0, approved: 0, blocked: 0 }, syncedAt: "" });
-        setChangedCount(0);
-        setError("");
-      } else {
-        deviceIdRef.current = deviceId;
-      }
-      if (needsInitialSync || changedDevice) {
-        await syncRoster("auto", deviceId);
-        return true;
-      }
-      return false;
-    };
-
-    const updateMounts = () => {
-      timer = 0;
-      const active = document.body.dataset.teacherRoleUi === "active";
-      if (!active) {
-        setCompactMounts([]);
-        setPanelMount(null);
-        resetForInactiveRole();
-        return;
-      }
-      const becameActive = !teacherActiveRef.current;
-      teacherActiveRef.current = true;
-      setCompactMounts(Array.from(document.querySelectorAll<HTMLElement>("[data-teacher-sync-mount]")));
-      setPanelMount(document.querySelector<HTMLElement>("[data-teacher-roster-manager-mount]"));
-      if (becameActive || syncedDeviceRef.current === "") void ensureTeacherDeviceSynced();
-      else void deriveDeviceId().then((deviceId) => {
-        if (deviceId && deviceIdRef.current && deviceId !== deviceIdRef.current) void ensureTeacherDeviceSynced();
-      }).catch(() => undefined);
-    };
-
-    const schedule = () => {
-      if (!timer) timer = window.setTimeout(updateMounts, 0);
-    };
-
+    const schedule=()=>{if(!timer)timer=window.setTimeout(align,0);};
     schedule();
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["data-teacher-role-ui", "class", "title", "data-device-id"],
-    });
-
-    const refreshVisibleTeacher = async () => {
-      if (document.visibilityState === "visible" && document.body.dataset.teacherRoleUi === "active") {
-        const alreadySynced = await ensureTeacherDeviceSynced();
-        if (!alreadySynced) await syncRoster("auto");
-      }
-    };
-
-    interval = window.setInterval(() => {
-      void refreshVisibleTeacher();
-    }, 60_000);
-
-    const onVisible = () => {
-      void refreshVisibleTeacher();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    const onManualSyncRequested = () => { setChangedCount(0); void syncRoster("manual"); };
-    window.addEventListener("boi-ech:teacher-roster-sync", onManualSyncRequested);
-
-    return () => {
-      if (timer) window.clearTimeout(timer);
-      if (interval) window.clearInterval(interval);
-      observer.disconnect();
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("boi-ech:teacher-roster-sync", onManualSyncRequested);
-      syncGenerationRef.current += 1;
-      teacherActiveRef.current = false;
-      clearRosterState();
-      setCompactMounts([]);
-      setPanelMount(null);
-    };
-  }, []);
-
-  const compact = compactMounts.map((mount) => createPortal(
-    <CompactSync
-      key={mount.dataset.teacherSyncMount || mount.className}
-      loading={loading}
-      syncedAt={data.syncedAt || null}
-      pending={data.counts.pending}
-      changedCount={changedCount}
-      onSync={() => { setChangedCount(0); void syncRoster("manual"); }}
-    />,
-    mount,
-  ));
-
-  const panel = panelMount ? createPortal(
-    <RosterPanel
-      roster={data.roster}
-      counts={data.counts}
-      loading={loading}
-      error={error}
-      syncedAt={data.syncedAt || null}
-      onSync={() => { setChangedCount(0); void syncRoster("manual"); }}
-      onAction={(action, item) => void mutate(action, item)}
-      canManage={data.canManage !== false}
-    />,
-    panelMount,
-  ) : null;
-
-  return <>{compact}{panel}</>;
+    const observer=new MutationObserver(schedule);
+    observer.observe(document.body,{childList:true,subtree:true,attributes:true,
+      attributeFilter:["data-teacher-role-ui","data-device-id","data-person-role"]});
+    const check=window.setInterval(()=>{if(document.body.dataset.teacherRoleUi==="active")void sync();},60000);
+    const onVisible=()=>{if(!document.hidden&&document.body.dataset.teacherRoleUi==="active")void sync();};
+    window.addEventListener("focus",onVisible);
+    return()=>{if(timer)window.clearTimeout(timer);window.clearInterval(check);
+      observer.disconnect();window.removeEventListener("focus",onVisible);generation.current++;};
+  },[sync]);
+  return <>
+    {mounts.map(node=>createPortal(<CompactSync key={node.dataset.teacherSyncMount||"teacher"} loading={loading}
+      syncedAt={data.syncedAt} onSync={()=>void sync()}/>,node))}
+    {panel?createPortal(<RosterPanel data={data} loading={loading} error={error}
+      onSync={()=>void sync()}/>,panel):null}
+  </>;
 }
