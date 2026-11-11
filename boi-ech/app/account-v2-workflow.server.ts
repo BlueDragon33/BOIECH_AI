@@ -89,7 +89,8 @@ export class AccountV2Workflow {
     const className=field(manager?input.facultyUnit:input.className,80);
     const jobTitle=manager?field(input.jobTitle,120):"";
     const jobPosition=manager?field(input.jobPosition,120):"";
-    const code=manager?"MGR_"+actor.storageDeviceId.slice(0,20).toUpperCase():field(input.personCode,32).toUpperCase();
+    // Internal stable database reference only: never ask a teacher or learner for a personal code.
+    const code=(manager?"MGR_":s.role==="teacher"?"GV_":"HV_")+actor.storageDeviceId.slice(0,20).toUpperCase();
     // Contact was collected at registration. Do not ask the manager for it again,
     // or confuse self-declared contact with a device approval proof.
     const contact=manager?await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
