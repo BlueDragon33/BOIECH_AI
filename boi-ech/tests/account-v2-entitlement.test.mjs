@@ -18,12 +18,13 @@ const initial=Date.UTC(2026,10,8,9,0,0);
 function fixture(){
  const sqlite=new DatabaseSync(":memory:");
  sqlite.exec("PRAGMA foreign_keys=ON");
- sqlite.exec(`CREATE TABLE accounts(account_id TEXT PRIMARY KEY);
+ sqlite.exec(`CREATE TABLE accounts(account_id TEXT PRIMARY KEY,storage_device_id TEXT NOT NULL);
   CREATE TABLE account_onboarding(account_id TEXT PRIMARY KEY,stage TEXT NOT NULL);
   CREATE TABLE device_access(device_id TEXT PRIMARY KEY,learner_name TEXT,person_role TEXT,status TEXT);
   CREATE TABLE account_audit(actor TEXT NOT NULL,action TEXT NOT NULL,target TEXT NOT NULL,purpose TEXT NOT NULL);`);
  sqlite.exec(fs.readFileSync(new URL("../drizzle/0023_account_entitlement.sql",import.meta.url),"utf8"));
- sqlite.prepare("INSERT INTO accounts VALUES(?)").run(id);
+ sqlite.prepare("INSERT INTO accounts VALUES(?,?)").run(id,"device-fixture");
+ sqlite.prepare("INSERT INTO device_access VALUES(?,?,?,?)").run("device-fixture","Manager fixture","manager","approved");
  sqlite.prepare("INSERT INTO account_onboarding VALUES(?,'requested')").run(id);
  const prepare=sql=>{let args=[];return{bind(...a){args=a;return this},
   async first(){return sqlite.prepare(sql).get(...args)??null},
@@ -62,7 +63,7 @@ test("Owner policy 30->45 affects future approvals only, with CAS and immutable 
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit").get().n,1);
  }finally{f.close()}
 });
-test("Suspend, reinstate and extend use account scope/CAS and do not write device access rows",async()=>{
+test("Suspend, reinstate and extend use manager account scope/CAS and do not write device access rows",async()=>{
  const f=fixture();try{
   f.sqlite.prepare("UPDATE account_onboarding SET stage='active' WHERE account_id=?").run(id);
   await f.db.batch([await f.service.grantOnApproval(id,"learner")]);
@@ -78,5 +79,17 @@ test("Suspend, reinstate and extend use account scope/CAS and do not write devic
   assert.equal(Date.parse(after.expiresAt)-initial,90*day);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit").get().n,3);
   assert.equal(await f.service.read(other),null);
+ }finally{f.close()}
+});
+
+test("individual duration cannot change a teacher entitlement",async()=>{
+ const f=fixture();try{
+  f.sqlite.exec("UPDATE device_access SET person_role='teacher'; UPDATE account_onboarding SET stage='active'");
+  await f.db.batch([await f.service.grantOnApproval(id,"teacher")]);
+  const before=await f.service.read(id);
+  await assert.rejects(()=>f.service.change(owner,{accountId:id,operation:"suspend",expectedRevision:before.revision,reason:"Scope check"}),
+    error=>error.status===403&&error.code==="BOI_MANAGER_ACCOUNT_REQUIRED");
+  assert.deepEqual(await f.service.read(id),before);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit").get().n,0);
  }finally{f.close()}
 });

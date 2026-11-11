@@ -4,10 +4,27 @@ type Person={accountId:string;role:"learner"|"teacher";name:string|null;personCo
  className:string|null;status:"pending"|"approved"|"blocked";registrationComplete:boolean;
  onboardingStage:string|null;onboardingRevision:number|null;firstReviewMine:boolean;assignedToMe:boolean};
 type Board={devices:Person[];nextCursor:string|null;quotas:{learner:{limit:number;used:number};teacher:{limit:number;used:number}}};
+function verifiedBoard(board:Board|undefined,after=""):Board {
+ const fail=()=>new Error("Hàng chờ xét duyệt chưa được xác minh.");
+ if(!board||!Array.isArray(board.devices)||board.devices.length>50)throw fail();
+ let previous=after;
+ for(const person of board.devices){
+  if(!person||!/^acc_[a-f0-9]{64}$/.test(person.accountId)||person.accountId<=previous
+    ||!["learner","teacher"].includes(person.role)||!["pending","approved","blocked"].includes(person.status)
+    ||(person.onboardingRevision!==null&&!Number.isSafeInteger(person.onboardingRevision)))throw fail();
+  previous=person.accountId;
+ }
+ if(board.nextCursor!==null&&(!board.devices.length||board.nextCursor!==previous))throw fail();
+ for(const role of ["learner","teacher"] as const){
+  const quota=board.quotas?.[role];
+  if(!quota||!Number.isSafeInteger(quota.used)||quota.used<0||!Number.isSafeInteger(quota.limit)||quota.limit<0)throw fail();
+ }
+ return board;
+}
 async function command(payload:Record<string,unknown>){
  const response=await fetch("/api/accounts",{method:"POST",credentials:"same-origin",cache:"no-store",
   headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
- const data=await response.json() as {board?:Board;onboarding?:{stage:string};account?:{status:string};error?:string};
+ const data=await response.json() as {board?:Board;onboarding?:{account_id:string;stage:string;revision:number};account?:{accountId:string;status:string};error?:string};
  if(!response.ok)throw new Error(data.error??"Thao tác chưa được xác nhận.");
  return data;
 }
@@ -19,10 +36,9 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
   if(locked.current)return;
   locked.current=true;setBusy(true);setError("");
   try{const data=await command({action:"review-list",after,limit:50});
-    if(!data.board||!Array.isArray(data.board.devices))throw new Error("Chưa có bảng xét duyệt xác thực.");
+    const next=verifiedBoard(data.board,after);
     if(mounted.current)setBoard(current=>after&&current
-      ? {...data.board!,devices:[...current.devices.filter(a=>!data.board!.devices.some(b=>b.accountId===a.accountId)),
-         ...data.board!.devices]} : data.board!);
+      ? {...next,devices:[...current.devices,...next.devices]} : next);
   }catch(e){if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Không tải được hồ sơ.");}}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  },[]);
@@ -39,11 +55,14 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
   try{
    const result=await command({action,accountId:person.accountId,expectedRevision:person.onboardingRevision,
      ...(action==="review"?{operation:"approve"}:{}),...(action==="review-changes"?{reason}: {})});
-   if(action==="review-first"&&result.onboarding?.stage!=="profile_required")throw new Error("Duyệt lần một chưa được máy chủ xác nhận.");
-   if(action==="review"&&result.account?.status!=="approved")throw new Error("Duyệt lần hai chưa được máy chủ xác nhận.");
-   if(action==="review-changes"&&result.onboarding?.stage!=="changes_requested")throw new Error("Yêu cầu bổ sung chưa được máy chủ xác nhận.");
-   const data=await command({action:"review-list"});if(!data.board)throw new Error("Cần đồng bộ lại trạng thái.");
-   if(mounted.current){setBoard(data.board);setNotice("Đã thực hiện và đọc lại trạng thái máy chủ.");}
+   const verified=action==="review"
+     ? result.account?.accountId===person.accountId&&result.account.status==="approved"
+     : result.onboarding?.account_id===person.accountId
+       && result.onboarding.stage===(action==="review-first"?"profile_required":"changes_requested")
+       && person.onboardingRevision!==null&&result.onboarding.revision===person.onboardingRevision+1;
+   if(!verified)throw new Error("Chưa xác minh kết quả xét duyệt. Đồng bộ lại trước khi tiếp tục.");
+   const next=verifiedBoard((await command({action:"review-list"})).board);
+   if(mounted.current){setBoard(next);setNotice("Đã thực hiện và đọc lại trạng thái máy chủ.");}
   }catch(e){if(mounted.current){setBoard(null);setError(e instanceof Error?e.message:"Thao tác chưa xác nhận; cần đồng bộ lại trước khi tiếp tục.");}}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  }
@@ -56,7 +75,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
   {board?<p>Học viên đã duyệt: {board.quotas.learner.used}/{board.quotas.learner.limit} · Giảng viên: {board.quotas.teacher.used}/{board.quotas.teacher.limit}</p>:null}
   {error?<p role="alert">{error}</p>:null}{notice?<p role="status">{notice}</p>:null}
   {!board?<p>{busy?"Đang đọc dữ liệu…":"Chưa có dữ liệu được xác minh."}</p>:null}
-  {board && !pending.length?<p>Không có tài khoản chờ duyệt.</p>:null}
+  {board && !pending.length && !board.nextCursor?<p>Không có tài khoản chờ duyệt.</p>:null}
   {pending.map(person=><article key={person.accountId} style={{border:"1px solid var(--border,#777)",borderRadius:12,padding:12,marginBlock:8}}>
    <strong>{person.name||"Tài khoản chưa khai hồ sơ"} · {person.role==="teacher"?"Giảng viên":"Học viên"}</strong>
    <p style={{fontSize:13}}>{person.personCode||person.accountId.slice(0,14)} · {person.className||"Chưa có lớp"} ·

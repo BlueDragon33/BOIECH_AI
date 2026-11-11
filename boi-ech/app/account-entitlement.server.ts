@@ -126,6 +126,9 @@ export class AccountEntitlementService {
     const reason=this.reason(input.reason);
     const current=await this.read(id);
     if(!current) throw new AccountEntitlementError("ACCOUNT_ENTITLEMENT_REQUIRED",409);
+    const target=await this.db.prepare(`SELECT d.person_role AS role FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id WHERE a.account_id=?`).bind(id).first<{role:string}>();
+    if(target?.role!=="manager") reject("BOI_MANAGER_ACCOUNT_REQUIRED",403);
     if(current.revision!==input.expectedRevision) reject("ACCOUNT_CAS_CONFLICT",409);
     let state=current.state,expiry=current.expiresAt;
     if(operation==="set-expiry"){
@@ -143,7 +146,9 @@ export class AccountEntitlementService {
       this.db.prepare(`UPDATE account_entitlements SET state=?,expires_at=?,revision=revision+1,
         changed_by=?,updated_at=CURRENT_TIMESTAMP
         WHERE account_id=? AND revision=? AND EXISTS(
-          SELECT 1 FROM account_onboarding o WHERE o.account_id=? AND o.stage IN ('active','suspended')
+          SELECT 1 FROM account_onboarding o JOIN accounts a ON a.account_id=o.account_id
+          JOIN device_access d ON d.device_id=a.storage_device_id
+          WHERE o.account_id=? AND o.stage IN ('active','suspended') AND d.person_role='manager'
         )`).bind(state,expiry,actor.actor,id,input.expectedRevision,id),
       this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
         VALUES(?,?,?,CASE WHEN changes()=1 THEN ? ELSE NULL END)`)

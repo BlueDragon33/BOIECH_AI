@@ -1,6 +1,7 @@
 import { DeviceAccessError } from "./device-auth.server";
 
 const TOKEN_AUDIENCE = "boi-ech-control";
+export const ACCOUNT_CONTROL_AUDIENCE = "boi-ech-accounts";
 const TOKEN_ISSUER = "quan-ly-hoc-tap";
 
 type ControlConfiguration = {
@@ -82,7 +83,7 @@ async function signature(secret: string, value: string) {
   return base64Url(new Uint8Array(signed));
 }
 
-async function browserTicket(secret: string, supplied: string) {
+async function signedTicket(secret: string, supplied: string, audience: typeof TOKEN_AUDIENCE | typeof ACCOUNT_CONTROL_AUDIENCE) {
   const [version, encoded, suppliedSignature, extra] = supplied.split(".");
   if (version !== "v1" || !encoded || !suppliedSignature || extra) return null;
   const expected = await signature(secret, `${version}.${encoded}`);
@@ -94,14 +95,15 @@ async function browserTicket(secret: string, supplied: string) {
   const suppliedRole = typeof payload.role === "string" ? payload.role : "viewer";
   const role = ["viewer", "reviewer", "publisher", "owner"].includes(suppliedRole) ? suppliedRole : "viewer";
   const expiresAt = typeof payload.exp === "number" ? payload.exp : 0;
-  if (payload.iss !== TOKEN_ISSUER || payload.aud !== TOKEN_AUDIENCE || !actor.includes("@") || expiresAt <= Date.now() || expiresAt > Date.now() + 10 * 60 * 1000) return null;
+  const maxTtl = audience === ACCOUNT_CONTROL_AUDIENCE ? 60_000 : 10 * 60_000;
+  if (payload.iss !== TOKEN_ISSUER || payload.aud !== audience || !actor.includes("@") || expiresAt <= Date.now() || expiresAt > Date.now() + maxTtl) return null;
   return { actor, role };
 }
 
-export async function requireControlService(request: Request) {
+export async function requireControlService(request: Request, audience: typeof TOKEN_AUDIENCE | typeof ACCOUNT_CONTROL_AUDIENCE = TOKEN_AUDIENCE) {
   const { secret: configured, origin } = await configuration();
   const requestOrigin = (request.headers.get("origin") ?? "").replace(/\/$/, "");
-  if (requestOrigin && !trustedControlOrigin(requestOrigin, origin)) {
+  if (requestOrigin && (audience === ACCOUNT_CONTROL_AUDIENCE || !trustedControlOrigin(requestOrigin, origin))) {
     throw new DeviceAccessError("Origin không được phép dùng Control API Bơi ếch.", 403, "CONTROL_ORIGIN_FORBIDDEN");
   }
   const authorization = request.headers.get("authorization") ?? "";
@@ -109,8 +111,8 @@ export async function requireControlService(request: Request) {
   if (configured.length < 32 || supplied.length < 32) {
     throw new DeviceAccessError("Dịch vụ quản trị không được phép truy cập.", 403, "CONTROL_SERVICE_FORBIDDEN");
   }
-  if (!(await secureEqual(configured, supplied))) {
-    const ticket = await browserTicket(configured, supplied);
+  if (audience === ACCOUNT_CONTROL_AUDIENCE || !(await secureEqual(configured, supplied))) {
+    const ticket = await signedTicket(configured, supplied, audience);
     if (!ticket) throw new DeviceAccessError("Vé quản trị đã hết hạn hoặc không hợp lệ.", 403, "CONTROL_TICKET_FORBIDDEN");
     return ticket;
   }

@@ -149,8 +149,13 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(!["scheduled","completed","cancelled"].includes(String(status)))fail("Trạng thái buổi học không hợp lệ.");
   if(status==="completed"&&Date.parse(endsAt)>Date.now())fail("Chưa thể hoàn thành buổi học chưa kết thúc.");
   command={action,id:sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,version};
+  const storedTeacherGuard=actor.accountId ? `AND EXISTS(SELECT 1 FROM manager_device_assignments ma
+    WHERE ma.manager_device_id=? AND ma.target_device_id=training_sessions.teacher_id)` : "";
+  const storedTeacherBindings=actor.accountId ? [managerStorageDeviceId] : [];
   write=version===0?db.prepare(`INSERT INTO training_sessions(id,title,class_id,room_id,teacher_id,starts_at,ends_at,status,version) SELECT ?,?,?,?,?,?,?,?,1 WHERE ${authorityGuard}`).bind(sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,...authorityBindings)
-  :db.prepare(`UPDATE training_sessions SET title=?,class_id=?,room_id=?,teacher_id=?,starts_at=?,ends_at=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=? AND ${authorityGuard}`).bind(title,classId,roomId,teacherId,startsAt,endsAt,status,sessionId,version,...authorityBindings);
+  :db.prepare(`UPDATE training_sessions SET title=?,class_id=?,room_id=?,teacher_id=?,starts_at=?,ends_at=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP
+    WHERE id=? AND version=? AND ${authorityGuard} ${storedTeacherGuard}`)
+    .bind(title,classId,roomId,teacherId,startsAt,endsAt,status,sessionId,version,...authorityBindings,...storedTeacherBindings);
  } else if(action==="assign-person") {
   const personId=id(payload.personId),expectedClassName=typeof payload.expectedClassName==="string"?payload.expectedClassName:fail("Thiếu lớp hiện tại để kiểm tra thay đổi đồng thời.");
   const target=await db.prepare("SELECT person_role AS role FROM device_access WHERE device_id=? AND person_role IN ('learner','teacher') AND registration_submitted_at IS NOT NULL").bind(personId).first<{role:string}>();

@@ -48,3 +48,18 @@ test("P0 atomic D1: preexisting active entitlement cannot be silently ignored th
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM account_manager_permissions WHERE account_id=?").get(id).count,0);
  }finally{f.close()}
 });
+
+test("applicant revocation before profile commit keeps the account pending without activation audit",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const manager=await pendingApprovedOwner(f,9403);
+  const session=await f.service.session(manager.token);
+  const batch=f.db.batch.bind(f.db);
+  f.db.batch=async statements=>{
+   f.sqlite.prepare("UPDATE account_sessions SET revoked=1 WHERE token_hash=?").run(session.sessionHash);
+   return batch(statements);
+  };
+  await assert.rejects(()=>f.flow.submitProfile(manager.token,profile()),error=>error.status===409);
+  assertUnchanged(f,manager);
+ }finally{f.close();}
+});

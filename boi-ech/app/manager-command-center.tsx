@@ -77,20 +77,21 @@ export default function ManagerCommandCenter({board,busy,pendingReviewCount,onNa
  const selectedClass=roomClasses.find(resource=>resource.id===classId)||roomClasses[0];
  const selectedMembers=selectedClass?membersOfClass(board.people,selectedClass):[];
  const pending=board.people.filter(person=>person.status==="pending"||!person.registered);
+ const displayedPending=pendingReviewCount===undefined?pending.length:pendingReviewCount??"—";
  const blockedOrExpired=board.people.filter(person=>person.status==="blocked"||person.expired);
  const teacherCount=board.people.filter(person=>person.role==="teacher").length;
  const learnerCount=board.people.filter(person=>person.role==="learner").length;
  const urgentClasses=classes.filter(resource=>resource.status==="active"&&(resource.state==="overloaded"||resource.missingTeachers>0));
- const knownRoomIds=new Set(rooms.map(room=>room.id));
- const occupiedRoomIds=new Set(activeSessions.filter(session=>knownRoomIds.has(session.roomId)).map(session=>session.roomId));
+ const occupiedRoomCount=rooms.filter(room=>room.bookingCount>0).length;
+ const bookingCount=rooms.reduce((sum,room)=>sum+room.bookingCount,0);
  const relevantRoomCount=rooms.filter(resource=>resource.status==="active").length;
  const metrics=[
   {label:"Học viên",value:learnerCount,icon:"people",destination:"people" as Destination,note:"Hồ sơ trong hệ thống"},
   {label:"Giảng viên / HLV",value:teacherCount,icon:"people",destination:"people" as Destination,note:"Danh sách giảng dạy"},
   {label:"Lớp học",value:classes.length,icon:"class",destination:"class" as Destination,note:urgentClasses.length+" lớp cần chú ý"},
-  {label:"Phòng / Hồ",value:rooms.length,icon:"room",destination:"room" as Destination,note:occupiedRoomIds.size+" phòng có lịch trong khoảng"},
+  {label:"Phòng / Hồ",value:rooms.length,icon:"room",destination:"room" as Destination,note:occupiedRoomCount+" phòng có lịch trong khoảng"},
   {label:"Cơ sở / Tòa",value:buildings.length,icon:"building",destination:"building" as Destination,note:"Dữ liệu cơ sở đã ghi nhận"},
-  {label:"Hồ sơ cần xem",value:pendingReviewCount===undefined?pending.length:pendingReviewCount??"—",icon:"people",destination:"review" as Destination,note:pendingReviewCount===null?"Mở hàng chờ xét duyệt":"Chờ duyệt / thiếu đăng ký"},
+  {label:"Hồ sơ cần xem",value:displayedPending,icon:"people",destination:"review" as Destination,note:pendingReviewCount===null?"Mở hàng chờ xét duyệt":"Chờ duyệt / thiếu đăng ký"},
  ];
  function selectBuilding(id:string){setBuildingId(id);setRoomId("");setClassId("");setRoomFilter("all");}
  function selectRoom(id:string){setRoomId(id);setClassId("");}
@@ -122,7 +123,7 @@ export default function ManagerCommandCenter({board,busy,pendingReviewCount,onNa
      }):<div className={styles.diagramEmpty}><strong>Chưa có tòa học</strong><p>Thiết lập tòa và phòng để bắt đầu sơ đồ.</p><button type="button" onClick={()=>onCreateResource("building")} disabled={busy}>＋ Tạo tòa</button></div>}
     </div>
     <div className={styles.diagramLegend}><span><i data-state="active"/>Hoạt động</span><span><i data-state="unavailable"/>Tạm ngừng</span><span><i data-state="archived"/>Lưu trữ</span></div>
-    <div className={styles.facilityTotals}><span><strong>{relevantRoomCount}</strong> phòng hoạt động</span><span><strong>{occupiedRoomIds.size}</strong> phòng có lịch</span><span><strong>{activeSessions.length}</strong> buổi trong khoảng xem</span></div>
+    <div className={styles.facilityTotals}><span><strong>{relevantRoomCount}</strong> phòng hoạt động</span><span><strong>{occupiedRoomCount}</strong> phòng có lịch</span><span><strong>{bookingCount}</strong> buổi trong khoảng xem</span></div>
    </section>
 
    <section className={styles.drillPanel} aria-label="Sơ đồ phân cấp tòa phòng lớp">
@@ -151,7 +152,7 @@ export default function ManagerCommandCenter({board,busy,pendingReviewCount,onNa
        <span className={styles.sessionText}><strong>{klass?.name||"Lớp không còn trong danh sách"}</strong><small>{session.title} · {teacher?.name||"Chưa rõ HLV"}</small></span>
        <span className={styles.sessionState}>{session.status==="completed"?"Hoàn thành":"Đã xếp"}</span>
       </button>;
-     })}{!selectedRoomSessions.length?<p className={styles.emptyCompact}>Chưa có buổi học trong khoảng đang xem. Một phòng có thể phục vụ nhiều lớp ở các khung giờ khác nhau.</p>:null}</div>
+     })}{!selectedRoomSessions.length?<p className={styles.emptyCompact}>{selectedRoom.bookingCount>0?"Các ca của phòng trong khoảng này nằm ngoài phạm vi được xem.":"Chưa có buổi học trong khoảng đang xem. Một phòng có thể phục vụ nhiều lớp ở các khung giờ khác nhau."}</p>:null}</div>
     </>:null}
     {selectedClass?<div className={styles.classFocus}>
      <div className={styles.drillHeading}><h4>{selectedClass.name}</h4><Badge tone={selectedClass.state}>{stateText[selectedClass.state]}</Badge></div>
@@ -165,7 +166,7 @@ export default function ManagerCommandCenter({board,busy,pendingReviewCount,onNa
   <div className={styles.bottomPanels}>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Ưu tiên xử lý</h3><button type="button" onClick={()=>onNavigate("class")}>Mở quản lý →</button></div>
     <button type="button" onClick={()=>onNavigate("class")}><Badge tone={urgentClasses.length?"missing":"available"}>{urgentClasses.length}</Badge><span>Lớp quá sĩ số hoặc thiếu giảng viên</span></button>
-    <button type="button" onClick={()=>onNavigate("review")}><Badge tone={pending.length?"missing":"available"}>{pending.length}</Badge><span>Hồ sơ thiếu đăng ký / chờ duyệt</span></button>
+    <button type="button" onClick={()=>onNavigate("review")}><Badge tone={displayedPending===0?"available":"missing"}>{displayedPending}</Badge><span>Hồ sơ thiếu đăng ký / chờ duyệt</span></button>
     <button type="button" onClick={()=>onNavigate("people")}><Badge tone={blockedOrExpired.length?"inactive":"available"}>{blockedOrExpired.length}</Badge><span>Hồ sơ bị khóa / hết hạn</span></button>
    </section>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Lịch trong khoảng xem</h3><button type="button" onClick={()=>onNavigate("schedule")}>Toàn bộ lịch →</button></div>

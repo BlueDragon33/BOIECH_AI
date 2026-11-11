@@ -5,12 +5,12 @@ import { readAccountCapacity, changeAccountCapacity } from "../../../account-cap
 import { AccountV2Workflow } from "../../../account-v2-workflow.server";
 import { getCourseDatabase } from "../../../device-auth.server";
 import { accountErrorResponse, accountService, accountConfiguration } from "../../../account-runtime.server";
-import { controlPreflight, controlResponse, requireControlService, withControlCors } from "../../../control-auth.server";
+import { ACCOUNT_CONTROL_AUDIENCE, controlResponse, requireControlService } from "../../../control-auth.server";
 export const dynamic = "force-dynamic";
-export function OPTIONS(request: Request) { return controlPreflight(request); }
+export function OPTIONS() { return new Response(null, { status: 403 }); }
 export async function POST(request: Request) {
   try {
-    const owner = await requireControlService(request);
+    const owner = await requireControlService(request, ACCOUNT_CONTROL_AUDIENCE);
     if (owner.role !== "owner") throw new AccountError("OWNER_REQUIRED");
     const raw = await request.text();
     if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);
@@ -54,5 +54,5 @@ export async function POST(request: Request) {
     if (input.action === "read") return controlResponse(await service.ownerRead(String(input.accountId)), 200, request);
     if (input.action !== "command") throw new AccountError("ACCOUNT_INPUT", 400);
     return controlResponse(await service.ownerCommand(owner, input), 200, request);
-  } catch (error) { return withControlCors(request, accountErrorResponse(error)); }
+  } catch (error) { return accountErrorResponse(error); }
 }

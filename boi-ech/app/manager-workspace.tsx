@@ -89,7 +89,13 @@ export default function ManagerWorkspace({deviceId,getProof,accountReviews}:{dev
    <button type="button" onClick={()=>setPreviewOnly(false)}>Thoát xem thử</button></header>
    <ManagerApprovalPanel previewOnly/>
  </main>;
- if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role={noticeError?"alert":"status"}>{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button><button type="button" onClick={()=>setPreviewOnly(true)}>Xem thử không cần cấp quyền · dữ liệu mẫu</button></main>;
+ if(!board)return <main className={styles.workspace} data-device-id={deviceId}>
+   <h1>Cán bộ quản lý</h1>
+   <p role={noticeError?"alert":"status"}>{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p>
+   <button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button>
+   {!busy&&accountReviews?<section className={styles.accountTools} aria-label="Xét duyệt học viên và giảng viên">{accountReviews}</section>:null}
+   <button type="button" onClick={()=>setPreviewOnly(true)}>Xem thử không cần cấp quyền · dữ liệu mẫu</button>
+  </main>;
  return <div data-device-id={deviceId} data-person-role="manager">
    <TrainingDashboard accountControls={accountReviews===undefined?<ManagerApprovalPanel getProof={getProof}/>:accountReviews} pendingReviewCount={accountReviews===undefined?undefined:null} appearance={appearance} onAppearanceChange={changeAppearance} board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindowRange(next);}}/></div>;
 }

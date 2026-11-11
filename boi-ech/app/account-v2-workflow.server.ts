@@ -124,9 +124,16 @@ export class AccountV2Workflow {
           updated_at=CURRENT_TIMESTAMP
           WHERE device_id=? AND status='pending' AND EXISTS(
             SELECT 1 FROM account_onboarding WHERE account_id=?
-            AND stage='profile_required' AND revision=? AND first_review_by IS NOT NULL)`)
+            AND stage='profile_required' AND revision=? AND first_review_by IS NOT NULL)
+          AND EXISTS(SELECT 1 FROM account_sessions s
+            JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+            JOIN account_credentials c ON c.account_id=s.account_id AND c.generation=s.generation
+            WHERE s.account_id=? AND s.token_hash=? AND s.device_id=?
+              AND s.revoked=0 AND b.revoked=0 AND b.approved=1
+              AND s.expires_at>(julianday('now')-2440587.5)*86400000
+              AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000)`)
           .bind(family+" "+given,family,given,code,className,phone,
-            actor.storageDeviceId,actor.accountId,s.revision),
+            actor.storageDeviceId,actor.accountId,s.revision,actor.accountId,actor.sessionHash,actor.deviceId),
         // Reuse the audited 0025 manager-assignment guard within the *same* D1
         // transaction. profile_review is never committed or exposed as a step.
         this.db.prepare(`UPDATE account_onboarding SET stage='profile_review',
