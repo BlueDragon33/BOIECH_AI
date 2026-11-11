@@ -169,7 +169,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   }
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
       {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
-      <h1>{account ? "Tài khoản Bơi Ếch" : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
+      <h1>{account ? (account.onboardingStage==="requested"?"Hồ sơ đăng ký đang chờ xét duyệt":"Tài khoản Bơi Ếch") : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
       {!account?<p className={styles.authSubtitle}>{mode==="register" ? "Tạo tài khoản và gửi yêu cầu xét duyệt." : mode==="recover" ? "Sử dụng mã khôi phục an toàn đã được cấp." : "Đăng nhập để tiếp tục học tập và giảng dạy."}</p>:null}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {notice && <p role="status">{notice}</p>}
@@ -225,8 +225,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             {(account.role==="manager"
               ?([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["facultyUnit","Khoa / Đơn vị","text"],
                 ["jobTitle","Chức danh","text"],["jobPosition","Chức vụ","text"]] as const)
-              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["personCode","Mã học viên","text"],
-                ["className","Lớp / đơn vị","text"],["phone","Số điện thoại","tel"]] as const)
+              :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["className","Lớp / đơn vị","text"],["phone","Số điện thoại","tel"]] as const)
             ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
               <span>{label} <span className={styles.requiredMark} aria-label="Bắt buộc">*</span></span>
               <input name={name} type={kind} required aria-required="true" minLength={name==="phone"?7:2}
@@ -252,7 +251,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           </footer>
         </form> : null}
         <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void run(() => reload())}>Đồng bộ trạng thái</button>
-          <button type="button" disabled={busy} onClick={() => void run(async () => { await send({ action: "rotate" }); await reload(); setNotice("Đã đổi vé phiên an toàn; tối đa 8 giờ kể từ khi đăng nhập."); })}>Gia hạn phiên</button>
           <button type="button" disabled={busy} onClick={() => void run(async () => { setReady(false); setRecovery(""); recoveryOwner.current=""; await send({ action: "logout" }); broadcast();
             // Keep a pending one-use invitation ONLY in the URL fragment during the
             // cross-account navigation. Fragments are not sent in HTTP requests, and
@@ -260,12 +258,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             // Never persist it in local/session storage or put it in the query string.
             reloadPreservingPendingManagerInvite(managerInviteRef.current); })}>Đăng xuất / đổi tài khoản</button></div>
         {active&&account.canReadRegistrants?<RegistrantReader/>:null}
-        {active&&v2&&account.role==="manager"?<details>
-          <summary>Hàng chờ xét duyệt học viên và giảng viên · Account-first V2</summary>
-          <ManagerV2ReviewPanel singleReview={singleReview}/>
-        </details>:null}
+       
         {active&&v2?<VerifiedSyncSettings accountId={account.accountId}/>:null}
-        <details className={styles.profileDevices}><summary>Trang cá nhân · Bảo mật và thiết bị ({devices.filter(d=>!d.revoked).length}/3 đang liên kết)</summary><p>Quản lý tối đa 3 thiết bị; thu hồi thiết bị cũ tại đây. Thiết bị mới phải được xác nhận riêng.</p>{devices.map(d=><div key={d.device_id}>
+        {active?<details className={styles.profileDevices}><summary>Bảo mật và thiết bị ({devices.filter(d=>!d.revoked).length}/3 đang liên kết)</summary><p>Quản lý tối đa 3 thiết bị; thu hồi thiết bị cũ tại đây. Thiết bị mới phải được xác nhận riêng.</p>{devices.map(d=><div key={d.device_id}>
           <span>{d.device_id.slice(0,12)} · {d.revoked?"Đã thu hồi":v2&&d.approved===0?"Chờ xác nhận":"Đã xác nhận"}</span>
           {v2 && !d.revoked && d.approved===0 && account.deviceApproved===true ? <form onSubmit={e=>{
             e.preventDefault();const el=e.currentTarget;const password=(new FormData(el)).get("password");
@@ -275,7 +270,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           <button type="submit" disabled={busy}>Xác nhận thiết bị này</button></form>:null}
           {!d.revoked && (!v2 || account.deviceApproved===true) ? <button type="button" disabled={busy}
             onClick={()=>void run(async()=>{await send({action:"revoke-device",deviceId:d.device_id});await reload();broadcast();})}>Thu hồi thiết bị này</button>:null}
-        </div>)}</details>
+        </div>)}</details>:null}
       </> : <>
 
         <form key={mode} className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
@@ -307,7 +302,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
           {mode === "register" && <>{managerInvite
            ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; tài khoản vẫn phải chờ Owner duyệt và hoàn thiện hồ sơ.</p>
-           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["personCode", "Mã học viên / cán bộ / giảng viên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt, bạn hoàn thiện hồ sơ bắt buộc để vào ứng dụng.</p>}
+           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "personCode" || name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID và mật khẩu trước. Sau khi được duyệt, bạn hoàn thiện hồ sơ bắt buộc để vào ứng dụng.</p>}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
           <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
@@ -322,11 +317,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     </section>;
   return <>
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
-      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}/>
+      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof} accountSettings={accountPanel}/>
     </div> : null}
-    {managerDashboard?<details className={styles.managerAccountTools}>
-      <summary>Tài khoản, bảo mật và đăng xuất</summary>{accountPanel}
-    </details>:accountPanel}
-    {ready && active && !recovery && !managerDashboard && account ? <div key={account.accountId}>{children}</div> : null}
+    {!managerDashboard && ready && active && !recovery && account ? <div key={account.accountId}>{children}</div> : null}
+    {!managerDashboard ? (ready && active && account
+      ? <details className={styles.managerAccountTools}><summary>Trang cá nhân · Cài đặt và bảo mật</summary>{accountPanel}</details>
+      : accountPanel) : null}
   </>;
 }
