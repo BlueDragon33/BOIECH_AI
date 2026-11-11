@@ -220,10 +220,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
   }
   async function logoutAccount(){
-    closeProfile();
     await run(async()=>{
-      setReady(false);setRecovery("");recoveryOwner.current="";
-      await send({action:"logout"});broadcast();
+      // Keep the current validated UI usable if network logout fails.
+      await send({action:"logout"});
+      closeProfile();setReady(false);setRecovery("");recoveryOwner.current="";
+      broadcast();
       reloadPreservingPendingManagerInvite(managerInviteRef.current);
     });
   }
