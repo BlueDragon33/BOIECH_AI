@@ -108,6 +108,20 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     const channel = new BroadcastChannel("boiech-account-auth"); channel.onmessage = refresh;
     return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh); channel.close(); };
   }, [enabled, bypass, reload]);
+  useEffect(()=>{
+    if(!ready||!v2||!singleReview||!account?.accountId||
+      account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
+      account.deviceApproved!==true)return;
+    const key=account.accountId+":"+account.onboardingRevision;
+    if(attemptedAutoActivation.current.has(key))return;
+    attemptedAutoActivation.current.add(key);
+    // Exactly one server-side human review has happened. The canonical
+    // complete profile is already stored in D1, so there is no second review.
+    void send({action:"profile-draft-activate"})
+      .then(async()=>{await reload();if(mounted.current)setNotice("Hồ sơ đã tự kích hoạt sau lần duyệt duy nhất.");})
+      .catch(e=>{if(mounted.current)setError(accountNetworkError(e));});
+  },[ready,v2,singleReview,account?.accountId,account?.onboardingStage,
+     account?.profileDraftReady,account?.onboardingRevision,account?.deviceApproved,reload]);
   async function run(action: () => Promise<void>) {
     if (lock.current) return; lock.current = true; setBusy(true); setError(""); setNotice("");
     try { await action(); } catch (e) { if (mounted.current) setError(accountNetworkError(e)); }
@@ -307,6 +321,20 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         {active&&account.canReadRegistrants?<RegistrantReader/>:null}
        
         {active&&v2?<VerifiedSyncSettings accountId={account.accountId}/>:null}
+        {active&&v2?<details className={styles.profileDevices}><summary>Câu hỏi khôi phục mật khẩu</summary>
+          <p><strong>Tên lúc nhỏ của bạn là gì?</strong></p>
+          <p>{account.securityQuestionConfigured?"Đã thiết lập câu trả lời bảo mật.":"Chưa thiết lập câu trả lời bảo mật."}
+             {" "}Hệ thống không thể hiển thị lại đáp án cũ. Bạn có thể đổi đáp án dưới đây.</p>
+          <form onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const fields=Object.fromEntries(new FormData(form));
+            void run(async()=>{await send({action:"security-question-set",password:fields.currentPassword,securityAnswer:fields.securityAnswer});
+              form.reset();await reload();setNotice("Đã cập nhật câu trả lời bảo mật (không hiển thị đáp án).");});
+          }}>
+            <label>Mật khẩu tài khoản hiện tại<input name="currentPassword" type="password" required autoComplete="current-password" disabled={busy}/></label>
+            <label>Tên lúc nhỏ của bạn là gì?<input name="securityAnswer" type="password" minLength={2} maxLength={120} required autoComplete="new-password" disabled={busy}/></label>
+            <button type="submit" disabled={busy}>Lưu câu trả lời mới</button>
+          </form>
+          <small>Chỉ dùng câu trả lời không đủ đặt lại mật khẩu: cần thêm thiết bị P-256 gốc. Nếu mất thiết bị, dùng mã khôi phục một lần đã cấp.</small>
+        </details>:null}
         {active?<details className={styles.profileDevices}><summary>Bảo mật và thiết bị ({devices.filter(d=>!d.revoked).length}/3 đang liên kết)</summary><p>Quản lý tối đa 3 thiết bị; thu hồi thiết bị cũ tại đây. Thiết bị mới phải được xác nhận riêng.</p>{devices.map(d=><div key={d.device_id}>
           <span>{d.device_id.slice(0,12)} · {d.revoked?"Đã thu hồi":v2&&d.approved===0?"Chờ xác nhận":"Đã xác nhận"}</span>
           {v2 && !d.revoked && d.approved===0 && account.deviceApproved===true ? <form onSubmit={e=>{
