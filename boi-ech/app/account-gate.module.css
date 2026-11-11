@@ -156,3 +156,10 @@
 .pendingSteps li[data-state="done"]{border-color:#8cddc4;background:#e9faf4;color:#0c705c;font-weight:700}
 .pendingSteps li[data-state="current"]{border-color:#a9b9f4;background:#eaf0ff;color:#2448a0;font-weight:700}
 @media(max-width:580px){.pendingSteps{grid-template-columns:repeat(2,minmax(0,1fr))}.pendingTitle{gap:9px}}
+
+/* Saved registration profile is canonical D1 data, distinct from trial-only sandbox activity. */
+.savedProfile{margin:15px 0;padding:16px 18px;border:1px solid #93d3c7;border-radius:14px;
+ background:linear-gradient(135deg,#e5faf6,#edf6ff);color:#15394b}
+.savedProfile h2{margin:0 0 7px;font-size:1.1rem}.savedProfile p{color:#3e6573;margin:0 0 12px}
+.savedProfile button{background:linear-gradient(120deg,#067778,#2b65af);border-color:#138c9e;color:#fff;font-weight:700}
+.savedProfile button:focus-visible{outline:3px solid #6a5cce;outline-offset:3px}
