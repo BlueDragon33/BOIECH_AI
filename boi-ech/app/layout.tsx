@@ -32,6 +32,7 @@ import "./teacher-secondary-tabs-v37.css";
 import "./video-analysis-v37.css";
 import "./teacher-premium-v9-layout-clean.css";
 import "./role-readable-v9.css";
+import "./modal-contrast-v9.css";
 import StudentRoleShell from "./student-role-shell";
 import StudentTeacherInbox from "./student-teacher-inbox";
 import StudentAdaptiveCoach from "./student-adaptive-coach";
