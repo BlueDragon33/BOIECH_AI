@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
 import {createTrainingClient,type TrainingProof,type TrainingWindow} from "./training-client";
 import {classKey,classNames,type ResourceKind,type ResourceStatus,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession} from "./training-types";
-import {AppIcon,Badge,ResourceStatusBars,PersonStatusBar,personReadiness,eligible,stateText,defaultDisplay,parseDisplayPreferences,type DisplayPreferences} from "./manager-status";
+import {AppIcon,Badge,ResourceStatusBars,personReadiness,eligible,stateText,defaultDisplay,parseDisplayPreferences,type DisplayPreferences} from "./manager-status";
 import {ManagerDetailSheet,ManagerSheet,type DetailTarget} from "./manager-details";
 import styles from "./manager-workspace.module.css";
 import ManagerApprovalPanel from "./manager-approval-panel";
