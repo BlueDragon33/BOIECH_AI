@@ -42,6 +42,21 @@ export async function verifyPassword(password: unknown, verifier: string) {
   const actual = await derive(password, match[1]);
   return timingSafeEqual(actual, Buffer.from(match[2], "hex"));
 }
+// Knowledge answers are not credentials by themselves: recovery also requires
+// proof from the previously trusted P-256 registration device.
+function normalizeChildhoodName(value: unknown) {
+  if (typeof value !== "string" || /[\\x00-\\x1f]/.test(value)) fail("SECURITY_ANSWER_INVALID",400);
+  const name=value.normalize("NFC").trim().replace(/\\s+/g," ").toLocaleLowerCase("vi");
+  if ([...name].length<2 || name.length>120) fail("SECURITY_ANSWER_INVALID",400);
+  return "boi-ech:childhood-name:v1:"+name;
+}
+export async function hashSecurityAnswer(value: unknown) {
+  return hashPassword(normalizeChildhoodName(value));
+}
+export async function verifySecurityAnswer(value: unknown, verifier:string) {
+  try {return await verifyPassword(normalizeChildhoodName(value),verifier);}
+  catch{return false;}
+}
 export async function deviceKeyId(value: unknown) {
   if (!value || typeof value !== "object") fail("DEVICE_KEY_INVALID", 400);
   const k = value as JsonWebKey;
@@ -153,6 +168,9 @@ export class AccountService {
       WHERE d.person_role='manager' ORDER BY a.account_id LIMIT 101`).all<{ account_id: string }>();
     if ((result.results?.length ?? 0) > 100) fail("ACCOUNT_RESULT_LIMIT", 413);
     return Promise.all((result.results ?? []).map(r => this.ownerRead(r.account_id)));
+  }
+  async limitSecurityRecoveryAttempt(login: string, peer: string) {
+    await this.throttle(login,peer,"recovery-question",3);
   }
   private async throttle(login: string, peer: string, kind: string, maximum = 6) {
     const now = this.now(), window = 15 * 60 * 1000;
@@ -282,6 +300,10 @@ export class AccountService {
   private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string) {
     const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
     const verifier = await hashPassword(input.password), accountId = "acc_" + random();
+    // Existing accounts/tests remain valid without a question; the new V9 UI
+    // requires one when creating an account. The secret is never returned.
+    const securityVerifier = typeof input.securityAnswer === "string" && input.securityAnswer.trim()
+      ? await hashSecurityAnswer(input.securityAnswer) : null;
     const storageId = random(), recoveryCode = random();
     try {
       await this.db.batch([
@@ -293,6 +315,9 @@ export class AccountService {
         this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
         this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
           .bind(accountId,verifier,digest(recoveryCode)),
+        ...(securityVerifier ? [this.db.prepare(
+          "INSERT INTO account_recovery_questions(account_id,answer_verifier) VALUES(?,?)"
+        ).bind(accountId,securityVerifier)] : []),
         ...(typeof input.contactType==="string" && typeof input.contactValue==="string" ? [
           this.db.prepare("INSERT INTO account_contacts(account_id,kind,value) VALUES(?,?,?)")
             .bind(accountId,input.contactType,input.contactValue),
