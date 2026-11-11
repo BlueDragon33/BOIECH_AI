@@ -184,29 +184,3 @@
   overflow-y:auto;scrollbar-width:none}
  .railStatus::-webkit-scrollbar{display:none}
 }
-/* Teacher and learner: fixed full sidebar with independently scrollable role
-   navigation. The brand never scrolls away with the right-hand content. */
-body[data-student-role-ui="active"] .app-shell>.sidebar,
-body[data-teacher-role-ui="active"] .app-shell>.sidebar{
- position:fixed!important;top:0!important;bottom:0!important;left:0!important;
- height:100dvh!important;max-height:100dvh!important;
- overflow:hidden!important;display:flex!important;flex-direction:column!important;
- overscroll-behavior:contain;box-sizing:border-box
-}
-body[data-student-role-ui="active"] .app-shell>.sidebar>.brand-row,
-body[data-teacher-role-ui="active"] .app-shell>.sidebar>.brand-row{
- flex:0 0 auto!important;position:relative;z-index:1
-}
-body[data-student-role-ui="active"] .app-shell>.sidebar>.student-role-nav-mount,
-body[data-teacher-role-ui="active"] .app-shell>.sidebar>.teacher-role-nav-mount{
- display:flex!important;flex:1 1 auto!important;height:auto!important;min-height:0!important;
- overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;
- scrollbar-width:none!important;-ms-overflow-style:none;
-}
-body[data-student-role-ui="active"] .student-role-nav-mount::-webkit-scrollbar,
-body[data-teacher-role-ui="active"] .teacher-role-nav-mount::-webkit-scrollbar{display:none!important;width:0!important}
-body[data-student-role-ui="active"] .app-shell .student-role-nav,
-body[data-teacher-role-ui="active"] .app-shell .teacher-role-nav{
- min-height:max-content!important;height:auto!important;width:100%;
- flex:0 0 auto;overflow:visible!important
-}
