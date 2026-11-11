@@ -41,36 +41,40 @@ test("all instructor navigation destinations remain present", () => {
     "Báo cáo",
     "Tin nhắn",
     "Lịch dạy",
-    "Hồ sơ",
+    "Hồ sơ chuyên môn",
   ]) assert.ok(shell.includes(`label: "${label}"`), label);
 });
 
-test("teacher roster remains signed authorized-class and reversible", () => {
-  assert.match(rosterRoute, /verifyDeviceRequest\(payload, previewRequest\)/);
-  assert.match(rosterRoute, /teacher\.personRole !== "teacher"/);
-  assert.match(rosterRoute, /person_role = 'learner'/);
-  assert.match(rosterRoute, /teacherClassNames\(teacher\.className\)/);
-  assert.match(rosterRoute, /lower\(trim\(class_name\)\) IN \(\$\{classPlaceholders\}\)/);
-  assert.match(rosterRoute, /SET status = 'blocked'/);
-  assert.doesNotMatch(rosterRoute, /DELETE FROM device_access/);
+test("teacher roster is P-256 protected, approved-only, class-scoped and never permits approvals",()=>{
+  assert.match(rosterRoute,/verifyDeviceRequest\(payload,false\)/);
+  assert.match(rosterRoute,/if\(payload.action!=="list"\)/);
+  assert.match(rosterRoute,/teacher.personRole!=="teacher"/);
+  assert.match(rosterRoute,/WHERE person_role='learner' AND status='approved'/);
+  assert.match(rosterRoute,/teacherClassNames\(teacher.className\)/);
+  assert.match(rosterRoute,/lower\(trim\(class_name\)\) IN \(\$\{placeholders\}\)/);
+  assert.match(rosterRoute,/\.bind\(\.\.\.classes.map/);
+  assert.doesNotMatch(rosterRoute,/UPDATE device_access|DELETE FROM device_access/);
 });
 
-test("teacher roster client does not receive private device identity or phone", () => {
-  const itemStart = rosterRoute.indexOf("function rosterItem");
-  const itemEnd = rosterRoute.indexOf("async function listRoster", itemStart);
-  assert.ok(itemStart >= 0 && itemEnd > itemStart);
-  const publicItem = rosterRoute.slice(itemStart, itemEnd);
-  assert.doesNotMatch(publicItem, /phone\s*:/);
-  assert.doesNotMatch(publicItem, /deviceId|displayCode|publicKey|public_key/);
+test("teacher roster HTTP response omits device keys and private contact",()=>{
+  const begin=rosterRoute.indexOf("const roster=(result.results");
+  const end=rosterRoute.indexOf("return respond({canManage:false,roster",begin);
+  assert.ok(begin>=0&&end>begin);
+  const fields=rosterRoute.slice(begin,end);
+  assert.match(fields,/name:row.learner_name/);
+  assert.match(fields,/className:row.class_name/);
+  assert.doesNotMatch(fields,/deviceId:|device_id:|phone:|publicKey:|public_key:/);
+  assert.match(rosterRoute,/canManage:false,roster/);
 });
 
-test("roster synchronization is manual plus visible-tab 60-second refresh and role-gated", () => {
-  assert.match(roster, /Đồng bộ dữ liệu/);
-  assert.match(roster, /60_000/);
-  assert.match(roster, /document\.visibilityState === "visible"/);
-  assert.match(roster, /document\.body\.dataset\.teacherRoleUi !== "active"/);
-  assert.match(roster, /syncGenerationRef/);
-  assert.match(roster, /syncedDeviceRef/);
+test("teacher roster sync is 60s and role-gated, without old toolbar injection",()=>{
+  assert.match(roster,/Đồng bộ dữ liệu/);
+  assert.match(roster,/60000/);
+  assert.match(roster,/!document.hidden/);
+  assert.match(roster,/document.body.dataset.teacherRoleUi==="active"/);
+  assert.match(roster,/generation.current/);
+  assert.match(roster,/device.current/);
+  assert.doesNotMatch(roster,/teacher-topbar-sync/);
 });
 
 test("teacher interventions remain text-only and cannot mutate canonical AI scoring", () => {
