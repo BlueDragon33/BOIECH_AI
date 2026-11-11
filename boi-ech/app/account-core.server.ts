@@ -582,19 +582,21 @@ export class AccountService {
     const actor = await this.authorize(token);
     await this.capability(actor, "manager.approve.registration");
     const onboardingSelect = this.v2Enabled ? ",o.stage AS onboarding_stage,o.revision AS onboarding_revision,o.first_review_by" : "";
+    const draftSelect=this.v2Enabled ? ",json_extract(pd.profile_json,'$.familyName') AS draft_family,json_extract(pd.profile_json,'$.givenName') AS draft_given,json_extract(pd.profile_json,'$.className') AS draft_class" : "";
+    const draftJoin=this.v2Enabled ? " LEFT JOIN account_profile_drafts pd ON pd.account_id=a.account_id" : "";
     const onboardingJoin = this.v2Enabled ? " LEFT JOIN account_onboarding o ON o.account_id=a.account_id" : "";
     // Anonymous-profile requested rows form a bounded shared intake pool; after first review
     // only the accepting manager may read the applicant's profile during second review.
     const scopePending = this.v2Enabled ? " AND (o.stage='requested' OR o.first_review_by=?)" : "";
-    const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect} FROM accounts a
-      JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}
+    const result = await this.db.prepare(`SELECT ${COLUMNS},m.manager_device_id${onboardingSelect}${draftSelect} FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id LEFT JOIN manager_device_assignments m ON m.target_device_id=d.device_id${onboardingJoin}${draftJoin}
       WHERE ((d.status='pending' AND d.person_role IN ('learner','teacher') AND d.payment_status='unassigned'
         AND m.target_device_id IS NULL${scopePending})
        OR m.manager_device_id=?)${this.v2Enabled ? " AND a.account_id>?" : ""}
        ORDER BY a.account_id LIMIT ${this.v2Enabled ? "?" : "201"}`)
        .bind(...(this.v2Enabled ? [actor.accountId] : []),actor.storageDeviceId,
          ...(this.v2Enabled ? [after,(pageLimit as number)+1] : []))
-       .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null }>();
+       .all<Row & { manager_device_id: string | null; onboarding_stage?: string; onboarding_revision?: number; first_review_by?: string|null; draft_family?:string|null; draft_given?:string|null; draft_class?:string|null }>();
     if (!this.v2Enabled && (result.results?.length ?? 0) > 200) fail("ACCOUNT_RESULT_LIMIT", 413);
     const allRows=result.results??[],limit=this.v2Enabled?pageLimit as number:200;
     const devices=allRows.slice(0,limit),hasMore=this.v2Enabled && allRows.length>limit;
@@ -621,8 +623,8 @@ export class AccountService {
       teacher: { limit: limits.teacher_limit, used: counts.results?.find(c => c.person_role === "teacher")?.used ?? 0 },
     }, nextCursor:hasMore?devices[devices.length-1].account_id:null,
     devices: devices.map(r => ({ accountId: r.account_id, deviceId: r.storage_device_id,
-      deviceCode: r.person_code, role: r.person_role, name: r.learner_name, personCode: r.person_code, className: r.class_name,
-      status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.person_code&&r.learner_name&&r.phone&&r.class_name) : true,
+      deviceCode: r.person_code, role: r.person_role, name: r.learner_name||(r.draft_family&&r.draft_given?`${r.draft_family} ${r.draft_given}`:null), personCode: r.person_code, className: r.class_name||r.draft_class,
+      status: r.status, registrationComplete: this.v2Enabled ? Boolean(r.draft_family&&r.draft_given||r.learner_name&&r.class_name) : true,
       onboardingStage: r.onboarding_stage??null, onboardingRevision: r.onboarding_revision??null,
       firstReviewMine: r.first_review_by===actor.accountId,
       assignedToMe: r.manager_device_id === actor.storageDeviceId })) };
