@@ -1,0 +1,24 @@
+.root{color:#eaf2ff;padding:18px;border:1px solid rgba(105,155,229,.36);border-radius:18px;background:linear-gradient(140deg,#0c1939,#162651 60%,#231b56);box-shadow:0 20px 38px rgba(0,6,30,.26)}
+.head{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.head h2{margin:0 0 5px;font-size:clamp(1.1rem,2vw,1.4rem);font-weight:750}
+.head p{margin:0;color:#c7d8fb;font-size:.9rem}
+.root button{border:1px solid rgba(111,194,245,.56);background:linear-gradient(130deg,#124e88,#3942a5);color:#fff;border-radius:10px;padding:9px 15px;font-weight:600;cursor:pointer;min-height:42px}
+.root button:hover:not(:disabled){border-color:#97e6fa;filter:brightness(1.1)}
+.root button:focus-visible{outline:3px solid #67e5ff;outline-offset:3px}
+.root button:disabled{opacity:.48;cursor:not-allowed}
+.meta{font-size:.87rem;color:#bed8f5;margin:12px 0}
+.groups{display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px}
+.group{border:1px solid rgba(149,181,245,.2);border-radius:14px;background:rgba(7,17,49,.37);padding:12px;min-width:0}
+.group h3{margin:0 0 12px;font-size:1rem;color:#e9efff}
+.entry{border:1px solid rgba(138,160,222,.2);border-radius:12px;padding:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.entry:last-child{margin-bottom:0}
+.entry strong{font-size:.95rem;overflow-wrap:anywhere}
+.details{display:flex;flex-direction:column;gap:6px;min-width:0}
+.details small{font-size:.8rem;color:#b8c8e6;overflow-wrap:anywhere}
+.status{font-weight:600;color:#8ce4fc;font-size:.83rem}
+.error{margin:12px 0;color:#ffc7c7;border:1px solid #cc6873;border-radius:10px;background:#542437;padding:11px}
+.success{margin:12px 0;color:#c7ffe7;border:1px solid #359f89;border-radius:10px;background:#0d473f;padding:11px}
+.empty{color:#bbcee9;font-size:.9rem;line-height:1.55}
+.pager{margin-top:14px}
+@media(max-width:750px){.groups{grid-template-columns:1fr}.root{padding:14px}}
+@media(max-width:480px){.entry{align-items:stretch;flex-direction:column}.entry button{width:100%}.head button{width:100%}}
