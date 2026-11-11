@@ -190,6 +190,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             : "Chưa đủ điều kiện truy cập."
             : account.status === "pending" ? "Chờ duyệt tài khoản. Bạn chỉ cần đăng ký một lần; trạng thái sẽ dùng chung trên mọi thiết bị."
             : "Tài khoản đã bị khóa hoặc hết hạn. Liên hệ cán bộ có thẩm quyền."}</p>}
+        {v2 && account.onboardingStage==="requested" ? <section className={styles.pendingJourney} aria-label="Tiến độ đăng ký">
+          <div className={styles.pendingTitle}><span aria-hidden="true">◎</span><div><h2>Yêu cầu đang được xử lý</h2>
+           <p>Tài khoản đã được tiếp nhận. Học viên và Giảng viên sẽ do Cán bộ quản lý có quyền xét duyệt; Cán bộ quản lý do Owner duyệt.</p></div></div>
+          <ol className={styles.pendingSteps}><li data-state="done">Đã đăng ký</li><li data-state="current">Đang chờ xét duyệt</li><li>Hồ sơ hoàn thiện</li><li>Kích hoạt tài khoản</li></ol>
+          <p className={styles.pendingHelp}>Bạn có thể đồng bộ trạng thái mà không đăng ký lại. Hồ sơ và thời hạn sử dụng được kiểm tra tại máy chủ.</p>
+        </section> : null}
         {v2&&account.deviceApproved===false?<form className={styles.deviceContactCheck}
           onSubmit={e=>{e.preventDefault();void compareContact(e.currentTarget);}}>
           <h2>Thiết bị mới · Đối chiếu liên hệ</h2>
