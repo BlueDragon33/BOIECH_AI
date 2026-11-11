@@ -81,7 +81,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
    const response=await command({action:"review-first",accountId:person.accountId,
     expectedRevision:person.onboardingRevision});
    if(response.onboarding?.stage!=="profile_required"
-     ||response.onboarding.revision!==person.onboardingRevision!+1)
+     ||response.onboarding.revision!==Number(person.onboardingRevision)+1)
     throw new Error("Máy chủ chưa xác nhận quyết định duyệt một lần.");
    const verified=await readback(person.accountId);
    if(mounted.current){setBoard(verified);setNotice("Đã duyệt một lần và đọc lại đúng hồ sơ từ D1. Người dùng đang chờ hoàn thiện hồ sơ; chưa kích hoạt tài khoản.");}
