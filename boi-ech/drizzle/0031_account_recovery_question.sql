@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS account_recovery_questions (
     CHECK(question_id='childhood_name_v1'),
   answer_verifier TEXT NOT NULL CHECK(
     answer_verifier LIKE 'scrypt$32768$8$3$%'
-    AND length(answer_verifier)=121
+    AND length(answer_verifier)=114
   ),
   revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>=1),
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
