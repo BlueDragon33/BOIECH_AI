@@ -227,6 +227,81 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       reloadPreservingPendingManagerInvite(managerInviteRef.current);
     });
   }
+  const profileSections:ProfileSection[]=[
+    {id:"overview",label:"Thông tin tài khoản",hint:"Trạng thái tài khoản và quyền sử dụng",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.profileSummary}>
+          <span className={styles.profileLargeAvatar}>{(account?.name?.trim()[0]||"B").toLocaleUpperCase("vi")}</span>
+          <div><small>HỒ SƠ ĐÃ XÁC THỰC</small><h3>{account?.name||"Tài khoản Bơi Ếch"}</h3>
+            <p>{account?.role==="manager"?"Cán bộ quản lý":account?.role==="teacher"?"Giảng viên":"Học viên"}</p></div>
+        </div>
+        <div className={styles.settingDataGrid}>
+          <div><small>Trạng thái tài khoản</small><strong>{active?"Đang hoạt động":"Chờ kích hoạt"}</strong></div>
+          <div><small>Quyền truy cập</small><strong>{account?.entitlementActive?"Đã xác nhận thời hạn":"Chưa xác nhận"}</strong></div>
+          <div><small>Thời hạn truy cập</small><strong>{account?.expiresAt?
+            new Intl.DateTimeFormat("vi-VN",{dateStyle:"medium"}).format(new Date(account.expiresAt)):"Chưa có dữ liệu"}</strong></div>
+          <div><small>Thiết bị liên kết</small><strong>{devices.filter(d=>!d.revoked).length}/3</strong></div>
+        </div>
+        <div className={styles.settingInfo}>Thông tin nhận dạng nội bộ không cần nhập hoặc hiển thị.
+          Muốn thay đổi mật khẩu/quản lý thiết bị, mở các mục Bảo mật và thiết bị bên trái.</div>
+        {active&&account?.canReadRegistrants?<RegistrantReader/>:null}
+      </div>},
+    {id:"security",label:"Bảo mật cá nhân",hint:"Khôi phục mật khẩu và bảo vệ tài khoản",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.settingSectionTitle}><span>◆</span><div><h3>Câu hỏi khôi phục mật khẩu</h3>
+          <p>Tên lúc nhỏ của bạn là gì?</p></div></div>
+        <div className={styles.settingInfo}>{account?.securityQuestionConfigured?"Câu trả lời đã được thiết lập và mã hóa một chiều bằng scrypt.":"Chưa có câu trả lời bảo mật cho tài khoản này."}
+          {" "}Đáp án cũ không thể xem lại; bạn có thể thiết lập câu trả lời mới bên dưới.</div>
+        <form className={styles.securityUpdateForm} onSubmit={e=>{
+          e.preventDefault();const form=e.currentTarget;const fields=Object.fromEntries(new FormData(form));
+          void run(async()=>{
+            await send({action:"security-question-set",password:fields.currentPassword,securityAnswer:fields.securityAnswer});
+            form.reset();await reload();setNotice("Đã cập nhật câu trả lời khôi phục.");
+          });
+        }}>
+          <label>Mật khẩu hiện tại<input name="currentPassword" type="password" required autoComplete="current-password" disabled={busy}/></label>
+          <label>Câu trả lời mới<input name="securityAnswer" type="password" minLength={2} maxLength={120}
+            required autoComplete="new-password" disabled={busy} placeholder="Nhập tên lúc nhỏ"/></label>
+          <button type="submit" disabled={busy}>Lưu câu trả lời bảo mật</button>
+        </form>
+        <p className={styles.securityFinePrint}>Khôi phục bằng câu hỏi còn yêu cầu khóa P-256 trên thiết bị tin cậy gốc;
+          nếu mất thiết bị, hãy dùng mã khôi phục một lần đã cấp.</p>
+        {error?<p role="alert" className={styles.error}>{error}</p>:null}
+        {notice?<p role="status" className={styles.settingSuccess}>{notice}</p>:null}
+      </div>},
+    {id:"devices",label:"Bảo mật và thiết bị",hint:"Kiểm tra tối đa ba thiết bị tin cậy",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.settingSectionTitle}><span>▣</span><div><h3>Thiết bị đã liên kết</h3>
+          <p>{devices.filter(d=>!d.revoked).length}/3 thiết bị · Dữ liệu lấy từ phiên hiện tại</p></div></div>
+        <div className={styles.deviceList}>{devices.map(device=><article className={styles.deviceItem} key={device.device_id}>
+          <div><strong>Thiết bị {device.device_id.slice(0,8).toUpperCase()}</strong>
+            <small>{device.revoked?"Đã thu hồi":v2&&device.approved===0?"Đang chờ xác nhận":"Thiết bị tin cậy"}
+              {" · "}{device.created_at}</small></div>
+          {!device.revoked&&v2&&device.approved===0&&account?.deviceApproved===true?
+            <form onSubmit={e=>{e.preventDefault();const el=e.currentTarget;const password=new FormData(el).get("password");
+              void run(async()=>{await send({action:"approve-device",deviceId:device.device_id,password});
+                el.reset();await reload();setNotice("Đã xác nhận thiết bị mới.");});}}>
+              <label>Mật khẩu xác nhận<input name="password" type="password" required autoComplete="current-password" disabled={busy}/></label>
+              <button disabled={busy} type="submit">Xác nhận thiết bị</button>
+            </form>:null}
+          {!device.revoked&&(!v2||account?.deviceApproved===true)?
+            <button type="button" className={styles.revokeButton} disabled={busy}
+              onClick={()=>{if(window.confirm("Thu hồi thiết bị này? Các phiên của thiết bị sẽ bị vô hiệu hóa."))void run(async()=>{
+                await send({action:"revoke-device",deviceId:device.device_id});await reload();broadcast();
+              });}}>Thu hồi</button>:null}
+        </article>)}</div>
+        {!devices.length?<p role="status">Không đọc được thiết bị nào từ máy chủ.</p>:null}
+        {error?<p role="alert" className={styles.error}>{error}</p>:null}
+        {notice?<p role="status" className={styles.settingSuccess}>{notice}</p>:null}
+      </div>},
+    {id:"sync",label:"Đồng bộ dữ liệu",hint:"Theo dõi và thiết lập dữ liệu được đồng bộ",content:
+      <div className={styles.accountSettingPane}>
+        <div className={styles.settingSectionTitle}><span>↻</span><div><h3>Đồng bộ có xác minh</h3>
+          <p>Thực hiện trong phạm vi quyền và thiết bị của tài khoản.</p></div></div>
+        {active&&v2&&account?<VerifiedSyncSettings accountId={account.accountId}/>:
+          <p>Đồng bộ chỉ khả dụng sau khi tài khoản được kích hoạt.</p>}
+      </div>}
+  ];
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
       {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
       <h1>{account ? (account.onboardingStage==="requested"?"Hồ sơ đăng ký đang chờ xét duyệt":"Tài khoản Bơi Ếch") : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
