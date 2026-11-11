@@ -160,8 +160,8 @@ export class AccountV2Workflow {
     const code=(manager?"MGR_":s.role==="teacher"?"GV_":"HV_")+actor.storageDeviceId.slice(0,20).toUpperCase();
     // Contact was collected at registration. Do not ask the manager for it again,
     // or confuse self-declared contact with a device approval proof.
-    const contact=manager?await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
-      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>():null;
+    const contact=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>();
     // Secondary details are optional and self-declared, never a security proof.
     // The primary contact cannot be overwritten from this profile form.
     let secondary:{kind:"email"|"phone";value:string}|null=null;
