@@ -144,6 +144,11 @@ test("nested building→room→class retains real context for new class session"
  assert.deepEqual(popup.props.people.map(person=>person.id),["t1"],"only scoped people from real class");
  addCa().props.onClick();assert.deepEqual(sessions.pop(),["room-1","class-b"]);
 });
+// Exercise the canonical TrainingDashboard with in-memory React state. Do not
+// mock or bypass the real session-editor callbacks under test.
+function workspaceProps(extra={}){return {board:board(),tab:"overview",setTab:()=>{},busy:false,notice:"",onCommand:async()=>false,onWindowChange:()=>{},...extra};}
+function workspaceHarness(props){const state=[];let cursor=0;const hooks={...React,useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==="function"?initial():initial;return [state[i],next=>{state[i]=typeof next==="function"?next(state[i]):next;}]}};const {TrainingDashboard}=load("app/manager-workspace.tsx",hooks);return ()=>{cursor=0;return elements(TrainingDashboard(props));};}
+
 test("manager workspace carries selected room and class into existing session editor",()=>{
  const render=workspaceHarness(workspaceProps());
  const center=render().find(node=>typeof node.type==="function"&&node.type.name==="ManagerCommandCenter");

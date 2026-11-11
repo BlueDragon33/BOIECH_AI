@@ -65,7 +65,7 @@ test("V9 trusted original P-256 plus normalized answer recovers and revokes prev
   const next=await service.challenge(user.login,"fixture-peer-q2");
   const recovery=await service.recover({login:user.login,
     securityAnswer:"  BÉ   BÔNG  ",password:"New password safe 123",
-    ...await proof(user,next.challenge)},"fixture-peer-q2");
+    ...(await proof(user,next.challenge))},"fixture-peer-q2");
   assert.match(recovery.recoveryCode,/^[a-f0-9]{64}$/);
   assert.notEqual(recovery.recoveryCode,user.account.recoveryCode);
   await assert.rejects(()=>f.service.session(user.account.token),e=>e.status===401);

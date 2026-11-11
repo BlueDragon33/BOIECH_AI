@@ -11,7 +11,7 @@ async function publicKey(){
 function payload(n,contactType,contactValue){
  return {action:"register",role:"learner",login:"r1contact"+n,
   password:"A private passphrase for R1 "+n,
-  privacyAccepted:true,contactType,contactValue};
+  privacyAccepted:true,securityAnswer:"Tuoi nho cua toi",contactType,contactValue};
 }
 test("R1: email-only registration is stored as unverified and never sends OTP",async()=>{
  const f=accountStack({v2:true});

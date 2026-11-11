@@ -10,7 +10,7 @@ async function key(){
 function request(n,invite){
  return {role:'manager',login:'manager'+n,password:'Private actor passphrase! '+n,
   contactType:'email',contactValue:'manager'+n+'@fixture.invalid',
-  managerInviteToken:invite,privacyAccepted:true};
+  managerInviteToken:invite,privacyAccepted:true,securityAnswer:"Ten thoi tho au"};
 }
 test('Owner issues a one-use invitation; DB stores only hash and an immutable audit',async()=>{
  const f=accountStack({v2:true});try{
