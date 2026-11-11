@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import RegistrantReader from "./registrant-reader";
 import ManagerWorkspace from "./manager-workspace";
 import VerifiedSyncSettings from "./verified-sync-settings";
+import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, preparePortableAccount } from "./multi-account-switcher";
@@ -28,7 +29,7 @@ async function send(body: Record<string, unknown>) {
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Chưa xác minh được thao tác tài khoản.");
   return data as { recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
-    devices?:Array<{device_id:string;approved:number;created_at:string}> };
+    devices?:Array<{device_id:string;approved:number;created_at:string}>;trial?:TrialLease };
 }
 function reloadPreservingPendingManagerInvite(token: string) {
   const oneUseFragment=/^[a-f0-9]{64}$/.test(token) ? "#manager-invite="+token : "";
@@ -44,6 +45,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [account, setAccount] = useState<Account | null>(null), [devices, setDevices] = useState<Device[]>([]);
   const [v2,setV2]=useState(false);
   const [singleReview,setSingleReview]=useState(false);
+  const [trialEnabled,setTrialEnabled]=useState(false);
+  const [trial,setTrial]=useState<TrialLease|null>(null);
+  const [trialUsed,setTrialUsed]=useState(false);
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -56,8 +60,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
   const reload = useCallback(async (claim = false) => {
     const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
-    const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; error?: string };
-    if (mounted.current) { setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true); }
+    const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
+    if (mounted.current) { setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true); setTrialEnabled(data.accountUiTrial === true); }
     if (!response.ok) {
       if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
       throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
@@ -168,6 +172,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       setNotice(pending?"Đã lưu hồ sơ để cán bộ có thể kiểm duyệt. Khi được duyệt, bạn sẽ không phải nhập lại thông tin.":singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Đã gửi hồ sơ để xét duyệt.");
     });
   }
+  async function openTrial(){
+    await run(async()=>{
+      const status=await send({action:"trial-status"});
+      const lease=status.trial?.state==="available"?(await send({action:"trial-start"})).trial:status.trial;
+      if(!lease||lease.state!=="active"){
+        if(lease?.state==="expired")setTrialUsed(true);
+        throw new Error(lease?.state==="expired"?"Lượt trải nghiệm 8 giờ đã hết, không thể gia hạn.":"Không xác minh được thời hạn thử trên máy chủ.");
+      }
+      if(lease.role!==account?.role)throw new Error("Vai trò thử không khớp với tài khoản.");
+      setTrial(lease);
+    });
+  }
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
       {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
       <h1>{account ? (account.onboardingStage==="requested"?"Hồ sơ đăng ký đang chờ xét duyệt":"Tài khoản Bơi Ếch") : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
@@ -262,6 +278,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <button type="submit" disabled={busy}>{busy?"Đang xác minh…":account.onboardingStage==="requested"?"Lưu hồ sơ để cán bộ xét duyệt":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
           </footer>
         </form> : null}
+        {v2&&singleReview&&trialEnabled&&!trialUsed&&!active&&account.deviceApproved===true&&
+         ["requested","profile_required","changes_requested"].includes(account.onboardingStage||"")?
+          <section className={styles.trialInvitation}><div><strong>Trải nghiệm thử giao diện — 8 giờ</strong>
+            <p>Thời hạn máy chủ cấp một lần. Không cấp quyền tài khoản, không dùng dữ liệu thật hoặc AI; nội dung thử chỉ ở bộ nhớ và sẽ bị xóa khi hết hạn.</p></div>
+            <button type="button" disabled={busy} onClick={()=>void openTrial()}>Mở trải nghiệm thử 8 giờ</button></section>:null}
+        {trialUsed&&!active?<p role="status">Lượt trải nghiệm thử đã kết thúc. Hồ sơ đăng ký và quyền xét duyệt vẫn được giữ nguyên.</p>:null}
         <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void run(() => reload())}>Đồng bộ trạng thái</button>
           <button type="button" disabled={busy} onClick={() => void run(async () => { setReady(false); setRecovery(""); recoveryOwner.current=""; await send({ action: "logout" }); broadcast();
             // Keep a pending one-use invitation ONLY in the URL fragment during the
@@ -327,6 +349,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         <p className={styles.authFootnote}>Hồ sơ cũ được bảo toàn. Việc liên kết tài khoản cần xác minh quyền sở hữu trước khi chuyển dữ liệu.</p>
       </>}
     </section>;
+  if(ready&&account&&!active&&trial?.state==="active"&&account.role===trial.role){
+    return <AccountTrialSandbox key={account.accountId} lease={trial}
+      onExit={()=>setTrial(null)}
+      onExpired={()=>{setTrial(null);setTrialUsed(true);void reload().catch(e=>setError(accountNetworkError(e)));}}/>;
+  }
   return <>
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
       <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof} accountSettings={accountPanel}/>
