@@ -184,7 +184,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         {!active && <p role="status" className={styles.pending}>
           {v2 ? account.deviceApproved===false ? "Thiết bị mới chưa được xác nhận. Hãy phê duyệt từ thiết bị đã tin cậy trước khi mở dữ liệu."
             : account.onboardingStage==="requested" ? "Đã tiếp nhận đăng ký. Đang chờ người có thẩm quyền phê duyệt."
-            : account.onboardingStage==="profile_required" ? singleReview?"Đã được duyệt. Điền đủ hồ sơ bắt buộc để kích hoạt và vào ứng dụng.":"Đã duyệt lần một. Hãy hoàn thiện hồ sơ để gửi duyệt lần hai."
+            : account.onboardingStage==="profile_required" ? singleReview?(account.profileDraftReady?"Đã được duyệt. Hồ sơ khai trước đã lưu; chỉ cần xác nhận kích hoạt.":"Đã được duyệt. Điền đủ hồ sơ bắt buộc để kích hoạt và vào ứng dụng."):"Đã duyệt lần một. Hãy hoàn thiện hồ sơ để gửi duyệt lần hai."
             : account.onboardingStage==="profile_review" ? "Hồ sơ đang được xét duyệt lần hai."
             : account.onboardingStage==="changes_requested" ? "Hồ sơ cần bổ sung. Hãy cập nhật và gửi lại."
             : account.onboardingStage==="legacy_hold" ? "Hồ sơ cũ cần được đối chiếu trước khi chuyển sang V2."
@@ -195,7 +195,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         {v2 && account.onboardingStage==="requested" ? <section className={styles.pendingJourney} aria-label="Tiến độ đăng ký">
           <div className={styles.pendingTitle}><span aria-hidden="true">◎</span><div><h2>Yêu cầu đang được xử lý</h2>
            <p>Tài khoản đã được tiếp nhận. Học viên và Giảng viên sẽ do Cán bộ quản lý có quyền xét duyệt; Cán bộ quản lý do Owner duyệt.</p></div></div>
-          <ol className={styles.pendingSteps}><li data-state="done">Đã đăng ký</li><li data-state="current">Đang chờ xét duyệt</li><li>Hồ sơ hoàn thiện</li><li>Kích hoạt tài khoản</li></ol>
+          <ol className={styles.pendingSteps}><li data-state="done">Đã đăng ký</li><li data-state={account.profileDraftReady?"done":undefined}>{account.profileDraftReady?"Đã lưu hồ sơ":"Khai hồ sơ"}</li><li data-state="current">Đang chờ xét duyệt</li><li>Kích hoạt tài khoản</li></ol>
           <p className={styles.pendingHelp}>Bạn có thể đồng bộ trạng thái mà không đăng ký lại. Hồ sơ và thời hạn sử dụng được kiểm tra tại máy chủ.</p>
         </section> : null}
         {v2&&account.deviceApproved===false?<form className={styles.deviceContactCheck}
