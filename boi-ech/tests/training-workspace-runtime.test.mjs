@@ -55,10 +55,16 @@ function elements(node){if(Array.isArray(node))return node.flatMap(elements);if(
 function content(node){if(Array.isArray(node))return node.map(content).join('');if(node===null||node===undefined)return'';if(typeof node!=='object')return String(node);return content(node.props?.children);}
 function dashboardHarness(props){const values=[];let cursor=0;const hooks={...React,useState(initial){const index=cursor++;if(!(index in values))values[index]=typeof initial==='function'?initial():initial;return[values[index],next=>{values[index]=typeof next==='function'?next(values[index]):next;}];}};const {TrainingDashboard}=load('app/manager-workspace.tsx',async()=>{},hooks);return()=>{cursor=0;return elements(TrainingDashboard(props));};}
 
-test('manager account controls render inside the themed workspace rather than above the application',()=>{
+test('premium overview keeps owner account controls out of the manager dashboard; scoped review remains in People tab',()=>{
  const {TrainingDashboard}=load('app/manager-workspace.tsx');
- const html=renderToStaticMarkup(React.createElement(TrainingDashboard,{board:{from:'2030-01-01T09:00:00Z',to:'2030-01-01T10:00:00Z',observedAt:'2030-01-01T09:00:00Z',people:[],resources:[],sessions:[],summary:{}},tab:'overview',setTab:()=>{},busy:false,notice:'',onCommand:async()=>false,onWindowChange:()=>{},accountControls:React.createElement('details',null,React.createElement('summary',null,'Quản lý tài khoản'))}));
- assert.match(html,/<main[^>]*>[\s\S]*Quản lý tài khoản[\s\S]*<\/main>/);
+ const board={from:'2030-01-01T09:00:00Z',to:'2030-01-01T10:00:00Z',observedAt:'2030-01-01T09:00:00Z',people:[],resources:[],sessions:[],summary:{freeRooms:0,unassignedLearners:0}};
+ const props={board,setTab:()=>{},busy:false,notice:'',onCommand:async()=>false,onWindowChange:()=>{},accountControls:React.createElement('details',null,React.createElement('summary',null,'Duyệt học viên và giảng viên'))};
+ const overview=renderToStaticMarkup(React.createElement(TrainingDashboard,{...props,tab:'overview'}));
+ const people=renderToStaticMarkup(React.createElement(TrainingDashboard,{...props,tab:'people'}));
+ assert.match(overview,/MANAGER CONSOLE|Trung tâm điều hành/);
+ assert.doesNotMatch(overview,/Quản lý tài khoản · phê duyệt hai vòng/);
+ assert.doesNotMatch(overview,/<summary>Duyệt học viên và giảng viên<\/summary>/);
+ assert.match(people,/<main[^>]*>[\s\S]*Duyệt học viên và giảng viên[\s\S]*<\/main>/);
 });
 test('manager approval policy resolves the disabled feature and shows a retryable error on service failure',async()=>{
  for(const [status,body,expected] of [[404,{code:'ACCOUNT_FEATURE_DISABLED'},'Duyệt thiết bị học viên và giảng viên'],[503,{error:'unavailable'},'Không xác minh được chính sách']]){
