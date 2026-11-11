@@ -51,10 +51,12 @@ test("V9 premium source-backed hierarchy traverses building, room, class, actual
  const map=read("manager-command-center.tsx"),css=read("manager-command-center.module.css");
  assert.match(map,/Lớp học trong \{selectedRoom\.name\}/);
  assert.match(map,/roomClasses\.map\(klass=>/);
- assert.match(map,/selectedMembers\.map\(person=>/);
+ assert.match(map,/teachers\.map\(person=>/);
+ assert.match(map,/learners\.map\(person=>/);
  assert.match(map,/onOpenDetail\(\{kind:"person",id:person\.id\}\)/);
- assert.match(css,/\.classIconGrid/);
- assert.match(css,/\.personIconGrid/);
+ assert.match(css,/\.focusIconGrid/);
+ assert.match(css,/\.compactRail/);
+ assert.match(map,/ClassRosterDialog/);
  assert.doesNotMatch(map,/value:pending\.length,icon:"people"/);
 });
 test("V9 Owner list-all is read-only and guarded exclusively by control Owner service",()=>{
