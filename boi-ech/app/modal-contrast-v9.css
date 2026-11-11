@@ -213,3 +213,33 @@ body[data-teacher-role-ui="active"] .teacher-page .teacher-table td{
 @media(prefers-reduced-motion:reduce){
  .appearance-panel,.teacher-learner-drawer{scroll-behavior:auto!important}
 }
+
+/* Existing multi-account switcher already centers its overlay. Its original
+   9–12px gray labels were below 4.5:1 contrast on the light panel. */
+.multi-account-overlay{
+ position:fixed!important;inset:0!important;
+ display:grid!important;place-items:center!important;
+ padding:clamp(10px,2vw,22px)!important
+}
+.multi-account-dialog{
+ max-width:calc(100vw - 20px)!important;
+ max-height:calc(100dvh - 30px)!important;
+ overflow-y:auto!important;
+ color:#17364f!important;
+ background:#f7fbff!important
+}
+.multi-account-dialog header span{color:#075c6a!important}
+.multi-account-intro,.multi-account-note,.multi-account-empty,
+.multi-account-copy small,.multi-account-copy em,.multi-account-add small{
+ color:#435d72!important;
+ font-size:calc(12px + var(--font-adjust,0px))!important;
+ line-height:1.5!important
+}
+.multi-account-copy strong{color:#11324c!important;font-size:calc(14px + var(--font-adjust,0px))!important}
+.multi-account-list>button>b,.multi-account-working{color:#075c6a!important}
+.multi-account-list>button,.multi-account-add{
+ min-height:54px;color:#153650!important
+}
+.multi-account-dialog :is(button,input,select):focus-visible{
+ outline:3px solid #087dae!important;outline-offset:2px
+}
