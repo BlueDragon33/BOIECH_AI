@@ -410,34 +410,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             // the mount effect immediately scrubs the token from the address bar.
             // Never persist it in local/session storage or put it in the query string.
             reloadPreservingPendingManagerInvite(managerInviteRef.current); })}>Đăng xuất / đổi tài khoản</button></div>
-        {active&&account.canReadRegistrants?<RegistrantReader/>:null}
-       
-        {active&&v2?<VerifiedSyncSettings accountId={account.accountId}/>:null}
-        {active&&v2?<details className={styles.profileDevices}><summary>Câu hỏi khôi phục mật khẩu</summary>
-          <p><strong>Tên lúc nhỏ của bạn là gì?</strong></p>
-          <p>{account.securityQuestionConfigured?"Đã thiết lập câu trả lời bảo mật.":"Chưa thiết lập câu trả lời bảo mật."}
-             {" "}Hệ thống không thể hiển thị lại đáp án cũ. Bạn có thể đổi đáp án dưới đây.</p>
-          <form onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const fields=Object.fromEntries(new FormData(form));
-            void run(async()=>{await send({action:"security-question-set",password:fields.currentPassword,securityAnswer:fields.securityAnswer});
-              form.reset();await reload();setNotice("Đã cập nhật câu trả lời bảo mật (không hiển thị đáp án).");});
-          }}>
-            <label>Mật khẩu tài khoản hiện tại<input name="currentPassword" type="password" required autoComplete="current-password" disabled={busy}/></label>
-            <label>Tên lúc nhỏ của bạn là gì?<input name="securityAnswer" type="password" minLength={2} maxLength={120} required autoComplete="new-password" disabled={busy}/></label>
-            <button type="submit" disabled={busy}>Lưu câu trả lời mới</button>
-          </form>
-          <small>Chỉ dùng câu trả lời không đủ đặt lại mật khẩu: cần thêm thiết bị P-256 gốc. Nếu mất thiết bị, dùng mã khôi phục một lần đã cấp.</small>
-        </details>:null}
-        {active?<details className={styles.profileDevices}><summary>Bảo mật và thiết bị ({devices.filter(d=>!d.revoked).length}/3 đang liên kết)</summary><p>Quản lý tối đa 3 thiết bị; thu hồi thiết bị cũ tại đây. Thiết bị mới phải được xác nhận riêng.</p>{devices.map(d=><div key={d.device_id}>
-          <span>{d.device_id.slice(0,12)} · {d.revoked?"Đã thu hồi":v2&&d.approved===0?"Chờ xác nhận":"Đã xác nhận"}</span>
-          {v2 && !d.revoked && d.approved===0 && account.deviceApproved===true ? <form onSubmit={e=>{
-            e.preventDefault();const el=e.currentTarget;const password=(new FormData(el)).get("password");
-            void run(async()=>{await send({action:"approve-device",deviceId:d.device_id,password});
-              el.reset();await reload();setNotice("Đã xác nhận thiết bị mới.");});
-          }}><label>Nhập lại mật khẩu để xác nhận thiết bị<input name="password" type="password" required autoComplete="current-password" disabled={busy}/></label>
-          <button type="submit" disabled={busy}>Xác nhận thiết bị này</button></form>:null}
-          {!d.revoked && (!v2 || account.deviceApproved===true) ? <button type="button" disabled={busy}
-            onClick={()=>void run(async()=>{await send({action:"revoke-device",deviceId:d.device_id});await reload();broadcast();})}>Thu hồi thiết bị này</button>:null}
-        </div>)}</details>:null}
+
       </> : <>
 
         <form key={mode} className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
