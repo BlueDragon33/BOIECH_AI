@@ -82,7 +82,7 @@ export class AccountV2Workflow {
          jobPosition:field(input.jobPosition,120),
          ...(typeof input.secondaryContact==="string"&&input.secondaryContact.trim()
            ? {secondaryContact:field(input.secondaryContact,254)}:{})}
-      : {...common,className:field(input.className,80),phone:field(input.phone,32)};
+      : {...common,className:field(input.className,80),phone:typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):""};
     const json=JSON.stringify(fields);
     if(json.length>2048)bad("PROFILE_INVALID",400);
     const res=await this.db.batch([
@@ -168,12 +168,12 @@ export class AccountV2Workflow {
         secondary=normalizeRegistrationContact(contact.kind==="email"?"phone":"email",input.secondaryContact);
       }
     }
-    const raw=manager?(contact?.kind==="phone"?contact.value:""):field(input.phone,32);
+    const raw=contact?.kind==="phone"?contact.value:(typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):"");
     const cleanPhone=raw.replace(/[ ()-]/g,"");
     const phone=cleanPhone ? (cleanPhone.startsWith("+84")?"0"+cleanPhone.slice(3):cleanPhone) : null;
     // Persist SQL NULL when manager originally registered with email; empty string
     // would collide under the legacy UNIQUE(device_access.phone) constraint.
-    if(!/^[A-Z0-9._-]+$/.test(code)|| (!manager&&!/^\+?[0-9]{7,16}$/.test(phone??""))) bad("PROFILE_INVALID",400);
+    if(!/^[A-Z0-9._-]+$/.test(code)|| (phone&&!/^\+?[0-9]{7,16}$/.test(phone))) bad("PROFILE_INVALID",400);
     if (this.singleReview) {
       // One human review was recorded by firstReview(). User's completed profile
       // is the second *state transition*, NOT a second human approval.
