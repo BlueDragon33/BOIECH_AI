@@ -84,3 +84,24 @@ test("named premium text/background pairs pass AA contrast",()=>{
  ["#183550","#ffffff"],["#435e73","#f7fbff"]
  ])assert.ok(contrastRatio(ink,bg)>=4.5,"WCAG below AA "+ink+"/"+bg);
 });
+
+test("Multi-account switcher remains centered with readable formerly faint labels",()=>{
+ const css=source("multi-account-switcher.css");
+ assert.match(css,/\.multi-account-overlay\s*\{[\s\S]*?place-items:\s*center/);
+ assert.match(roleCss,/\.multi-account-dialog\{\s*max-width:calc\(100vw - 20px\)!important/);
+ assert.match(roleCss,/\.multi-account-copy small,\.multi-account-copy em,\.multi-account-add small\{/);
+ assert.match(roleCss,/color:#435d72!important/);
+ assert.match(roleCss,/font-size:calc\(12px \+ var\(--font-adjust,0px\)\)!important/);
+ assert.match(roleCss,/\.multi-account-dialog header span\{color:#075c6a!important\}/);
+});
+
+test("WCAG fallback uses real black/white, avoiding the medium gray failure",()=>{
+ const {readableForeground,contrastRatio}=actualPalette();
+ assert.match(page,/contrastRatio\("#000000", background\)/);
+ for(const bg of ["#777777","#808080","#858585","#999999"]){
+  for(const ink of [["#f4fbfb","#102b3f"],["#bdd0da","#718899"]]){
+   const selected=readableForeground(bg,...ink);
+   assert.ok(contrastRatio(selected,bg)>=4.5);
+  }
+ }
+});
