@@ -5,8 +5,10 @@ import {AccountError,AccountService,deviceKeyId,hashPassword,verifyPassword,hash
 const fail=(code:string,status=403):never=>{throw new AccountError(code,status)};
 const QUESTION="Tên lúc nhỏ của bạn là gì?";
 const loginName=(input:unknown)=>{
-  if(typeof input!=="string"||! /^[a-z0-9][a-z0-9._-]{2,63}$/.test(input.trim().toLowerCase()))fail("ACCOUNT_INPUT",400);
-  return input.trim().toLowerCase();
+  if(typeof input!=="string")throw new AccountError("ACCOUNT_INPUT",400);
+  const normalized=input.trim().toLowerCase();
+  if(!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(normalized))throw new AccountError("ACCOUNT_INPUT",400);
+  return normalized;
 };
 const nonce=()=>randomBytes(32).toString("base64url");
 
@@ -77,7 +79,7 @@ export class AccountSecurityQuestionService{
       JOIN account_credentials c ON c.account_id=a.account_id
       JOIN account_recovery_questions q ON q.account_id=a.account_id
       WHERE a.login=?`).bind(login).first<QuestionRow>();
-    if(!row)fail("AUTH_FAILED",401);
+    if(!row)throw new AccountError("AUTH_FAILED",401);
     // Consume the nonce once, before answer verification. Failed attempts cannot replay.
     const consumed=await this.db.prepare(`DELETE FROM device_challenges
       WHERE nonce=? AND device_id=? AND expires_at>?`)
