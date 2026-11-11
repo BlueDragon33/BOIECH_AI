@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import RegistrantReader from "./registrant-reader";
 import ManagerWorkspace from "./manager-workspace";
+import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialog";
 import VerifiedSyncSettings from "./verified-sync-settings";
 import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
@@ -48,6 +49,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [trialEnabled,setTrialEnabled]=useState(false);
   const [trial,setTrial]=useState<TrialLease|null>(null);
   const [trialUsed,setTrialUsed]=useState(false);
+  const [profileOpen,setProfileOpen]=useState(false);
+  const closeProfile=useCallback(()=>setProfileOpen(false),[]);
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -122,6 +125,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       .catch(e=>{if(mounted.current)setError(accountNetworkError(e));});
   },[ready,v2,singleReview,account?.accountId,account?.onboardingStage,
      account?.profileDraftReady,account?.onboardingRevision,account?.deviceApproved,reload]);
+  useEffect(()=>{
+    const open=()=>setProfileOpen(true);
+    window.addEventListener("boi:account:open",open);
+    return()=>window.removeEventListener("boi:account:open",open);
+  },[]);
   async function run(action: () => Promise<void>) {
     if (lock.current) return; lock.current = true; setBusy(true); setError(""); setNotice("");
     try { await action(); } catch (e) { if (mounted.current) setError(accountNetworkError(e)); }
@@ -209,6 +217,14 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       }
       if(lease.role!==account?.role)throw new Error("Vai trò thử không khớp với tài khoản.");
       setTrial(lease);
+    });
+  }
+  async function logoutAccount(){
+    closeProfile();
+    await run(async()=>{
+      setReady(false);setRecovery("");recoveryOwner.current="";
+      await send({action:"logout"});broadcast();
+      reloadPreservingPendingManagerInvite(managerInviteRef.current);
     });
   }
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
