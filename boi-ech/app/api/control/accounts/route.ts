@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export function OPTIONS(request: Request) { return controlPreflight(request); }
 export async function POST(request: Request) {
   try {
-    const owner = await requireControlService(request);
+    const owner = await requireControlService(request, "account-owner");
     if (owner.role !== "owner") throw new AccountError("OWNER_REQUIRED");
     const raw = await request.text();
     if (raw.length > 4096) throw new AccountError("ACCOUNT_INPUT", 413);

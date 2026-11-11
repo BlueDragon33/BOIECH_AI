@@ -63,7 +63,7 @@ test("V9 Owner list-all is read-only and guarded exclusively by control Owner se
  const owner=read("account-core.server.ts"),route=read("api/control/accounts/route.ts");
  assert.match(owner,/async ownerAllAccounts\(after:unknown/);
  assert.match(owner,/contract:"boi-owner-accounts-all\.v1"/);
- assert.match(route,/requireControlService\(request\)/);
+ assert.match(route,/requireControlService\(request, "account-owner"\)/);
  assert.match(route,/owner\.role !== "owner"/);
  assert.match(route,/input\.action === "list-all"/);
 });

@@ -60,3 +60,13 @@ test('later releases retain an activated account mode and reject inconsistent or
  assert.equal(productionPackage(s,revision).vars.BOI_ECH_ACCOUNT_V2,'true');
  for(const change of [s=>s.result.bindings.find(b=>b.name==='BOI_ECH_ACCOUNT_FIRST').text='false',s=>s.result.bindings.find(b=>b.name==='BOI_ECH_ACCOUNT_ORIGIN').text='https://other.invalid']){const bad=structuredClone(s);change(bad);assert.throws(()=>productionPackage(bad,revision));}
 });
+test('an explicit single-review activation can release without rerunning legacy mapping',()=>{
+ const s=settings();
+ const active=productionPackage(s,revision,true);
+ s.result.bindings.push(...Object.entries(active.vars)
+   .filter(([name])=>name.startsWith('BOI_ECH_ACCOUNT_'))
+   .map(([name,text])=>({type:'plain_text',name,text})));
+ assert.equal(productionPackage(s,revision,false,true).vars.BOI_ECH_SINGLE_REVIEW,'true');
+ assert.throws(()=>productionPackage(settings(),revision,false,true),/requires Account-first V2/);
+ assert.throws(()=>verifyProductionArtifact(active,revision,false,true),/single-review/);
+});

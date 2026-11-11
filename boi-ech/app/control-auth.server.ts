@@ -95,10 +95,10 @@ async function browserTicket(secret: string, supplied: string) {
   const role = ["viewer", "reviewer", "publisher", "owner"].includes(suppliedRole) ? suppliedRole : "viewer";
   const expiresAt = typeof payload.exp === "number" ? payload.exp : 0;
   if (payload.iss !== TOKEN_ISSUER || payload.aud !== TOKEN_AUDIENCE || !actor.includes("@") || expiresAt <= Date.now() || expiresAt > Date.now() + 10 * 60 * 1000) return null;
-  return { actor, role };
+  return { actor, role, scope: payload.scope };
 }
 
-export async function requireControlService(request: Request) {
+export async function requireControlService(request: Request, scope?: "account-owner") {
   const { secret: configured, origin } = await configuration();
   const requestOrigin = (request.headers.get("origin") ?? "").replace(/\/$/, "");
   if (requestOrigin && !trustedControlOrigin(requestOrigin, origin)) {
@@ -111,9 +111,10 @@ export async function requireControlService(request: Request) {
   }
   if (!(await secureEqual(configured, supplied))) {
     const ticket = await browserTicket(configured, supplied);
-    if (!ticket) throw new DeviceAccessError("Vé quản trị đã hết hạn hoặc không hợp lệ.", 403, "CONTROL_TICKET_FORBIDDEN");
-    return ticket;
+    if (!ticket || ticket.scope !== scope) throw new DeviceAccessError("Vé quản trị đã hết hạn hoặc không đúng phạm vi.", 403, "CONTROL_TICKET_FORBIDDEN");
+    return { actor: ticket.actor, role: ticket.role };
   }
+  if (scope) throw new DeviceAccessError("Cần vé quản lý tài khoản có chữ ký.", 403, "CONTROL_TICKET_FORBIDDEN");
   const actor = (request.headers.get("x-control-actor") ?? "system").trim().toLowerCase().slice(0, 160);
   const suppliedRole = (request.headers.get("x-control-role") ?? "viewer").trim().toLowerCase();
   const role = ["viewer", "reviewer", "publisher", "owner"].includes(suppliedRole) ? suppliedRole : "viewer";
