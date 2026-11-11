@@ -123,8 +123,17 @@ export default function TeacherRosterManager(){
       const panelNode=active?document.querySelector<HTMLElement>("[data-teacher-roster-manager-mount]"):null;
       setMounts(prev=>prev.length===items.length&&prev.every((node,i)=>node===items[i])?prev:items);
       setPanel(prev=>prev===panelNode?prev:panelNode);
+      const liveDevice=active?document.querySelector<HTMLElement>(".app-shell")?.getAttribute("data-device-id")??"":"";
+      if(active&&liveDevice&&device.current&&liveDevice!==device.current){
+        // Account changes cannot leave a previous user's roster on screen.
+        generation.current++;device.current="";busy.current=false;
+        setData(EMPTY);setError("");setLoading(false);
+      }
       if(active&&!device.current&&!busy.current)void sync();
-      if(!active&&device.current){generation.current++;device.current="";setData(EMPTY);setError("");}
+      if(!active&&device.current){
+        generation.current++;device.current="";busy.current=false;
+        setData(EMPTY);setError("");setLoading(false);
+      }
     };
     const schedule=()=>{if(!timer)timer=window.setTimeout(align,0);};
     schedule();
