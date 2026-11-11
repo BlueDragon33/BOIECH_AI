@@ -339,7 +339,14 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <small>Chỉ lưu liên hệ đã cung cấp; không gửi mã xác minh lúc đăng ký.</small>
           </fieldset>:null}
           {mode==="login"?<div className={styles.authInlineLinks}><button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("recover")}>Quên mật khẩu?</button></div>:null}
-          {(mode === "recover" || mode==="devices") && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          {mode==="recover"&&v2?<fieldset className={styles.contactChoice}><legend>Chọn cách khôi phục mật khẩu</legend>
+            <div className={styles.contactMethods}><button type="button" aria-pressed={recoveryMethod==="code"} onClick={()=>setRecoveryMethod("code")}>Mã khôi phục</button>
+            <button type="button" aria-pressed={recoveryMethod==="question"} onClick={()=>setRecoveryMethod("question")}>Tên lúc nhỏ + thiết bị gốc</button></div>
+            <small>Chỉ câu trả lời bảo mật không đủ khôi phục. Cần khóa P-256 trong trình duyệt gốc; nếu mất thiết bị, dùng mã khôi phục một lần.</small>
+          </fieldset>:null}
+          {(mode==="devices" || mode==="recover"&&(!v2||recoveryMethod==="code")) && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          {mode==="recover"&&v2&&recoveryMethod==="question"?<label>Tên lúc nhỏ của bạn là gì?
+            <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="off" disabled={busy}/></label>:null}
           {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
             <select name="deviceId" required disabled={busy}>
               {recoveryDevices.map(d=><option key={d.device_id} value={d.device_id}>{d.device_id.slice(0,16)} · {d.created_at}</option>)}
@@ -349,10 +356,13 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
           {mode === "register" && <>{managerInvite
            ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; tài khoản vẫn phải chờ Owner duyệt và hoàn thiện hồ sơ.</p>
-           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?[["familyName", "Họ"], ["givenName", "Tên"], ["className", "Lớp / đơn vị"], ["phone", "Số điện thoại"]].map(([name, label]) => <label key={name}>{label}<input name={name} required maxLength={name === "phone" ? 32 : 60} disabled={busy} autoComplete={name === "phone" ? "tel" : "off"}/></label>):<p>Đăng ký ID, mật khẩu và liên hệ trước. Ngay sau đăng ký, bạn có thể khai và lưu hồ sơ trong lúc chờ xét duyệt; không cần nhập lại khi kích hoạt.</p>}
+           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?<p role="alert">Đăng ký mới yêu cầu Account-first V2. Hiện hệ thống chưa bật V2; không thể tạo hồ sơ bằng biểu mẫu cũ.</p>:<p>Chỉ tạo tài khoản và thiết lập bảo mật tại bước này. Sau một lần duyệt, bổ sung hồ sơ là được kích hoạt ngay, không duyệt lại.</p>}
+             {v2?<label>Câu hỏi bảo mật: Tên lúc nhỏ của bạn là gì?
+               <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="new-password" disabled={busy}/>
+               <small>Hãy ghi nhớ đáp án. Đáp án được mã băm, không thể xem lại; có thể thay đổi tại Trang cá nhân.</small></label>:null}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
-          <button type="submit" disabled={busy}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
+          <button type="submit" disabled={busy||(mode==="register"&&!v2)}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
         </form>
         <div className={styles.authFooter}>
           {mode==="register"?<>Đã có tài khoản? <button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("login")}>Đăng nhập</button></>
