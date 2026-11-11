@@ -132,6 +132,22 @@ export class AccountService {
       managers,nextCursor:hasMore?managers[managers.length-1].accountId:null};
   }
 
+  // Owner-only control bridge: read-only, cursor-bounded visibility across
+  // ALL roles. Does not grant any teacher/learner approval power to APP.
+  async ownerAllAccounts(after:unknown="",limit:unknown=40){
+    if(!this.v2Enabled)fail("ACCOUNT_V2_REQUIRED",409);
+    if(typeof after!=="string" || (after&&!ACCOUNT.test(after))
+       ||!Number.isInteger(limit)||(limit as number)<1||(limit as number)>50)
+      fail("ACCOUNT_QUERY_LIMIT",400);
+    const data=await this.db.prepare(`SELECT a.account_id FROM accounts a
+      WHERE a.account_id>? ORDER BY a.account_id LIMIT ?`)
+      .bind(after,(limit as number)+1).all<{account_id:string}>();
+    const rows=data.results??[],hasMore=rows.length>(limit as number);
+    const page=rows.slice(0,limit as number);
+    return {verified:true,contract:"boi-owner-accounts-all.v1" as const,
+      accounts:await Promise.all(page.map(row=>this.ownerRead(row.account_id))),
+      nextCursor:hasMore?page[page.length-1].account_id:null};
+  }
   async ownerList() {
     const result = await this.db.prepare(`SELECT a.account_id FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
       WHERE d.person_role='manager' ORDER BY a.account_id LIMIT 101`).all<{ account_id: string }>();
