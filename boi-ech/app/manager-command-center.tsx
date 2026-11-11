@@ -74,8 +74,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
  const roomClasses=classes.filter(resource=>roomClassIds.has(resource.id));
  const selectedClass=roomClasses.find(resource=>resource.id===classId)||roomClasses[0];
  const selectedMembers=selectedClass?membersOfClass(board.people,selectedClass):[];
- const pending=board.people.filter(person=>person.status==="pending"||!person.registered);
- const blockedOrExpired=board.people.filter(person=>person.status==="blocked"||person.expired);
+  const blockedOrExpired=board.people.filter(person=>person.status==="blocked"||person.expired);
  const teacherCount=board.people.filter(person=>person.role==="teacher").length;
  const learnerCount=board.people.filter(person=>person.role==="learner").length;
  const urgentClasses=classes.filter(resource=>resource.status==="active"&&(resource.state==="overloaded"||resource.missingTeachers>0));
@@ -88,7 +87,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
   {label:"Lớp học",value:classes.length,icon:"class",destination:"class" as Destination,note:urgentClasses.length+" lớp cần chú ý"},
   {label:"Phòng / Hồ",value:rooms.length,icon:"room",destination:"room" as Destination,note:occupiedRoomIds.size+" phòng có lịch trong khoảng"},
   {label:"Cơ sở / Tòa",value:buildings.length,icon:"building",destination:"building" as Destination,note:"Dữ liệu cơ sở đã ghi nhận"},
-  {label:"Hồ sơ cần xem",value:pending.length,icon:"people",destination:"review" as Destination,note:"Chờ duyệt / thiếu đăng ký"},
+  {label:"Ca học",value:activeSessions.length,icon:"schedule",destination:"schedule" as Destination,note:"Ca trong khoảng xem đã chọn"},
  ];
  function selectBuilding(id:string){setBuildingId(id);setRoomId("");setClassId("");setRoomFilter("all");}
  function selectRoom(id:string){setRoomId(id);setClassId("");}
@@ -185,7 +184,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
   <div className={styles.bottomPanels}>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Ưu tiên xử lý</h3><button type="button" onClick={()=>onNavigate("class")}>Mở quản lý →</button></div>
     <button type="button" onClick={()=>onNavigate("class")}><Badge tone={urgentClasses.length?"missing":"available"}>{urgentClasses.length}</Badge><span>Lớp quá sĩ số hoặc thiếu giảng viên</span></button>
-    <button type="button" onClick={()=>onNavigate("review")}><Badge tone={pending.length?"missing":"available"}>{pending.length}</Badge><span>Hồ sơ thiếu đăng ký / chờ duyệt</span></button>
+    <button type="button" onClick={()=>onNavigate("review")}><AppIcon name="approval"/><span>Kiểm duyệt tài khoản · Mở hàng chờ xác thực</span></button>
     <button type="button" onClick={()=>onNavigate("people")}><Badge tone={blockedOrExpired.length?"inactive":"available"}>{blockedOrExpired.length}</Badge><span>Hồ sơ bị khóa / hết hạn</span></button>
    </section>
    <section className={styles.actionPanel}><div className={styles.panelHeading}><h3>Lịch trong khoảng xem</h3><button type="button" onClick={()=>onNavigate("schedule")}>Toàn bộ lịch →</button></div>
