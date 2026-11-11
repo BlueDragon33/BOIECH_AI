@@ -15,6 +15,7 @@ export async function accountConfiguration() {
   const enabled = values.BOI_ECH_ACCOUNT_FIRST === "true";
   const v2 = enabled && values.BOI_ECH_ACCOUNT_V2 === "true";
   const singleReview = v2 && values.BOI_ECH_SINGLE_REVIEW === "true";
+  const uiTrial = singleReview && values.BOI_ECH_UI_TRIAL === "true";
   const origin = typeof values.BOI_ECH_ACCOUNT_ORIGIN === "string" ? values.BOI_ECH_ACCOUNT_ORIGIN : "";
   if (enabled) {
     let valid = false;
@@ -22,7 +23,7 @@ export async function accountConfiguration() {
       (values.LOCAL_CONTROL_PLANE === "true" && ["localhost", "127.0.0.1"].includes(u.hostname))); } catch { /* fail closed */ }
     if (!valid) throw new AccountError("ACCOUNT_ORIGIN_UNCONFIGURED", 503);
   }
-  return { enabled, origin, v2, singleReview };
+  return { enabled, origin, v2, singleReview, uiTrial };
 }
 export function sameOrigin(origin: string | null, expected: string, contentType: string | null, requireJson = true) {
   if (!origin || origin !== expected || (requireJson && !contentType?.toLowerCase().startsWith("application/json"))) throw new AccountError("ACCOUNT_CSRF_REJECTED", 403);
@@ -72,6 +73,11 @@ export function accountErrorResponse(error: unknown) {
     ACCOUNT_POLICY_UNAVAILABLE: "Chính sách giới hạn tài khoản chưa sẵn sàng. Chưa tạo hồ sơ nào.",
     DEVICE_LIMIT_REACHED: "Đã đủ 3 thiết bị. Hãy dùng máy đã xác nhận để gỡ máy cũ hoặc mã khôi phục an toàn.",
     DEVICE_APPROVAL_REQUIRED: "Thiết bị mới đang chờ xác nhận từ một thiết bị tin cậy.",
+    TRIAL_FEATURE_DISABLED: "Chế độ thử chưa được bật trên môi trường này.",
+    TRIAL_NOT_ELIGIBLE: "Tài khoản không còn thuộc trạng thái đủ điều kiện trải nghiệm thử.",
+    TRIAL_EXPIRED: "Lượt trải nghiệm 8 giờ đã hết hạn, không thể gia hạn.",
+    TRIAL_ROLE_CONFLICT: "Vai trò thử không khớp với hồ sơ đăng ký.",
+    TRIAL_CLOCK_UNAVAILABLE: "Không xác nhận được đồng hồ máy chủ; đã khóa chế độ thử.",
     DEVICE_APPROVAL_CONFLICT: "Thiết bị đã thay đổi trạng thái; tải lại trước khi duyệt.",
     ACCOUNT_ONBOARDING_REQUIRED: "Tài khoản chưa được duyệt hoặc chưa hoàn tất hồ sơ bắt buộc.",
     ACCOUNT_ONBOARDING_MISSING: "Trạng thái xét duyệt chưa được xác minh; hãy liên hệ quản trị.",
