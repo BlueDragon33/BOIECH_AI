@@ -50,7 +50,32 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
     {apps.map(app=><button type="button" key={app.id} aria-current={tab===app.id?"page":undefined} onClick={()=>selectTab(app.id)}><AppIcon name={app.id}/><span>{app.label}</span>{count(app.id)!==null?<span className={styles.railCount}>{count(app.id)}</span>:null}</button>)}
     <div className={styles.railStatus}><strong>Tình trạng điều phối</strong><span>{attention.length} lớp cần bổ sung</span><span>{board.summary.unassignedLearners} học viên chờ phân lớp</span><button type="button" onClick={()=>selectTab("class")}>Mở quản lý →</button></div>
   </aside>
-  <header className={styles.header}><div className={styles.brand}><span className={styles.brandMark} aria-hidden="true">BẾ</span><div><small>BƠI ẾCH AI · ĐIỀU PHỐI</small><h1>Cán bộ quản lý</h1></div></div><button type="button" className={styles.iconButton} aria-label="Mở cài đặt" onClick={()=>selectTab("settings")}><AppIcon name="settings"/></button></header>
+  <header className={styles.header}>
+    <div className={styles.brand}><span className={styles.brandMark} aria-hidden="true">BẾ</span>
+      <div><small>BƠI ẾCH AI · ĐIỀU PHỐI PREMIUM</small><h1>Cán bộ quản lý</h1></div></div>
+    <div className={styles.headerActions}>
+      <button type="button" className={styles.iconButton} aria-label="Cài đặt điều phối"
+        onClick={()=>selectTab("settings")}><AppIcon name="settings"/></button>
+      <div className={styles.accountMenuAnchor}
+        onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setAccountMenuOpen(false);}}>
+        <button type="button" className={styles.accountTrigger} aria-expanded={accountMenuOpen}
+          aria-label="Mở menu tài khoản Cán bộ quản lý" aria-controls="manager-account-dropdown"
+          onClick={()=>setAccountMenuOpen(!accountMenuOpen)}>
+          <span className={styles.managerAvatar}>{(accountName.trim()[0]||"Q").toLocaleUpperCase("vi")}</span>
+          <span className={styles.managerIdentity}><strong>{accountName}</strong><small>Cán bộ quản lý</small></span>
+          <span className={styles.managerChevron} aria-hidden="true">⌄</span>
+        </button>
+        {accountMenuOpen?<div id="manager-account-dropdown" className={styles.accountMenu}
+          aria-label="Tài khoản Cán bộ quản lý">
+          <div className={styles.accountMenuHeading}><strong>Không gian tài khoản</strong><small>Hồ sơ, cài đặt và phiên đăng nhập</small></div>
+          <button type="button" onClick={()=>{setAccountMenuOpen(false);onOpenAccount();}}>Trang cá nhân và bảo mật <span>›</span></button>
+          <button type="button" onClick={()=>{setAccountMenuOpen(false);selectTab("settings");}}>Thiết lập giao diện <span>›</span></button>
+          <button type="button" className={styles.accountLogout} onClick={()=>{setAccountMenuOpen(false);onLogout();}}>
+            Đăng xuất tài khoản <span>↗</span></button>
+        </div>:null}
+      </div>
+    </div>
+   </header>
   <div className={styles.syncLine}><span className={styles.syncDot} data-busy={busy}/><small>{busy?"Đang đồng bộ…":`Cập nhật gần nhất ${dateLabel(board.observedAt)}`}</small><button type="button" className={styles.textButton} disabled={busy} onClick={()=>onWindowChange({from:board.from,to:board.to})}>Đồng bộ</button></div>
   {tab==="approval"?<section className={styles.accountTools} aria-label="Kiểm duyệt tài khoản học viên và giảng viên">{accountControls??<p role="alert">Chưa xác minh được quyền duyệt tài khoản.</p>}</section>:null}
   <section className={styles.window} aria-label="Khoảng kiểm tra còn trống"><button type="button" className={styles.windowToggle} aria-expanded={showWindow} onClick={()=>setShowWindow(!showWindow)}><span><small>Khoảng đang xem</small><strong>{dateLabel(board.from)} → {dateLabel(board.to)}</strong></span><span aria-hidden="true">⌄</span></button><form hidden={!showWindow} onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);try{setFormError("");onWindowChange({from:utc(String(data.get("from"))),to:utc(String(data.get("to")))});}catch(error){setFormError(error instanceof Error?error.message:"");}}}><label>Từ<input key={board.from} name="from" type="datetime-local" defaultValue={localDate(board.from)} required disabled={busy}/></label><label>Đến<input key={board.to} name="to" type="datetime-local" defaultValue={localDate(board.to)} required disabled={busy}/></label><button disabled={busy}>Kiểm tra / đồng bộ</button></form><small className={styles.timezone}>{timezone} · Trạng thái phòng và nhân sự tính trong khoảng này.</small></section>
@@ -94,7 +119,7 @@ export default function ManagerWorkspace({deviceId,getProof,onOpenAccount,onLogo
    <button type="button" onClick={()=>setPreviewOnly(false)}>Thoát xem thử</button></header>
    <ManagerApprovalPanel previewOnly/>
  </main>;
- if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button><button type="button" onClick={()=>setPreviewOnly(true)}>Xem thử không cần cấp quyền · dữ liệu mẫu</button></main>;
+ if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button><button type="button" onClick={()=>setPreviewOnly(true)}>Xem thử không cần cấp quyền · dữ liệu mẫu</button><button type="button" onClick={onOpenAccount}>Trang cá nhân và bảo mật</button><button type="button" onClick={onLogout}>Đăng xuất</button></main>;
  return <div data-device-id={deviceId} data-person-role="manager">
    <TrainingDashboard accountControls={<ManagerApprovalPanel getProof={getProof}/>} onOpenAccount={onOpenAccount} onLogout={onLogout} accountName={accountName} appearance={appearance} onAppearanceChange={changeAppearance} board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindowRange(next);}}/></div>;
 }
