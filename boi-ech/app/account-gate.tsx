@@ -6,7 +6,6 @@ import ManagerWorkspace from "./manager-workspace";
 import VerifiedSyncSettings from "./verified-sync-settings";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { RegistrationRoles } from "./registration-roles";
-import ManagerV2ReviewPanel from "./manager-v2-review-panel";
 import { portableCredential, portableManagerProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
