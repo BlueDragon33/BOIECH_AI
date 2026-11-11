@@ -104,3 +104,23 @@ test("V9 manager/learner/teacher registration has no initial Họ, Tên, Lớp, 
  assert.match(backend,/UPDATE account_sessions SET revoked=1/);
  assert.doesNotMatch(backend,/return \{[^}]*answer_verifier:/);
 });
+
+test("V9 active account can rotate answer with current password, never read old answer",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const user=await registerWithSigningKey(f,17005,"manager"),service=svc(f);
+  await f.flow.firstReview({kind:"owner",actor:"owner@fixture.invalid"},user.account.account.accountId,1);
+  await f.flow.submitProfile(user.account.token,{familyName:"Nha",givenName:"Quan ly",
+    facultyUnit:"Khoa",jobTitle:"Giang vien",jobPosition:"Quan ly",expectedRevision:2});
+  await assert.rejects(()=>service.change(user.account.token,"wrong password","Tên Mới"),e=>e.status===401);
+  const changed=await service.change(user.account.token,password,"Tên Mới");
+  assert.deepEqual(changed,{question:"Tên lúc nhỏ của bạn là gì?",configured:true});
+  const row=f.sqlite.prepare("SELECT revision,answer_verifier FROM account_recovery_questions WHERE account_id=?")
+    .get(user.account.account.accountId);
+  assert.equal(row.revision,2);
+  assert.doesNotMatch(row.answer_verifier,/Tên Mới/);
+  assert.equal((await service.status(user.account.token)).configured,true);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit WHERE action='account.security.answer.changed'")
+    .get().n,1);
+ }finally{f.close();}
+});
