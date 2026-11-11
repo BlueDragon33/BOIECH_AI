@@ -121,3 +121,92 @@
  .managerChevron{font-size:1rem}
  .accountMenu{right:0;top:calc(100% + 6px)}
 }
+
+
+/* V9.2 — two real personnel groups; small icons open the existing audited
+   ManagerDetailSheet. No cards duplicated with account approval. */
+.peopleGroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-width:0;align-items:start}
+.peopleRolePanel{min-width:0;overflow:hidden;border:1px solid #688dd070;border-radius:19px;
+ background:linear-gradient(145deg,#192b50,#1c284c);box-shadow:0 9px 28px #060e2742}
+.peopleRoleHeading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 17px;
+ border-bottom:1px solid #7395d348}
+.peopleRoleTitle{display:flex;align-items:center;gap:11px;min-width:0}
+.peopleRoleTitle>div{min-width:0}
+.peopleRoleTitle small{font-size:.69em;color:#9fdcf7;font-weight:850;letter-spacing:.08em}
+.peopleRoleTitle h3{font-size:1.12em;color:#f2f8ff!important;margin:2px 0!important}
+.peopleRoleTitle p{font-size:.72em;color:#bed2ee;line-height:1.4;margin:3px 0 0}
+.peopleRoleEmblem{display:grid;place-items:center;flex:0 0 43px;width:43px;height:43px;border-radius:13px;
+ border:1px solid #96d6f29c;background:linear-gradient(140deg,#1c8bb2,#3362ad);color:#fff}
+.peopleRoleEmblem[data-role="teacher"]{background:linear-gradient(130deg,#5e49b2,#345eae)}
+.peopleRoleEmblem .appIcon{width:25px;height:25px;background:none!important;color:inherit!important}
+.peopleRoleCount{display:grid;place-items:center;flex:none;min-width:38px;height:34px;
+ border-radius:10px;padding:0 8px;background:#486ba2;color:#fff;font-size:.94em;font-weight:850}
+.peopleIconGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,115px),1fr));align-content:start;
+ gap:10px;min-width:0;max-height:365px;overflow-y:auto;overscroll-behavior:contain;padding:14px;
+ scrollbar-width:thin}
+.workspace .personIconTile{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;
+ min-width:0;height:auto!important;min-height:132px;padding:12px 7px;
+ border:1px solid #7b9ad570;border-radius:14px;background:linear-gradient(145deg,#2a4270,#25365d);
+ color:#e9f4ff;text-align:center;box-shadow:0 5px 12px #06132d33}
+.workspace .personIconTile:hover{border-color:#95ebf6;background:linear-gradient(145deg,#35579b,#43398e)}
+.personIconTile[data-role="teacher"] .personIconAvatar{background:linear-gradient(135deg,#8a74ff,#37a1d0)}
+.personIconAvatar{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:14px;
+ background:linear-gradient(135deg,#52c7e1,#386fc6);color:white;font-size:1.35em;font-weight:900}
+.personIconTile strong{display:block;max-width:100%;font-size:.81em;line-height:1.3;color:#f5faff;
+ overflow-wrap:anywhere}
+.personIconTile small{display:block;max-width:100%;font-size:.68em;line-height:1.35;color:#b9cdeb;
+ overflow-wrap:anywhere}
+.personIconStatus{display:block;max-width:100%;margin-top:auto;padding:3px 5px;border-radius:7px;
+ font-size:.66em;line-height:1.35;background:#2d5371;color:#d5f5ff;overflow-wrap:anywhere}
+.personIconStatus[data-tone="available"],.personIconStatus[data-tone="full"]{background:#17675d;color:#baffec}
+.personIconStatus[data-tone="inactive"],.personIconStatus[data-tone="missing"]{background:#73474c;color:#ffdfe4}
+.peopleRoleEmpty{grid-column:1/-1;color:#c7d9ee;padding:15px 8px;margin:0;font-size:.83em}
+.workspace .personIconTile:focus-visible{outline:3px solid #91efff;outline-offset:3px}
+@media(max-width:1150px){.peopleGroups{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.peopleIconGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,105px),1fr));max-height:320px}
+.peopleRoleHeading{padding:12px}.peopleIconGrid{padding:10px}}
+/* Manager desk: the entire rail is pinned while ONLY the middle list scrolls. */
+@media(min-width:1101px){
+ .desktopRail{height:100dvh!important;max-height:100dvh!important;overflow:hidden!important;
+  overscroll-behavior:contain;isolation:isolate}
+ .railBrand,.railCaption{flex:0 0 auto}
+ .railNavigation{display:flex;flex-direction:column;flex:1 1 auto;gap:5px;min-height:0;
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:3px 2px 13px;
+  scrollbar-width:none;-ms-overflow-style:none}
+ .railNavigation::-webkit-scrollbar{display:none;width:0}
+ .workspace .railNavigation>button{display:flex;align-items:center;flex:0 0 auto;gap:11px;width:100%;min-height:47px;
+  border:0;background:transparent;color:#e2eaff;text-align:left;padding:8px 12px;
+  border-radius:12px;font-size:.88em}
+ .workspace .railNavigation>button:hover{background:#314c9a}
+ .workspace .railNavigation>button[aria-current="page"]{background:linear-gradient(105deg,#306dfc,#8844ed);
+  color:white;border:1px solid #a7baff;box-shadow:0 4px 14px #5b54f888}
+ .railStatus{flex:0 0 auto;margin-top:0!important;max-height:min(170px,27dvh);
+  overflow-y:auto;scrollbar-width:none}
+ .railStatus::-webkit-scrollbar{display:none}
+}
+/* Teacher and learner: fixed full sidebar with independently scrollable role
+   navigation. The brand never scrolls away with the right-hand content. */
+body[data-student-role-ui="active"] .app-shell>.sidebar,
+body[data-teacher-role-ui="active"] .app-shell>.sidebar{
+ position:fixed!important;top:0!important;bottom:0!important;left:0!important;
+ height:100dvh!important;max-height:100dvh!important;
+ overflow:hidden!important;display:flex!important;flex-direction:column!important;
+ overscroll-behavior:contain;box-sizing:border-box
+}
+body[data-student-role-ui="active"] .app-shell>.sidebar>.brand-row,
+body[data-teacher-role-ui="active"] .app-shell>.sidebar>.brand-row{
+ flex:0 0 auto!important;position:relative;z-index:1
+}
+body[data-student-role-ui="active"] .app-shell>.sidebar>.student-role-nav-mount,
+body[data-teacher-role-ui="active"] .app-shell>.sidebar>.teacher-role-nav-mount{
+ display:flex!important;flex:1 1 auto!important;height:auto!important;min-height:0!important;
+ overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;
+ scrollbar-width:none!important;-ms-overflow-style:none;
+}
+body[data-student-role-ui="active"] .student-role-nav-mount::-webkit-scrollbar,
+body[data-teacher-role-ui="active"] .teacher-role-nav-mount::-webkit-scrollbar{display:none!important;width:0!important}
+body[data-student-role-ui="active"] .app-shell .student-role-nav,
+body[data-teacher-role-ui="active"] .app-shell .teacher-role-nav{
+ min-height:max-content!important;height:auto!important;width:100%;
+ flex:0 0 auto;overflow:visible!important
+}
