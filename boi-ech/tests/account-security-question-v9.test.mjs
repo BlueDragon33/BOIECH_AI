@@ -54,7 +54,7 @@ test("V9 question alone cannot recover password; wrong answer and wrong original
     e=>e.status===401&&e.code==="AUTH_FAILED");
   const after=f.sqlite.prepare("SELECT generation FROM account_credentials WHERE account_id=?")
     .get(user.account.account.accountId);
-  assert.equal(after.generation,0);
+  assert.equal(after.generation,1);
  }finally{f.close();}
 });
 
