@@ -477,3 +477,472 @@ body[data-student-role-ui="active"] .student-lesson-grid>button.locked>small{
 body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-lesson-grid>button.locked>small{
   color:#8ce8d9!important;
 }
+
+/*
+ * VII. Screenshot follow-up: real learner home feature/adaptive cards and
+ * teacher Learners/Tasks/Reports. These use DIFFERENT components from lessons
+ * and the Overview grid; do not emulate font scaling with CSS zoom/transform.
+ */
+
+/* Seven fixed feature cards were squeezing learner copy into 9px. */
+body[data-student-role-ui="active"] .student-capabilities{
+  min-width:0;
+  padding:clamp(15px,2vw,24px)!important;
+}
+body[data-student-role-ui="active"] .student-capabilities>header{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-end;
+  gap:13px;
+}
+body[data-student-role-ui="active"] .student-capabilities>header p{
+  max-width:550px;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  text-align:left!important;
+  color:#526e81!important;
+}
+body[data-student-role-ui="active"] .student-capabilities header span{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.5;
+}
+body[data-student-role-ui="active"] .student-capabilities h2{
+  font-size:calc(25px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+}
+body[data-student-role-ui="active"] .student-capabilities>div{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:13px!important;
+}
+body[data-student-role-ui="active"] .student-capability{
+  min-width:0;
+  height:auto!important;
+  min-height:158px!important;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  padding:17px!important;
+  gap:0;
+  text-align:left;
+  overflow-wrap:anywhere;
+  border-radius:var(--ui-radius,14px)!important;
+}
+body[data-student-role-ui="active"] .student-capability>span{
+  width:44px!important;height:44px!important;
+  flex:none;
+}
+body[data-student-role-ui="active"] .student-capability svg{
+  width:23px!important;height:23px!important;
+}
+body[data-student-role-ui="active"] .student-capability strong{
+  margin-top:12px!important;
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+  color:#173e5a!important;
+}
+body[data-student-role-ui="active"] .student-capability small{
+  display:block;
+  margin-top:7px!important;
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  color:#536e80!important;
+}
+body[data-student-role-ui="active"] .student-capability>i{
+  right:12px;top:14px;
+  font-size:calc(15px + var(--font-adjust,0px));
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-density="compact"] .student-capabilities>div{
+  gap:9px!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-density="compact"] .student-capability{
+  min-height:142px!important;
+  padding:12px!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-capabilities{
+  background:var(--card-background,#0b314b)!important;
+  border-color:#4e778c!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-capabilities h2,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-capabilities>header p{
+  color:#e8f6fb!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-capability{
+  background:#153c57!important;border-color:#5c899d!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-capability strong,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-capability small{
+  color:#e6f3fa!important;
+}
+
+/* Adaptive learner model: header, plan buttons, competency labels and status. */
+body[data-student-role-ui="active"] .student-adaptive-coach{
+  min-width:0;
+  font-size:calc(15px + var(--font-adjust,0px))!important;
+  line-height:1.5;
+  background:var(--card-background,#fff);
+  border-radius:var(--ui-radius,14px)!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach>header{
+  grid-template-columns:minmax(0,1fr) minmax(130px,165px);
+  gap:14px;
+  min-width:0;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach h2{
+  font-size:calc(25px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach>header p,
+body[data-student-role-ui="active"] .student-adaptive-stale,
+body[data-student-role-ui="active"] .student-adaptive-coach>footer>span{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  color:#526e80!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-coach :is(
+  .student-adaptive-heading span,
+  .student-adaptive-average>span,
+  .student-adaptive-alerts>span
+),body[data-student-role-ui="active"] .student-adaptive-coach>header>div:first-child>span{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-heading strong{
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-heading button,
+body[data-student-role-ui="active"] .student-adaptive-coach>footer button{
+  min-height:42px!important;
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+  padding:9px 12px!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-body{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(250px,.65fr);
+  gap:14px;
+  padding:15px;
+  min-width:0;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:11px!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid>button{
+  min-width:0;
+  min-height:175px!important;
+  height:auto!important;
+  padding:15px!important;
+  overflow-wrap:anywhere;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid span,
+body[data-student-role-ui="active"] .student-adaptive-plan-grid em{
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid strong{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-plan-grid p{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  color:#526e80!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-insight{
+  min-width:0;
+  padding:15px;
+  gap:11px;
+}
+body[data-student-role-ui="active"] .student-adaptive-score span,
+body[data-student-role-ui="active"] .student-adaptive-competencies>div,
+body[data-student-role-ui="active"] .student-adaptive-competencies strong,
+body[data-student-role-ui="active"] .student-adaptive-alerts p,
+body[data-student-role-ui="active"] .student-adaptive-stable{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-competencies>div{
+  grid-template-columns:minmax(65px,.75fr) minmax(44px,.4fr) minmax(0,1fr)!important;
+  min-height:28px;
+  gap:9px;
+}
+body[data-student-role-ui="active"] .student-adaptive-score strong,
+body[data-student-role-ui="active"] .student-adaptive-average>strong{
+  font-size:calc(30px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-loading>strong,
+body[data-student-role-ui="active"] .student-adaptive-error>strong{
+  font-size:calc(18px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .student-adaptive-loading>span,
+body[data-student-role-ui="active"] .student-adaptive-error>span,
+body[data-student-role-ui="active"] .student-adaptive-error>p,
+body[data-student-role-ui="active"] .student-adaptive-error>button{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-density="compact"] .student-adaptive-plan-grid>button{
+  min-height:151px!important;padding:11px!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-coach{
+  background:#113750!important;color:#e6f5fa!important;border-color:#668b9b!important;
+}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-coach :is(
+ h2,p,strong,small,.student-adaptive-heading strong,.student-adaptive-plan-grid p,.student-adaptive-plan-grid strong
+){color:#e6f5fa!important}
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-insight,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-plan-grid>button,
+body[data-student-role-ui="active"] .app-shell[data-appearance-theme="dark"] .student-adaptive-score{
+  background:#184561!important;color:#e4f3fb!important;border-color:#668b9b!important;
+}
+
+/* Teacher three named tabs share a real feature workspace, not the overview. */
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern){
+  min-width:0;
+  display:grid;
+  gap:15px;
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header{
+  min-height:0!important;
+  height:auto!important;
+  padding:20px!important;
+  overflow:visible!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header>span:not([data-teacher-sync-mount]){
+  font-size:calc(12px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header h1{
+  font-size:calc(30px + var(--font-adjust,0px))!important;
+  line-height:1.25!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-page:not(.teacher-secondary-modern)>header p{
+  font-size:calc(15px + var(--font-adjust,0px))!important;
+  line-height:1.55!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-class-scope-bar{
+  min-width:0;
+  height:auto!important;
+  flex-wrap:wrap;
+  gap:12px;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-class-scope-bar :is(span,small,label,select){
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-class-scope-bar strong{
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-primary-link,
+body[data-teacher-role-ui="active"] .teacher-page .teacher-export-button{
+  min-height:44px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  padding:10px 14px!important;
+  white-space:normal;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-roster-sync-compact{
+  flex-wrap:wrap;
+  min-width:0;
+  gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-sync-compact :is(span,small),
+body[data-teacher-role-ui="active"] .teacher-roster-manager>header :is(span,p),
+body[data-teacher-role-ui="active"] .teacher-roster-summary span,
+body[data-teacher-role-ui="active"] .teacher-roster-empty{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+  white-space:normal!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager>header{
+  flex-wrap:wrap;
+  gap:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager>header h2{
+  font-size:calc(22px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager :is(button,input),
+body[data-teacher-role-ui="active"] .teacher-roster-sync-compact>button,
+body[data-teacher-role-ui="active"] .teacher-roster-status{
+  min-height:38px;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary{
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr))!important;
+  gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary strong{
+  font-size:calc(23px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table-wrap,
+body[data-teacher-role-ui="active"] .teacher-table-wrap{
+  min-width:0;
+  max-width:100%;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table :is(th,td,strong,small),
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table :is(th,td,strong,small){
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table :is(th,td){
+  padding:12px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table td small,
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table td small{
+  color:#587284!important;
+}
+
+/* Tasks: intervention cards in the independent L8 UI. */
+body[data-teacher-role-ui="active"] .teacher-smart-interventions,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics{
+  min-width:0;
+  height:auto!important;
+  overflow:visible!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions>header,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics>header{
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:wrap;
+  gap:14px;
+  padding:18px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions h2,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics h2{
+  font-size:calc(23px + var(--font-adjust,0px))!important;
+  line-height:1.3!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions>header p,
+body[data-teacher-role-ui="active"] .teacher-learning-analytics>header p,
+body[data-teacher-role-ui="active"] .teacher-smart-empty p,
+body[data-teacher-role-ui="active"] .teacher-loop-empty p{
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.55!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-interventions>header :is(span,strong),
+body[data-teacher-role-ui="active"] .teacher-learning-analytics>header>div:first-child>span{
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-grid{
+  gap:13px;
+  padding:14px;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card{
+  min-width:0;
+  height:auto!important;
+  padding:17px;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card>header{
+  flex-wrap:wrap;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card :is(
+ p,ul,li,small,footer span,header>span,header>b
+){
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card :is(h3,header strong){
+  font-size:calc(17px + var(--font-adjust,0px))!important;
+  line-height:1.35!important;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card footer{
+  flex-wrap:wrap;gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-smart-card footer button{
+  min-height:42px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+  padding:9px 12px!important;
+}
+
+/* Reports: actual L7 timeline and evidence, not just page header. */
+body[data-teacher-role-ui="active"] .teacher-loop-summary{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-summary article,
+body[data-teacher-role-ui="active"] .teacher-loop-card,
+body[data-teacher-role-ui="active"] .teacher-loop-evidence{
+  min-width:0;
+  padding:15px!important;
+  overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-summary strong{
+  font-size:calc(26px + var(--font-adjust,0px))!important;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-summary span,
+body[data-teacher-role-ui="active"] .teacher-loop-evidence :is(span,small,i),
+body[data-teacher-role-ui="active"] .teacher-loop-card :is(
+ small,blockquote,.teacher-loop-note,.teacher-loop-status,footer span
+){
+  font-size:calc(13px + var(--font-adjust,0px))!important;
+  line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>header{
+  flex-wrap:wrap;gap:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>header strong,
+body[data-teacher-role-ui="active"] .teacher-loop-evidence strong{
+  font-size:calc(16px + var(--font-adjust,0px))!important;
+  line-height:1.4!important;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>footer{
+  flex-wrap:wrap;gap:10px;
+}
+body[data-teacher-role-ui="active"] .teacher-loop-card>footer button{
+  min-height:42px!important;
+  padding:9px 12px!important;
+  font-size:calc(14px + var(--font-adjust,0px))!important;
+}
+
+/* Layout beats shrinking fonts: fewer columns at narrower widths. */
+@media(max-width:1500px){
+ body[data-student-role-ui="active"] .student-capabilities>div{
+   grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:1180px){
+ body[data-student-role-ui="active"] .student-adaptive-body{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-loop-summary{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:950px){
+ body[data-student-role-ui="active"] .student-capabilities>div,
+ body[data-student-role-ui="active"] .student-adaptive-plan-grid,
+ body[data-teacher-role-ui="active"] .teacher-smart-grid{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-loop-evidence-grid{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+}
+@media(max-width:620px){
+ body[data-student-role-ui="active"] .student-capabilities>div,
+ body[data-student-role-ui="active"] .student-adaptive-plan-grid,
+ body[data-teacher-role-ui="active"] .teacher-smart-grid,
+ body[data-teacher-role-ui="active"] .teacher-loop-summary{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-coach>header{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-coach>footer{
+   flex-wrap:wrap;gap:10px;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-coach>footer>div{
+   flex-wrap:wrap;
+ }
+ body[data-student-role-ui="active"] .student-adaptive-competencies>div{
+   grid-template-columns:minmax(55px,.8fr) 45px minmax(0,1fr)!important;
+ }
+}
