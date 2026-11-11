@@ -113,7 +113,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
    <section className={styles.group} aria-label="Hồ sơ chờ duyệt"><h3>{roleFilter==="teacher"?"Giảng viên":"Học viên"} · Chờ tiếp nhận</h3>
     {pending.map(person=><article className={styles.entry} key={person.accountId}>
      <div className={styles.details}><strong>{person.name||"Hồ sơ chưa khai"} · {displayRole(person.role)}</strong>
-      <small>Mã: {person.accountId.slice(0,14)} · {person.className||"Chưa phân lớp"}</small>
+      <small>{person.className||"Chưa phân lớp"}</small>
       <span className={styles.status}>Chờ duyệt đúng một lần</span></div>
      <button type="button" disabled={busy||board.quotas[person.role].used>=board.quotas[person.role].limit}
       onClick={()=>void approve(person)}>Duyệt hồ sơ</button>
