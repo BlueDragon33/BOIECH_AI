@@ -78,3 +78,20 @@ test("V8 backend atomicity: pre-granted manager privilege cannot return 409 afte
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_entitlements WHERE account_id=?").get(m.account.accountId).n,0);
  }finally{f.close()}
 });
+
+test("V8 manager V2 quota display follows ACTIVE entitlement, not retired device access expiry",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const m=await activeManager(f,9950),l=await f.register(9951,"learner");
+  await f.flow.firstReview({kind:"manager",token:m.token},l.account.accountId,1);
+  await f.flow.submitProfile(l.token,profile(9951));
+  const used=async()=>(await f.service.reviewBoard(m.token,"",50)).quotas.learner.used;
+  assert.equal(await used(),1);
+  f.sqlite.prepare("UPDATE device_access SET access_expires_at='2000-01-01T00:00:00Z' WHERE device_id=?")
+    .run(l.account.storageDeviceId);
+  assert.equal(await used(),1,"V2 active entitlement remains valid despite stale V1 date");
+  f.sqlite.prepare("UPDATE account_entitlements SET state='suspended' WHERE account_id=?")
+    .run(l.account.accountId);
+  assert.equal(await used(),0,"Suspended V2 entitlement must not consume active quota");
+ }finally{f.close()}
+});
