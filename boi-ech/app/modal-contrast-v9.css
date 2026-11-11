@@ -1,0 +1,215 @@
+/* BOI Premium V9.4 — single centered-modal and contrast policy.
+ * Last-loaded after historical role styles. No permissions or API mutations.
+ * Text in arbitrary learner/teacher custom colors is derived by WCAG in page.tsx.
+ */
+
+/* Appearance is a dialog, not a right-edge flyout. Isolate it from user-picked
+ * background variables so its own controls always remain readable. */
+.appearance-scrim{
+  position:fixed!important;inset:0!important;
+  z-index:2147481200!important;
+  background:rgba(1,11,32,.76)!important;
+  backdrop-filter:blur(7px);
+}
+.appearance-panel{
+  position:fixed!important;z-index:2147481201!important;
+  inset:50% auto auto 50%!important;
+  top:50%!important;left:50%!important;right:auto!important;bottom:auto!important;
+  transform:translate(-50%,-50%)!important;
+  width:min(560px,calc(100vw - 28px))!important;
+  max-width:calc(100vw - 28px)!important;
+  max-height:calc(100dvh - 28px)!important;
+  margin:0!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  padding:clamp(16px,2.5vw,26px)!important;
+  border:1px solid #bed2e6!important;
+  border-radius:20px!important;
+  background:#f7fbff!important;
+  color:#142b45!important;
+  color-scheme:light!important;
+  --ink:#142b45;
+  --muted:#4b6077;
+  --line:#c5d5e6;
+  --teal-dark:#075c6a;
+}
+.appearance-panel h2,.appearance-panel strong,
+.appearance-panel label{color:#152d48!important}
+.appearance-panel p,.appearance-panel small,.appearance-panel>footer span{
+  color:#4a617a!important
+}
+.appearance-panel .segmented-control{
+  background:#e5eff9!important
+}
+.appearance-panel .segmented-control button{
+  color:#263f5e!important
+}
+.appearance-panel .segmented-control button.active{
+  background:#fff!important;color:#113f66!important
+}
+.appearance-panel .background-options button,
+.appearance-panel .font-options button,
+.appearance-panel>footer button,
+.appearance-panel .color-picker{
+  background:#fff!important;color:#183550!important;border-color:#b6cbe1!important
+}
+.appearance-panel :is(button,input,select):focus-visible{
+  outline:3px solid #067aaf!important;outline-offset:2px
+}
+
+/* The teacher learner profile was a full-height right-hand drawer, despite
+ * declaring role=dialog. It now opens in the actual viewport center. */
+.teacher-drawer-backdrop{
+  position:fixed!important;inset:0!important;z-index:2147481000!important;
+  display:grid!important;place-items:center!important;
+  padding:clamp(10px,2vw,24px)!important;
+  background:rgba(1,12,31,.77)!important;backdrop-filter:blur(7px)
+}
+.teacher-learner-drawer{
+  width:min(700px,100%)!important;
+  max-width:calc(100vw - 20px)!important;
+  height:auto!important;
+  max-height:calc(100dvh - 30px)!important;
+  margin:auto!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+  padding:clamp(16px,2.6vw,25px)!important;
+  border:1px solid #b9d2e6!important;border-radius:20px!important;
+  background:#f7fbff!important;
+  color:#17344f!important;
+  box-shadow:0 30px 85px rgba(0,8,25,.65)!important
+}
+.teacher-learner-drawer :is(h2,h3,strong,dt,dd){
+  color:#183651!important
+}
+.teacher-learner-drawer :is(p,small){
+  color:#435e73!important;
+  line-height:1.5!important
+}
+.teacher-learner-drawer dt,.teacher-learner-drawer dd{
+  font-size:calc(14px + var(--font-adjust,0px))!important
+}
+.teacher-learner-drawer dl div{
+  background:#fff!important;border-color:#b9d1e0!important;
+  flex-wrap:wrap
+}
+.teacher-learner-drawer section{
+  background:#e9f5fb!important;border:1px solid #c6deeb
+}
+.teacher-learner-drawer section>span{
+  color:#095f85!important;font-size:calc(12px + var(--font-adjust,0px))!important
+}
+.teacher-learner-drawer :is(button,a):focus-visible{
+  outline:3px solid #087aa9!important;outline-offset:3px
+}
+
+/* Existing actions and notes already use centered backdrops; keep that
+ * contract while imposing viewport limits and readable form control colors. */
+.teacher-action-backdrop,.teacher-note-backdrop{
+  position:fixed!important;inset:0!important;
+  display:grid!important;place-items:center!important;
+  padding:clamp(10px,2vw,24px)!important
+}
+.teacher-action-dialog,.teacher-note-dialog{
+  width:min(650px,100%)!important;
+  max-width:calc(100vw - 20px)!important;
+  max-height:calc(100dvh - 30px)!important;
+  margin:auto!important;overflow-y:auto!important;
+  border-radius:19px!important;
+  background:#f7fbff!important;color:#153550!important;
+}
+.teacher-action-dialog :is(input,select,textarea),
+.teacher-note-dialog :is(input,select,textarea){
+  background:#fff!important;color:#123552!important;
+  border:1px solid #9ebbd0!important;
+  min-height:42px;
+  font-size:calc(14px + var(--font-adjust,0px))!important
+}
+.teacher-action-dialog :is(p,small,label),
+.teacher-note-dialog :is(p,small,label){
+  color:#36576e!important
+}
+.teacher-action-dialog>header :is(p,small,strong),
+.teacher-note-dialog>header :is(p,small,strong){
+  color:#eef9ff!important
+}
+.teacher-action-dialog>header,
+.teacher-note-dialog>header{
+  background:linear-gradient(135deg,#153554,#173e67)!important
+}
+
+/* Screen-spanning dark supervision rail: explicitly light labels against
+ * navy. Do not inherit light-card ink here. */
+body[data-teacher-role-ui="active"] .teacher-rail-card{
+  background:#112e4d!important;
+  color:#e7f4ff!important;
+  border-color:#456a85!important
+}
+body[data-teacher-role-ui="active"] .teacher-rail-card :is(
+  h2,h3,strong,p,small,span,button
+){
+  color:#d7eafb!important
+}
+body[data-teacher-role-ui="active"] .teacher-rail-card>header strong{
+  color:#fff!important
+}
+body[data-teacher-role-ui="active"] .teacher-rail-card :is(button,a):focus-visible{
+  outline:3px solid #6fe9ef!important;outline-offset:2px
+}
+
+/* Content surfaces use foreground ink computed for the card background.
+ * This prevents white-on-white when custom colors/theme are changed. */
+body[data-student-role-ui="active"] :is(
+  .student-learning-card,.student-goals-card,.student-progress-card,
+  .student-video-card,.student-profile-card,.student-adaptive-coach
+),
+body[data-teacher-role-ui="active"] :is(
+  .teacher-white-card,.teacher-smart-interventions,.teacher-learning-analytics
+){
+  background:var(--card-background,#fff)!important;
+  color:var(--card-ink,#163955)!important;
+  border-color:color-mix(in srgb,var(--card-ink,#163955) 22%,transparent)!important;
+}
+body[data-student-role-ui="active"] :is(
+ .student-learning-card,.student-goals-card,.student-progress-card,
+ .student-video-card,.student-profile-card,.student-adaptive-coach
+) :is(h1,h2,h3,strong),
+body[data-teacher-role-ui="active"] :is(
+ .teacher-white-card,.teacher-smart-interventions,.teacher-learning-analytics
+) :is(h1,h2,h3,strong){
+  color:var(--card-ink,#163955)!important;
+}
+body[data-student-role-ui="active"] :is(
+ .student-learning-card,.student-goals-card,.student-progress-card,
+ .student-video-card,.student-profile-card,.student-adaptive-coach
+) :is(p,small,label,li),
+body[data-teacher-role-ui="active"] :is(
+ .teacher-white-card,.teacher-smart-interventions,.teacher-learning-analytics
+) :is(p,small,label,li){
+  color:var(--card-muted,#49647a)!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button,
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table{
+  background:var(--card-background,#fff)!important;
+  color:var(--card-ink,#163955)!important;
+}
+body[data-student-role-ui="active"] .student-lesson-grid>button :is(strong,small,p,footer),
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table :is(th,td,strong,small){
+  color:var(--card-ink,#163955)!important;
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table th{
+  background:color-mix(in srgb,var(--card-background,#fff) 85%,var(--card-ink,#163955) 15%)!important
+}
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table td{
+  background:var(--card-background,#fff)!important;
+  border-color:color-mix(in srgb,var(--card-ink,#163955) 20%,transparent)!important
+}
+
+/* Reduced vertical space and high zoom: never pin dialogs below the fold. */
+@media(max-width:620px){
+ .appearance-panel{width:calc(100vw - 20px)!important;max-height:calc(100dvh - 20px)!important}
+ .teacher-learner-drawer,.teacher-action-dialog,.teacher-note-dialog{
+   max-height:calc(100dvh - 20px)!important
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ .appearance-panel,.teacher-learner-drawer{scroll-behavior:auto!important}
+}
