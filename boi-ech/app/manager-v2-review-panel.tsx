@@ -52,6 +52,7 @@ const displayRole=(role:Role)=>role==="teacher"?"Giảng viên":"Học viên";
 export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?:boolean}){
  const [board,setBoard]=useState<Board|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [roleFilter,setRoleFilter]=useState<Role>("learner");
  const mounted=useRef(true),locked=useRef(false);
  const refresh=useCallback(async(after="")=>{
   if(locked.current)return;
@@ -91,19 +92,25 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
   }finally{locked.current=false;if(mounted.current)setBusy(false);}
  }
  if(!singleReview)return <p role="alert" className={styles.error}>Chế độ duyệt một lần chưa được xác minh. Không cấp quyền hoặc tiếp nhận hồ sơ.</p>;
- const pending=board?.devices.filter(p=>p.status==="pending"&&p.onboardingStage==="requested")??[];
- const progress=board?.devices.filter(p=>p.onboardingStage!=="requested")??[];
+ const scoped=board?.devices.filter(p=>p.role===roleFilter)??[];
+ const pending=scoped.filter(p=>p.status==="pending"&&p.onboardingStage==="requested");
+ const progress=scoped.filter(p=>p.onboardingStage!=="requested");
  return <section className={styles.root} aria-label="Duyệt học viên và giảng viên — một lần">
   <header className={styles.head}>
    <div><h2>Xét duyệt tài khoản · Một lần duyệt</h2><p>Chỉ cán bộ có quyền trong Bơi Ếch mới duyệt Học viên/Giảng viên. Duyệt chưa cấp quyền sử dụng khi hồ sơ chưa hoàn tất.</p></div>
    <button type="button" disabled={busy} onClick={()=>void refresh()}>Đồng bộ D1</button>
   </header>
+  <div className={styles.roleTabs} role="tablist" aria-label="Phân loại hồ sơ kiểm duyệt">
+   {([["learner","Học viên"],["teacher","Giảng viên"]] as const).map(([role,label])=><button
+    type="button" key={role} role="tab" aria-selected={roleFilter===role} aria-controls="boi-manager-approval-list"
+    className={roleFilter===role?styles.selectedRole:undefined} onClick={()=>setRoleFilter(role)}>{label} · {board?.devices.filter(p=>p.role===role&&p.onboardingStage==="requested").length??"—"} chờ</button>)}
+  </div>
   {board?<p className={styles.meta}>Đang sử dụng: {board.quotas.learner.used}/{board.quotas.learner.limit} Học viên · {board.quotas.teacher.used}/{board.quotas.teacher.limit} Giảng viên · {pending.length} hồ sơ chờ trên trang đang xem</p>:null}
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
   {notice?<p role="status" className={styles.success}>{notice}</p>:null}
   {!board?<p className={styles.empty}>{busy?"Đang đọc danh sách có xác thực…":"Chưa có dữ liệu được xác minh. Không coi lỗi kết nối là 0 hồ sơ."}</p>:null}
-  {board?<div className={styles.groups}>
-   <section className={styles.group} aria-label="Hồ sơ chờ duyệt"><h3>Hồ sơ chờ tiếp nhận</h3>
+  {board?<div id="boi-manager-approval-list" role="tabpanel" className={styles.groups}>
+   <section className={styles.group} aria-label="Hồ sơ chờ duyệt"><h3>{roleFilter==="teacher"?"Giảng viên":"Học viên"} · Chờ tiếp nhận</h3>
     {pending.map(person=><article className={styles.entry} key={person.accountId}>
      <div className={styles.details}><strong>{person.name||"Hồ sơ chưa khai"} · {displayRole(person.role)}</strong>
       <small>Mã: {person.accountId.slice(0,14)} · {person.className||"Chưa phân lớp"}</small>
@@ -113,7 +120,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
     </article>)}
     {!pending.length?<p className={styles.empty}>Không có hồ sơ mới chờ duyệt trên trang này (đã đọc được dữ liệu).</p>:null}
    </section>
-   <section className={styles.group} aria-label="Hồ sơ đang xử lý"><h3>Hồ sơ đã tiếp nhận / đang hoàn thiện</h3>
+   <section className={styles.group} aria-label="Hồ sơ đang xử lý"><h3>{roleFilter==="teacher"?"Giảng viên":"Học viên"} · Đã tiếp nhận / đang hoàn thiện</h3>
     {progress.map(person=><article className={styles.entry} key={person.accountId}>
      <div className={styles.details}><strong>{person.name||person.accountId.slice(0,14)} · {displayRole(person.role)}</strong>
       <span className={styles.status}>{person.onboardingStage==="profile_required"?"Đã duyệt · Chờ người dùng điền hồ sơ":
