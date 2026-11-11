@@ -125,7 +125,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
 
    <section className={styles.drillPanel} aria-label="Sơ đồ phân cấp tòa phòng lớp">
     <div className={styles.panelHeading}><div><small>PHÂN CẤP TƯƠNG TÁC</small><h3>Tòa → Phòng / Hồ → Lớp / Ca</h3></div></div>
-    <div className={styles.breadcrumb}><span>{selectedBuilding?.name||"Chưa có tòa"}</span><span aria-hidden="true">›</span><span>{selectedRoom?.name||"Chưa chọn phòng"}</span><span aria-hidden="true">›</span><span>{selectedClass?.name||"Chưa có lớp"}</span></div>
+    <div className={styles.breadcrumb} aria-label="Đường dẫn sơ đồ"><span>{selectedBuilding?.name||"Chưa có tòa"}</span><span aria-hidden="true">›</span><span>{selectedRoom?.name||"Chưa chọn phòng"}</span><span aria-hidden="true">›</span><span>{selectedClass?.name||"Chưa có lớp"}</span><span aria-hidden="true">›</span><span>{selectedClass?selectedMembers.length+" cá nhân":"Chưa chọn lớp"}</span></div>
     <div className={styles.drillHeading}><h4>Phòng / Hồ thuộc {selectedBuilding?.name||"tòa"}</h4><button type="button" disabled={busy||!selectedBuilding} onClick={()=>onCreateResource("room",selectedBuilding?.id)}>＋ Phòng</button></div>
     <div className={styles.roomFilters} aria-label="Lọc phòng">{([{id:"all",label:"Tất cả"},{id:"free",label:"Chưa có lịch"},{id:"attention",label:"Cần xử lý"}] as const).map(filter=><button key={filter.id} type="button" aria-pressed={roomFilter===filter.id} onClick={()=>{setRoomFilter(filter.id);setRoomId("");setClassId("");}}>{filter.label}</button>)}</div>
     <div className={styles.roomGrid}>
@@ -140,6 +140,18 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
      })}
      {!filteredRooms.length?<div className={styles.emptyCompact}>{buildingRooms.length?"Không có phòng theo bộ lọc này.":"Tòa chưa có phòng. Hãy tạo phòng trước khi xếp lịch."}</div>:null}
     </div>
+    {selectedRoom ? <section className={styles.hierarchySection} aria-label="Lớp thuộc phòng đã chọn">
+     <div className={styles.drillHeading}><h4>Lớp học trong {selectedRoom.name}</h4><span className={styles.hierarchyHint}>{roomClasses.length} lớp theo lịch đang xem</span></div>
+     <div className={styles.classIconGrid}>
+      {roomClasses.map(klass=><button type="button" key={klass.id} className={styles.classIcon}
+       data-selected={selectedClass?.id===klass.id} aria-pressed={selectedClass?.id===klass.id}
+       onClick={()=>setClassId(klass.id)}>
+        <AppIcon name="class"/><strong>{klass.name}</strong>
+        <small>{activeSessions.filter(session=>session.roomId===selectedRoom.id&&session.classId===klass.id).length} ca học</small>
+       </button>)}
+      {!roomClasses.length?<p className={styles.emptyCompact}>Phòng chưa có lớp gắn với ca trong khoảng thời gian đang xem.</p>:null}
+     </div>
+    </section> : null}
     {selectedRoom?<><div className={`${styles.drillHeading} ${styles.roomContextHeading}`}><h4>{selectedRoom.name} · {roomClasses.length} lớp / {selectedRoomSessions.length} ca</h4><div className={styles.roomContextActions}><button type="button" disabled={busy} onClick={()=>onCreateSession(selectedRoom.id,selectedClass?.id)}>＋ Thêm ca</button><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedRoom.id})}>Chi tiết phòng →</button></div></div>
      <div className={styles.sessionList}>{selectedRoomSessions.map(session=>{
       const klass=classes.find(resource=>resource.id===session.classId);
@@ -154,7 +166,17 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
     {selectedClass?<div className={styles.classFocus}>
      <div className={styles.drillHeading}><h4>{selectedClass.name}</h4><Badge tone={selectedClass.state}>{stateText[selectedClass.state]}</Badge></div>
      <ResourceStatusBars resource={selectedClass} board={board}/>
-     <div className={styles.classMembers}>{selectedMembers.filter(person=>person.role==="teacher").slice(0,3).map(person=><button type="button" key={person.id} onClick={()=>onAssignPerson(person)}>Phân công HLV: {person.name} →</button>)}</div>
+     <section aria-label="Cá nhân trong lớp">
+      <h5 className={styles.memberHeading}>Cá nhân trong lớp · {selectedMembers.length}</h5>
+      <div className={styles.personIconGrid}>
+       {selectedMembers.map(person=><button type="button" className={styles.personIcon}
+        key={person.id} onClick={()=>onOpenDetail({kind:"person",id:person.id})}>
+        <AppIcon name="people"/><strong>{person.name||"Chưa khai tên"}</strong>
+        <small>{person.role==="teacher"?"Giảng viên":"Học viên"}</small>
+       </button>)}
+       {!selectedMembers.length?<p className={styles.emptyCompact}>Chưa có Học viên hoặc Giảng viên thuộc lớp này trong phạm vi được cấp.</p>:null}
+      </div>
+     </section>
      <div className={styles.classActions}><button type="button" onClick={()=>onOpenDetail({kind:"resource",id:selectedClass.id})}>Xem lớp / học viên</button><button type="button" onClick={()=>onNavigate("people")}>Phân công →</button></div>
     </div>:null}
    </section>
