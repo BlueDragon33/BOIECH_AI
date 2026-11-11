@@ -57,3 +57,10 @@ test("V9 Owner list-all is read-only and guarded exclusively by control Owner se
  assert.match(route,/owner\.role !== "owner"/);
  assert.match(route,/input\.action === "list-all"/);
 });
+
+test("V9 decision text preserves preapproval draft and does not imply second profile entry",()=>{
+ const panel=read("manager-v2-review-panel.tsx");
+ assert.match(panel,/Nếu hồ sơ đã khai đầy đủ/);
+ assert.match(panel,/Chưa cấp quyền truy cập/);
+ assert.doesNotMatch(panel,/Người dùng sẽ phải bổ sung hồ sơ trước khi được kích hoạt/);
+});
