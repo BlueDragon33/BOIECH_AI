@@ -1,4 +1,4 @@
-import {randomBytes} from "node:crypto";
+import {randomBytes,createHash} from "node:crypto";
 import type {D1Database} from "@cloudflare/workers-types";
 import {AccountError,AccountService,deviceKeyId,hashPassword,verifyPassword,hashSecurityAnswer,verifySecurityAnswer} from "./account-core.server";
 
@@ -53,7 +53,7 @@ export class AccountSecurityQuestionService{
   // A signed proof from the ORIGINAL trusted P-256 browser is mandatory.
   async challenge(loginInput:unknown,peer:string){
     const login=loginName(loginInput);
-    await this.accounts.limitSecurityRecoveryAttempt(login,peer);
+    await this.accounts.limitSecurityRecoveryAttempt(login,peer,"challenge");
     const challenge=nonce();
     const row=await this.db.prepare(`SELECT a.storage_device_id
       FROM accounts a JOIN account_recovery_questions q ON q.account_id=a.account_id
@@ -66,7 +66,7 @@ export class AccountSecurityQuestionService{
   }
   async recover(input:Record<string,unknown>,peer:string){
     const login=loginName(input.login);
-    await this.accounts.limitSecurityRecoveryAttempt(login,peer);
+    await this.accounts.limitSecurityRecoveryAttempt(login,peer,"recover");
     const challenge=typeof input.challenge==="string"?input.challenge:"";
     const signature=typeof input.signature==="string"?input.signature:"";
     if(!/^[A-Za-z0-9_-]{40,50}$/.test(challenge)||!/^[A-Za-z0-9_-]{80,200}$/.test(signature))
@@ -110,7 +110,7 @@ export class AccountSecurityQuestionService{
           WHERE q.account_id=? AND q.revision=? AND q.answer_verifier=?)
         AND EXISTS(SELECT 1 FROM account_devices b
           WHERE b.account_id=? AND b.device_id=? AND b.approved=1 AND b.revoked=0)`)
-        .bind(verifier,(await import("node:crypto")).createHash("sha256").update(nextCode).digest("hex"),
+        .bind(verifier,createHash("sha256").update(nextCode).digest("hex"),
           row.account_id,row.generation,row.account_id,row.question_revision,row.answer_verifier,row.account_id,deviceId),
       this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
         VALUES(?,'credential.recovered.question',?,CASE WHEN changes()=1
