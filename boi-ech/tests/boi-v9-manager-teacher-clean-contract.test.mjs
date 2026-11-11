@@ -30,7 +30,8 @@ test("Teacher professional profile does not render secret/internal account codes
  assert.doesNotMatch(teacher,/<dt>Số hiệu<\/dt>/);
  assert.doesNotMatch(teacher,/learner\.className \|\| learner\.personCode/);
  assert.match(teacher,/Phạm vi lớp được phân công/);
- assert.match(teacher,/Cán bộ quản lý phân công/);
+ assert.match(teacher,/Phạm vi lớp được phân công/);
+ assert.doesNotMatch(teacher,/<button[^>]*>Duyệt tài khoản/);
 });
 test("Final teacher layout wins after historical CSS and prevents clipped viewport",()=>{
  const legacy=layout.indexOf('import "./teacher-dashboard-visual-v8.css"');

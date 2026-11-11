@@ -7,7 +7,7 @@ test("V8 Premium manager is original UI, never a separate shadow dashboard",()=>
  const ws=read("manager-workspace.tsx"),center=read("manager-command-center.tsx"),css=read("manager-command-center.module.css");
  assert.match(ws,/<ManagerCommandCenter board=\{board\}/);
  assert.match(center,/Trung tâm điều hành/);
- assert.match(center,/Hệ thống cơ sở \/ tòa học/);
+ assert.match(center,/Sơ đồ phân cấp cơ sở tương tác/);
  assert.match(css,/\.metricTile/);
  assert.match(css,/\.campus/);
  assert.doesNotMatch(center,/fetch\(/);

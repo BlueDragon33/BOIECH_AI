@@ -120,7 +120,7 @@ test('settings changes display preferences without emitting a training mutation'
 });
 test('the schedule time window can be collapsed and reopened',()=>{
  const render=harness(props({tab:'schedule'}));
- const toggle=()=>render().find(n=>n.type==='button'&&n.props['aria-expanded']!==undefined);
+ const toggle=()=>render().find(n=>n.type==='button'&&n.props['className']==='windowToggle');
  assert.equal(toggle().props['aria-expanded'],true);toggle().props.onClick();assert.equal(toggle().props['aria-expanded'],false);
  toggle().props.onClick();assert.equal(toggle().props['aria-expanded'],true);
 });
@@ -134,7 +134,7 @@ test('availability filter excludes unassigned and inactive-class people',()=>{
 test('setup offers the first active class after a building exists',()=>{
  let selected;const b=board();b.resources=b.resources.filter(r=>r.kind!=='class');
  const tree=harness(props({board:b,setTab:next=>{selected=next;}}))();
- const next=tree.find(n=>n.type==='button'&&text(n)==='Thiết lập lớp học');assert.ok(next);
+ const next=tree.find(n=>n.type==='button'&&n.props['data-app']==='class');assert.ok(next);
  next.props.onClick();assert.equal(selected,'class');
 });
 test('replacing inactive memberships requires an explicit confirmation and keeps the CAS source',async()=>{
