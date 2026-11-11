@@ -54,9 +54,11 @@ test("Manager sidebar is viewport-pinned with independent nav scroll",()=>{
  assert.match(managerCss,/\.railStatus\{flex:0 0 auto;margin-top:0!important/);
 });
 
-test("Student and teacher sidebars pin brand; only inner menu scrolls",()=>{
- assert.match(roles,/body\[data-student-role-ui="active"\] \.app-shell>\.sidebar,/);
- assert.match(roles,/body\[data-teacher-role-ui="active"\] \.app-shell>\.sidebar\{/);
+test("Learner fixed and teacher sticky grid sidebars pin brand while inner menu scrolls",()=>{
+ assert.match(roles,/body\[data-student-role-ui="active"\] \.app-shell>\.sidebar\{/);
+ assert.match(roles,/body\[data-teacher-role-ui="active"\]\[data-teacher-blueprint="active"\] \.app-shell>\.sidebar\{/);
+ assert.match(roles,/position:sticky!important/);
+ assert.match(roles,/grid-template-columns:var\(--td8-sidebar,220px\) minmax\(0,1fr\)!important/);
  assert.match(roles,/position:fixed!important;top:0!important;bottom:0!important;left:0!important/);
  assert.match(roles,/body\[data-teacher-role-ui="active"\] \.app-shell>\.sidebar>\.teacher-role-nav-mount/);
  assert.match(roles,/body\[data-student-role-ui="active"\] \.app-shell>\.sidebar>\.student-role-nav-mount/);
