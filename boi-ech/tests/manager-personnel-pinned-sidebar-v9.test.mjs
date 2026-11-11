@@ -11,7 +11,7 @@ const layout=read("layout.tsx");
 
 test("Personnel is split into two real role groups, not a large shared card wall",()=>{
  assert.match(manager,/aria-label="Nhân sự theo vai trò"/);
- assert.match(manager,/(\["learner","teacher"\] as const)\.map\(role=>/);
+ assert.match(manager,/\(\["learner","teacher"\] as const\)\.map\(role=>/);
  assert.match(manager,/const members=people\.filter\(person=>person\.role===role\)/);
  assert.match(manager,/Danh sách Giảng viên/);
  assert.match(manager,/Danh sách Học viên/);
