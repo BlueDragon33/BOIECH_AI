@@ -176,13 +176,14 @@ export class AccountService {
     await this.throttle(login, peer, "register", 5);
     if (input.privacyAccepted !== true || !["learner", "manager", "teacher"].includes(String(input.role))) fail("ACCOUNT_INPUT", 400);
     if (this.v2Enabled) return this.registerV2(input, login);
-    const role = String(input.role), code = bounded(input.personCode, 32).toUpperCase();
+    const role = String(input.role);
     const rawPhone = bounded(input.phone, 32).replace(/[ ()-]/g, "");
     const phone = rawPhone.startsWith("+84") ? "0" + rawPhone.slice(3) : rawPhone;
     const family = bounded(input.familyName, 60), given = bounded(input.givenName, 60), className = bounded(input.className, 80);
-    if (!/^[A-Z0-9._-]+$/.test(code) || !/^[+0-9 ()-]{7,32}$/.test(phone)) fail("ACCOUNT_INPUT", 400);
+    if (!/^[+0-9 ()-]{7,32}$/.test(phone)) fail("ACCOUNT_INPUT", 400);
     const keyId = await deviceKeyId(input.publicKey), password = await hashPassword(input.password);
     const accountId = "acc_" + random(), storageId = random(), recoveryCode = random();
+    const code=(role==="manager"?"MGR_":role==="teacher"?"GV_":"HV_")+storageId.slice(0,20).toUpperCase();
     // Storage anchor is independent of login-device keys. Existing foreign-key consumers remain untouched.
     try {
       await this.db.batch([
