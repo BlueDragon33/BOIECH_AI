@@ -74,7 +74,7 @@ test("V9 trusted original P-256 plus normalized answer recovers and revokes prev
   assert.ok(newSession.token);
   await assert.rejects(()=>service.recover({login:user.login,
     securityAnswer:"Bé Bông",password:"Next password safe 123",
-    ...await proof(user,next.challenge)},"fixture-peer-q2"),e=>e.status===401);
+    ...(await proof(user,next.challenge))},"fixture-peer-q2"),e=>e.status===401);
  }finally{f.close();}
 });
 
@@ -86,7 +86,7 @@ test("V9 cannot recover after original P-256 device was revoked",async()=>{
   f.sqlite.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=?")
     .run(user.account.account.accountId);
   await assert.rejects(()=>service.recover({login:user.login,securityAnswer:"Bé Bông",
-    password:"New password safe 123",...await proof(user,next.challenge)},"fixture-peer-revoked"),
+    password:"New password safe 123",...(await proof(user,next.challenge))},"fixture-peer-revoked"),
     e=>e.status===401);
  }finally{f.close();}
 });

@@ -70,7 +70,9 @@ test("R1: UX stays on distinct login/register screens, with a contact icon switc
  assert.match(gate,/name="contactValue"/);
  assert.match(gate,/name="contactType"/);
  assert.match(gate,/onClick=\{\(\)=>setMode\("recover"\)\}/);
- assert.match(gate,/className=\{styles.profileDevices\}/);
+ assert.match(gate,/AccountProfileDialog/);
+ const profile=read("../app/account-profile-dialog.tsx");
+ assert.match(profile,/Bảo mật và thiết bị/);
  assert.doesNotMatch(gate,/"Đăng ký một lần"|"Chuyển hồ sơ cũ"|"Gỡ máy cũ khi đủ 3 thiết bị"/);
  assert.match(css,/\.authRoot \.contactMethods button\[aria-pressed=true\]/);
  assert.match(api,/normalizeRegistrationContact\(p.contactType,p.contactValue\)/);
