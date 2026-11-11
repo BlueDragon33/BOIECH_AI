@@ -4,12 +4,13 @@ import { accountRequest, accountErrorResponse, sessionCookie } from "../../accou
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
 import { AccountEntitlementService } from "../../account-entitlement.server";
+import { AccountTrialService } from "../../account-trial.server";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
 export async function GET(request: Request) {
   try { const { service, token, config } = await accountRequest(request);
-    if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview });
+    if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial });
     const account = await service.session(token);
     const workflow=config.v2?new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview):null;
     const onboarding = workflow ? await workflow.ownStatus(token) : null;
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
       ? await (await getCourseDatabase()).prepare("SELECT kind FROM account_contacts WHERE account_id=?")
         .bind(account.accountId).first<{kind:"email"|"phone"}>() : null;
     // Only public account fields leave the server, never the principal/session hash.
-    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, account: { accountId: account.accountId, status: account.status, role: account.role,
+    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial, account: { accountId: account.accountId, status: account.status, role: account.role,
       primaryContactKind:primaryContact?.kind??null,
       name: config.v2 && !account.deviceApproved ? null : account.name,
       storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
@@ -86,6 +87,12 @@ export async function POST(request: Request) {
     }
     if (config.v2) {
       const workflow = new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview);
+      if ((p.action === "trial-status" || p.action === "trial-start") && !config.uiTrial)
+        throw new AccountError("TRIAL_FEATURE_DISABLED",404);
+      if (p.action === "trial-status" || p.action === "trial-start") {
+        const trial=new AccountTrialService(await getCourseDatabase(),service);
+        return json({trial:p.action === "trial-start" ? await trial.start(token) : await trial.status(token)});
+      }
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
       if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
       if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
