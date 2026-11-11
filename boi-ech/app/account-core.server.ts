@@ -45,8 +45,8 @@ export async function verifyPassword(password: unknown, verifier: string) {
 // Knowledge answers are not credentials by themselves: recovery also requires
 // proof from the previously trusted P-256 registration device.
 function normalizeChildhoodName(value: unknown) {
-  if (typeof value !== "string" || /[\\x00-\\x1f]/.test(value)) fail("SECURITY_ANSWER_INVALID",400);
-  const name=value.normalize("NFC").trim().replace(/\\s+/g," ").toLocaleLowerCase("vi");
+  if (typeof value !== "string" || /[\x00-\x1f]/.test(value)) fail("SECURITY_ANSWER_INVALID",400);
+  const name=value.normalize("NFC").trim().replace(/\s+/g," ").toLocaleLowerCase("vi");
   if ([...name].length<2 || name.length>120) fail("SECURITY_ANSWER_INVALID",400);
   return "boi-ech:childhood-name:v1:"+name;
 }
