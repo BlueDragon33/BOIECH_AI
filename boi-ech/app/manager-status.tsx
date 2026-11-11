@@ -95,6 +95,7 @@ export function AppIcon({name}:{name:string}) {
     overview:<><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></>,
     schedule:<><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/></>,
     people:<><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m2-16a3 3 0 0 1 0 6m1 3a5 5 0 0 1 3 5v2"/></>,
+    approval:<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h9M8 13h5M14 17l2 2 4-4"/></>,
     class:<><path d="m2 8 10-5 10 5-10 5Zm4 3v6c4 3 8 3 12 0v-6m4-3v8"/></>,
     room:<><path d="M4 21h16M6 21V4l12-1v18M14 12h1"/></>,
     building:<><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h1m6 0h1m-8 4h1m6 0h1m-6 10v-6h4v6"/></>,
