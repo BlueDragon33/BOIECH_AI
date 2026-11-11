@@ -33,7 +33,7 @@
 .sheet{color:var(--mgr-ink);background:var(--mgr-surface);border:1px solid var(--mgr-line);border-radius:24px;padding:0;width:min(660px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;overscroll-behavior:contain;font:inherit}.sheet::backdrop{background:#081d35a6;backdrop-filter:blur(3px)}.sheetHeader{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--mgr-surface);border-bottom:1px solid var(--mgr-line);padding:14px 20px;z-index:1}.sheetHeader h2{overflow-wrap:anywhere}.workspace .closeButton{border:0;background:var(--mgr-soft);font-size:26px;width:44px;padding:0;min-width:44px;border-radius:50%;line-height:1}.sheetBody{padding:20px}.sheetHandle{display:none}.editor fieldset,.detailFieldset{border:0;padding:0;margin:0;min-width:0}.editor fieldset{display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr))}.editor legend{margin-bottom:12px}.editor .actions,.editor small{grid-column:1/-1}.actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0}.actions button:first-child{background:var(--mgr-primary);color:var(--mgr-on-primary);border-color:var(--mgr-primary)}.editor .check{display:flex;align-items:center;gap:10px;min-height:44px}.check input{width:22px;min-height:22px;height:22px;flex:none}.detailSection{margin-top:24px;padding-top:20px;border-top:1px solid var(--mgr-line)}.detailRow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid var(--mgr-line)}.detailRow>div{min-width:0}.detailRow strong{overflow-wrap:anywhere}.detailRow small{display:block;margin-top:3px}.detailRow button{flex-shrink:0;font-size:.8em}.waiting{max-width:860px;margin:24px auto}.waiting code{overflow-wrap:anywhere;font-weight:700}.waiting li{margin:8px 0}
 @media(max-width:900px){.appGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.homeSummary{align-items:flex-start}.summaryNumbers{gap:16px;flex-direction:column}}
 @media(max-width:620px){
- .workspace{padding:16px 14px calc(110px + env(safe-area-inset-bottom,0px))}.header{padding-top:0}.brand{gap:10px}.brandMark{width:42px;height:42px;flex-basis:42px;border-radius:14px}.brand small{font-size:.57em}.workspace h1{font-size:1.25em}.syncLine small{font-size:.75em}.syncLine .textButton{font-size:.75em}.window{border-radius:16px;margin-bottom:22px;padding-inline:12px}.window form{grid-template-columns:1fr}.timezone{font-size:.75em}.homeSummary{display:block;margin-bottom:20px}.homeSummary h2{font-size:1.6em}.summaryNumbers{flex-direction:row;justify-content:flex-start;gap:28px;margin-top:18px}.summaryNumbers strong{font-size:2.2em}.appGrid{gap:10px;margin-bottom:26px}.workspace .appGrid>button{border-radius:19px;padding:15px 5px}.appLabel{font-size:.8em}.appGrid small{font-size:.75em}.appIcon{width:44px;height:44px;border-radius:14px}.sectionHeading{gap:10px;align-items:start}.sectionHeading h2{font-size:1.15em}.sectionHeading .primaryButton{padding:10px;font-size:.75em}.grid,.settings{grid-template-columns:1fr}.card,.attentionCard{padding:16px;border-radius:18px}.toolbar{grid-template-columns:1fr 1fr;gap:10px}.resultCount{grid-column:1/-1;padding:0}.toolbar label{font-size:.75em}.toolbar input,.toolbar select{padding-inline:9px}.cardHeading{gap:8px}.cardHeading .badge{max-width:46%}.sheet{position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-height:calc(100dvh - 10px);border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}.sheetHandle{display:block;width:36px;height:4px;border-radius:4px;background:var(--mgr-line);margin:10px auto 0}.sheetHeader{padding:12px 16px}.sheetHeader h2{font-size:1.1em}.sheetBody{padding:16px}.editor fieldset{grid-template-columns:1fr}.actions button{flex:1 1 130px}
+ .workspace{padding:16px 14px calc(110px + env(safe-area-inset-bottom,0px))}.header{padding-top:0}.brand{gap:10px}.brandMark{width:42px;height:42px;flex-basis:42px;border-radius:14px}.brand small{font-size:.57em}.workspace h1{font-size:1.25em}.syncLine small{font-size:.75em}.syncLine .textButton{font-size:.75em}.window{border-radius:16px;margin-bottom:22px;padding-inline:12px}.window form{grid-template-columns:1fr}.timezone{font-size:.75em}.homeSummary{display:block;margin-bottom:20px}.homeSummary h2{font-size:1.6em}.summaryNumbers{flex-direction:row;justify-content:flex-start;gap:28px;margin-top:18px}.summaryNumbers strong{font-size:2.2em}.appGrid{gap:10px;margin-bottom:26px}.workspace .appGrid>button{border-radius:19px;padding:15px 5px}.appLabel{font-size:.8em}.appGrid small{font-size:.75em}.appIcon{width:44px;height:44px;border-radius:14px}.sectionHeading{gap:10px;align-items:start}.sectionHeading h2{font-size:1.15em}.sectionHeading .primaryButton{padding:10px;font-size:.75em}.grid,.settings{grid-template-columns:1fr}.card,.attentionCard{padding:16px;border-radius:18px}.toolbar{grid-template-columns:1fr 1fr;gap:10px}.resultCount{grid-column:1/-1;padding:0}.toolbar label{font-size:.75em}.toolbar input,.toolbar select{padding-inline:9px}.cardHeading{gap:8px}.cardHeading .badge{max-width:46%}.sheet{position:fixed;inset:0;margin:auto;width:min(660px,calc(100vw - 24px));max-height:calc(100dvh - 32px);border-radius:22px;padding-bottom:0}.sheetHandle{display:none}.sheetHeader{padding:12px 16px}.sheetHeader h2{font-size:1.1em}.sheetBody{padding:16px}.editor fieldset{grid-template-columns:1fr}.actions button{flex:1 1 130px}
 }
 @media(prefers-reduced-motion:no-preference){.workspace button{transition:background-color .15s ease}.track>i{transition:width .2s ease}}
 
@@ -183,4 +183,64 @@
  .railStatus{flex:0 0 auto;margin-top:0!important;max-height:min(170px,27dvh);
   overflow-y:auto;scrollbar-width:none}
  .railStatus::-webkit-scrollbar{display:none}
+}
+
+/* V9.4 — one centered native modal at every viewport and zoom level.
+   The native <dialog>.showModal() keeps its top-layer focus/escape semantics. */
+.sheet{
+ position:fixed!important;inset:0!important;margin:auto!important;
+ width:min(680px,calc(100vw - 28px))!important;
+ max-width:calc(100vw - 28px)!important;
+ max-height:calc(100dvh - 36px)!important;
+ overflow-y:auto!important;overflow-x:hidden!important;
+ border-radius:21px!important;
+ background:var(--mgr-surface)!important;
+ color:var(--mgr-ink)!important;
+ border:1px solid var(--mgr-line)!important;
+ box-shadow:0 32px 90px rgba(1,8,25,.7);
+ color-scheme:normal;
+}
+.sheet::backdrop{background:rgba(1,8,29,.76)!important;backdrop-filter:blur(7px)}
+.sheetHeader{
+ background:var(--mgr-surface)!important;
+ color:var(--mgr-ink)!important;
+ border-bottom:1px solid var(--mgr-line)!important;
+}
+.sheetHeader h2,.sheetBody,.sheetBody p,.sheetBody strong,.detailRow strong{
+ color:var(--mgr-ink)!important;
+}
+.sheetBody small,.sheetBody .metricDetail,.detailRow small{
+ color:var(--mgr-muted)!important;
+}
+.sheetBody .detailSection{border-color:var(--mgr-line)!important}
+.sheetBody .detailRow{border-color:var(--mgr-line)!important}
+.workspace .sheetBody button:not(.primaryButton){
+ background:var(--mgr-soft)!important;color:var(--mgr-ink)!important;
+ border:1px solid var(--mgr-line)!important;
+}
+.workspace .sheetBody button.primaryButton,.sheetBody .primaryButton{
+ background:var(--mgr-primary)!important;
+ color:var(--mgr-on-primary)!important;
+ border-color:var(--mgr-primary)!important;
+}
+/* The personnel icon panels are dark, even when the manager chooses light UI;
+   inherited global manager headings must not turn dark against these panels. */
+.workspace .peopleRolePanel,
+.workspace .peopleRolePanel h3,
+.workspace .peopleRolePanel strong,
+.workspace .peopleRolePanel p{
+ color:#f3f7ff!important;
+}
+.workspace .peopleRolePanel small{color:#d2e6ff!important}
+.workspace .personIconTile{
+ color:#f3f7ff!important;
+ background:linear-gradient(145deg,#2a4270,#25365d)!important;
+}
+.workspace .personIconTile strong{color:#fff!important}
+.workspace .personIconTile small{color:#d1e5ff!important}
+.workspace .peopleRoleCount{color:#fff!important}
+@media(max-width:620px){
+ .sheet{max-height:calc(100dvh - 24px)!important;width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important}
+ .sheetHeader{padding:12px 14px!important}
+ .sheetBody{padding:15px!important}
 }
