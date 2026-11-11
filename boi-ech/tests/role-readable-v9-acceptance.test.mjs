@@ -65,3 +65,12 @@ test("V9 display repair is role-scoped without altering Account-first or D1",()=
   assert.doesNotMatch(roleCss,/wrangler|fetch\(|\/api\/|account_entitlements|SELECT \* FROM|boi-ech-db/);
   assert.doesNotMatch(teacher,/boi:appearance:open[^\n]*fetch\(/);
 });
+
+test("Compact density and dark-theme controls visibly affect both role dashboards",()=>{
+  assert.match(roleCss,/data-appearance-density="compact"\] \.teacher-capability-action/);
+  assert.match(roleCss,/data-appearance-density="compact"\] \.student-lesson-grid>button/);
+  assert.match(roleCss,/data-appearance-theme="dark"\] \.teacher-capability-action/);
+  assert.match(roleCss,/data-appearance-theme="dark"\] \.student-lesson-grid>button/);
+  assert.match(roleCss,/var\(--card-ink,#eaf7ff\)/);
+  assert.match(roleCss,/min-height:84px!important/);
+});
