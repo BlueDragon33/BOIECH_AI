@@ -109,7 +109,7 @@ function props(extra={}){return {board:board(),tab:'overview',setTab:()=>{},busy
 test('phone home launcher and bottom navigation reach rooms and settings without mutations',()=>{
  let selected;let writes=0;const render=harness(props({setTab:value=>{selected=value;},onCommand:async()=>{writes++;return true;}}));
  const tree=render();const nav=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='Điều phối đào tạo');
- assert.ok(nav);const buttons=elements(nav).filter(n=>n.type==='button');assert.equal(buttons.length,5);
+ assert.ok(nav);const buttons=elements(nav).filter(n=>n.type==='button');assert.equal(buttons.length,6);
  const settings=buttons.find(n=>text(n).includes('Cài đặt'));assert.ok(settings);settings.props.onClick();assert.equal(selected,'settings');
  const room=tree.find(n=>n.type==='button'&&n.props['data-app']==='room');assert.ok(room);room.props.onClick();assert.equal(selected,'room');assert.equal(writes,0);
 });
@@ -129,7 +129,7 @@ test('availability filter excludes unassigned and inactive-class people',()=>{
  b.people=[person,{...person,id:'unassigned',name:'Chưa phân lớp',className:''},{...person,id:'old',name:'Lớp cũ',className:'Old'}];
  const render=harness(props({board:b,tab:'people'}));
  render().find(n=>n.type==='select'&&elements(n).some(x=>x.type==='option'&&x.props.value==='available')).props.onChange({target:{value:'available'}});
- assert.deepEqual(render().filter(n=>n.type==='article').map(n=>text(n).includes('Học viên mẫu')), [true]);
+ assert.deepEqual(render().filter(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Xem hồ sơ')).map(n=>text(n).includes('Học viên mẫu')), [true]);
 });
 test('setup offers the first active class after a building exists',()=>{
  let selected;const b=board();b.resources=b.resources.filter(r=>r.kind!=='class');
@@ -141,7 +141,9 @@ test('replacing inactive memberships requires an explicit confirmation and keeps
  const b=board();b.resources.push({...resource,id:'old',name:'Old',status:'archived',state:'inactive'});
  b.people=[{...person,id:'teacher',role:'teacher',className:'A; Old'}];const commands=[];
  const render=harness(props({board:b,tab:'people',onCommand:async payload=>{commands.push(payload);return true;}}));
- render().find(n=>n.type==='button'&&text(n)==='Phân công lớp').props.onClick();let tree=render();
+ const icon=render().find(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Xem hồ sơ giảng viên'));assert.ok(icon);icon.props.onClick();
+ const personSheet=render().find(n=>n.props?.target?.kind==='person');assert.ok(personSheet);
+ personSheet.props.onAssignPerson(b.people[0]);let tree=render();
  assert.ok(tree.some(n=>n.type==='p'&&text(n).includes('A; Old')));
  assert.equal(tree.find(n=>n.type==='button'&&text(n)==='Lưu phân công').props.disabled,true);
  tree.filter(n=>n.type==='form').at(-1).props.onSubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));assert.equal(commands.length,0);
