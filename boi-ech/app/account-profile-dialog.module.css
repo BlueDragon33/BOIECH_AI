@@ -43,8 +43,8 @@
 .backdrop button:focus-visible,.backdrop input:focus-visible,.backdrop select:focus-visible,
 .backdrop summary:focus-visible{outline:3px solid #21a5cf;outline-offset:2px}
 @media(max-width:750px){
- .backdrop{padding:0;align-items:end}
- .dialog{height:min(96dvh,980px);max-height:96dvh;border-radius:22px 22px 0 0;grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+ .backdrop{padding:clamp(8px,2vw,18px);align-items:center;justify-items:center}
+ .dialog{width:min(100%,680px);height:min(94dvh,860px);max-height:94dvh;border-radius:20px;grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
  .sidebar{padding:14px 15px 9px;border-right:0;border-bottom:1px solid #5373b944}
  .brand{padding:0 4px 8px;font-size:.76rem}.identity{padding:6px 6px 10px;margin-bottom:6px;gap:9px}
  .avatar{width:38px;height:38px;flex-basis:38px;border-radius:12px;font-size:1.1rem}.identity strong{font-size:.9rem}
@@ -54,4 +54,32 @@
  .navButton strong{font-size:.79rem}.sidebarFoot{display:none}
  .heading{padding:14px 17px 13px}.heading h2{font-size:1.35rem}.heading p{font-size:.77rem}
  .close{width:38px;height:38px}.scroll{padding:17px}.footer{padding:9px 17px}
+}
+
+/* V9.4 — all fullscreen account pop-ups are viewport-centered, including
+   mobile. Interior content scrolls; the frame never anchors to the bottom. */
+.backdrop{
+ position:fixed!important;inset:0!important;
+ display:grid!important;place-items:center!important;
+ padding:clamp(10px,2vw,28px)!important;
+}
+.dialog{
+ margin:auto!important;
+ max-width:calc(100vw - 20px)!important;
+ max-height:calc(100dvh - 24px)!important;
+ overflow:hidden!important;
+ box-shadow:0 28px 95px rgba(1,7,27,.74);
+}
+.main{background:#f6faff!important;color:#152e4e!important}
+.main :is(h1,h2,h3,strong,dt){color:#183455}
+.main :is(p,small,dd){color:#4b6077}
+.heading{background:#f2f8ff!important}
+.heading p{color:#486580!important}
+.navButton{color:#e2eeff}
+.navButton small{color:#bad0e9}
+.navButton[aria-current=page]{color:#fff}
+@media(max-width:750px){
+ .dialog{width:min(680px,calc(100vw - 20px))!important;max-height:calc(100dvh - 20px)!important}
+ .sidebar{max-height:min(280px,38dvh);overflow-y:auto}
+ .scroll{min-height:0;overflow-y:auto}
 }
