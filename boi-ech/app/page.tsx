@@ -681,11 +681,32 @@ function splitLegacyLearnerName(value: string | null | undefined) {
   };
 }
 
+/* WCAG 2.x contrast computation for user-editable appearance backgrounds.
+ * Approximate RGB brightness can select white text on a pale custom card.
+ * Always use a foreground with >=4.5:1 contrast against a valid #RRGGBB. */
+function colorLuminance(value: string): number | null {
+  const match = /^#([\\da-f]{2})([\\da-f]{2})([\\da-f]{2})$/i.exec(value);
+  if (!match) return null;
+  const channels = match.slice(1).map(channel => Number.parseInt(channel, 16) / 255);
+  const linear = channels.map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+}
+function contrastRatio(foreground: string, background: string) {
+  const first = colorLuminance(foreground), second = colorLuminance(background);
+  if (first === null || second === null) return 1;
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
 function darkBackground(value: string) {
-  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(value);
-  if (!match) return false;
-  const [red, green, blue] = match.slice(1).map((channel) => Number.parseInt(channel, 16));
-  return (red * 299 + green * 587 + blue * 114) / 1000 < 142;
+  const luminance = colorLuminance(value);
+  return luminance !== null && luminance < 0.179;
+}
+function readableForeground(background: string, lightText: string, darkText: string) {
+  const preferred = darkBackground(background) ? lightText : darkText;
+  if (contrastRatio(preferred, background) >= 4.5) return preferred;
+  const alternative = preferred === lightText ? darkText : lightText;
+  if (contrastRatio(alternative, background) >= 4.5) return alternative;
+  return contrastRatio("#ffffff", background) >= contrastRatio("#081525", background)
+    ? "#ffffff" : "#081525";
 }
 
 function InstallAppButton({ install }: { install: () => void }) {
@@ -1454,9 +1475,6 @@ export default function Home() {
   const learnerGivenName = deviceAccess?.learnerGivenName?.trim() || legacyProfileName.learnerGivenName || "Học viên";
   const learnerFullName = deviceAccess?.learnerName?.trim() || [deviceAccess?.learnerFamilyName, learnerGivenName].filter(Boolean).join(" ");
   const learnerInitial = learnerGivenName.slice(0, 1).toUpperCase();
-  const usesDarkBackground = darkBackground(appearance.background);
-  const usesDarkContent = darkBackground(appearance.contentBackground);
-  const usesDarkCard = darkBackground(appearance.cardBackground);
   const activeLessonCanSubmit = canSubmitLesson(progress.completed, selectedLesson);
   const activeSubmissionReady = activeLessonAnswered === activeQuestions.length && activeLessonCanSubmit;
   const activeSubmissionStatus = activeLessonAnswered < activeQuestions.length
@@ -1784,12 +1802,12 @@ export default function Home() {
         "--accent-color": appearance.accent,
         "--ui-radius": `${appearance.radius}px`,
         "--ui-density": appearance.density === "compact" ? "0.88" : "1",
-        "--page-ink": usesDarkBackground ? "#f4fbfb" : "#102b3f",
-        "--page-muted": usesDarkBackground ? "#cee2e4" : "#5d7282",
-        "--content-ink": usesDarkContent ? "#f4fbfb" : "#123b61",
-        "--content-muted": usesDarkContent ? "#bad0da" : "#657d8d",
-        "--card-ink": usesDarkCard ? "#f4fbfb" : "#173c5e",
-        "--card-muted": usesDarkCard ? "#bdd0da" : "#718899",
+        "--page-ink": readableForeground(appearance.background, "#f4fbfb", "#102b3f"),
+        "--page-muted": readableForeground(appearance.background, "#cee2e4", "#5d7282"),
+        "--content-ink": readableForeground(appearance.contentBackground, "#f4fbfb", "#123b61"),
+        "--content-muted": readableForeground(appearance.contentBackground, "#bad0da", "#657d8d"),
+        "--card-ink": readableForeground(appearance.cardBackground, "#f4fbfb", "#173c5e"),
+        "--card-muted": readableForeground(appearance.cardBackground, "#bdd0da", "#718899"),
         "--site-font": fontStack,
         "--font-adjust": `${appearance.textSize}px`,
       } as React.CSSProperties}
