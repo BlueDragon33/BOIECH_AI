@@ -163,3 +163,14 @@
 .savedProfile h2{margin:0 0 7px;font-size:1.1rem}.savedProfile p{color:#3e6573;margin:0 0 12px}
 .savedProfile button{background:linear-gradient(120deg,#067778,#2b65af);border-color:#138c9e;color:#fff;font-weight:700}
 .savedProfile button:focus-visible{outline:3px solid #6a5cce;outline-offset:3px}
+
+
+/* An authenticated pending account may enter an isolated UI-only trial. */
+.trialInvitation{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;
+ padding:19px;margin:16px 0;border:1px solid #6ca9e8;border-radius:17px;
+ background:linear-gradient(125deg,#14294d,#31245b 72%,#164766);color:#e7f4ff}
+.trialInvitation>div{flex:1 1 220px}
+.trialInvitation strong{font-size:1.08rem;color:#c4f5ff}
+.trialInvitation p{max-width:65ch;margin:8px 0 0;color:#cce2f7;line-height:1.55;font-size:.89rem}
+.root .trialInvitation button{flex:0 1 auto;min-height:48px;border-color:#7ce7ef;background:linear-gradient(125deg,#315ac1,#0b8e9e);color:#fff;font-weight:800}
+.root .trialInvitation button:focus-visible{outline:3px solid #92f7ff;outline-offset:3px}
