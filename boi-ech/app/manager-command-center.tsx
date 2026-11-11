@@ -270,7 +270,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
           <section className={styles.focusLevel} aria-label={`Lớp học trong ${selectedRoom.name}`}>
            <div className={styles.focusToolbar}>
             <strong>Lớp học trong {selectedRoom.name}</strong>
-            <button type="button" disabled={busy} onClick={()=>onCreateSession(selectedRoom.id)}>＋ Thêm ca</button>
+            <button type="button" disabled={busy} onClick={()=>onCreateSession(selectedRoom.id,selectedClass?.id)}>＋ Thêm ca</button>
            </div>
            <p className={styles.scopeNote}>Các lớp có ca trong khoảng thời gian đang xem. Chọn lớp để mở danh sách Học viên/Giảng viên.</p>
            <div className={styles.focusIconGrid}>
