@@ -57,13 +57,15 @@ test("invalid time window does not invent occupied rooms or assigned classes",()
  assert.deepEqual(sessionsInWindow(b),[]);
  assert.deepEqual(classesInRoom(b,"room-1"),[]);
 });
-test("manager UI renders real hierarchy, multiple room classes and the pending queue",()=>{
- const b=board();const markup=renderToStaticMarkup(React.createElement(commandCenter.default,{board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:()=>{}}));
- for(const term of ["Tòa B","Hồ 25m","Ếch cơ bản","Ếch nâng cao","HLV An","Ca sáng","Ca tiếp theo","Hồ sơ cần xem","2 lớp"])assert.ok(markup.includes(term),term);
- assert.match(markup,/aria-label="Sơ đồ phân cấp tòa phòng lớp"/);
- assert.match(markup,/aria-pressed="true"/);
- assert.ok(!markup.includes("Lớp ngoài"));
- assert.ok(!markup.includes("PRIVATE-PHONE"));
+test("manager campus initially renders only real buildings and does not auto-expand hidden rooms",()=>{
+ const markup=renderToStaticMarkup(React.createElement(commandCenter.default,{board:board(),busy:false,
+  onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:()=>{}}));
+ assert.match(markup,/aria-label="Sơ đồ phân cấp cơ sở tương tác"/);
+ assert.match(markup,/Tòa B/);
+ assert.match(markup,/data-stage="buildings"/);
+ assert.doesNotMatch(markup,/aria-label="Mở phòng Hồ 25m"/);
+ assert.doesNotMatch(markup,/aria-label="Mở danh sách lớp Ếch cơ bản"/);
+ assert.doesNotMatch(markup,/PRIVATE-PHONE/);
 });
 test("empty building state offers real setup instead of showing fake map data",()=>{
  const b=board();b.resources=[];b.sessions=[];
@@ -114,33 +116,34 @@ function hookHarness(props){
  const Component=load("app/manager-command-center.tsx",hooks).default;
  return ()=>{cursor=0;return elements(Component(props));};
 }
-test("contextual room creation uses the selected building without changing access commands",()=>{
- const creations=[];const b=board();
- const render=hookHarness({board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:(...args)=>creations.push(args),onCreateSession:()=>{}});
- const addRoom=render().find(node=>node.type==="button"&&contentText(node).includes("＋ Phòng"));
- assert.ok(addRoom);addRoom.props.onClick();
- assert.deepEqual(creations,[["room","building-1"]]);
-});
-test("new session inherits selected room and the selected class even with two classes",()=>{
- const sessions=[];
- const render=hookHarness({board:board(),busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},onCreateResource:()=>{},onCreateSession:(...args)=>sessions.push(args)});
+test("contextual room creation stays under the selected real building",()=>{
+ const creations=[];const render=hookHarness({board:board(),busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},
+  onCreateResource:(...args)=>creations.push(args),onCreateSession:()=>{}});
  let tree=render();
- const addCa=()=>tree.find(node=>node.type==="button"&&contentText(node).includes("＋ Thêm ca"));
- assert.ok(addCa());addCa().props.onClick();
- assert.deepEqual(sessions.pop(),["room-1","class-a"]);
- const second=tree.find(node=>node.type==="button"&&contentText(node).includes("Ca tiếp theo"));
- assert.ok(second);second.props.onClick();
- tree=render();addCa().props.onClick();
- assert.deepEqual(sessions.pop(),["room-1","class-b"]);
+ tree.find(node=>node.type==="button"&&node.props["aria-label"]==="Mở tòa Tòa B").props.onClick();
+ tree=render();
+ const addRoom=tree.find(node=>node.type==="button"&&contentText(node).includes("＋ Phòng"));
+ assert.ok(addRoom);addRoom.props.onClick();
+ assert.deepEqual(creations,[[ "room","building-1" ]]);
 });
-
-function workspaceHarness(props){
- const state=[];let cursor=0;
- const hooks={...React,useState(initial){const slot=cursor++;if(!(slot in state))state[slot]=typeof initial==="function"?initial():initial;return [state[slot],next=>{state[slot]=typeof next==="function"?next(state[slot]):next;}] }};
- const {TrainingDashboard}=load("app/manager-workspace.tsx",hooks);
- return ()=>{cursor=0;return elements(TrainingDashboard(props));};
-}
-function workspaceProps(){return {board:board(),tab:"overview",setTab:()=>{},busy:false,notice:"",onCommand:async()=>false,onWindowChange:()=>{}};}
+test("nested building→room→class retains real context for new class session",()=>{
+ const sessions=[];const render=hookHarness({board:board(),busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},
+  onCreateResource:()=>{},onCreateSession:(...args)=>sessions.push(args)});
+ let tree=render();
+ tree.find(node=>node.props?.["aria-label"]==="Mở tòa Tòa B").props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m"));
+ tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m").props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Mở danh sách lớp Ếch cơ bản"));
+ const addCa=()=>tree.find(node=>node.type==="button"&&contentText(node).includes("＋ Thêm ca"));
+ addCa().props.onClick();assert.deepEqual(sessions.pop(),["room-1",undefined]);
+ tree.find(node=>node.props?.["aria-label"]==="Mở danh sách lớp Ếch nâng cao").props.onClick();
+ tree=render();
+ const popup=tree.find(node=>typeof node.type==="function"&&node.type.name==="ClassRosterDialog");
+ assert.ok(popup,"class selection opens a dedicated popup component");
+ assert.equal(popup.props.klass.id,"class-b");
+ assert.deepEqual(popup.props.people.map(person=>person.id),["t1"],"only scoped people from real class");
+ addCa().props.onClick();assert.deepEqual(sessions.pop(),["room-1","class-b"]);
+});
 test("manager workspace carries selected room and class into existing session editor",()=>{
  const render=workspaceHarness(workspaceProps());
  const center=render().find(node=>typeof node.type==="function"&&node.type.name==="ManagerCommandCenter");
@@ -167,26 +170,16 @@ test("a room alerts on overlapping training sessions, not adjacent distinct clas
  assert.equal(roomNeedsAttention(b,"room-1"),false,"cancelled conflicts must not alert");
 });
 
-test("review shortcut narrows manager people list without triggering privileged mutations",()=>{
- const props=workspaceProps();
- let writes=0;
+test("review shortcut opens dedicated manager-only approval tab without account writes",()=>{
+ const props=workspaceProps();let writes=0;
  props.setTab=next=>{props.tab=next;};
  props.onCommand=async()=>{writes++;return false;};
  const render=workspaceHarness(props);
  const center=render().find(node=>typeof node.type==="function"&&node.type.name==="ManagerCommandCenter");
- assert.ok(center);
- center.props.onNavigate("review");
- assert.equal(props.tab,"people");
- const cards=render().filter(node=>node.type==="article");
- assert.equal(cards.length,1);
- assert.ok(contentText(cards[0]).includes("Hồ sơ đang chờ"));
+ assert.ok(center);center.props.onNavigate("review");
+ assert.equal(props.tab,"approval");
  assert.equal(writes,0);
- assert.ok(!elements(cards[0]).some(node=>node.type==="button"&&/Phân (lớp|công)/.test(contentText(node))),"review cards must not offer assignment writes");
- elements(cards[0]).find(node=>node.type==="button"&&contentText(node)==="Chi tiết").props.onClick();
- const detail=render().find(node=>typeof node.type==="function"&&node.type.name==="ManagerDetailSheet");
- assert.equal(detail.props.readOnly,true,"review details must keep the same read-only context");
 });
-
 test("room sessions use chronological instants across timezone offsets without false conflicts",()=>{
  const b=board();
  b.sessions=[
@@ -215,4 +208,43 @@ test("booked rooms flag an ineligible assigned coach even when the class has eno
  }
  const b=board();b.people=b.people.filter(p=>p.id!=="t1");
  assert.equal(roomNeedsAttention(b,"room-1"),true,"missing session coach reference");
+});
+
+test("changing building or room keeps nonselected siblings as compact icons inside the same campus",()=>{
+ const b=board();
+ b.resources.push({...b.resources[0],id:"building-2",name:"Tòa A"});
+ b.resources.push({...b.resources[1],id:"room-2",name:"Hồ 50m",parentId:"building-1"});
+ const render=hookHarness({board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},
+  onCreateResource:()=>{},onCreateSession:()=>{}});
+ let tree=render();
+ tree.find(node=>node.props?.["aria-label"]==="Mở tòa Tòa B").props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Chuyển sang tòa Tòa A"),"other building remains available");
+ tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m").props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Chuyển sang phòng Hồ 50m"),"other room collapses, not disappears");
+ tree.find(node=>node.props?.["aria-label"]==="Chuyển sang phòng Hồ 50m").props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Chuyển sang phòng Hồ 25m"));
+ const back=tree.find(node=>node.type==="button"&&contentText(node)==="← Tất cả phòng");
+ assert.ok(back);back.props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m"),"back restores room list");
+ tree.find(node=>node.props?.["aria-label"]==="Chuyển sang tòa Tòa A").props.onClick();tree=render();
+ assert.ok(tree.find(node=>node.props?.["aria-label"]==="Chuyển sang tòa Tòa B"),"building switching is reversible");
+});
+
+test("class popup uses a body portal and role-scoped roster, with no inline full-person list",()=>{
+ const source=fs.readFileSync("app/manager-command-center.tsx","utf8");
+ assert.match(source,/createPortal\(<div className=\{styles\.classModalBackdrop\}/);
+ assert.match(source,/role="dialog" aria-modal="true"/);
+ assert.match(source,/aria-label=\{`Danh sách học viên và giảng viên lớp/);
+ assert.match(source,/teachers=people\.filter\(person=>person\.role==="teacher"\)/);
+ assert.match(source,/learners=people\.filter\(person=>person\.role==="learner"\)/);
+ assert.match(source,/onOpenDetail\(\{kind:"person",id:person\.id\}\)/);
+ assert.doesNotMatch(source,/<div className=\{styles\.personIconGrid\}>/);
+});
+
+test("hierarchy CSS bounds icon rails and responsive grids within the campus frame",()=>{
+ const css=fs.readFileSync("app/manager-command-center.module.css","utf8");
+ for(const token of [".hierarchyWorkspace",".compactRail",".roomWorkspace",".focusedContent",".focusIconGrid",
+  ".classModalBackdrop","overflow-x:auto","max-height:530px","@media(max-width:660px)"])
+   assert.ok(css.includes(token),token);
+ assert.match(css,/grid-template-columns:minmax\(0,1fr\)!important/);
 });
