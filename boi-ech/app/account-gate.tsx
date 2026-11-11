@@ -11,7 +11,8 @@ import styles from "./account-gate.module.css";
 type Account = { accountId: string; status: string; role: string; name: string; expiresAt: string | null;
   storageDeviceId?:string|null; primaryContactKind?:"email"|"phone"|null;
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
-  onboardingNote?: string|null; entitlementActive?: boolean;
+  onboardingNote?: string|null; entitlementActive?: boolean; profileDraftReady?:boolean;
+  profileDraftFields?:Record<string,string>|null;
   canReadRegistrants?: boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
@@ -161,9 +162,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
-      await send({...fields,action:"submit-profile",expectedRevision:account?.onboardingRevision});
+      const pending=account?.onboardingStage==="requested";
+      await send({...fields,action:pending?"profile-draft-save":"submit-profile",expectedRevision:account?.onboardingRevision});
       await reload();
-      setNotice(singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Hồ sơ đã gửi chờ duyệt lần thứ hai. Chưa có quyền sử dụng chức năng chính.");
+      setNotice(pending?"Đã lưu hồ sơ để cán bộ có thể kiểm duyệt. Khi được duyệt, bạn sẽ không phải nhập lại thông tin.":singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Đã gửi hồ sơ để xét duyệt.");
     });
   }
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
@@ -217,10 +219,15 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         </form>:null}
         {v2 && account.onboardingStage==="changes_requested" && account.onboardingNote ? <p role="status">
           Yêu cầu bổ sung của người xét duyệt: {account.onboardingNote}</p>:null}
-        {v2 && account.deviceApproved!==false && ["profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
+        {v2 && account.onboardingStage==="profile_required" && account.profileDraftReady ? <section role="status" className={styles.savedProfile}>
+          <h2>Hồ sơ đã lưu trước khi xét duyệt</h2><p>Không cần nhập lại. Hãy xác nhận kích hoạt sau khi hồ sơ đã được phê duyệt một lần.</p>
+          <button type="button" disabled={busy} onClick={()=>void run(async()=>{await send({action:"profile-draft-activate"});await reload();setNotice("Đã kích hoạt bằng hồ sơ đã lưu và xác nhận trạng thái máy chủ.");})}>Kích hoạt bằng hồ sơ đã lưu</button>
+        </section>:null}
+        {v2 && account.deviceApproved!==false && ["requested","profile_required","changes_requested"].includes(account.onboardingStage||"") ? <form
+          key={`${account.accountId}:${account.onboardingStage}:${account.profileDraftReady}`}
           className={styles.profileForm} onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
           <header className={styles.profileHeading}>
-            <span className={styles.profileEyebrow}>BƯỚC 02 · HỒ SƠ ĐỊNH DANH</span>
+            <span className={styles.profileEyebrow}>{account.onboardingStage==="requested"?"BƯỚC 01 · KHAI HỒ SƠ TRƯỚC KHI DUYỆT":"BƯỚC 02 · HỒ SƠ ĐỊNH DANH"}</span>
             <h2>{account.role==="manager"?"Hồ sơ Cán bộ quản lý":"Hoàn thiện hồ sơ cá nhân"}</h2>
             <p>{account.role==="manager"
               ?"Bổ sung thông tin công tác và phương thức liên hệ còn thiếu. Không cần mã cá nhân hoặc nhập lại liên hệ đã đăng ký."
@@ -233,7 +240,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
               :([["familyName","Họ và tên lót","text"],["givenName","Tên","text"],["className","Lớp / đơn vị","text"],["phone","Số điện thoại","tel"]] as const)
             ).map(([name,label,kind])=><label key={name} className={name==="facultyUnit"||name==="className"?styles.profileFieldWide:styles.profileField}>
               <span>{label} <span className={styles.requiredMark} aria-label="Bắt buộc">*</span></span>
-              <input name={name} type={kind} required aria-required="true" minLength={name==="phone"?7:2}
+              <input name={name} type={kind} defaultValue={account.profileDraftFields?.[name]??""} required aria-required="true" minLength={name==="phone"?7:2}
                 maxLength={name==="phone"||name==="personCode"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
                 autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
@@ -252,7 +259,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           </div>
           <footer className={styles.profileFooter}>
             <p>Thông tin được lưu vào hồ sơ Bơi Ếch. Chỉ tài khoản đủ quyền mới được xem hoặc xử lý.</p>
-            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
+            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":account.onboardingStage==="requested"?"Lưu hồ sơ để cán bộ xét duyệt":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
           </footer>
         </form> : null}
         <div className={styles.actions}><button type="button" disabled={busy} onClick={() => void run(() => reload())}>Đồng bộ trạng thái</button>
