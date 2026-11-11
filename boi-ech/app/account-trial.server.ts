@@ -23,7 +23,7 @@ export class AccountTrialService {
       .bind(actor.accountId).first<{role:TrialRole;status:string;stage:string}>();
     if(!row || !["manager","teacher","learner"].includes(row.role)
        ||row.status!=="pending" || !["requested","profile_required","changes_requested"].includes(row.stage))
-      fail("TRIAL_NOT_ELIGIBLE",403);
+      throw new AccountError("TRIAL_NOT_ELIGIBLE",403);
     return {actor,role:row.role};
   }
   private async readLease(accountId:string,role:TrialRole) {
@@ -33,7 +33,7 @@ export class AccountTrialService {
     if(!row){
       const clock=await this.db.prepare("SELECT CAST(unixepoch('now') AS INTEGER)*1000 AS now_ms")
         .first<{now_ms:number}>();
-      if(!clock)fail("TRIAL_CLOCK_UNAVAILABLE",503);
+      if(!clock)throw new AccountError("TRIAL_CLOCK_UNAVAILABLE",503);
       return {state:"available" as const,role,serverNowMs:Number(clock.now_ms),startedAtMs:null,expiresAtMs:null};
     }
     if(row.role!==role)fail("TRIAL_ROLE_CONFLICT",409);
