@@ -441,6 +441,21 @@ export async function portableManagerProof(storageDeviceId: string) {
     signature:btoa(binary).replaceAll("+","-").replaceAll("/","_").replaceAll("=","")};
 }
 
+/** Password recovery requires the P-256 key of the original trusted browser.
+ * This does NOT register a device or expose its private key.
+ */
+export async function portableChildhoodRecoveryProof(login: string, challenge: string) {
+  const credential=await readActiveCredential();
+  if(!credential?.privateKey) throw new Error("Thiết bị này không có khóa bảo mật gốc. Hãy dùng thiết bị đã đăng ký hoặc mã khôi phục một lần.");
+  if(!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(login)||!/^[A-Za-z0-9_-]{40,50}$/.test(challenge))
+    throw new Error("Yêu cầu khôi phục không hợp lệ.");
+  const bytes=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},credential.privateKey,
+    new TextEncoder().encode(`boi-ech:recover:${login}:${challenge}`));
+  let binary="";
+  new Uint8Array(bytes).forEach(byte=>{binary+=String.fromCharCode(byte)});
+  return {challenge,signature:btoa(binary).replaceAll("+","-").replaceAll("/","_").replaceAll("=","")};
+}
+
 export async function portableCredential(withProof = false) {
   let credential = await readActiveCredential();
   if (!credential?.privateKey || !credential.publicKey) {
