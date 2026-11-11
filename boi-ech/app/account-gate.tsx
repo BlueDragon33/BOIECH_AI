@@ -498,11 +498,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   }
   return <>
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
-      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof} accountSettings={accountPanel}/>
+      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
+        onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}/>
     </div> : null}
     {!managerDashboard && ready && active && !recovery && account ? <div key={account.accountId}>{children}</div> : null}
-    {!managerDashboard ? (ready && active && account
-      ? <details className={styles.managerAccountTools}><summary>Trang cá nhân · Cài đặt và bảo mật</summary>{accountPanel}</details>
-      : accountPanel) : null}
+    {!managerDashboard && ready && active && pathname!=="/" && account?
+      <button type="button" className={styles.accountCornerButton} onClick={()=>setProfileOpen(true)}
+        aria-label="Mở Trang cá nhân và bảo mật">Trang cá nhân</button>:null}
+    {!managerDashboard && !(ready && active && account) ? accountPanel : null}
+    {ready&&active&&account?<AccountProfileDialog open={profileOpen}
+      name={account.name||"Tài khoản Bơi Ếch"}
+      role={account.role==="manager"?"manager":account.role==="teacher"?"teacher":"learner"}
+      sections={profileSections} onClose={closeProfile}
+      onLogout={()=>void logoutAccount()} busy={busy}/>:null}
   </>;
 }
