@@ -71,29 +71,40 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  const classes=resources.filter(r=>r.kind==="class");
  const classKeys=new Set(classes.map(resource=>classKey(resource.name)));
  let visiblePeople=people;
+ let visibleSessions=sessions;
  if(actor?.accountId){
   const runtime=await import("./account-runtime.server");
   const service=await runtime.accountService(),principal=await service.authorize(await runtime.accountCookieToken());
+  if(principal.accountId!==actor.accountId)fail("Thiết bị và phiên không thuộc cùng tài khoản cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
   await service.capability(principal,"manager.manage.assigned");
+  const canonical=await db.prepare("SELECT storage_device_id FROM accounts WHERE account_id=?")
+    .bind(principal.accountId).first<{storage_device_id:string}>();
+  if(!canonical)fail("Không xác minh được thiết bị gốc của cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
   const assigned=await db.prepare("SELECT target_device_id FROM manager_device_assignments WHERE manager_device_id=?")
-    .bind(actor.deviceId).all<{target_device_id:string}>();
+    .bind(canonical.storage_device_id).all<{target_device_id:string}>();
   const ids=new Set((assigned.results??[]).map(r=>r.target_device_id));
   visiblePeople=people.filter(p=>ids.has(p.id));
+  visibleSessions=sessions.filter(session=>ids.has(session.teacherId));
  }
- return {resources,people:visiblePeople,sessions,from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:people.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:people.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
+ return {resources,people:visiblePeople,sessions:visibleSessions,from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
 export async function trainingCommand(actor:PublicDeviceState,payload:Record<string,unknown>) {
  requireManager(actor);
- let accountSessionHash="";
+ let accountSessionHash="",managerStorageDeviceId=actor.deviceId;
  if(actor.accountId){
   const runtime=await import("./account-runtime.server");
   const service=await runtime.accountService(),principal=await service.authorize(await runtime.accountCookieToken());
+  if(principal.accountId!==actor.accountId)fail("Thiết bị và phiên không thuộc cùng tài khoản cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
   await service.capability(principal,"manager.manage.assigned");
+  const canonical=await (await trainingDatabase()).prepare("SELECT storage_device_id FROM accounts WHERE account_id=?")
+    .bind(principal.accountId).first<{storage_device_id:string}>();
+  if(!canonical)fail("Không xác minh được thiết bị gốc của cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
+  managerStorageDeviceId=canonical.storage_device_id;
   accountSessionHash=principal.sessionHash;
   if(payload.action==="assign-person"||payload.action==="save-session"){
    const target=payload.action==="assign-person"?payload.personId:payload.teacherId;
    const owned=await (await trainingDatabase()).prepare("SELECT 1 AS allowed FROM manager_device_assignments WHERE manager_device_id=? AND target_device_id=?")
-    .bind(actor.deviceId,target).first<{allowed:number}>();
+    .bind(managerStorageDeviceId,target).first<{allowed:number}>();
    if(!owned)fail("Hồ sơ chưa thuộc phạm vi được phân công.","MANAGER_SCOPE_FORBIDDEN",403);
   }
  }
@@ -115,7 +126,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   AND s.token_hash=? AND s.revoked=0 AND b.revoked=0
   AND s.expires_at>(julianday('now')-2440587.5)*86400000 AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
   ${scopedTarget?"AND EXISTS(SELECT 1 FROM manager_device_assignments ma WHERE ma.manager_device_id=a.device_id AND ma.target_device_id=?)":""})`:AUTH_GUARD;
- const authorityBindings=actor.accountId?[actor.deviceId,accountSessionHash,...(scopedTarget?[scopedTarget]:[])]:[actor.deviceId];
+ const authorityBindings=actor.accountId?[managerStorageDeviceId,accountSessionHash,...(scopedTarget?[scopedTarget]:[])]:[actor.deviceId];
  const db=await trainingDatabase();const commandId=id(payload.commandId);
  const action=payload.action;let command:Record<string,unknown>;let write:D1PreparedStatement;
  if(action==="save-resource") {
