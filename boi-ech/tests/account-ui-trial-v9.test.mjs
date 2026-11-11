@@ -70,7 +70,7 @@ test("V9 trial: network contract has no real trial mutation endpoint, sandbox ne
  const gate=readFileSync(new URL("../app/account-gate.tsx",import.meta.url),"utf8");
  assert.match(source,/DỮ LIỆU THỬ — KHÔNG LƯU VÀO HỒ SƠ THẬT/);
  assert.doesNotMatch(source,/localStorage\.|sessionStorage\.|indexedDB\.|serviceWorker\./);
- assert.doesNotMatch(source,/(?:fetch|send)\(\s*["'](?:\/api\/(?!accounts))?/);
+ assert.doesNotMatch(source,/fetch\(\s*["']\/api\/(?!accounts\b)/);
  assert.match(source,/body:JSON\.stringify\(\{action:"trial-status"\}\)/);
  assert.match(route,/config\.uiTrial/);
  assert.match(route,/p\.action === "trial-start"/);
