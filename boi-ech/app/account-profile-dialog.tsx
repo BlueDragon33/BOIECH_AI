@@ -18,14 +18,12 @@ const Icon=({name}:{name:ProfileSection["id"]})=>
   strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{icons[name]}</svg>;
 
 export default function AccountProfileDialog({open,name,role,sections,onClose,onLogout,busy=false}:Props){
- const [mounted,setMounted]=useState(false);
  const [selected,setSelected]=useState<ProfileSection["id"]>("overview");
  const closeRef=useRef<HTMLButtonElement>(null);
  const priorFocus=useRef<HTMLElement|null>(null);
  const dialogId=useId();
- useEffect(()=>{setMounted(true)},[]);
  useEffect(()=>{
-   if(!open||!mounted)return;
+   if(!open)return;
    priorFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
    const previousOverflow=document.body.style.overflow;
    document.body.style.overflow="hidden";
@@ -44,8 +42,8 @@ export default function AccountProfileDialog({open,name,role,sections,onClose,on
    document.addEventListener("keydown",onKey);
    queueMicrotask(()=>closeRef.current?.focus());
    return()=>{document.removeEventListener("keydown",onKey);document.body.style.overflow=previousOverflow;priorFocus.current?.focus();};
- },[open,mounted,onClose]);
- if(!open||!mounted)return null;
+ },[open,onClose]);
+ if(!open||typeof document==="undefined")return null;
  const active=sections.find(s=>s.id===selected)??sections[0];
  return createPortal(<div className={styles.backdrop} role="presentation"
    onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
