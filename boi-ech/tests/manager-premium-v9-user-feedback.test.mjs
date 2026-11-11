@@ -64,3 +64,10 @@ test("V9 decision text preserves preapproval draft and does not imply second pro
  assert.match(panel,/Chưa cấp quyền truy cập/);
  assert.doesNotMatch(panel,/Người dùng sẽ phải bổ sung hồ sơ trước khi được kích hoạt/);
 });
+
+test("V9 pending stepper and profile-required guidance reflect canonical saved draft",()=>{
+ const gate=read("account-gate.tsx");
+ assert.match(gate,/account\.profileDraftReady\?"Đã lưu hồ sơ":"Khai hồ sơ"/);
+ assert.match(gate,/account\.profileDraftReady\?"Đã được duyệt\. Hồ sơ khai trước đã lưu/);
+ assert.match(gate,/profile-draft-activate/);
+});
