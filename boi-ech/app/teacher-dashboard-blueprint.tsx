@@ -172,45 +172,15 @@ function ensureAttentionToolbar(state: BlueprintState) {
   applyAttentionFilters(state);
 }
 
-function ensureTopbarTools() {
-  const actions = document.querySelector<HTMLElement>("body[data-teacher-role-ui='active'] .topbar-actions");
-  const chip = actions?.querySelector<HTMLElement>(".learner-chip");
-  if (!actions || !chip) return;
-  if (!actions.querySelector(".teacher-topbar-refresh")) {
-    const refresh = document.createElement("button");
-    refresh.type = "button";
-    refresh.className = "teacher-topbar-tool teacher-topbar-refresh";
-    refresh.dataset.teacherBlueprint = "refresh";
-    refresh.textContent = "Làm mới";
-    refresh.addEventListener("click", () => window.dispatchEvent(new CustomEvent("boi-ech:teacher-refresh")));
-    actions.insertBefore(refresh, chip);
-  }
-  if (!actions.querySelector(".teacher-topbar-sync")) {
-    const sync = document.createElement("button");
-    sync.type = "button";
-    sync.className = "teacher-topbar-tool teacher-topbar-sync";
-    sync.dataset.teacherBlueprint = "sync";
-    sync.textContent = "Đồng bộ";
-    sync.addEventListener("click", () => window.dispatchEvent(new CustomEvent("boi-ech:teacher-roster-sync")));
-    actions.insertBefore(sync, chip);
-  }
-  if (!actions.querySelector(".teacher-mode-badge")) {
-    const badge = document.createElement("span");
-    badge.className = "teacher-mode-badge";
-    badge.dataset.teacherBlueprint = "mode-badge";
-    badge.textContent = "Giảng viên Pro";
-    actions.insertBefore(badge, chip);
-  }
-  if (!actions.querySelector(".teacher-alert-shortcut")) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "teacher-alert-shortcut";
-    button.dataset.teacherBlueprint = "alert-shortcut";
-    button.setAttribute("aria-label", "Mở cảnh báo nhanh");
-    button.innerHTML = `<span>!</span>`;
-    button.addEventListener("click", () => scrollTo(".teacher-alert-list"));
-    actions.insertBefore(button, chip);
-  }
+function removeLegacyTopbarTools() {
+  // V9: no extra command buttons above Teacher content. Existing active
+  // sessions can retain injected nodes during HMR; clear them too.
+  document.querySelectorAll(
+    '.topbar-actions > .teacher-topbar-refresh, ' +
+    '.topbar-actions > .teacher-topbar-sync, ' +
+    '.topbar-actions > .teacher-mode-badge, ' +
+    '.topbar-actions > .teacher-alert-shortcut'
+  ).forEach(node => node.remove());
 }
 
 function ensureHeroDetails() {
@@ -276,7 +246,7 @@ export default function TeacherDashboardBlueprint() {
         return;
       }
       document.body.dataset.teacherBlueprint = "active";
-      ensureTopbarTools();
+      removeLegacyTopbarTools();
       ensureHeroDetails();
       ensureAttentionToolbar(state);
       ensureReviewActions(state);
