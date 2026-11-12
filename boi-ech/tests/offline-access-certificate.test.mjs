@@ -76,7 +76,8 @@ test("issues only server-verified completion certificates without exposing phone
   assert.match(route, /verificationCode/);
   assert.doesNotMatch(route.match(/function publicCertificate[\s\S]*?\n}/)?.[0] ?? "", /phone/i);
   assert.match(certificatePage, /In \/ Lưu PDF/);
-  assert.match(certificatePage, /Giảng viên có thể mở lại đúng liên kết/);
+  assert.match(certificatePage, /Ai có mã xác minh đều có thể xem chứng nhận hoàn thành này/);
+  assert.match(certificatePage, /không hiển thị công khai/);
   assert.match(migration, /CREATE TABLE `course_certificates`/);
 });
 
