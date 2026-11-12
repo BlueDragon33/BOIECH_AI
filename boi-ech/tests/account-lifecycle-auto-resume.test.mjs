@@ -59,17 +59,17 @@ test("approval polling at 20s and automatic draft activation still work without 
  assert.match(gateSource,/account\.onboardingStage==="profile_required"/);
  assert.match(gateSource,/account\.profileDraftReady!==true/);
  assert.match(gateSource,/action:"profile-draft-activate"/);
- assert.match(gateSource,/shouldAutoResumeDocument\(observedLifecycle\.current,nextLifecycle\)/);
+ assert.match(gateSource,/shouldAutoResumeDocument\(observedLifecycle\.current, nextLifecycle\)/);
  assert.match(gateSource,/readbackId !== readbackGeneration\.current/);
  assert.match(gateSource,/activationNeedsDocumentBootstrap\.current = null/);
 });
 
 test("profile submitted during manager approval retries once against readback and never registers again",()=>{
  assert.match(gateSource,/code!=="ACCOUNT_CAS_CONFLICT"/);
- assert.match(gateSource,/fresh\.account\?\.accountId!==account\?\.accountId/);
- assert.match(gateSource,/fresh\.account\.deviceApproved!==true/);
+ assert.match(gateSource,/verified\.accountId!==account\?\.accountId/);
+ assert.match(gateSource,/verified\.deviceApproved!==true/);
  assert.match(gateSource,/stage==="requested"\?"profile-draft-save":"submit-profile"/);
- assert.match(gateSource,/expectedRevision:fresh\.account\.onboardingRevision/);
+ assert.match(gateSource,/expectedRevision:verified\.onboardingRevision/);
  assert.doesNotMatch(gateSource,/action:"register".*expectedRevision:fresh/);
 });
 test("post-approval helper and UI source parse under real TypeScript compiler",()=>{
