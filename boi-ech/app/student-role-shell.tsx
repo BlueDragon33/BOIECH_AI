@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { shouldRefreshRoleShell } from "./role-mutation-filter";
 
 type LessonSnapshot = {
   index: number;
@@ -322,8 +323,7 @@ export default function StudentRoleShell() {
     };
     schedule();
     observer = new MutationObserver((mutations) => {
-      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-student-role-ui]"))) return;
-      schedule();
+      if (shouldRefreshRoleShell(mutations, "student")) schedule();
     });
     observer.observe(document.body, {
       childList: true,
