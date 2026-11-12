@@ -38,7 +38,7 @@ jobs:
       BOI_ECH_BASE_URL: ${{ vars.BOI_ECH_PREVIEW_ORIGIN }}
       CONTROL_OWNER_EMAILS: ${{ vars.CONTROL_OWNER_EMAILS }}
       APPLICATION_MANAGEMENT_ACCESS_MODE: standalone
-      APPLICATION_MANAGEMENT_BUILD_REVISION: 7f2e2e40fdae99cc483112c5eba94c59df74a4ec
+      APPLICATION_MANAGEMENT_BUILD_REVISION: 64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd
       PREVIEW_BRIDGE_CONFIRMATION: ${{ inputs.bridge_confirmation }}
 
     steps:
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: BlueDragon33/Application-Management
-          ref: 7f2e2e40fdae99cc483112c5eba94c59df74a4ec
+          ref: 64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd
           path: application-management-preview-source
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -121,7 +121,7 @@ jobs:
       - name: Package App Preview
         working-directory: application-management-preview-source
         env:
-          GITHUB_SHA: 7f2e2e40fdae99cc483112c5eba94c59df74a4ec
+          GITHUB_SHA: 64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd
         run: npm run cloudflare:preview:prepare
 
       - name: Confirm approved D1 identities and retained access protection without remote writes

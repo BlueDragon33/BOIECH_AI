@@ -27,18 +27,28 @@ function parse<T>(value: string, fallback: T): T {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 }
 
+// A public verifier needs only enough facts to confirm the award. Possession
+// of a certificate URL never grants access to private device or learning records.
 function publicCertificate(row: CertificateRow) {
   return {
     verificationCode: row.verification_code,
-    deviceCode: row.device_code,
     learnerName: row.learner_name,
     className: row.class_name,
-    scores: parse<Record<string, number>>(row.scores_json, {}),
-    totalActiveSeconds: Math.max(0, Number(row.total_active_seconds) || 0),
     completedAt: row.completed_at,
     courseVersion: row.course_version,
     issuedAt: row.issued_at,
     courseTitle: "Ứng dụng AI trong dạy và học môn Bơi ếch",
+  };
+}
+
+// Only the signed-device issuance response retains private metrics. The public
+// GET endpoint deliberately never calls this projection.
+function issuedCertificate(row: CertificateRow) {
+  return {
+    ...publicCertificate(row),
+    deviceCode: row.device_code,
+    scores: parse<Record<string, number>>(row.scores_json, {}),
+    totalActiveSeconds: Math.max(0, Number(row.total_active_seconds) || 0),
   };
 }
 
@@ -92,7 +102,7 @@ export async function POST(request: Request) {
               total_active_seconds, completed_at, course_version, issued_at
          FROM course_certificates WHERE device_id = ?`,
     ).bind(device.deviceId).first<CertificateRow>();
-    if (existing) return json({ certificate: publicCertificate(existing), created: false });
+    if (existing) return json({ certificate: issuedCertificate(existing), created: false });
 
     const completion = await database.prepare(
       `SELECT MAX(created_at) AS completed_at FROM course_activity_events
@@ -123,7 +133,7 @@ export async function POST(request: Request) {
     ]);
     const row = await certificateForCode(code);
     if (!row) return json({ error: "Không thể đọc chứng chỉ vừa tạo." }, 500);
-    return json({ certificate: publicCertificate(row), created: true }, 201);
+    return json({ certificate: issuedCertificate(row), created: true }, 201);
   } catch (error) {
     if (error instanceof DeviceAccessError) return json({ error: error.message, code: error.code, device: error.device }, error.status);
     return json({ error: "Dịch vụ chứng chỉ đang tạm gián đoạn." }, 500);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { shouldRefreshRoleShell } from "./role-mutation-filter";
 import TeacherLearningAnalyticsPanel, { type InterventionLearningAnalyticsClient, type LearnerLearningAnalyticsClient } from "./teacher-learning-analytics";
 import TeacherSmartInterventions, { type SmartSuggestionClient } from "./teacher-smart-interventions";
 import TeacherTwoWayMessages, { type TeacherLearnerReply } from "./teacher-two-way-messages";
@@ -334,10 +335,7 @@ export default function TeacherRoleShell() {
     };
     schedule();
     const observer = new MutationObserver((mutations) => {
-      // The body carries the active-role flag; it must not make every DOM node
-      // look like an owned portal and hide legitimate device/role transitions.
-      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-teacher-role-ui]:not(body)"))) return;
-      schedule();
+      if (shouldRefreshRoleShell(mutations, "teacher")) schedule();
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "title", "data-device-id", "data-person-role"] });
     return () => {

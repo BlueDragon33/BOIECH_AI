@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { shouldRefreshRoleShell } from "./role-mutation-filter";
 
 type LessonSnapshot = {
   index: number;
@@ -17,7 +18,6 @@ type LessonSnapshot = {
 type StudentSnapshot = {
   name: string;
   initial: string;
-  personCode: string;
   activeSection: string;
   completedLessons: number;
   totalLessons: number;
@@ -34,7 +34,6 @@ type StudentSnapshot = {
 const EMPTY: StudentSnapshot = {
   name: "Học viên",
   initial: "H",
-  personCode: "",
   activeSection: "Tổng quan",
   completedLessons: 0,
   totalLessons: 8,
@@ -217,7 +216,7 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
 
       <section className="student-profile-card" id="student-profile">
         <div className="student-avatar">{snapshot.initial}</div>
-        <div><span>HỒ SƠ HỌC VIÊN</span><h3>{snapshot.name}</h3><p>{snapshot.personCode || "Mã học viên được bảo vệ theo thiết bị"}</p></div>
+        <div><span>HỒ SƠ HỌC VIÊN</span><h3>{snapshot.name}</h3><p>Hồ sơ học tập đã xác thực</p></div>
         <dl><div><dt>Vai trò</dt><dd>Học viên</dd></div><div><dt>Quyền truy cập</dt><dd>{snapshot.access || "Đã xác thực"}</dd></div><div><dt>Trạng thái</dt><dd>{snapshot.network}</dd></div><div><dt>Thiết bị</dt><dd>{DEVICE_TYPE_LABELS[snapshot.deviceType]}{snapshot.platform ? ` · ${snapshot.platform}` : ""}{snapshot.browser ? ` · ${snapshot.browser}` : ""}</dd></div></dl>
       </section>
     </div>
@@ -277,8 +276,6 @@ export default function StudentRoleShell() {
 
       const chip = document.querySelector<HTMLElement>(".learner-chip");
       const rawName = text(chip?.querySelector("strong")).replace(/^Chào\s+/i, "") || "Học viên";
-      const title = chip?.getAttribute("title") ?? "";
-      const personCode = title.includes("·") ? title.split("·").slice(1).join("·").trim() : "";
       const topStatus = text(document.querySelector(".top-status"));
       const lessonMatch = /([0-9]+)\s*\/\s*([0-9]+)\s*bài/i.exec(topStatus);
       const progressText = text(document.querySelector(".sidebar-progress strong"));
@@ -301,7 +298,6 @@ export default function StudentRoleShell() {
       const next: StudentSnapshot = {
         name: rawName,
         initial: rawName.slice(0, 1).toUpperCase() || "H",
-        personCode,
         activeSection,
         completedLessons: lessonMatch ? Number(lessonMatch[1]) : lessons.filter((item) => item.done).length,
         totalLessons: lessonMatch ? Number(lessonMatch[2]) : Math.max(8, lessons.length),
@@ -327,8 +323,7 @@ export default function StudentRoleShell() {
     };
     schedule();
     observer = new MutationObserver((mutations) => {
-      if (mutations.every((mutation) => mutation.target instanceof Element && mutation.target.closest("[data-student-role-ui]"))) return;
-      schedule();
+      if (shouldRefreshRoleShell(mutations, "student")) schedule();
     });
     observer.observe(document.body, {
       childList: true,

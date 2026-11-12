@@ -1,0 +1,90 @@
+name: Boi Ech Paired Preview Read-Only QA
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/boi-paired-preview-readonly-qa.yml"
+      - ".github/workflows/deploy-boi-ech-preview.yml"
+      - "boi-ech/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-pair-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      EXPECTED_APP_SHA: 64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout Owner-approved Application-Management Preview source
+        uses: actions/checkout@v4
+        with:
+          repository: BlueDragon33/Application-Management
+          ref: 64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd
+          path: paired-application-management
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+      - name: Assert exact paired revisions and read-only V2 integration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C paired-application-management rev-parse HEAD)" = "$EXPECTED_APP_SHA"
+          test "$(grep -Fc "$EXPECTED_APP_SHA" .github/workflows/deploy-boi-ech-preview.yml)" -eq 3
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const boi=fs.readFileSync('boi-ech/app/api/control/v2/account-summary/route.ts','utf8');
+          const app=fs.readFileSync('paired-application-management/app/api/apps/boi-ech/access/route.ts','utf8');
+          const view=fs.readFileSync('paired-application-management/app/boi-access-view.tsx','utf8');
+          if (!boi.includes('contract: "boi-account-summary.v2"')
+            || !boi.includes('requireControlService(request)')
+            || boi.includes('export async function POST(')
+            || !app.includes('/api/control/v2/account-summary')
+            || !app.includes('result.payload.contract !== "boi-account-summary.v2"')
+            || !view.includes('data.contract === "boi-account-summary.v2"')
+            || !view.includes('data.verified !== true')) {
+            throw Error('Paired Preview Account-first V2 contract mismatch: fail closed');
+          }
+          console.log('Paired exact-SHA contract PASS; no remote D1 or Worker writes');
+          NODE
+      - name: Install and test BOIECH_AI
+        working-directory: boi-ech
+        run: |
+          npm ci --no-audit --no-fund
+          npm run lint
+          npm test
+      - name: Install and test pinned Application-Management
+        working-directory: paired-application-management
+        run: |
+          npm ci --no-audit --no-fund
+          npm run lint
+          npm test
+
+  production-anonymous-readback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+      - name: Read current Production anonymous V2 flags (GET only, no cookies)
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const url='https://boi-ech.boiech-ai.workers.dev/api/accounts';
+          const response=await fetch(url,{method:'GET',redirect:'manual',
+            headers:{'accept':'application/json','cache-control':'no-store'},
+            signal:AbortSignal.timeout(20000)});
+          console.log('Current Production anonymous /api/accounts HTTP',response.status);
+          let data;
+          try { data=await response.json(); }catch { throw Error('Production account API response is not JSON'); }
+          const result={enabled:data.enabled===true,accountV2:data.accountV2===true,
+            accountSingleReview:data.accountSingleReview===true,
+            code:typeof data.code==='string'?data.code:null};
+          console.log('Current Production account feature flags (no private data):',JSON.stringify(result));
+          if(response.status!==200||!result.enabled||!result.accountV2)
+            throw Error('Production anonymous Account-first V2 readback FAIL — do not claim registration operational');
+          NODE

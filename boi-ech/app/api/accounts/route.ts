@@ -12,7 +12,17 @@ const json = (data: unknown, cookie?: string) => Response.json(data, { headers: 
 export async function GET(request: Request) {
   try { const { service, token, config } = await accountRequest(request);
     if (!token) return json({ enabled: true, account: null, accountV2: config.v2, accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial });
-    const account = await service.session(token);
+    // Expired/revoked browser cookies are not a reason to hide public V2
+    // registration. Keep server feature flags, clear the invalid session,
+    // and return anonymous state; every protected action remains fail-closed.
+    let account: Awaited<ReturnType<typeof service.session>>;
+    try { account = await service.session(token); }
+    catch (error) {
+      if (error instanceof AccountError && (error.code === "SESSION_INVALID" || error.code === "SESSION_REQUIRED"))
+        return json({ enabled: true, account: null, accountV2: config.v2,
+          accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial }, sessionCookie(""));
+      throw error;
+    }
     const workflow=config.v2?new AccountV2Workflow(await getCourseDatabase(),service,config.singleReview):null;
     const onboarding = workflow ? await workflow.ownStatus(token) : null;
     const profileDraft=workflow && account.deviceApproved ? await workflow.ownProfileDraft(token) : null;
