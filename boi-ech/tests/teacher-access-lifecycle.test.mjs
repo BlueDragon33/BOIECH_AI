@@ -10,6 +10,12 @@ async function fixture(credential = null) {
   const source = ts.createSourceFile(path.pathname, await readFile(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const declarations = source.statements.filter(node => ts.isFunctionDeclaration(node) && ["TeacherRoleShell", "createTeacherOverviewLoader"].includes(node.name?.text));
   const { outputText } = ts.transpileModule(declarations.map(node => node.getText(source).replace("export default ", "")).join("\n"), { compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 } });
+  // Run the real shared role mutation filter in this fake DOM fixture too.
+  const filterSource = await readFile(new URL("../app/role-mutation-filter.ts", import.meta.url), "utf8");
+  const filterCode = ts.transpileModule(filterSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const loadedFilter = { exports: {} };
+  new Function("exports", "module", filterCode)(loadedFilter.exports, loadedFilter);
+  const shouldRefreshRoleShell = loadedFilter.exports.shouldRefreshRoleShell;
   const slots = [], effects = [], timers = new Map(), listeners = new Map(), observers = new Set(), requests = [], keys = [];
   let cursor = 0, dirty = true, tree, now = 0, timerId = 0, mountCount = 0;
   const changed = (a, b) => !a || a.length !== b.length || a.some((value, index) => !Object.is(value, b[index]));
@@ -30,13 +36,22 @@ async function fixture(credential = null) {
     });
   }
   class Element {
-    dataset = {}; children = []; isConnected = true; className = "";
+    dataset = {}; children = []; isConnected = true; className = ""; nodeType = 1;
+    get parentElement() { return this.parent ?? null; }
     querySelector(selector) { return this.queries?.[selector] ?? null; }
     getAttribute(name) { return name === "data-device-id" ? this.dataset.deviceId : name === "title" ? "Giảng viên thử nghiệm · SQTEST" : null; }
-    closest(selector) {
-      if (this.dataset.teacherRoleUi && !(selector.includes(":not(body)") && this.tagName === "BODY")) return this;
-      return this.parent?.closest(selector) ?? null;
+    matches(selector) {
+      return selector.split(",").some(part => {
+        const value = part.trim();
+        if (value === ".app-shell") return this === shell;
+        if (value === ".learner-chip") return this === chip;
+        if (value === ".sidebar") return this === sidebar;
+        if (value === ".topbar") return this === topbar;
+        if (value === "[data-teacher-role-ui]:not(body)") return Boolean(this.dataset.teacherRoleUi && this.tagName !== "BODY");
+        return false;
+      });
     }
+    closest(selector) { return this.matches(selector) ? this : this.parent?.closest(selector) ?? null; }
     append(node) { node.parent = this; node.isConnected = this.isConnected; this.children.push(node); notify(this); }
     insertBefore(node) { this.append(node); }
     insertAdjacentElement(_where, node) { this.parent.append(node); }
@@ -74,7 +89,7 @@ async function fixture(credential = null) {
   const hashing = new Set();
   const cryptoFacade = { subtle: { digest(...args) { const pending = crypto.subtle.digest(...args); hashing.add(pending); pending.finally(() => hashing.delete(pending)); return pending; } } };
   const React = { Fragment: "fragment", createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
-  const render = new Function("useState", "useRef", "useMemo", "useEffect", "React", "createPortal", "window", "document", "MutationObserver", "Element", "text", "loadTeacherOverview", "saveTeacherAction", "readStoredDeviceCredential", "TeacherNavigation", "TeacherSearch", "TeacherDashboard", "crypto", `${outputText}; return TeacherRoleShell;`)(useState, useRef, useMemo, useEffect, React, (child, mount) => ({ type: "portal", children: [child], mount }), window, document, MutationObserver, Element, node => node?.textContent ?? "", load, async () => {}, async () => credential, "nav", "search", "dashboard", cryptoFacade);
+  const render = new Function("useState", "useRef", "useMemo", "useEffect", "React", "createPortal", "window", "document", "MutationObserver", "Element", "text", "loadTeacherOverview", "saveTeacherAction", "readStoredDeviceCredential", "TeacherNavigation", "TeacherSearch", "TeacherDashboard", "crypto", "shouldRefreshRoleShell", `${outputText}; return TeacherRoleShell;`)(useState, useRef, useMemo, useEffect, React, (child, mount) => ({ type: "portal", children: [child], mount }), window, document, MutationObserver, Element, node => node?.textContent ?? "", load, async () => {}, async () => credential, "nav", "search", "dashboard", cryptoFacade, shouldRefreshRoleShell);
   function find(node, type) { if (!node) return null; if (node.type === type) return node; for (const child of node.children ?? []) { const found = find(child, type); if (found) return found; } return null; }
   async function settle() {
     for (let iteration = 0; iteration < 40; iteration++) {
