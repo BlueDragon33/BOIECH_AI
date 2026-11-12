@@ -116,7 +116,7 @@ function LegacyManagerApprovalPanel({getProof,previewOnly=false}:{getProof?:(sig
       <section><h3>Chờ cán bộ xét duyệt</h3>
         {queued.map(device=><article key={device.deviceId} className={styles.device}>
           <div><strong>{device.name} · {device.role==="teacher"?"Giảng viên":"Học viên"}</strong>
-            <small>{device.deviceCode} · {device.personCode} · {device.className}</small></div>
+            <small>{device.deviceCode} · {device.className || "Chưa phân lớp"}</small></div>
           <button type="button" disabled={busy||previewOnly||board.quotas[device.role].used>=board.quotas[device.role].limit||
             !device.registrationComplete} onClick={()=>void decide("approve",device)}>Duyệt thiết bị</button>
         </article>)}
