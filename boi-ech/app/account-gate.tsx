@@ -7,6 +7,7 @@ import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialo
 import VerifiedSyncSettings from "./verified-sync-settings";
 import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
+import { accountServerActive, shouldAutoResumeDocument, recoveryMustRemainVisible, type ObservedLifecycle } from "./account-lifecycle-client";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
@@ -112,11 +113,19 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
   const refreshInFlight=useRef(false);
+  const readbackGeneration=useRef(0);
+  const observedLifecycle=useRef<ObservedLifecycle|null>(null);
+  const activationNeedsDocumentBootstrap=useRef<string|null>(null);
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
+    const readbackId=++readbackGeneration.current;
     const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
     const data = await readAccountPayload(response) as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
-    if (mounted.current) { setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true); setTrialEnabled(data.accountUiTrial === true); }
+    // A polling GET can finish after a successful profile submit/readback.
+    // Never allow that stale reply to roll the UI back to a pending state.
+    if (!mounted.current || readbackId !== readbackGeneration.current) return;
+    setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true);
+    setTrialEnabled(data.accountUiTrial === true);
     if (!response.ok) {
       if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
       throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
@@ -131,8 +140,17 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       if(mounted.current) setReady(false);
     }
     await preparePortableAccount(data.account?.accountId ?? null, claim);
+    if (!mounted.current || readbackId !== readbackGeneration.current) return;
     current.current = data.account?.accountId ?? "";
-    if (mounted.current) { setObservedNow(Date.now()); setAccount(data.account ?? null); setDevices(data.devices ?? []); setReady(true); }
+    const nextLifecycle: ObservedLifecycle = {
+      accountId: data.account?.accountId ?? "",
+      active: accountServerActive(data.account, data.accountV2 === true, Date.now()),
+    };
+    if (shouldAutoResumeDocument(observedLifecycle.current, nextLifecycle))
+      activationNeedsDocumentBootstrap.current = nextLifecycle.accountId;
+    observedLifecycle.current = nextLifecycle;
+    setObservedNow(Date.now()); setAccount(data.account ?? null);
+    setDevices(data.devices ?? []); setReady(true);
   }, []);
   useEffect(()=>{
     if(!enabled||bypass)return;
@@ -321,18 +339,51 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     signal?.throwIfAborted();
     return portableManagerProof(managerStorageId);
   },[managerStorageId]);
+  const active = accountServerActive(account, v2, observedNow);
+  useEffect(()=>{
+    if (!enabled || bypass || !ready || !active || !account?.accountId ||
+      activationNeedsDocumentBootstrap.current !== account.accountId || recovery) return;
+    // No one-time recovery secret is discarded by an automatic reload.
+    // The server has already confirmed account, device, onboarding and entitlement.
+    activationNeedsDocumentBootstrap.current = null;
+    window.location.reload();
+  },[enabled,bypass,ready,active,account?.accountId,recovery]);
   if (!enabled || bypass) return children;
-  const active = account?.status === "approved" && (!account.expiresAt || Date.parse(account.expiresAt) > observedNow)
-    && (!v2 || (account.onboardingStage==="active" && account.deviceApproved===true && account.entitlementActive===true));
   const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
     && account.storageDeviceId && pathname==="/");
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
       const pending=account?.onboardingStage==="requested";
-      await send({...fields,action:pending?"profile-draft-save":"submit-profile",expectedRevision:account?.onboardingRevision});
+      const action=pending?"profile-draft-save":"submit-profile";
+      let alreadyActivated=false;
+      try {
+        await send({...fields,action,expectedRevision:account?.onboardingRevision});
+      } catch(caught) {
+        if((caught as {code?:string})?.code!=="ACCOUNT_CAS_CONFLICT")throw caught;
+        // Review can finish while a user is filling the form. Read the
+        // canonical state, then retry this one profile submission once with
+        // the new revision; never resubmit an account registration.
+        const response=await fetch("/api/accounts",{credentials:"same-origin",cache:"no-store"});
+        const fresh=await readAccountPayload(response) as {account?:Account|null};
+        if(!response.ok || fresh.account?.accountId!==account?.accountId ||
+          fresh.account.deviceApproved!==true)throw caught;
+        const stage=fresh.account.onboardingStage;
+        if(accountServerActive(fresh.account,v2,Date.now())) alreadyActivated=true;
+        else if(Number.isInteger(fresh.account.onboardingRevision) &&
+          (stage==="requested" || stage==="profile_required" ||
+          stage==="changes_requested" || (singleReview && stage==="profile_review"))) {
+          await send({...fields,action:stage==="requested"?"profile-draft-save":"submit-profile",
+            expectedRevision:fresh.account.onboardingRevision});
+        } else {
+          await reload();
+          throw new Error("Trạng thái xét duyệt đã thay đổi. Đã đồng bộ hồ sơ mới; vui lòng kiểm tra lại.");
+        }
+      }
       await reload();
-      setNotice(pending?"Đã lưu hồ sơ để cán bộ có thể kiểm duyệt. Khi được duyệt, bạn sẽ không phải nhập lại thông tin.":singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Đã gửi hồ sơ để xét duyệt.");
+      setNotice(alreadyActivated?"Hồ sơ đã được kích hoạt trên máy chủ."
+        :pending?"Đã lưu hồ sơ để cán bộ có thể kiểm duyệt. Khi được duyệt, bạn sẽ không phải nhập lại thông tin."
+        :singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Đã gửi hồ sơ để xét duyệt.");
     });
   }
   async function openTrial(){
@@ -614,11 +665,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
         accountName={account.name||"Cán bộ quản lý"}/>
     </div> : null}
-    {!managerDashboard && ready && active && !recovery && account ? <div key={account.accountId}>{children}</div> : null}
+    {!managerDashboard && ready && active && account ? <div key={account.accountId}>{children}</div> : null}
     {!managerDashboard && ready && active && pathname!=="/" && account?
       <button type="button" className={styles.accountCornerButton} onClick={()=>setProfileOpen(true)}
         aria-label="Mở Trang cá nhân và bảo mật">Trang cá nhân</button>:null}
     {!managerDashboard && !(ready && active && account) ? accountPanel : null}
+    {ready && account && recoveryMustRemainVisible(active,recovery) ?
+      <aside className={styles.activeRecovery} aria-label="Mã khôi phục tài khoản cần lưu" role="region">
+        <h2>Mã khôi phục một lần · hãy lưu riêng</h2>
+        <p>Bạn đã được vào ứng dụng. Mã này chỉ hiển thị một lần; hãy lưu ở nơi an toàn để khôi phục tài khoản khi cần.</p>
+        <code>{recovery}</code>
+        <button type="button" onClick={()=>setRecovery("")}>Tôi đã lưu mã an toàn</button>
+      </aside>:null}
     {ready&&active&&account?<AccountProfileDialog open={profileOpen}
       name={account.name||"Tài khoản Bơi Ếch"}
       role={account.role==="manager"?"manager":account.role==="teacher"?"teacher":"learner"}
