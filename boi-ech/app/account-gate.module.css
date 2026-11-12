@@ -218,3 +218,16 @@
 @media(max-width:600px){.settingDataGrid{grid-template-columns:1fr}.profileSummary{padding:15px}
  .profileLargeAvatar{width:52px;height:52px;border-radius:16px;font-size:1.3rem}
  .accountCornerButton{right:9px;top:9px;padding:8px;font-size:.8rem}}
+
+/* Inline auth validation: adjacent, high-contrast and accessible on every viewport. */
+.authRoot .authForm .fieldError{
+ display:block;margin:2px 0 0;padding:7px 10px;border-left:3px solid #ba303a;
+ border-radius:5px;background:#fff0f1;color:#8b1528;font-size:.84rem;
+ line-height:1.45;font-weight:700;overflow-wrap:anywhere;
+}
+.authRoot .authForm input[aria-invalid="true"]{
+ border-color:#b42335;background:#fff8f8;box-shadow:0 0 0 1px #b4233540;
+}
+.authRoot .authForm input[aria-invalid="true"]:focus-visible{
+ outline:3px solid #b4233580;outline-offset:2px;
+}
