@@ -505,11 +505,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       </> : <>
 
         <form key={mode} className={styles.authForm} noValidate
-          onInvalidCapture={e=>{const input=e.target as HTMLInputElement;
+          onInvalidCapture={e=>{const input=e.target as unknown as HTMLInputElement;
             if(input.tagName==="INPUT"){e.preventDefault();onAuthInvalid(input,e.currentTarget);}}}
-          onBlurCapture={e=>{const input=e.target as HTMLInputElement;
+          onBlurCapture={e=>{const input=e.target as unknown as HTMLInputElement;
             if(input.tagName==="INPUT")onAuthBlur(input,e.currentTarget);}}
-          onInputCapture={e=>{const input=e.target as HTMLInputElement;
+          onInputCapture={e=>{const input=e.target as unknown as HTMLInputElement;
             if(input.tagName==="INPUT")onAuthInput(input);}}
           onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
           <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy} aria-invalid={Boolean(fieldErrors.login)} aria-describedby={fieldErrors.login?"auth-login-error":undefined}/>{fieldErrors.login?<small id="auth-login-error" role="alert" className={styles.fieldError}>{fieldErrors.login}</small>:null}</label>
