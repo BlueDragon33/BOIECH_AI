@@ -17,7 +17,7 @@ class FakeNode {
     this.tags.add("ELEMENT");
   }
   matches(selector){return selector.split(",").some(s=>this.tags.has(s.trim()));}
-  closest(selector){for(let n=this;n;n=n.parentElement)if(n.matches(selector))return n;return null;}
+  closest(selector){if(this.matches(selector))return this;return this.parentElement?.closest(selector)??null;}
   querySelector(selector){for(const node of this.children){if(node.matches(selector))return node;const inside=node.querySelector(selector);if(inside)return inside;}return null;}
 }
 const root=new FakeNode({types:["BODY"]});
