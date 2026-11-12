@@ -121,6 +121,17 @@ test('P2 five-item mobile dock and header settings preserve all destinations wit
  center.props.onNavigate('building');assert.equal(selected,'building');
  assert.equal(writes,0);
 });
+test('P2 approval and settings do not show an irrelevant scheduling time-window widget',()=>{
+ for(const tab of ['approval','settings']){
+  const tree=harness(props({tab,accountControls:React.createElement('p',null,'Đã xác minh quyền duyệt')}))();
+  assert.ok(!tree.some(n=>n.props?.['aria-label']==='Khoảng thời gian điều phối'),
+   'the scheduling window should not compete with the '+tab+' workflow');
+ }
+ const overview=harness(props({tab:'overview'}))();
+ assert.ok(overview.some(n=>n.props?.['aria-label']==='Khoảng thời gian điều phối'));
+ const schedule=harness(props({tab:'schedule'}))();
+ assert.ok(schedule.some(n=>n.props?.['aria-label']==='Khoảng thời gian điều phối'));
+});
 test('settings changes display preferences without emitting a training mutation',()=>{
  let appearance;let writes=0;const tree=harness(props({tab:'settings',appearance:{theme:'system',textSize:'large'},onAppearanceChange:next=>{appearance=next;},onCommand:async()=>{writes++;return true;}}))();
  const theme=tree.find(n=>n.type==='select'&&n.props['aria-label']==='Giao diện');assert.ok(theme);
