@@ -106,12 +106,20 @@ function elements(node){if(Array.isArray(node))return node.flatMap(elements);if(
 function text(node){if(Array.isArray(node))return node.map(text).join('');if(node==null)return '';return typeof node==='object'?text(node.props?.children):String(node);}
 function harness(props){const state=[];let cursor=0;const hooks={...React,useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return[state[i],next=>{state[i]=typeof next==='function'?next(state[i]):next;}];}};const {TrainingDashboard}=load('app/manager-workspace.tsx',hooks);return()=>{cursor=0;return elements(TrainingDashboard(props));};}
 function props(extra={}){return {board:board(),tab:'overview',setTab:()=>{},busy:false,notice:'',onCommand:async()=>false,onWindowChange:()=>{},...extra};}
-test('phone home launcher and bottom navigation reach rooms and settings without mutations',()=>{
+test('P2 five-item mobile dock and header settings preserve all destinations without mutations',()=>{
  let selected;let writes=0;const render=harness(props({setTab:value=>{selected=value;},onCommand:async()=>{writes++;return true;}}));
- const tree=render();const nav=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='Điều phối đào tạo');
- assert.ok(nav);const buttons=elements(nav).filter(n=>n.type==='button');assert.equal(buttons.length,6);
- const settings=buttons.find(n=>text(n).includes('Cài đặt'));assert.ok(settings);settings.props.onClick();assert.equal(selected,'settings');
- const room=tree.find(n=>n.type==='button'&&n.props['data-app']==='room');assert.ok(room);room.props.onClick();assert.equal(selected,'room');assert.equal(writes,0);
+ const tree=render();const nav=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='Điều phối đào tạo — năm mục chính');
+ assert.ok(nav);const buttons=elements(nav).filter(n=>n.type==='button');assert.equal(buttons.length,5);
+ assert.deepEqual(buttons.map(n=>text(n)),['Trang chủ','Kiểm duyệt','Lịch','Lớp học','Nhân sự']);
+ assert.ok(!tree.some(n=>n.type==='section'&&n.props['aria-label']==='Ứng dụng điều phối'),'redundant launcher must be gone');
+ const settings=tree.find(n=>n.type==='button'&&n.props['aria-label']==='Mở cài đặt điều phối');
+ assert.ok(settings,'Settings remains directly accessible on mobile via header');
+ settings.props.onClick();assert.equal(selected,'settings');
+ const center=tree.find(n=>typeof n.type==='function'&&n.type.name==='ManagerCommandCenter');
+ assert.ok(center,'the real command center replaces duplicate launcher tiles');
+ center.props.onNavigate('room');assert.equal(selected,'room');
+ center.props.onNavigate('building');assert.equal(selected,'building');
+ assert.equal(writes,0);
 });
 test('settings changes display preferences without emitting a training mutation',()=>{
  let appearance;let writes=0;const tree=harness(props({tab:'settings',appearance:{theme:'system',textSize:'large'},onAppearanceChange:next=>{appearance=next;},onCommand:async()=>{writes++;return true;}}))();
@@ -131,11 +139,11 @@ test('availability filter excludes unassigned and inactive-class people',()=>{
  render().find(n=>n.type==='select'&&elements(n).some(x=>x.type==='option'&&x.props.value==='available')).props.onChange({target:{value:'available'}});
  assert.deepEqual(render().filter(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Xem hồ sơ')).map(n=>text(n).includes('Học viên mẫu')), [true]);
 });
-test('setup offers the first active class after a building exists',()=>{
+test('command center reaches class setup after a building exists without duplicate launcher',()=>{
  let selected;const b=board();b.resources=b.resources.filter(r=>r.kind!=='class');
  const tree=harness(props({board:b,setTab:next=>{selected=next;}}))();
- const next=tree.find(n=>n.type==='button'&&n.props['data-app']==='class');assert.ok(next);
- next.props.onClick();assert.equal(selected,'class');
+ const center=tree.find(n=>typeof n.type==='function'&&n.type.name==='ManagerCommandCenter');
+ assert.ok(center);center.props.onNavigate('class');assert.equal(selected,'class');
 });
 test('replacing inactive memberships requires an explicit confirmation and keeps the CAS source',async()=>{
  const b=board();b.resources.push({...resource,id:'old',name:'Old',status:'archived',state:'inactive'});
