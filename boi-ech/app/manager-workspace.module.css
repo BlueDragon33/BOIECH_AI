@@ -115,7 +115,7 @@
 .workspace .accountTrigger:focus-visible,.workspace .accountMenu button:focus-visible{
  outline:3px solid #86e4f6;outline-offset:3px}
 @media(max-width:600px){
- .headerActions{gap:5px}.managerIdentity{display:none}
+ .headerActions{flex-shrink:0;gap:5px}.managerIdentity{display:none}
  .workspace .accountTrigger{min-height:42px;padding:4px 7px}
  .managerAvatar{width:32px;height:32px;border-radius:10px}
  .managerChevron{font-size:1rem}
