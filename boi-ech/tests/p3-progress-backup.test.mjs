@@ -7,9 +7,9 @@ const source = readFileSync(new URL("../app/progress-backup.ts", import.meta.url
 const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
 const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const module = { exports: {} };
-new Function("exports", "module", code)(module.exports, module);
-const { parseLocalQuizBackup } = module.exports;
+const loaded = { exports: {} };
+new Function("exports", "module", code)(loaded.exports, loaded);
+const { parseLocalQuizBackup } = loaded.exports;
 const current = "Nguyễn Văn A";
 const create = (draft, extra = {}) => JSON.stringify({
   hoc_vien: current, mon_hoc: "Ứng dụng AI trong dạy và học môn Bơi ếch",
