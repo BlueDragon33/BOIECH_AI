@@ -54,10 +54,25 @@ function accountNetworkError(error: unknown) {
     return "Không kết nối được máy chủ tài khoản. Nếu vừa đăng ký, hãy thử Đăng nhập hoặc Đồng bộ trạng thái trước khi gửi lại để tránh trùng yêu cầu.";
   return raw || "Chưa xác minh được kết nối tài khoản.";
 }
+// Cloudflare or an upstream outage may return HTML (or no body). Never display
+// raw infrastructure errors or leave account onboarding waiting for JSON.
+// A 401 still means "no active session", even if its response has no JSON.
+async function readAccountPayload(response: Response): Promise<Record<string, unknown>> {
+  let parsed: unknown;
+  try { parsed=await response.json(); } catch { /* Non-JSON body, handled below. */ }
+  if(parsed && typeof parsed==="object" && !Array.isArray(parsed))
+    return parsed as Record<string, unknown>;
+  if(response.status===401) return {};
+  if(response.status===429)
+    throw new Error("Hệ thống đang giới hạn lượt thử. Không gửi liên tiếp; hãy thử lại sau 15 phút.");
+  if(response.status>=500)
+    throw new Error("Máy chủ tài khoản tạm gián đoạn. Nếu vừa đăng ký, hãy kiểm tra lại trạng thái trước khi gửi lại để tránh tạo yêu cầu trùng.");
+  throw new Error("Máy chủ trả dữ liệu không đúng định dạng. Hãy chọn Đồng bộ trạng thái hoặc thử lại sau.");
+}
 async function send(body: Record<string, unknown>) {
   const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const data = await response.json();
+  const data = await readAccountPayload(response) as { error?: string; code?: string; [key:string]:unknown };
   if (!response.ok) throw Object.assign(new Error(data.error ?? "Chưa xác minh được thao tác tài khoản."), {
     code: typeof data.code==="string" ? data.code : "ACCOUNT_SERVICE_UNAVAILABLE"
   });
@@ -100,7 +115,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
-    const data = await response.json() as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
+    const data = await readAccountPayload(response) as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
     if (mounted.current) { setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true); setTrialEnabled(data.accountUiTrial === true); }
     if (!response.ok) {
       if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
@@ -153,8 +168,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // Hidden tabs and ongoing requests are skipped; only authenticated server state grants access.
     const timer = window.setInterval(() => { if(mounted.current) setObservedNow(Date.now()); refresh(); },
       needsApprovalPolling ? 20000 : 60000);
-    const channel = new BroadcastChannel("boiech-account-auth"); channel.onmessage = refresh;
-    return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh); channel.close(); };
+    // BroadcastChannel can be unavailable/disabled in private browsing.
+    // Focus, pageshow and the existing polling interval remain the fallback.
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        channel = new BroadcastChannel("boiech-account-auth");
+        channel.onmessage = refresh;
+      }
+    } catch { /* A blocked cross-tab channel must never block sign-in. */ }
+    return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh); channel?.close(); };
   }, [enabled, bypass, reload, needsApprovalPolling]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
@@ -181,7 +204,15 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     try { await action(); } catch (e) { if (mounted.current) setError(accountNetworkError(e)); }
     finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
-  function broadcast() { const c = new BroadcastChannel("boiech-account-auth"); c.postMessage("changed"); c.close(); }
+  function broadcast() {
+    // Same-page state refresh already completed. Cross-tab notification is
+    // best effort and must not turn a successful login into an error.
+    try {
+      if (typeof BroadcastChannel === "undefined") return;
+      const channel=new BroadcastChannel("boiech-account-auth");
+      channel.postMessage("changed"); channel.close();
+    } catch { /* Other tabs will refresh on focus or the current polling cycle. */ }
+  }
   useEffect(()=>{ queueMicrotask(()=>setFieldErrors({})); },[mode,contactType]);
   function onAuthInvalid(input:HTMLInputElement,form:HTMLFormElement) {
     const message=authFieldError(input,form,contactType);
