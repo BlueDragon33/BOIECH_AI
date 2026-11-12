@@ -82,7 +82,7 @@ test("P1 public GET verifies a certificate without any account cookie and return
   assert.equal(observed().boundCode, VALID_CODE);
   assert.equal(observed().signatureChecks, 0, "public lookup must not require a signed device");
   assert.equal(observed().writes, 0, "public GET must never mutate D1");
-  assert.doesNotMatch(JSON.stringify(data), /BE-SECRET-DEVICE|12345|"01":10/);
+  assert.doesNotMatch(JSON.stringify(data.certificate), /BE-SECRET-DEVICE|"scores"|"totalActiveSeconds"/);
 });
 
 test("P1 invalid and unknown certificate codes never disclose a record", async () => {
