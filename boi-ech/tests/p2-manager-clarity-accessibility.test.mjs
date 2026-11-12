@@ -5,6 +5,9 @@ import { readFileSync } from "node:fs";
 const manager = readFileSync(new URL("../app/manager-workspace.tsx", import.meta.url), "utf8");
 const css = readFileSync(new URL("../app/manager-workspace.module.css", import.meta.url), "utf8");
 const student = readFileSync(new URL("../app/student-role-shell.tsx", import.meta.url), "utf8");
+const globalCss = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+const studentCss = readFileSync(new URL("../app/student-role-shell.css", import.meta.url), "utf8");
+const teacherCss = readFileSync(new URL("../app/teacher-role-shell.css", import.meta.url), "utf8");
 
 function luminance(hex) {
   const rgb = hex.replace("#","").match(/../g).map(v=>parseInt(v,16)/255)
@@ -45,4 +48,18 @@ test("P2 learner profile never renders or extracts historical personal identifie
  assert.match(student,/Hồ sơ học tập đã xác thực/);
  assert.match(student,/Quyền truy cập/);
  assert.match(student,/Trạng thái/);
+});
+
+test("P2 fixed quiz controls retain readable baseline and five-column mobile layout",()=>{
+ assert.match(globalCss,/\.question-nav button \{[^}]*color: #4b6170; font-size: calc\(14px/);
+ assert.match(globalCss,/\.submit-button \{[^}]*background: #16a096; color: #0b2630; font-size: calc\(14px/);
+ assert.match(globalCss,/\.question-nav > div \{ grid-template-columns: repeat\(5,minmax\(0,1fr\)\); \}/);
+ assert.doesNotMatch(globalCss,/\.question-nav > div \{ grid-template-columns: repeat\(10,1fr\); \}/);
+ for(const [fg,bg] of [
+   ["#0b2630","#16a096"],["#4b6170","#ffffff"],
+   ["#40535e","#f6f8f8"],["#0f668a","#eaf8fb"],
+   ["#135f82","#e6f6f9"],["#435f70","#f5f9fb"]
+ ])assert.ok(contrast(fg,bg)>=4.5,fg+" on "+bg+" below WCAG AA");
+ assert.match(studentCss,/\.student-video-flow article > span \{[^}]*font-size: 12px/);
+ assert.match(teacherCss,/\.teacher-table th \{[^}]*font-size: 13px/);
 });
