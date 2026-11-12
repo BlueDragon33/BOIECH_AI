@@ -12,7 +12,7 @@ export default function RegistrantReader(){
  }catch(e){setRows([]);setMessage(e instanceof Error?e.message:"Không đọc được hồ sơ.")}finally{lock.current=false;setBusy(false)}}
  return <details><summary>Xem hồ sơ mở rộng · quyền được cấp riêng</summary><p>Chỉ hiển thị thông tin cần thiết; mỗi trang yêu cầu xác minh quyền và ghi audit mới.</p>
   <form onSubmit={e=>{e.preventDefault();void read()}}><label>Mục đích truy cập<input required minLength={3} maxLength={160} value={purpose} disabled={busy} onChange={e=>{setPurpose(e.target.value);setRows([])}}/></label><button disabled={busy} type="submit">Xem hồ sơ</button></form>
-  {message?<p role="status">{message}</p>:null}<ul>{rows.map(r=><li key={r.accountId}><b>{r.name}</b> · {r.personCode} · {r.role} · {r.className} · {r.status}</li>)}</ul>
+  {message?<p role="status">{message}</p>:null}<ul>{rows.map(r=><li key={r.accountId}><b>{r.name}</b> · {r.role} · {r.className} · {r.status}</li>)}</ul>
   {rows.length&&offset!==null?<button type="button" disabled={busy} onClick={()=>void read(offset)}>Trang tiếp theo</button>:null}
  </details>;
 }
