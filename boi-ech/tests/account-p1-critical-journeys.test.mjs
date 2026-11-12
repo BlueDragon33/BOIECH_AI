@@ -13,7 +13,7 @@ const managerProfile = {
 };
 function learnerProfile(n) {
   return { familyName: "Hoc vien", givenName: "Da khai",
-    className: "Lop " + n, phone: "", expectedRevision: 1 };
+    className: "Lop " + n, phone: "090" + String(n).padStart(7, "0"), expectedRevision: 1 };
 }
 async function publicKey() {
   const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign","verify"]);
