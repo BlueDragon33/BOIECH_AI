@@ -113,7 +113,7 @@ body[data-student-role-ui="active"][data-student-section="overview"] .page-overv
 .student-capabilities > div { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .student-capability { position: relative; min-height: 132px; padding: 14px 12px; overflow: hidden; border: 1px solid #e1ebef; border-radius: 13px; text-align: left; color: #113a59; background: linear-gradient(180deg, #fff, #f7fbfd); cursor: pointer; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
 .student-capability:hover { transform: translateY(-3px); border-color: #91d8e1; box-shadow: 0 12px 24px rgba(20, 97, 126, .09); }
-.student-capability > span { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 10px; color: #147ca9; background: #eaf8fb; }
+.student-capability > span { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 10px; color: #0f668a; background: #eaf8fb; }
 .student-capability svg { width: 19px; height: 19px; }
 .student-capability strong { display: block; margin-top: 11px; font-size: 11px; }
 .student-capability small { display: block; margin-top: 5px; color: #8494a1; font-size: 9px; line-height: 1.42; }
@@ -172,7 +172,7 @@ body[data-student-role-ui="active"][data-student-section="overview"] .page-overv
 .student-video-copy button svg { width: 17px; height: 17px; }
 .student-video-flow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .student-video-flow article { display: grid; grid-template-columns: 28px 1fr auto; gap: 9px; align-items: center; padding: 11px; border: 1px solid #dce9ee; border-radius: 11px; background: linear-gradient(180deg, #fff, #f6fbfc); }
-.student-video-flow article > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: #177aa2; background: #e6f6f9; font-size: 8px; font-weight: 900; }
+.student-video-flow article > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: #135f82; background: #e6f6f9; font-size: 12px; font-weight: 900; }
 .student-video-flow strong { display: block; color: #1f4055; font-size: 9px; }
 .student-video-flow small { display: block; margin-top: 2px; color: #8a9ba4; font-size: 7px; }
 .student-video-flow article > i { color: #22aa8c; font-size: 9px; font-style: normal; font-weight: 900; }
