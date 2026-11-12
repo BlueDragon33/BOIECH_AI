@@ -8,6 +8,8 @@ const student = readFileSync(new URL("../app/student-role-shell.tsx", import.met
 const globalCss = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const studentCss = readFileSync(new URL("../app/student-role-shell.css", import.meta.url), "utf8");
 const teacherCss = readFileSync(new URL("../app/teacher-role-shell.css", import.meta.url), "utf8");
+const managerApprovals = readFileSync(new URL("../app/manager-approval-panel.tsx", import.meta.url), "utf8");
+const registrants = readFileSync(new URL("../app/registrant-reader.tsx", import.meta.url), "utf8");
 
 function luminance(hex) {
   const rgb = hex.replace("#","").match(/../g).map(v=>parseInt(v,16)/255)
@@ -62,4 +64,12 @@ test("P2 fixed quiz controls retain readable baseline and five-column mobile lay
  ])assert.ok(contrast(fg,bg)>=4.5,fg+" on "+bg+" below WCAG AA");
  assert.match(studentCss,/\.student-video-flow article > span \{[^}]*font-size: 12px/);
  assert.match(teacherCss,/\.teacher-table th \{[^}]*font-size: 13px/);
+});
+
+test("P2 review and registrant directories omit role-personal codes but preserve device reference",()=>{
+ assert.doesNotMatch(managerApprovals,/\{device\.personCode\}/);
+ assert.match(managerApprovals,/\{device\.deviceCode\} · \{device\.className/);
+ assert.doesNotMatch(registrants,/\{r\.personCode\}/);
+ assert.match(registrants,/\{r\.name\}/);
+ assert.match(registrants,/\{r\.role\}/);
 });
