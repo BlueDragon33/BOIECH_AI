@@ -18,6 +18,36 @@ type Account = { accountId: string; status: string; role: string; name: string; 
   canReadRegistrants?: boolean; securityQuestionConfigured?:boolean };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
+type AuthContact = "email" | "phone";
+const fieldLabels: Record<string,string> = {
+  login:"tên đăng nhập", password:"mật khẩu", passwordConfirm:"mật khẩu xác nhận",
+  contactValue:"thông tin liên hệ", securityAnswer:"câu trả lời bảo mật",
+  privacyAccepted:"xác nhận xử lý dữ liệu", recoveryCode:"mã khôi phục"
+};
+function authFieldError(input: HTMLInputElement, form: HTMLFormElement, contactType: AuthContact): string {
+  const name=input.name, value=input.value;
+  if (input.validity.valueMissing || (input.required && input.type!=="checkbox" && !value.trim()))
+    return "Vui lòng nhập " + (fieldLabels[name] ?? "thông tin bắt buộc") + ".";
+  if (input.validity.tooShort || input.validity.tooLong)
+    return name==="password" || name==="passwordConfirm"
+      ? "Mật khẩu phải có ít nhất 15 ký tự khi đăng ký và tối đa 1.024 ký tự."
+      : "Độ dài thông tin chưa hợp lệ.";
+  if (name==="login" && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$/.test(value))
+    return "Tên đăng nhập cần 3–64 ký tự, bắt đầu bằng chữ hoặc số; chỉ dùng chữ, số, dấu chấm, _ hoặc -.";
+  if (name==="passwordConfirm" && value !== (form.elements.namedItem("password") as HTMLInputElement|null)?.value)
+    return "Mật khẩu nhập lại không khớp. Hãy kiểm tra ô này.";
+  if (name==="contactValue" && contactType==="email" &&
+    (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) || /[<>(),;:]/.test(value)))
+    return "Email không hợp lệ. Ví dụ: ten@example.com.";
+  if (name==="contactValue" && contactType==="phone" &&
+    !/^\+?[0-9]{7,16}$/.test(value.replace(/[\s().-]/g,"")))
+    return "Số điện thoại phải có 7–16 chữ số, có thể bắt đầu bằng dấu +.";
+  if (name==="securityAnswer" && value.trim().length<2)
+    return "Câu trả lời bảo mật cần ít nhất 2 ký tự.";
+  if (input.validity.patternMismatch || input.validity.typeMismatch || input.validity.badInput)
+    return "Giá trị " + (fieldLabels[name] ?? "này") + " chưa đúng định dạng.";
+  return "";
+}
 function accountNetworkError(error: unknown) {
   const raw=error instanceof Error?error.message:"";
   if (/load failed|failed to fetch|networkerror|network request failed/i.test(raw))
@@ -28,7 +58,9 @@ async function send(body: Record<string, unknown>) {
   const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "Chưa xác minh được thao tác tài khoản.");
+  if (!response.ok) throw Object.assign(new Error(data.error ?? "Chưa xác minh được thao tác tài khoản."), {
+    code: typeof data.code==="string" ? data.code : "ACCOUNT_SERVICE_UNAVAILABLE"
+  });
   return data as { recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
     devices?:Array<{device_id:string;approved:number;created_at:string}>;trial?:TrialLease;challenge?:string };
 }
@@ -54,6 +86,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({});
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [contactType,setContactType]=useState<"email"|"phone">("email");
   const [recoveryMethod,setRecoveryMethod]=useState<"code"|"question">("code");
@@ -62,6 +95,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const managerInviteRef=useRef("");
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
+  const refreshInFlight=useRef(false);
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
@@ -101,16 +135,26 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
     return ()=>{live=false};
   },[enabled,bypass]);
+  const needsApprovalPolling=Boolean(account && (account.status!=="approved" ||
+    account.onboardingStage!=="active" || account.deviceApproved===false || account.entitlementActive===false));
   useEffect(() => {
     if (!enabled || bypass) return;
     mounted.current = true;
     document.documentElement.dataset.accountFirst = "true";
-    const refresh = () => { if (!document.hidden && !lock.current) void reload().catch(e => { if (mounted.current) setError(accountNetworkError(e)); }); };
+    const refresh = () => {
+      if (document.hidden || lock.current || refreshInFlight.current) return;
+      refreshInFlight.current=true;
+      void reload().catch(e => { if (mounted.current) setError(accountNetworkError(e)); })
+        .finally(()=>{refreshInFlight.current=false;});
+    };
     refresh(); window.addEventListener("focus", refresh); window.addEventListener("pageshow",refresh);
-    const timer = window.setInterval(() => { if(mounted.current) setObservedNow(Date.now()); refresh(); },60000);
+    // A pending registration checks server approval every 20s; active accounts retain 60s refresh.
+    // Hidden tabs and ongoing requests are skipped; only authenticated server state grants access.
+    const timer = window.setInterval(() => { if(mounted.current) setObservedNow(Date.now()); refresh(); },
+      needsApprovalPolling ? 20000 : 60000);
     const channel = new BroadcastChannel("boiech-account-auth"); channel.onmessage = refresh;
     return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh); channel.close(); };
-  }, [enabled, bypass, reload]);
+  }, [enabled, bypass, reload, needsApprovalPolling]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
       account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
@@ -122,9 +166,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // complete profile is already stored in D1, so there is no second review.
     void send({action:"profile-draft-activate"})
       .then(async()=>{await reload();if(mounted.current)setNotice("Hồ sơ đã tự kích hoạt sau lần duyệt duy nhất.");})
-      .catch(e=>{if(mounted.current)setError(accountNetworkError(e));});
+      .catch(e=>{attemptedAutoActivation.current.delete(key);
+        if(mounted.current)setError(accountNetworkError(e));});
   },[ready,v2,singleReview,account?.accountId,account?.onboardingStage,
-     account?.profileDraftReady,account?.onboardingRevision,account?.deviceApproved,reload]);
+     account?.profileDraftReady,account?.onboardingRevision,account?.deviceApproved,reload,observedNow]);
   useEffect(()=>{
     const open=()=>setProfileOpen(true);
     window.addEventListener("boi:account:open",open);
@@ -136,11 +181,42 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     finally { lock.current = false; if (mounted.current) setBusy(false); }
   }
   function broadcast() { const c = new BroadcastChannel("boiech-account-auth"); c.postMessage("changed"); c.close(); }
+  useEffect(()=>{ queueMicrotask(()=>setFieldErrors({})); },[mode,contactType]);
+  function onAuthInvalid(input:HTMLInputElement,form:HTMLFormElement) {
+    const message=authFieldError(input,form,contactType);
+    if(message)setFieldErrors(previous=>({...previous,[input.name]:message}));
+  }
+  function onAuthBlur(input:HTMLInputElement,form:HTMLFormElement) {
+    if(!input.name||input.type==="hidden")return;
+    const message=authFieldError(input,form,contactType);
+    setFieldErrors(previous=>{
+      if(!message && !previous[input.name])return previous;
+      const next={...previous};if(message)next[input.name]=message;else delete next[input.name];
+      return next;
+    });
+  }
+  function onAuthInput(input:HTMLInputElement) {
+    if(!input.name)return;
+    setFieldErrors(previous=>{
+      if(!previous[input.name] && !(input.name==="password"&&previous.passwordConfirm))return previous;
+      const next={...previous};delete next[input.name];
+      if(input.name==="password")delete next.passwordConfirm;
+      return next;
+    });
+  }
   async function submit(form: HTMLFormElement) {
-    const fields = Object.fromEntries(new FormData(form));
-    if(mode==="register" && fields.password!==fields.passwordConfirm){
-      setError("Mật khẩu nhập lại không khớp.");return;
+    const issues:Record<string,string>={};
+    for(const input of Array.from(form.querySelectorAll<HTMLInputElement>("input[name]"))){
+      if(input.type==="hidden")continue;
+      const message=authFieldError(input,form,contactType);
+      if(message)issues[input.name]=message;
     }
+    if(Object.keys(issues).length){
+      setFieldErrors(issues);
+      (form.elements.namedItem(Object.keys(issues)[0]) as HTMLInputElement|null)?.focus();
+      return;
+    }
+    const fields = Object.fromEntries(new FormData(form));
     delete fields.passwordConfirm;
     // Password is used for this HTTPS submission only, then cleared from the input.
     const password = fields.password; const field = form.elements.namedItem("password") as HTMLInputElement | null;
@@ -168,11 +244,25 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         return;
       }
       const invited=mode==="register"&&Boolean(managerInvite);
-      const result = await send({ ...fields, password, ...key,
-        action:invited?"manager-register":mode,
-        role:invited?"manager":role,
-        ...(invited?{managerInviteToken:managerInvite}:{}),
-        privacyAccepted: fields.privacyAccepted === "on" });
+      let result:Awaited<ReturnType<typeof send>>;
+      try {
+        result = await send({ ...fields, password, ...key,
+          action:invited?"manager-register":mode,
+          role:invited?"manager":role,
+          ...(invited?{managerInviteToken:managerInvite}:{}),
+          privacyAccepted: fields.privacyAccepted === "on" });
+      } catch(caught) {
+        const code=(caught as {code?:string})?.code;
+        const target=code==="AUTH_FAILED"?"password"
+          : code==="PASSWORD_POLICY"?"password"
+          : code==="ACCOUNT_CONTACT_INVALID"?"contactValue"
+          : code==="SECURITY_ANSWER_INVALID"?"securityAnswer":null;
+        if(!target)throw caught;
+        setFieldErrors(previous=>({...previous,[target]:code==="AUTH_FAILED"
+          ? "Tên đăng nhập hoặc mật khẩu chưa đúng. Hãy kiểm tra hai ô trên."
+          : accountNetworkError(caught)}));
+        return;
+      }
       if(invited){managerInviteRef.current="";setManagerInvite("");}
       if (result.recoveryCode) { recoveryOwner.current = result.account?.accountId ?? result.accountId ?? ""; setRecovery(result.recoveryCode); }
       if (mode === "recover") { setMode("login"); setNotice("Đã đổi mật khẩu và thu hồi các phiên cũ. Hãy lưu mã khôi phục mới."); }
@@ -414,10 +504,17 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
 
       </> : <>
 
-        <form key={mode} className={styles.authForm} onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
-          <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy}/></label>
-          <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login"||mode==="devices" ? 1 : 15} maxLength={1024} autoComplete={mode === "login"||mode==="devices" ? "current-password" : "new-password"} disabled={busy}/></label>
-          {mode==="register"?<label>Nhập lại mật khẩu<input name="passwordConfirm" type="password" required minLength={15} maxLength={1024} autoComplete="new-password" disabled={busy}/></label>:null}
+        <form key={mode} className={styles.authForm} noValidate
+          onInvalidCapture={e=>{const input=e.target as HTMLInputElement;
+            if(input.tagName==="INPUT"){e.preventDefault();onAuthInvalid(input,e.currentTarget);}}}
+          onBlurCapture={e=>{const input=e.target as HTMLInputElement;
+            if(input.tagName==="INPUT")onAuthBlur(input,e.currentTarget);}}
+          onInputCapture={e=>{const input=e.target as HTMLInputElement;
+            if(input.tagName==="INPUT")onAuthInput(input);}}
+          onSubmit={e => { e.preventDefault(); void submit(e.currentTarget); }}>
+          <label>Tên đăng nhập<input name="login" required minLength={3} maxLength={64} autoComplete="username" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}" disabled={busy} aria-invalid={Boolean(fieldErrors.login)} aria-describedby={fieldErrors.login?"auth-login-error":undefined}/>{fieldErrors.login?<small id="auth-login-error" role="alert" className={styles.fieldError}>{fieldErrors.login}</small>:null}</label>
+          <label>{mode === "recover" ? "Mật khẩu mới" : "Mật khẩu"}<input name="password" type="password" required minLength={mode === "login"||mode==="devices" ? 1 : 15} maxLength={1024} autoComplete={mode === "login"||mode==="devices" ? "current-password" : "new-password"} disabled={busy} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password?"auth-password-error":undefined}/>{fieldErrors.password?<small id="auth-password-error" role="alert" className={styles.fieldError}>{fieldErrors.password}</small>:null}</label>
+          {mode==="register"?<label>Nhập lại mật khẩu<input name="passwordConfirm" type="password" required minLength={15} maxLength={1024} autoComplete="new-password" disabled={busy} aria-invalid={Boolean(fieldErrors.passwordConfirm)} aria-describedby={fieldErrors.passwordConfirm?"auth-password-confirm-error":undefined}/>{fieldErrors.passwordConfirm?<small id="auth-password-confirm-error" role="alert" className={styles.fieldError}>{fieldErrors.passwordConfirm}</small>:null}</label>:null}
           {mode==="register"?<fieldset className={styles.contactChoice}>
             <legend>Thông tin liên hệ <span aria-hidden="true">*</span></legend>
             <div className={styles.contactMethods} aria-label="Chọn phương thức liên hệ">
@@ -428,7 +525,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <label>{contactType==="email"?"Địa chỉ email *":"Số điện thoại *"}
               <input key={contactType} name="contactValue" type={contactType==="email"?"email":"tel"}
                 placeholder={contactType==="email"?"ten@gmail.com":"+84 / +7 ..."}
-                autoComplete={contactType==="email"?"email":"tel"} required maxLength={254} disabled={busy}/>
+                autoComplete={contactType==="email"?"email":"tel"} required maxLength={254} disabled={busy} aria-invalid={Boolean(fieldErrors.contactValue)} aria-describedby={fieldErrors.contactValue?"auth-contact-error":undefined}/>
+              {fieldErrors.contactValue?<small id="auth-contact-error" role="alert" className={styles.fieldError}>{fieldErrors.contactValue}</small>:null}
             </label>
             <small>Chỉ lưu liên hệ đã cung cấp; không gửi mã xác minh lúc đăng ký.</small>
           </fieldset>:null}
@@ -438,9 +536,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             <button type="button" aria-pressed={recoveryMethod==="question"} onClick={()=>setRecoveryMethod("question")}>Tên lúc nhỏ + thiết bị gốc</button></div>
             <small>Chỉ câu trả lời bảo mật không đủ khôi phục. Cần khóa P-256 trong trình duyệt gốc; nếu mất thiết bị, dùng mã khôi phục một lần.</small>
           </fieldset>:null}
-          {(mode==="devices" || mode==="recover"&&(!v2||recoveryMethod==="code")) && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy}/></label>}
+          {(mode==="devices" || mode==="recover"&&(!v2||recoveryMethod==="code")) && <label>Mã khôi phục<input name="recoveryCode" required minLength={64} maxLength={64} autoComplete="off" disabled={busy} aria-invalid={Boolean(fieldErrors.recoveryCode)} aria-describedby={fieldErrors.recoveryCode?"auth-recovery-error":undefined}/>{fieldErrors.recoveryCode?<small id="auth-recovery-error" role="alert" className={styles.fieldError}>{fieldErrors.recoveryCode}</small>:null}</label>}
           {mode==="recover"&&v2&&recoveryMethod==="question"?<label>Tên lúc nhỏ của bạn là gì?
-            <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="off" disabled={busy}/></label>:null}
+            <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="off" disabled={busy} aria-invalid={Boolean(fieldErrors.securityAnswer)} aria-describedby={fieldErrors.securityAnswer?"auth-security-error":undefined}/>{fieldErrors.securityAnswer?<small id="auth-security-error" role="alert" className={styles.fieldError}>{fieldErrors.securityAnswer}</small>:null}</label>:null}
           {mode==="devices" && recoveryDevices.length>0 ? <label>Thiết bị cần gỡ
             <select name="deviceId" required disabled={busy}>
               {recoveryDevices.map(d=><option key={d.device_id} value={d.device_id}>{d.device_id.slice(0,16)} · {d.created_at}</option>)}
@@ -452,10 +550,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
            ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; tài khoản vẫn phải chờ Owner duyệt và hoàn thiện hồ sơ.</p>
            : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?<p role="alert">Đăng ký mới yêu cầu Account-first V2. Hiện hệ thống chưa bật V2; không thể tạo hồ sơ bằng biểu mẫu cũ.</p>:<p>Chỉ tạo tài khoản và thiết lập bảo mật tại bước này. Sau một lần duyệt, bổ sung hồ sơ là được kích hoạt ngay, không duyệt lại.</p>}
              {v2?<label>Câu hỏi bảo mật: Tên lúc nhỏ của bạn là gì?
-               <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="new-password" disabled={busy}/>
+               <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="new-password" disabled={busy} aria-invalid={Boolean(fieldErrors.securityAnswer)} aria-describedby={fieldErrors.securityAnswer?"auth-security-error":undefined}/>
+               {fieldErrors.securityAnswer?<small id="auth-security-error" role="alert" className={styles.fieldError}>{fieldErrors.securityAnswer}</small>:null}
                <small>Hãy ghi nhớ đáp án. Đáp án được mã băm, không thể xem lại; có thể thay đổi tại Trang cá nhân.</small></label>:null}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
-            <label><input type="checkbox" name="privacyAccepted" required disabled={busy}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.</label></>}
+            <label><input type="checkbox" name="privacyAccepted" required disabled={busy} aria-invalid={Boolean(fieldErrors.privacyAccepted)} aria-describedby={fieldErrors.privacyAccepted?"auth-privacy-error":undefined}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.{fieldErrors.privacyAccepted?<small id="auth-privacy-error" role="alert" className={styles.fieldError}>{fieldErrors.privacyAccepted}</small>:null}</label></>}
           <button type="submit" disabled={busy||(mode==="register"&&!v2)}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
         </form>
         <div className={styles.authFooter}>
