@@ -46,9 +46,14 @@ test("pending approval checks server at 20s with no overlapping refresh",()=>{
    "refreshInFlight.current=false",
    'action:"profile-draft-activate"',
    "attemptedAutoActivation.current.delete(key)",
-   'account?.status === "approved"',
-   "account.entitlementActive===true"])
+   "accountServerActive(account, v2, observedNow)"])
    assert.ok(source.includes(check),check);
+});
+test("approved UI still requires exact server-side entitlement and trusted device",()=>{
+ const contract=readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");
+ for(const check of ['account.status !== "approved"','account.onboardingStage === "active"',
+   'account.deviceApproved === true','account.entitlementActive === true'])
+   assert.ok(contract.includes(check),check);
 });
 test("unchanged manager invitation handling remains in account gate",()=>{
  for(const check of ['#manager-invite=',"managerInviteRef.current=invite",
