@@ -50,7 +50,7 @@ test("pending approval checks server at 20s with no overlapping refresh",()=>{
    assert.ok(source.includes(check),check);
 });
 test("approved UI still requires exact server-side entitlement and trusted device",()=>{
- const contract=readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");
+ const contract=fs.readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");
  for(const check of ['account.status !== "approved"','account.onboardingStage === "active"',
    'account.deviceApproved === true','account.entitlementActive === true'])
    assert.ok(contract.includes(check),check);
