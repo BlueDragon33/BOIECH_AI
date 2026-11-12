@@ -366,15 +366,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         // the new revision; never resubmit an account registration.
         const response=await fetch("/api/accounts",{credentials:"same-origin",cache:"no-store"});
         const fresh=await readAccountPayload(response) as {account?:Account|null};
-        if(!response.ok || fresh.account?.accountId!==account?.accountId ||
-          fresh.account.deviceApproved!==true)throw caught;
-        const stage=fresh.account.onboardingStage;
-        if(accountServerActive(fresh.account,v2,Date.now())) alreadyActivated=true;
-        else if(Number.isInteger(fresh.account.onboardingRevision) &&
+        const verified=fresh.account;
+        if(!response.ok || !verified || verified.accountId!==account?.accountId ||
+          verified.deviceApproved!==true)throw caught;
+        const stage=verified.onboardingStage;
+        if(accountServerActive(verified,v2,Date.now())) alreadyActivated=true;
+        else if(Number.isInteger(verified.onboardingRevision) &&
           (stage==="requested" || stage==="profile_required" ||
           stage==="changes_requested" || (singleReview && stage==="profile_review"))) {
           await send({...fields,action:stage==="requested"?"profile-draft-save":"submit-profile",
-            expectedRevision:fresh.account.onboardingRevision});
+            expectedRevision:verified.onboardingRevision});
         } else {
           await reload();
           throw new Error("Trạng thái xét duyệt đã thay đổi. Đã đồng bộ hồ sơ mới; vui lòng kiểm tra lại.");
