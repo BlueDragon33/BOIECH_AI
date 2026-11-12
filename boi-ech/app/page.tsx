@@ -3,7 +3,8 @@
 /* Ảnh đã được tối ưu sẵn thành WebP cục bộ; giữ URL do máy chủ cấp. */
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { parseLocalQuizBackup } from "./progress-backup";
 import ManagerWorkspace from "./manager-workspace";
 import { RegistrationRoles } from "./registration-roles";
 import AiLearningHub, { type AiApiResponse } from "./ai-learning-hub";
@@ -1774,13 +1775,56 @@ export default function Home() {
   }
 
   function exportProgress() {
-    const payload = JSON.stringify({ hoc_vien: learnerFullName, mon_hoc: "Ứng dụng AI trong dạy và học môn Bơi ếch", bai_hoc_dang_mo: `Bài ${selectedLesson}`, ngay_sao_luu: new Date().toISOString(), tien_do: progress }, null, 2);
+    const payload = JSON.stringify({
+      backup_version: 2, backup_purpose: "local-quiz-drafts",
+      hoc_vien: learnerFullName,
+      mon_hoc: "Ứng dụng AI trong dạy và học môn Bơi ếch",
+      bai_hoc_dang_mo: `Bài ${selectedLesson}`,
+      ngay_sao_luu: new Date().toISOString(),
+      // Completion and score fields are reference-only. Restoring this file
+      // must never change server-verified grades, access or certificates.
+      tien_do: progress,
+    }, null, 2);
     const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = "tien-do-boi-ech-toan-lo-trinh.json";
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async function restoreLocalQuizDraft(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    try {
+      if (file.size > 256 * 1024) throw new Error("Tệp vượt quá 256 KB, không thể nhập.");
+      const restored = parseLocalQuizBackup(await file.text(), learnerFullName);
+      if (!window.confirm("Chỉ khôi phục câu trả lời nháp trên thiết bị này. Kết quả, điểm, quyền mở bài và chứng chỉ vẫn lấy từ máy chủ. Tiếp tục?")) return;
+      setProgress(current => {
+        const completed = new Set(current.completed.filter(key => /^bai-0[1-8]$/.test(key)).map(key => key.slice(-2)));
+        const submitted = new Set([...current.lessonSubmitted, ...completed]);
+        const allowed = Object.entries(restored.lessonAnswers).filter(([key]) => !submitted.has(key.slice(0, 2)));
+        const filtered = (entries: Record<string, number[]>) => Object.fromEntries(
+          Object.entries(entries).filter(([lesson]) => !submitted.has(lesson)),
+        );
+        return {
+          ...current,
+          // Never import the untrusted completed, submitted, lessonSubmitted
+          // or serverScores fields present in older backup formats.
+          answers: submitted.has("03") ? current.answers : restored.answers,
+          lessonAnswers: { ...current.lessonAnswers, ...Object.fromEntries(allowed) },
+          lessonFlags: { ...current.lessonFlags, ...filtered(restored.lessonFlags) },
+          lessonChecked: { ...current.lessonChecked, ...filtered(restored.lessonChecked) },
+          flags: submitted.has("03") ? current.flags : restored.flags,
+          checked: submitted.has("03") ? current.checked : restored.checked,
+        };
+      });
+      setNotice("Đã khôi phục câu trả lời nháp trên thiết bị. Điểm, tiến độ được duyệt và chứng chỉ không thay đổi.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Không đọc được tệp sao lưu.");
+    }
   }
 
   const managerDeviceId = deviceAccess?.deviceId;
@@ -2412,7 +2456,7 @@ export default function Home() {
                 return <div key={id}><span className={done ? "done" : ""}>{done ? "✓" : ""}</span><strong>{label}</strong><small>{status}</small></div>;
               })}
             </section>
-            <section className="backup-panel"><div><span>Sao lưu cá nhân</span><h3>Tải bản tiến độ về máy</h3><p>Tệp sao lưu chứa trạng thái học và câu trả lời của toàn bộ tám bài. Dữ liệu này tách biệt với bản sửa nội dung riêng trên thiết bị.</p></div><button onClick={exportProgress}>Tải bản sao lưu</button></section>
+            <section className="backup-panel" aria-label="Sao lưu và khôi phục bản nháp học tập"><div><span>Sao lưu cá nhân</span><h3>Sao lưu và khôi phục câu trả lời nháp</h3><p>Xuất bản sao lưu JSON. Khi nhập lại, chỉ câu trả lời và dấu đánh dấu chưa nộp được khôi phục trên thiết bị; điểm, phần hoàn thành, quyền mở bài và chứng chỉ vẫn do máy chủ xác minh.</p></div><div className="backup-actions"><button type="button" onClick={exportProgress}>Tải bản sao lưu</button><label htmlFor="restore-quiz-draft">Khôi phục bản nháp JSON</label><input id="restore-quiz-draft" type="file" accept=".json,application/json" aria-label="Chọn tệp sao lưu bản nháp Bơi Ếch" onChange={event=>void restoreLocalQuizDraft(event)} /></div></section>
           </div>
         )}
       </main>
