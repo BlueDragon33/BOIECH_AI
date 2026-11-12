@@ -74,7 +74,8 @@ function reloadPreservingPendingManagerInvite(token: string) {
 }
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
-  const bypass = pathname === "/xem-thu-can-bo-quan-ly" || pathname.startsWith("/quan-ly-thiet-bi") || pathname.startsWith("/bien-tap-");
+  // Certificate verification is public and read-only; issuance remains protected by signed device proof.
+  const bypass = pathname === "/chung-chi" || pathname === "/xem-thu-can-bo-quan-ly" || pathname.startsWith("/quan-ly-thiet-bi") || pathname.startsWith("/bien-tap-");
   const [account, setAccount] = useState<Account | null>(null), [devices, setDevices] = useState<Device[]>([]);
   const [v2,setV2]=useState(false);
   const [singleReview,setSingleReview]=useState(false);
