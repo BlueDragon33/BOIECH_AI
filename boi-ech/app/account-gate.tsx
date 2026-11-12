@@ -217,6 +217,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       return;
     }
     const fields = Object.fromEntries(new FormData(form));
+    // Keep the legacy cross-field invariant even when browser validation was bypassed.
+    if(mode==="register" && fields.password!==fields.passwordConfirm){
+      setFieldErrors(previous=>({...previous,passwordConfirm:"Mật khẩu nhập lại không khớp. Hãy kiểm tra ô này."}));
+      (form.elements.namedItem("passwordConfirm") as HTMLInputElement|null)?.focus();
+      return;
+    }
     delete fields.passwordConfirm;
     // Password is used for this HTTPS submission only, then cleared from the input.
     const password = fields.password; const field = form.elements.namedItem("password") as HTMLInputElement | null;
