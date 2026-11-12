@@ -107,7 +107,7 @@ body[data-teacher-role-ui="active"] .learner-chip strong { color: white; }
 
 .teacher-table-wrap { overflow: auto; border: 1px solid #e1eaee; border-radius: 12px; }
 .teacher-table { width: 100%; min-width: 790px; border-collapse: collapse; background: white; }
-.teacher-table th { padding: 10px 12px; color: #78909d; background: #f5f9fb; font-size: 9px; text-align: left; text-transform: uppercase; letter-spacing: .05em; }
+.teacher-table th { padding: 10px 12px; color: #435f70; background: #f5f9fb; font-size: 13px; text-align: left; text-transform: uppercase; letter-spacing: .05em; }
 .teacher-table td { padding: 11px 12px; border-top: 1px solid #edf2f4; color: #34536a; font-size: 10px; vertical-align: middle; }
 .teacher-student { display: flex; gap: 9px; align-items: center; }
 .teacher-student > span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #0b5570; background: #daf2f5; font-weight: 900; }
