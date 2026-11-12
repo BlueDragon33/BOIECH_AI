@@ -52,6 +52,15 @@
 .authRoot :global(.person-role-field label){display:flex;gap:9px;align-items:center;
   padding:12px;border:1px solid #c5dce4;border-radius:14px;cursor:pointer;background:#fbfdfe}
 .authRoot :global(.person-role-field label.selected){background:#e1f8f4;border-color:#0daea2}
+/* Auth screen uses light role cards; global dark-theme role labels must not leak in. */
+.authRoot :global(.person-role-field label),
+.authRoot :global(.person-role-field label.selected){color:#113d4b}
+.authRoot :global(.person-role-field label b),
+.authRoot :global(.person-role-field label.selected b){color:#123d48;font-size:14px;font-weight:800}
+.authRoot :global(.person-role-field label small),
+.authRoot :global(.person-role-field label.selected small){color:#3f6570;font-size:12px;line-height:1.5}
+.authRoot :global(.person-role-field label:focus-within){outline:3px solid #087d91;outline-offset:2px}
+
 .authRoot :global(.person-role-field small){display:block;font-size:.74rem;color:#60808a}
 .authRoot :global(.person-role-field input){width:19px;min-height:19px;accent-color:#099c91}
 .profileDevices{margin-top:14px;padding:12px;border:1px solid #c8dee4;border-radius:12px}
