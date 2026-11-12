@@ -46,7 +46,7 @@ test("pending approval checks server at 20s with no overlapping refresh",()=>{
    "refreshInFlight.current=false",
    'action:"profile-draft-activate"',
    "attemptedAutoActivation.current.delete(key)",
-   'account.status === "approved"',
+   'account?.status === "approved"',
    "account.entitlementActive===true"])
    assert.ok(source.includes(check),check);
 });
