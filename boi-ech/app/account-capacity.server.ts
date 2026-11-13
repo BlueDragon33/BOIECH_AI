@@ -36,7 +36,11 @@ export async function changeAccountCapacity(db: D1Database, owner: Owner, input:
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
     SELECT ?,'owner.account-capacity',?,CASE WHEN changes()=1 THEN ? ELSE NULL END`)
    .bind(owner.actor,role,`new_limit=${cap}`),
- ]);
+ ]).catch((error:unknown)=>{
+  if(error instanceof Error && /NOT NULL|constraint|CHECK/i.test(error.message))
+    throw new AccountError('ACCOUNT_CAS_CONFLICT',409);
+  throw error;
+ });
  if(Number(result[0]?.meta?.changes)!==1) throw new AccountError('ACCOUNT_CAS_CONFLICT',409);
  return readAccountCapacity(db,owner);
 }
