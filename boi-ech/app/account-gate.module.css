@@ -264,3 +264,38 @@
   .activeRecovery{left:10px;right:10px;bottom:10px;max-width:none;
     padding:14px;max-height:min(56dvh,460px)}
 }
+
+/* A visible, actionable warning rather than a silent 30-minute auth reset. */
+.sessionLeaseWarning {
+  position: fixed;
+  z-index: 1050;
+  inset-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(520px, calc(100vw - 24px));
+  margin-inline: auto;
+  display: grid;
+  gap: 9px;
+  padding: 16px 18px;
+  background: #fffaf0;
+  color: #57371a;
+  border: 2px solid #a7701c;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px #1b2a4160;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.sessionLeaseWarning strong { font-size: 15px; color: #5b3017; }
+.sessionLeaseWarning button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 9px 14px;
+  font: inherit;
+  font-weight: 800;
+  background: #174e91;
+  color: #fff;
+  border: 1px solid #174e91;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.sessionLeaseWarning button:disabled { opacity: .6; cursor: wait; }
+.sessionLeaseWarning button:focus-visible { outline: 3px solid #d17c20; outline-offset: 3px; }
