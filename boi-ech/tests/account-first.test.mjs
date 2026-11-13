@@ -18,6 +18,8 @@ function fixture(){
  CREATE TABLE access_automation_settings(id TEXT PRIMARY KEY,default_access_days INTEGER);INSERT INTO access_automation_settings VALUES('global',90);`);
  const ddl=new URL('../drizzle/0018_account_first.sql',import.meta.url);assert.ok(fs.existsSync(ddl),'additive DDL must exist');sqlite.exec(fs.readFileSync(ddl,'utf8'));
  sqlite.exec(fs.readFileSync(new URL('../drizzle/0032_active_session_lease.sql',import.meta.url),'utf8'));
+ sqlite.exec(fs.readFileSync(new URL('../drizzle/0034_blocked_account_device_hashes.sql',import.meta.url),'utf8'));
+ sqlite.exec(fs.readFileSync(new URL('../drizzle/0035_registration_capacity_alerts.sql',import.meta.url),'utf8'));
  function prepare(sql){
   let args=[];
   return {
