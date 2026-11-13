@@ -273,3 +273,60 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
   reject("ACCOUNT_READBACK_FAILED",503);
  return {ok:true,verified:true,contract:"boi-manager-renew.v1",entitlement:after,accountId:target};
 }
+
+
+/** Manager's reversible remove-from-service. Never hard-delete protected identity,
+ * payments, certificates, D1 audit or shared learning evidence. */
+export async function managerRemoveAccount(db:D1Database,accounts:AccountService,token:string,input:Record<string,unknown>){
+ const actor=await accounts.authorize(token);
+ if(actor.role!=="manager")reject("ACCOUNT_PERMISSION_REQUIRED",403);
+ await accounts.capability(actor,"manager.manage.assigned");
+ const id=input.accountId,revision=input.expectedRevision,reason=input.reason;
+ if(typeof id!=="string"||!accountPattern.test(id)||id===actor.accountId||
+  !Number.isSafeInteger(revision)||(revision as number)<1||
+  typeof reason!=="string"||reason.trim().length<10||reason.length>300||
+  input.confirmation!==id)reject("ACCOUNT_INPUT",400);
+ // Explicit Owner-preserved trio can never be removed by a manager.
+ if(["acc_1f73c030843c73a","acc_6b4dbc19e478ef4","acc_68cfa13cfe2f66d"]
+    .some(prefix=>id.startsWith(prefix)))reject("ACCOUNT_PROTECTED",403);
+ const target=await db.prepare(`SELECT a.storage_device_id AS deviceId,e.revision,
+  d.person_role AS role,d.status,o.stage AS stage
+  FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+  JOIN account_entitlements e ON e.account_id=a.account_id
+  JOIN account_onboarding o ON o.account_id=a.account_id
+  WHERE a.account_id=?`).bind(id).first<{
+  deviceId:string;revision:number;role:string;status:string;stage:string
+ }>();
+ if(!target||!["learner","teacher"].includes(target.role)||target.status!=="approved"||
+  target.stage!=="active"||target.revision!==revision)
+  reject("ACCOUNT_CAS_CONFLICT",409);
+ const batch:D1PreparedStatement[]=[
+  db.prepare(`UPDATE account_entitlements SET state='suspended',revision=revision+1,
+    changed_by=?,updated_at=CURRENT_TIMESTAMP
+    WHERE account_id=? AND revision=? AND state='active'`).bind(actor.accountId,id,revision),
+  db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+    VALUES(?,'manager.account.archived',?,CASE WHEN changes()=1 THEN ? ELSE NULL END)`)
+    .bind(actor.accountId,id,reason.trim()),
+  db.prepare(`UPDATE account_onboarding SET stage='suspended',revision=revision+1,
+    updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='active'`).bind(id),
+  db.prepare(`UPDATE device_access SET status='blocked',blocked_at=CURRENT_TIMESTAMP,
+    updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND person_role IN ('learner','teacher')
+    AND status='approved'`).bind(target.deviceId),
+  db.prepare("UPDATE account_sessions SET revoked=1 WHERE account_id=?").bind(id),
+  db.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=?").bind(id)
+ ];
+ try{await db.batch(batch);}catch(error){
+  if(error instanceof Error&&/NOT NULL|constraint|CHECK/i.test(error.message))
+   reject("ACCOUNT_CAS_CONFLICT",409);
+  throw error;
+ }
+ const state=await db.prepare(`SELECT e.state,d.status,o.stage
+  FROM account_entitlements e JOIN accounts a ON a.account_id=e.account_id
+  JOIN device_access d ON d.device_id=a.storage_device_id
+  JOIN account_onboarding o ON o.account_id=e.account_id
+  WHERE e.account_id=?`).bind(id).first<{state:string;status:string;stage:string}>();
+ if(state?.state!=="suspended"||state?.status!=="blocked"||state?.stage!=="suspended")
+  reject("ACCOUNT_READBACK_FAILED",503);
+ return {ok:true,verified:true,contract:"boi-manager-archive.v1",
+  accountId:id,archived:true,deleted:false,readback:true};
+}
