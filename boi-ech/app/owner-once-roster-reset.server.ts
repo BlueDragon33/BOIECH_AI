@@ -6,7 +6,7 @@ import type {getCourseDatabase} from "./device-auth.server";
 type DB=Awaited<ReturnType<typeof getCourseDatabase>>;
 type Owner={actor:string;role:string};
 type Row={
- device_id:string;name:string|null;role:string;created_at:string;updated_at:string;
+ device_id:string;name:string|null;role:string;created_at:string;updated_at:string|null;
  status:string;account_id:string|null;revision:number|null;legacy_key:string|null;
  payments:number;certificates:number;training:number;content:number;shared:number;
 };
@@ -108,7 +108,7 @@ export async function previewOwnerOnceRosterReset(db:DB,actor:Owner){
 const guard=`EXISTS(SELECT 1 FROM device_access d
  LEFT JOIN accounts a ON a.storage_device_id=d.device_id
  WHERE d.device_id=? AND d.person_role IN ('learner','teacher')
- AND d.device_id NOT IN (?,?) AND d.created_at=? AND d.updated_at=?
+ AND d.device_id NOT IN (?,?) AND d.created_at=? AND d.updated_at IS ?
  AND d.status=? AND COALESCE(d.learner_name,'')=?
  AND COALESCE(a.account_id,'')=? AND COALESCE(a.revision,-1)=?
  AND datetime(d.created_at)<=datetime(?)
