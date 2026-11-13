@@ -9,8 +9,11 @@ WITH owner_legacy AS (
         EXISTS(SELECT 1 FROM course_certificates c WHERE c.device_id=d.device_id) AS has_certificate,
         EXISTS(SELECT 1 FROM course_activity_events e WHERE e.device_id=d.device_id) AS has_progress,
         EXISTS(SELECT 1 FROM training_sessions t WHERE t.teacher_id=d.device_id) AS has_training,
-        EXISTS(SELECT 1 FROM course_content_versions v
-          WHERE v.created_by IN (d.device_id,a.account_id)) AS has_content,
+        (EXISTS(SELECT 1 FROM course_content_versions v
+          WHERE v.created_by IN (d.device_id,a.account_id)
+             OR v.editor_device_id=d.device_id)
+         OR EXISTS(SELECT 1 FROM content_editor_devices e
+          WHERE e.device_id=d.device_id)) AS has_content,
         EXISTS(SELECT 1 FROM account_sync_records r WHERE r.account_id=a.account_id)
         OR EXISTS(SELECT 1 FROM account_sync_events e WHERE e.account_id=a.account_id) AS has_sync
  FROM device_access d
