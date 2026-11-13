@@ -6,6 +6,18 @@ import { AccountV2Workflow } from "../../account-v2-workflow.server";
 import { AccountEntitlementService,managerRenewableAccounts,managerRenewAccount } from "../../account-entitlement.server";
 import { AccountTrialService } from "../../account-trial.server";
 import { AccountSecurityQuestionService } from "../../account-security-question.server";
+function friendlyDeviceLabel(userAgent:string|null):string{
+ const ua=(userAgent??"").slice(0,700),lower=ua.toLowerCase();
+ const browser=lower.includes("coc_coc")||lower.includes("coc coc")?"Cốc Cốc":
+  ua.includes("Edg/")||ua.includes("EdgA/")||ua.includes("EdgiOS/")?"Edge":
+  ua.includes("Firefox/")||ua.includes("FxiOS/")?"Firefox":
+  ua.includes("OPR/")||ua.includes("Opera")?"Opera":
+  ua.includes("CriOS/")||ua.includes("Chrome/")?"Chrome":
+  ua.includes("Safari/")?"Safari":"Trình duyệt khác";
+ const category=/iPad|Tablet|Android(?!.*Mobile)/i.test(ua)?"Máy tính bảng":
+  /Mobile|iPhone|Android/i.test(ua)?"Điện thoại":"Máy tính";
+ return category+" · "+browser;
+}
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
@@ -98,6 +110,7 @@ export async function POST(request: Request) {
     if (p.action === "manager-register") {
       const result=await service.registerManagerWithInvite(p,peer);
       const {token:session,...safe}=result;
+      await service.rememberCurrentDeviceLabel(session,friendlyDeviceLabel(request.headers.get("user-agent")));
       return json({ok:true,...safe},sessionCookie(session));
     }
     if (p.action === "register" || p.action === "login" || p.action === "claim") {
@@ -109,6 +122,7 @@ export async function POST(request: Request) {
       }
       const result = p.action === "register" ? await service.register(p, peer) : p.action === "login" ? await service.login(p, peer) : await service.claim(p, legacyId, peer);
       const { token: session, ...safe } = result;
+      await service.rememberCurrentDeviceLabel(session,friendlyDeviceLabel(request.headers.get("user-agent")));
       return json({ ok: true, ...safe }, sessionCookie(session));
     }
     if (config.v2) {
@@ -135,6 +149,10 @@ export async function POST(request: Request) {
       if (p.action === "review-changes") return json({ onboarding: await workflow.requestChanges(
         {kind:"manager",token},String(p.accountId),p.expectedRevision,p.reason) });
       if (p.action === "approve-device") return json(await service.approveDevice(token,p.deviceId,p.password,peer));
+    }
+    if (p.action === "device-label-update") {
+      await service.rememberCurrentDeviceLabel(token,friendlyDeviceLabel(request.headers.get("user-agent")));
+      return json({ok:true});
     }
     if (p.action === "keepalive") return json(await service.keepAlive(token));
     if (p.action === "rotate") { const result = await service.rotate(token); return json({ ok: true }, sessionCookie(result.token)); }

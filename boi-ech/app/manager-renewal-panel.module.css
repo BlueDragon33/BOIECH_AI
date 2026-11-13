@@ -13,3 +13,18 @@
 .error{padding:10px;color:#882936;border:1px solid #d8a1a9;background:#fff0f2;border-radius:9px}
 .panel footer{font-size:11px;color:#466480}
 @media(max-width:680px){.panel{padding:12px}.tools{grid-template-columns:1fr}.list article{grid-template-columns:1fr}.panel h2{font-size:19px}}
+
+
+/* Professional renewal cards: visible time and genuine learner progress. */
+.list article{grid-template-columns:minmax(180px,1.3fr) minmax(160px,1fr) auto;
+ gap:16px;padding:18px;border:1px solid #bdd7ed;border-radius:16px;
+ background:#f6faff;box-shadow:0 5px 16px #102b4a0b}
+.list article>div>strong{font-size:16px;color:#0e355f}
+.list article>label{align-self:center}
+.list article>label select{width:100%;font-weight:750;color:#153e6b}
+.list article>button{min-height:48px;background:#195b9b;font-size:13px}
+.lessonProgress{display:grid;gap:5px;margin-top:5px}
+.lessonProgress strong{font-size:11px;color:#2c587c}
+.lessonProgress span{font-size:12px;color:#244a6f}
+.lessonProgress progress{height:11px;width:100%;border-radius:8px;accent-color:#197ac1}
+@media(max-width:860px){.list article{grid-template-columns:1fr}.list article>button{width:100%}}

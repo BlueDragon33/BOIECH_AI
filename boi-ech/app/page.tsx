@@ -1911,6 +1911,7 @@ export default function Home() {
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileNav(true)} aria-label="Mở điều hướng"><Icon name="menu" /></button>
           <div className="breadcrumb"><span>Môn học độc lập</span><i /> <strong>{navItems.find((item) => item.id === section)?.label}</strong></div>
+          <div id="boi-account-lease-slot" className="boi-learner-header-lease" aria-label="Thời hạn tài khoản học viên hoặc giảng viên"/>
           <div className="topbar-actions">
             <button className={`network-state ${networkOnline ? "online" : "offline"}`} onClick={() => void flushOfflineQueue()} title={usingOfflineLesson ? "Nội dung đang được mở từ bộ nhớ thiết bị" : undefined}><i />{networkOnline ? pendingSyncCount > 0 ? `Đồng bộ ${pendingSyncCount} mục` : "Đã kết nối" : `Học offline${pendingSyncCount > 0 ? ` · ${pendingSyncCount} mục chờ` : ""}`}</button>
             <button type="button" className="learner-chip" title="Mở Trang cá nhân và bảo mật" aria-label="Mở Trang cá nhân và bảo mật" onClick={()=>window.dispatchEvent(new Event("boi:account:open"))}><span>{learnerInitial}</span><div><small>{deviceAccess.personRole === "teacher" ? "Giảng viên" : "Học viên"}</small><strong>Chào {learnerGivenName}</strong></div></button>

@@ -56,6 +56,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
   <header className={styles.header}>
     <div className={styles.brand}><span className={styles.brandMark} aria-hidden="true">BẾ</span>
       <div><small>BƠI ẾCH AI · ĐIỀU PHỐI PREMIUM</small><h1>Cán bộ quản lý</h1></div></div>
+    <div id="boi-account-lease-slot" className={styles.headerLeaseSlot} aria-label="Thời hạn tài khoản cán bộ"/>
     <div className={styles.headerActions}>
       <button type="button" className={`${styles.iconButton} ${styles.settingsShortcut}`} aria-label="Mở cài đặt điều phối" aria-current={tab==="settings"?"page":undefined}
         onClick={()=>selectTab("settings")}><AppIcon name="settings"/></button>
