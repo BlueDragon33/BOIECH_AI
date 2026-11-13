@@ -73,8 +73,11 @@ test("Manager can renew teacher/learner but cannot renew manager; expired or rev
   await f.flow.completeProfileWithoutReview(m.token,profile(75101,"manager"));
   const l=await reg(f,75102,"learner");
   await f.flow.completeProfileWithoutReview(l.token,profile(75102,"learner"));
+  f.sqlite.prepare("UPDATE device_profiles SET completed_json=?,total_active_seconds=640 WHERE device_id=?")
+   .run(JSON.stringify(["hoc-tap-01","bai-01","kiem-tra-01","bai-02"]),l.account.storageDeviceId);
   const svc=f.load("account-entitlement.server.ts");
   const listed=await svc.managerRenewableAccounts(f.db,f.service,m.token);
+  assert.equal(listed.accounts.find(x=>x.accountId===l.account.accountId).completedLessons,2);
   assert.equal(listed.verified,true);
   assert.ok(listed.accounts.some(x=>x.accountId===l.account.accountId&&x.role==="learner"));
   const before=await f.service.ownerRead(l.account.accountId);
