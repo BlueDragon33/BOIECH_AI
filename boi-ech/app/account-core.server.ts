@@ -300,6 +300,7 @@ export class AccountService {
       // Distinguish a full account roster from a duplicate identity without exposing others' data.
       if (error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED", 409);
       if (error instanceof Error && error.message.includes("ACCOUNT_ROLE_OR_POLICY_MISSING")) fail("ACCOUNT_POLICY_UNAVAILABLE", 503);
+      if (error instanceof Error && /PHONE_NATIONAL_DUPLICATE/.test(error.message)) fail("PROFILE_PHONE_IN_USE",409);
       if (error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE", 409);
       throw error;
     }
