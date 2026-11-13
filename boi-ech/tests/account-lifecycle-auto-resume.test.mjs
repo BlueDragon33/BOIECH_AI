@@ -11,7 +11,7 @@ const compiled=ts.transpileModule(helperSource,{compilerOptions:{
 }}).outputText;
 const exports={};
 new Function("exports",compiled)(exports);
-const {accountServerActive,shouldAutoResumeDocument,recoveryMustRemainVisible}=exports;
+const {accountServerActive,recoveryMustRemainVisible}=exports;
 
 const pending={accountId:"acc_"+("a".repeat(64)),status:"pending",onboardingStage:"requested",
  deviceApproved:true,entitlementActive:false,expiresAt:null};
@@ -30,17 +30,17 @@ test("only server-verified status + trusted device + active onboarding + entitle
  assert.equal(accountServerActive(active,false,Date.now()),true);
 });
 
-test("auto resume happens exactly on same-account pending-to-active transition, not on blocked or login events",()=>{
- const id=active.accountId;
- assert.equal(shouldAutoResumeDocument({accountId:id,active:false},{accountId:id,active:true}),true);
- assert.equal(shouldAutoResumeDocument(null,{accountId:id,active:true}),false);
- assert.equal(shouldAutoResumeDocument({accountId:"",active:false},{accountId:id,active:true}),false);
- assert.equal(shouldAutoResumeDocument({accountId:id,active:true},{accountId:id,active:true}),false);
- assert.equal(shouldAutoResumeDocument({accountId:id,active:false},{accountId:id,active:false}),false);
- assert.equal(shouldAutoResumeDocument({accountId:id,active:false},{accountId:"another",active:true}),false);
+test("active account mounts from server readback without forced document reload",()=>{
+ assert.match(gateSource,/await preparePortableAccount\(data\.account\?\.accountId \?\? null, claim\)/);
+ assert.match(gateSource,/ready && active && account \? <div key=\{account\.accountId\}>\{children\}<\/div>/);
+ assert.match(gateSource,/accountTransitionNeedsReload\(current\.current,data\.account\?\.accountId \?\? ""\)/);
+ assert.doesNotMatch(gateSource,/activationNeedsDocumentBootstrap/);
+ assert.doesNotMatch(gateSource,/shouldAutoResumeDocument/);
+ // Identity changes still require a hard reload to prevent cross-account local-store reuse.
+ assert.match(gateSource,/reloadPreservingPendingManagerInvite\(managerInviteRef\.current\)/);
 });
 
-test("a one-time recovery code cannot blank the whole app or be erased by auto reload",()=>{
+test("one-time recovery code remains visible without auto-reload on activation",()=>{
  assert.equal(recoveryMustRemainVisible(true,"single-use-token"),true);
  assert.equal(recoveryMustRemainVisible(false,"single-use-token"),false);
  assert.equal(recoveryMustRemainVisible(true,""),false);
