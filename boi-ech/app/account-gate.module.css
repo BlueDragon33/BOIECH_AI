@@ -299,3 +299,18 @@
 }
 .sessionLeaseWarning button:disabled { opacity: .6; cursor: wait; }
 .sessionLeaseWarning button:focus-visible { outline: 3px solid #d17c20; outline-offset: 3px; }
+
+/* Live account-level lease, separate from 30-minute browser idle session. */
+.leaseClock {
+ position:fixed;bottom:max(12px,env(safe-area-inset-bottom));left:max(12px,env(safe-area-inset-left));
+ z-index:620;display:grid;gap:3px;min-width:180px;max-width:min(300px,calc(100vw - 24px));
+ background:#f5fbff;color:#173a5b;border:2px solid #3176ad;border-radius:12px;
+ padding:10px 14px;box-shadow:0 8px 26px #08203f30;font-variant-numeric:tabular-nums;
+}
+.leaseClock strong {font-size:11px;font-weight:850;letter-spacing:.02em;}
+.leaseClock output {font-size:18px;font-weight:900;white-space:nowrap;}
+.leaseClock small {font-size:10px;color:#2d597f;line-height:1.3;}
+.leaseClock[data-expiring="true"] {background:#fff5ec;color:#7a2b20;border-color:#bd5832;}
+.leaseClock[data-expiring="true"] small {color:#843a29;}
+@media(max-width:560px){.leaseClock{padding:7px 9px;min-width:145px;max-width:180px;}
+ .leaseClock output{font-size:14px;}.leaseClock small{font-size:9px;}}
