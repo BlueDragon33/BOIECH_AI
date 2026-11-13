@@ -16,7 +16,7 @@ function owner(actor:Actor){
  if(actor.role!=="owner" || !actor.actor || !actor.actor.includes("@"))fail("OWNER_REQUIRED",403);
 }
 function validId(value:unknown):string {
- if(typeof value!=="string"||!HEX.test(value))fail("DEVICE_BINDING_INPUT",400);
+ if(typeof value!=="string"||!HEX.test(value))throw new AccountError("DEVICE_BINDING_INPUT",400);
  return value;
 }
 async function locate(db:DB,id:string){
