@@ -96,7 +96,8 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
   {tab==="people"&&filter==="review"?<p role="note">Hàng chờ nhân sự chỉ đọc. Mở tab Gia hạn tài khoản để điều chỉnh thời gian sử dụng.</p>:null}
   {tab==="people"?<div className={styles.peopleGroups} aria-label="Nhân sự theo vai trò">
     {(["learner","teacher"] as const).map(role=>{
-      const members=people.filter(person=>person.role===role).sort((left,right)=>left.name.localeCompare(right.name,"vi"));
+      const members=people.filter(person=>person.role===role).sort((left,right)=>
+         String(left.name??"").localeCompare(String(right.name??""),"vi"));
       const isTeacher=role==="teacher";
       return <section className={styles.peopleRolePanel} key={role} aria-label={isTeacher?"Danh sách Giảng viên":"Danh sách Học viên"}>
         <header className={styles.peopleRoleHeading}>
