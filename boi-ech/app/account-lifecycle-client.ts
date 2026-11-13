@@ -9,23 +9,12 @@ export type AccountLifecycle = {
   deviceApproved?: boolean;
   entitlementActive?: boolean;
 };
-export type ObservedLifecycle = { accountId: string; active: boolean };
-
 export function accountServerActive(account: AccountLifecycle | null | undefined, v2: boolean, now: number) {
   if (!account || account.status !== "approved") return false;
   if (account.expiresAt && (!Number.isFinite(Date.parse(account.expiresAt)) || Date.parse(account.expiresAt) <= now))
     return false;
   return !v2 || (account.onboardingStage === "active" &&
     account.deviceApproved === true && account.entitlementActive === true);
-}
-
-/** Only a server-observed transition for the same account can trigger a
- * one-time document bootstrap. New login, revoked/blocked accounts and
- * a different account never qualify. */
-export function shouldAutoResumeDocument(previous: ObservedLifecycle | null,
-  next: ObservedLifecycle) {
-  return Boolean(previous && previous.accountId === next.accountId &&
-    previous.accountId !== "" && !previous.active && next.active);
 }
 
 export function recoveryMustRemainVisible(active: boolean, recovery: string) {
