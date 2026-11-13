@@ -1043,3 +1043,9 @@ body { font-size: calc(16px + var(--font-adjust, 0px)); line-height: 1.65; }
 .topbar-actions button.learner-chip{appearance:none;font:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
 .topbar-actions button.learner-chip:hover{border-color:#2294bb;box-shadow:0 6px 19px #168bb52e;transform:translateY(-1px)}
 .topbar-actions button.learner-chip:focus-visible{outline:3px solid #28b7ce;outline-offset:3px}
+
+
+/* Account-first learner countdown in the topbar, never over lesson content. */
+.boi-learner-header-lease{flex:0 1 220px;min-width:0;margin-inline:auto;display:flex;align-items:center;justify-content:center}
+.boi-learner-header-lease:empty{display:none}
+@media(max-width:760px){.boi-learner-header-lease{flex:0 1 136px;margin-inline:4px}}
