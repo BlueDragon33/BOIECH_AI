@@ -20,7 +20,7 @@ async function makeManager(f,kind,n){
  return result;
 }
 test("R5: email-first manager may add mobile in same atomic activation, without second registration",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await makeManager(f,"email",41),id=manager.account.accountId;
   f.setCookie(manager.token);
@@ -42,7 +42,7 @@ test("R5: email-first manager may add mobile in same atomic activation, without 
  }finally{f.close();}
 });
 test("R5: phone-first manager may add email, preserving original phone and one trusted account",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await makeManager(f,"phone",42),id=manager.account.accountId;
   f.setCookie(manager.token);
@@ -58,7 +58,7 @@ test("R5: phone-first manager may add email, preserving original phone and one t
  }finally{f.close();}
 });
 test("R5: invalid secondary contact is denied before activation, with no partial write or entitlement",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await makeManager(f,"email",43),id=manager.account.accountId;
   for(const invalid of ["broken phone",{value:"123"},"123"]){
@@ -72,7 +72,7 @@ test("R5: invalid secondary contact is denied before activation, with no partial
  }finally{f.close();}
 });
 test("R5: optional supplemental contact may be omitted without blocking existing valid manager activation",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await makeManager(f,"email",44),id=manager.account.accountId;
   const stage=await f.flow.submitProfile(manager.token,{...profile,expectedRevision:2});
@@ -82,7 +82,7 @@ test("R5: optional supplemental contact may be omitted without blocking existing
  }finally{f.close();}
 });
 test("R5: raw D1 constraint rejects same-kind secondary contact and leaves primary unchanged",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await makeManager(f,"email",45),id=manager.account.accountId;
   assert.throws(()=>f.sqlite.prepare("UPDATE account_contacts SET secondary_kind='email', secondary_value='same@example.invalid' WHERE account_id=?").run(id),
