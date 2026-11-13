@@ -263,3 +263,7 @@
  color:#fff;font:inherit;font-weight:800;padding:12px 22px;cursor:pointer;
 }
 .managerRenderFallback button:focus-visible{outline:3px solid #f0b52b;outline-offset:3px}
+
+
+.headerLeaseSlot{display:flex;align-items:center;justify-content:center;min-width:0;flex:1 1 auto;padding:0 12px}
+@media(max-width:620px){.header{flex-wrap:wrap}.headerLeaseSlot{order:3;flex:0 0 100%;padding:0}}
