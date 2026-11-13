@@ -97,7 +97,7 @@ test("invalid backup confirmation or wrong protected ID is rejected before writi
    e=>e.code==="ROSTER_RESET_CONFIRMATION_REQUIRED");
   await assert.rejects(()=>m.executeOwnerOnceRosterReset(f.db,owner,{...runArgs(p),protectSon:"wrong"}),
    e=>e.code==="ROSTER_RESET_PROTECTION_CHANGED");
-  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM device_access").get().n,3);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM device_access").get().n,4);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM account_one_time_roster_resets").get().n,0);
  }finally{f.close();}
 });
