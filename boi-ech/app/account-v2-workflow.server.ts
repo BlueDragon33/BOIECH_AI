@@ -224,9 +224,22 @@ export class AccountV2Workflow {
         AND changes()=1`).bind(actor.accountId,state.revision,actor.accountId)
     ];
     if(manager){
-      statements.splice(1,0,this.db.prepare(`INSERT INTO account_manager_profiles
-        (account_id,faculty_unit,job_title,job_position)
-        SELECT ?,?,?,? WHERE changes()=1`).bind(actor.accountId,className,jobTitle,jobPosition));
+      // management_identity_guard clears management_enabled on person_code
+      // mutation. Apply the capability flag only AFTER identity/profile commit,
+      // never in that same UPDATE (otherwise the trigger silently resets it).
+      statements.splice(1,0,
+        this.db.prepare(`INSERT INTO account_manager_profiles
+          (account_id,faculty_unit,job_title,job_position)
+          SELECT ?,?,?,? WHERE changes()=1`)
+          .bind(actor.accountId,className,jobTitle,jobPosition),
+        this.db.prepare(`UPDATE device_access SET management_enabled=1,
+          updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND status='approved'
+          AND management_enabled=0 AND changes()=1 AND EXISTS(
+            SELECT 1 FROM account_manager_invitations i
+            WHERE i.consumed_by=? AND i.revoked_at_ms IS NULL
+              AND i.consumed_at_ms IS NOT NULL)`)
+          .bind(actor.storageDeviceId,actor.accountId)
+      );
     }
     // The second statement transitions requested->active only after the
     // preceding successful device write. The first profile insertion changes()
