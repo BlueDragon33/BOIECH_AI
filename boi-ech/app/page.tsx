@@ -3,6 +3,7 @@
 /* Ảnh đã được tối ưu sẵn thành WebP cục bộ; giữ URL do máy chủ cấp. */
 /* eslint-disable @next/next/no-img-element */
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { parseLocalQuizBackup } from "./progress-backup";
 import ManagerWorkspace from "./manager-workspace";
@@ -28,6 +29,11 @@ import type {
   PublicQuestion,
   ServerCourseState,
 } from "./course-types";
+
+// Each role enhancement bundle is loaded only when its authenticated role is visible.
+// No background DOM observers for unrelated roles or account sign-in screens.
+const LearnerEnhancements = dynamic(() => import("./learner-enhancements"), { ssr: false });
+const TeacherEnhancements = dynamic(() => import("./teacher-enhancements"), { ssr: false });
 
 type SectionId =
   | "tong-quan"
@@ -2482,6 +2488,8 @@ export default function Home() {
         onSync={() => void flushOfflineQueue()}
         onReminderChange={changeReminder}
       />
+      {deviceAccess.personRole === "learner" ? <LearnerEnhancements /> : null}
+      {deviceAccess.personRole === "teacher" ? <TeacherEnhancements /> : null}
     </div>
   );
 }
