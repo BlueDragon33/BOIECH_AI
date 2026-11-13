@@ -17,6 +17,7 @@ function fixture(){
  CREATE TABLE manager_approval_limits(scope TEXT PRIMARY KEY,learner_limit INTEGER,teacher_limit INTEGER);INSERT INTO manager_approval_limits VALUES('manager-tier',50,5);
  CREATE TABLE access_automation_settings(id TEXT PRIMARY KEY,default_access_days INTEGER);INSERT INTO access_automation_settings VALUES('global',90);`);
  const ddl=new URL('../drizzle/0018_account_first.sql',import.meta.url);assert.ok(fs.existsSync(ddl),'additive DDL must exist');sqlite.exec(fs.readFileSync(ddl,'utf8'));
+ sqlite.exec(fs.readFileSync(new URL('../drizzle/0032_active_session_lease.sql',import.meta.url),'utf8'));
  function prepare(sql){
   let args=[];
   return {
