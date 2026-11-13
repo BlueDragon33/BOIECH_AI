@@ -114,6 +114,8 @@ test("P1 pending-account polling still uses 20 seconds and never treats client s
   assert.match(gate, /account\.deviceApproved===false/);
   assert.match(gate, /account\.entitlementActive===false/);
   assert.match(gate, /action:"profile-draft-activate"/);
-  assert.match(gate, /account\?\.status === "approved"/);
-  assert.match(gate, /account\.entitlementActive===true/);
+  assert.match(gate, /accountServerActive\(account, v2, observedNow\)/);
+  const contract=readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");
+  assert.match(contract, /account\.status !== "approved"/);
+  assert.match(contract, /account\.entitlementActive === true/);
 });

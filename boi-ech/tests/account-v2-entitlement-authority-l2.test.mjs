@@ -171,7 +171,9 @@ test("UI shell requires V2 account entitlement and V1 legacy expiry path remains
  const gate=readFileSync(new URL("../app/account-gate.tsx",import.meta.url),"utf8");
  const api=readFileSync(new URL("../app/api/accounts/route.ts",import.meta.url),"utf8");
  const core=readFileSync(new URL("../app/account-core.server.ts",import.meta.url),"utf8");
- assert.match(gate,/account\.entitlementActive===true/);
+ assert.match(gate,/accountServerActive\(account, v2, observedNow\)/);
+ const lifecycle=readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");
+ assert.match(lifecycle,/account\.entitlementActive === true/);
  assert.match(gate,/Thời hạn tài khoản đã hết/);
  assert.match(api,/entitlementActive: config\.v2 \? entitlement\?\.active === true : undefined/);
  assert.match(api,/expiresAt: config\.v2 \? \(account\.deviceApproved \? entitlement\?\.expiresAt/);

@@ -98,7 +98,9 @@ test("R5: after server-confirmed active manager, AccountGate opens ManagerWorksp
  const proof=readFileSync(new URL("../app/multi-account-switcher.tsx",import.meta.url),"utf8");
  assert.match(ui,/managerDashboard=Boolean\(ready && active && v2/);
  assert.match(ui,/<ManagerWorkspace deviceId=\{account.storageDeviceId\} getProof=\{getManagerProof\}/);
- assert.match(ui,/!managerDashboard && ready && active && !recovery && account/);
+ assert.match(ui,/!managerDashboard && ready && active && account/);
+ assert.doesNotMatch(ui,/ready && active && !recovery && account/);
+ assert.match(ui,/recoveryMustRemainVisible\(active,recovery\)/);
  assert.match(ui,/primaryContactKind==="email"\?"Số điện thoại bổ sung":"Email bổ sung"/);
  assert.match(proof,/portableManagerProof\(storageDeviceId: string\)/);
  assert.match(proof,/action:"legacy-challenge",deviceId:storageDeviceId/);
