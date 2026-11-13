@@ -47,8 +47,8 @@ test("one-time recovery code remains visible without auto-reload on activation",
  assert.match(gateSource,/ready && active && account \? <div key=\{account\.accountId\}>\{children\}<\/div>/);
  assert.doesNotMatch(gateSource,/ready && active && !recovery && account \?/);
  assert.match(gateSource,/recoveryMustRemainVisible\(active,recovery\)/);
- assert.match(gateSource,/activationNeedsDocumentBootstrap\.current !== account\.accountId \|\| recovery/);
- assert.match(gateSource,/window\.location\.reload\(\)/);
+ assert.doesNotMatch(gateSource,/activationNeedsDocumentBootstrap/);
+ assert.match(gateSource,/ready && active && account \? <div key=\{account\.accountId\}>\{children\}<\/div>/);
  assert.match(gateSource,/Mã này chỉ hiển thị một lần/);
  assert.match(css,/\.activeRecovery\{/);
  assert.match(css,/@media\(max-width:600px\)/);
@@ -59,9 +59,7 @@ test("approval polling at 20s and automatic draft activation still work without 
  assert.match(gateSource,/account\.onboardingStage==="profile_required"/);
  assert.match(gateSource,/account\.profileDraftReady!==true/);
  assert.match(gateSource,/action:"profile-draft-activate"/);
- assert.match(gateSource,/shouldAutoResumeDocument\(observedLifecycle\.current, nextLifecycle\)/);
  assert.match(gateSource,/readbackId !== readbackGeneration\.current/);
- assert.match(gateSource,/activationNeedsDocumentBootstrap\.current = null/);
 });
 
 test("profile submitted during manager approval retries once against readback and never registers again",()=>{
