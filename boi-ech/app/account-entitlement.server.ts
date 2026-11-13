@@ -231,9 +231,9 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
          AND d.management_enabled=1 AND o.stage='active'
          AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
          AND p.scope='manager.manage.assigned' AND p.enabled=1
-         AND (p.expires_at IS NULL OR p.expires_at>?))`)
+         AND (p.expires_at IS NULL OR datetime(p.expires_at)>CURRENT_TIMESTAMP))`)
     .bind(next,actor.accountId,target,revision,target,
-      actor.accountId,actor.sessionHash,actor.deviceId,now,now,now),
+      actor.accountId,actor.sessionHash,actor.deviceId,now,now),
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
     SELECT ?,'manager.entitlement.renew',?,
     CASE WHEN changes()=1 THEN ? ELSE NULL END`)
