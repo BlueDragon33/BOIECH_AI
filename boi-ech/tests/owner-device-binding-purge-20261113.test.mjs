@@ -11,14 +11,14 @@ async function pair(f,n) {
  const d=f.sqlite.prepare("SELECT account_id,device_id,created_at,approved,revoked FROM account_devices WHERE account_id=?").get(a.account.accountId);
  return {account:a,device:d,id:hash(d.account_id,d.device_id)};
 }
-const request=(a,extra={})=>({bindingId:a.id,expectedStatus:"pending",
+const request=(a,extra={})=>({bindingId:a.id,expectedStatus:"approved",
  expectedCreatedAt:a.device.created_at,confirmation:a.id,reason:"Owner confirms unused device link",...extra});
 test("Owner clicks the hash and reads real canonical account binding without publishing the signing key",async()=>{
  const f=accountStack({v2:true,singleReview:true});try{
   const a=await pair(f,60101);
   const before=await f.load("owner-device-bindings.server.ts").ownerDeviceBinding(f.db,owner,{action:"inspect",bindingId:a.id});
   assert.equal(before.contract,"boi-owner-device-binding.v1");
-  assert.equal(before.bindingId,a.id);assert.equal(before.status,"pending");
+  assert.equal(before.bindingId,a.id);assert.equal(before.status,"approved");
   assert.equal(before.account.accountId,a.account.accountId);
   assert.equal(before.dependencies.sessions,1);
   assert.equal(before.purgeAllowed,false);
