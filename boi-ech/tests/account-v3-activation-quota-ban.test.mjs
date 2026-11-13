@@ -85,6 +85,12 @@ test("Manager can renew teacher/learner but cannot renew manager; expired or rev
   assert.equal(renewed.verified,true);
   assert.equal(renewed.entitlement.revision,before.entitlement.revision+1);
   assert.ok(Date.parse(renewed.entitlement.expiresAt)>Date.parse(before.entitlement.expiresAt));
+  const set=await svc.managerRenewAccount(f.db,f.service,m.token,{
+    accountId:l.account.accountId,expectedRevision:renewed.entitlement.revision,
+    period:"7d",reason:"Manager resets to exactly one week, never cumulative"
+  });
+  assert.ok(Math.abs(Date.parse(set.entitlement.expiresAt)-Date.now()-7*msDay)<120000);
+  assert.ok(Date.parse(set.entitlement.expiresAt)<Date.parse(renewed.entitlement.expiresAt));
   await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,l.token,{
     accountId:m.account.accountId,expectedRevision:1,days:5,
     reason:"Unauthorized learner attempts an extension"
@@ -96,10 +102,10 @@ test("Manager can renew teacher/learner but cannot renew manager; expired or rev
   f.sqlite.prepare("UPDATE account_entitlements SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?")
     .run(m.account.accountId);
   await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,m.token,{
-    accountId:l.account.accountId,expectedRevision:renewed.entitlement.revision,days:5,
+    accountId:l.account.accountId,expectedRevision:set.entitlement.revision,days:5,
     reason:"Expired manager cannot issue entitlements"
   }),e=>e.code==="ACCOUNT_EXPIRED");
-  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM account_audit WHERE action='manager.entitlement.renew'").get().n,1);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM account_audit WHERE action='manager.entitlement.renew'").get().n,2);
  }finally{f.close();}
 });
 test("Seat admission is atomic and rejected signup produces an aggregated Owner alert",async()=>{
