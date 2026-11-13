@@ -352,6 +352,16 @@ export class AccountService {
     return this.registerV2(input,login,inviteHash);
   }
 
+  private async recordCapacityRejection(role:string){
+    if(!["manager","teacher","learner"].includes(role))return;
+    // A failed admission trigger rolls back its transaction. This follow-up
+    // writes only an aggregated role counter, never the rejected identity.
+    try{await this.db.prepare(`INSERT INTO account_capacity_alerts
+      (person_role,rejected_attempts,last_rejected_at) VALUES(?,1,CURRENT_TIMESTAMP)
+      ON CONFLICT(person_role) DO UPDATE SET
+        rejected_attempts=rejected_attempts+1,last_rejected_at=CURRENT_TIMESTAMP`)
+      .bind(role).run();}catch{/* Never disguise a denied registration as success. */}
+  }
   private async assertReentryAllowed(login:string,deviceKey:string){
     const ban=await this.db.prepare(`SELECT kind FROM account_reentry_bans
       WHERE revoked_at IS NULL AND (kind='login' AND ban_hash=?
@@ -405,7 +415,7 @@ export class AccountService {
     } catch(error) {
       if(inviteHash && error instanceof Error && /NOT NULL.*purpose|MANAGER_INVITATION/i.test(error.message))
         fail("MANAGER_INVITATION_INVALID",409);
-      if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED",409);
+      if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) {await this.recordCapacityRejection(role);fail("ACCOUNT_CAPACITY_REACHED",409);}
       if(error instanceof Error && /ACCOUNT_DEVICE_BANNED/.test(error.message)) fail("ACCOUNT_REENTRY_BLOCKED",403);
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
