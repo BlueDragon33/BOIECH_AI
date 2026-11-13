@@ -81,3 +81,31 @@ test("missing Owner role, invalid confirmation and stale snapshot fail without d
    .get(id).n,1);
  }finally{f.close();}
 });
+
+test("legacy course profile is removed only when its source is not shared",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const solo=fixture(f,"8",8);
+  const sharedOne=fixture(f,"9",8);
+  const sharedTwo=fixture(f,"a",8);
+  f.sqlite.prepare("UPDATE device_access SET migrated_from_user_key='solo-old' WHERE device_id=?").run(solo);
+  f.sqlite.prepare("UPDATE device_access SET migrated_from_user_key='shared-old' WHERE device_id IN (?,?)")
+   .run(sharedOne,sharedTwo);
+  f.sqlite.prepare("INSERT INTO course_profiles(user_key,device_hash) VALUES('solo-old','hash-1')").run();
+  f.sqlite.prepare("INSERT INTO course_profiles(user_key,device_hash) VALUES('shared-old','hash-2')").run();
+  const svc=f.load("owner-legacy-bulk-purge.server.ts");
+  const pre=await svc.previewLegacyFiveDayPurge(f.db,owner);
+  assert.equal(pre.totalMatched,3);
+  assert.equal(pre.eligible,1);
+  assert.equal(pre.protected,2);
+  assert.equal(pre.protectedByReason.sharedLegacyProfiles,2);
+  const out=await svc.executeLegacyFiveDayPurge(f.db,owner,{
+   confirmation:"XOA TAI KHOAN CU TREN 5 NGAY",snapshot:pre.snapshot,
+   reason:"Remove independent old learner profile only"});
+  assert.equal(out.deleted,1);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM course_profiles WHERE user_key='solo-old'").get().n,0);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM course_profiles WHERE user_key='shared-old'").get().n,1);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM device_access WHERE device_id IN (?,?)")
+   .get(sharedOne,sharedTwo).n,2);
+ }finally{f.close();}
+});
