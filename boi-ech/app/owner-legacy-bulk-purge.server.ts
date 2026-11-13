@@ -7,7 +7,8 @@ type DB=Awaited<ReturnType<typeof getCourseDatabase>>;
 type Owner={actor:string;role:string};
 type Row={
  device_id:string;role:string;status:string;created_at:string;approved_at:string|null;
- account_id:string|null;account_revision:number|null;
+ account_id:string|null;account_revision:number|null;legacy_user_key:string|null;
+ shared_legacy_profile_risk:number;
  payment_risk:number;certificate_risk:number;training_risk:number;content_risk:number;
 };
 const hash=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -37,12 +38,20 @@ const protectedSql=`(
  OR EXISTS(SELECT 1 FROM course_certificates c WHERE c.device_id=d.device_id)
  OR EXISTS(SELECT 1 FROM training_sessions t WHERE t.teacher_id=d.device_id)
  OR EXISTS(SELECT 1 FROM course_content_versions v
-  WHERE v.created_by IN (d.device_id,a.account_id))
+  WHERE v.created_by IN (d.device_id,a.account_id) OR v.editor_device_id=d.device_id)
+ OR EXISTS(SELECT 1 FROM content_editor_devices e WHERE e.device_id=d.device_id)
+ OR (d.migrated_from_user_key IS NOT NULL AND EXISTS(
+  SELECT 1 FROM device_access other WHERE other.device_id<>d.device_id
+  AND other.migrated_from_user_key=d.migrated_from_user_key))
 )`;
 const from=`FROM device_access d LEFT JOIN accounts a ON a.storage_device_id=d.device_id
  LEFT JOIN account_onboarding o ON o.account_id=a.account_id`;
 const select=`SELECT d.device_id,d.person_role AS role,d.status,d.created_at,d.approved_at,
- a.account_id,a.revision AS account_revision,
+ a.account_id,a.revision AS account_revision,d.migrated_from_user_key AS legacy_user_key,
+ CASE WHEN d.migrated_from_user_key IS NOT NULL AND EXISTS(
+  SELECT 1 FROM device_access other WHERE other.device_id<>d.device_id
+  AND other.migrated_from_user_key=d.migrated_from_user_key)
+  THEN 1 ELSE 0 END AS shared_legacy_profile_risk,
  CASE WHEN d.payment_status='paid_verified' OR d.payment_proof_key IS NOT NULL
  OR EXISTS(SELECT 1 FROM payment_reviews p WHERE p.device_id=d.device_id) THEN 1 ELSE 0 END payment_risk,
  CASE WHEN EXISTS(SELECT 1 FROM course_certificates c WHERE c.device_id=d.device_id)
@@ -50,10 +59,13 @@ const select=`SELECT d.device_id,d.person_role AS role,d.status,d.created_at,d.a
  CASE WHEN EXISTS(SELECT 1 FROM training_sessions t WHERE t.teacher_id=d.device_id)
  THEN 1 ELSE 0 END training_risk,
  CASE WHEN EXISTS(SELECT 1 FROM course_content_versions v
- WHERE v.created_by IN (d.device_id,a.account_id)) THEN 1 ELSE 0 END content_risk
+ WHERE v.created_by IN (d.device_id,a.account_id) OR v.editor_device_id=d.device_id)
+ OR EXISTS(SELECT 1 FROM content_editor_devices e WHERE e.device_id=d.device_id)
+ THEN 1 ELSE 0 END content_risk
  ${from} WHERE ${provenance}`;
 const snapshot=(rows:Row[])=>hash(rows.map(r=>[
  r.device_id,r.role,r.status,r.created_at,r.approved_at,r.account_id,r.account_revision,
+ r.legacy_user_key,r.shared_legacy_profile_risk,
  r.payment_risk,r.certificate_risk,r.training_risk,r.content_risk
 ]));
 async function readRows(db:DB){
@@ -63,7 +75,8 @@ async function readRows(db:DB){
  if(raw.results.length>500)reject("LEGACY_CLEANUP_PAGING_REQUIRED",409);
  return raw.results;
 }
-const safe=(row:Row)=>![row.payment_risk,row.certificate_risk,row.training_risk,row.content_risk].some(Boolean);
+const safe=(row:Row)=>![row.payment_risk,row.certificate_risk,row.training_risk,row.content_risk,
+ row.shared_legacy_profile_risk].some(Boolean);
 export async function previewLegacyFiveDayPurge(db:DB,actor:Owner) {
  requireOwner(actor);
  const rows=await readRows(db);
@@ -78,7 +91,8 @@ export async function previewLegacyFiveDayPurge(db:DB,actor:Owner) {
    payment:protectedRows.filter(r=>r.payment_risk).length,
    certificate:protectedRows.filter(r=>r.certificate_risk).length,
    training:protectedRows.filter(r=>r.training_risk).length,
-   authoredContent:protectedRows.filter(r=>r.content_risk).length
+   authoredContent:protectedRows.filter(r=>r.content_risk).length,
+   sharedLegacyProfiles:protectedRows.filter(r=>r.shared_legacy_profile_risk).length
   },
   // A snapshot is tied to the exact set, not user-supplied record identifiers.
   snapshot:snapshot(rows),
@@ -140,6 +154,8 @@ export async function executeLegacyFiveDayPurge(
   del("course_activity_events","device_id=?",id);
   del("device_challenges","device_id=?",id);
   del("device_profiles","device_id=?",id);
+  // The legacy course profile may be removed only if no other device shares it.
+  del("course_profiles","user_key=?",row.legacy_user_key);
   // No payments, certificates, schedules or shared content can reach here:
   // any existing protected link aborts the final device delete by FK/CAS.
   del("device_access","device_id=?",id);
@@ -148,7 +164,7 @@ export async function executeLegacyFiveDayPurge(
  // audit must have inserted one row per confirmed deletion;
  // D1.batch is transactional, and D1 readback is required.
  for(let i=0;i<batch.length;i++){
-  if(Number(results[i*25]?.meta.changes)!==1)
+  if(Number(results[i*26]?.meta.changes)!==1)
    reject("LEGACY_CLEANUP_READBACK_FAILED",503);
  }
  const still=await db.prepare(`SELECT COUNT(*) AS n FROM device_access
