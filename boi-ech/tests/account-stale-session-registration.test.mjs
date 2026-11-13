@@ -75,7 +75,7 @@ test("existing authenticated GET path and all authorization boundaries remain in
     "new AccountEntitlementService",
     "account.deviceApproved",
     "account.status",
-    "await service.devices(token)"
+    "await service.devices(token"
   ])assert.ok(source.includes(token),"missing protected read "+token);
   assert.match(source,/return json\(\{ enabled: true, account: null, accountV2: config\.v2/);
 });
