@@ -22,7 +22,7 @@ const requireOwner=(actor:Owner)=>{
 const provenance=`d.person_role IN ('learner','teacher')
  AND datetime(d.created_at)<datetime('now','-5 days')
  AND d.registration_submitted_at IS NOT NULL AND d.approved_at IS NOT NULL
- AND d.status IN ('approved','blocked')
+ AND d.status IN ('approved','blocked','pending')
  AND (a.account_id IS NULL OR a.login IS NULL)
  AND (o.account_id IS NULL OR o.stage='legacy_hold')
  AND NOT EXISTS(SELECT 1 FROM manager_device_assignments m
