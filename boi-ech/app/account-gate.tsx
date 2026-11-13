@@ -18,7 +18,7 @@ type Account = { accountId: string; status: string; role: string; name: string; 
   profileDraftFields?:Record<string,string>|null;
   canReadRegistrants?: boolean; securityQuestionConfigured?:boolean;
   sessionExpiresAt?:number; sessionIdleExpiresAt?:number };
-type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
+type Device = { device_id: string; revoked: number; approved?: number; created_at: string; device_label?:string|null };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
 type AuthContact = "email" | "phone";
 type DeviceDisplay={label:string;browser:string};
@@ -131,6 +131,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [trialUsed,setTrialUsed]=useState(false);
   const [profileOpen,setProfileOpen]=useState(false);
   const closeProfile=useCallback(()=>setProfileOpen(false),[]);
+  // Sync a privacy-safe label on a trusted device; no raw UA leaves the edge.
+  // The remote device list will gain names as each device signs in again.
+  useEffect(()=>{
+   if(!profileOpen)return;
+   let cancelled=false;
+   void send({action:"device-label-update"}).then(()=>{
+     if(!cancelled)void reload();
+   }).catch(()=>{/* A label failure must never lock account access. */});
+   return()=>{cancelled=true;};
+  },[profileOpen]);
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -546,7 +556,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           <p>{devices.filter(d=>!d.revoked).length}/3 thiết bị · Dữ liệu lấy từ phiên hiện tại</p></div></div>
         <div className={styles.deviceList}>{devices.map((device,index)=>{
           const inUse=!device.revoked && Boolean(account?.deviceId) && device.device_id===account?.deviceId;
-          const name=inUse?currentDeviceDisplay().label:"Thiết bị khác "+(index+1)+" · Chưa rõ loại/trình duyệt";
+          const name=device.device_label?.trim() || (inUse?currentDeviceDisplay().label:"Thiết bị khác "+(index+1)+" · Chưa có thông tin trình duyệt");
           return <article className={styles.deviceItem} key={device.device_id}>
           <div><strong>{name}</strong>
             <small>{device.revoked?"Đã thu hồi":inUse?"Thiết bị hiện tại":v2&&device.approved===0?"Đang chờ xác nhận":"Thiết bị tin cậy"}
