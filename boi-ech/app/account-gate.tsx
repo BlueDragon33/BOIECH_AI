@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import {createPortal} from "react-dom";
 import RegistrantReader from "./registrant-reader";
 import ManagerWorkspace from "./manager-workspace";
 import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialog";
@@ -104,7 +105,15 @@ function reloadPreservingPendingManagerInvite(token: string) {
 }
 
 function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) {
+ const [slot,setSlot]=useState<HTMLElement|null>(null);
  const [now,setNow]=useState(0);
+ useEffect(()=>{
+  const update=()=>setSlot(document.getElementById("boi-account-lease-slot"));
+  update();
+  const observer=new MutationObserver(update);
+  observer.observe(document.body,{childList:true,subtree:true});
+  return()=>observer.disconnect();
+ },[role]);
  useEffect(()=>{queueMicrotask(()=>setNow(Date.now()));
   const tick=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(tick);},[]);
  const ms=Math.max(0,new Date(expiresAt).getTime()-now);
@@ -112,12 +121,12 @@ function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) 
  const minutes=Math.floor(ms%3600000/60000),seconds=Math.floor(ms%60000/1000);
  const left=`${days} ngày ${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
  const expiry=new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(expiresAt));
- return <aside className={styles.leaseClock} role="status" aria-label="Thời gian sử dụng còn lại"
+ return slot?createPortal(<aside className={`${styles.leaseClock} ${styles.leaseClockHeader}`} role="status" aria-label="Thời gian sử dụng còn lại"
    data-expiring={ms<=86400000}>
    <strong>{ms>0?"Thời hạn sử dụng":"Đã hết hạn"}</strong>
    <output aria-live="off">{ms>0?left:"00 ngày 00:00:00"}</output>
    <small>Đến {expiry} · {role==="manager"?"Owner gia hạn":"Cán bộ quản lý gia hạn"}</small>
- </aside>;
+ </aside>,slot):null;
 }
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
