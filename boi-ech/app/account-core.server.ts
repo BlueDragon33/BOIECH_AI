@@ -132,6 +132,9 @@ export class AccountService {
     const limit=pageLimit as number;
     const result=await this.db.prepare(`SELECT a.account_id AS accountId,
       a.revision AS accountRevision,d.person_role AS role,
+      a.created_at AS createdAt,d.last_seen_at AS lastSeenAt,
+      (SELECT COUNT(*) FROM account_sessions s WHERE s.account_id=a.account_id
+       AND s.revoked=0 AND s.expires_at>? AND s.idle_expires_at>?) AS activeSessions,
       COALESCE(d.learner_name,trim(json_extract(pd.profile_json,'$.familyName')||' '||json_extract(pd.profile_json,'$.givenName'))) AS name,
       d.status,o.stage AS onboardingStage,o.revision AS onboardingRevision,
       pd.updated_at AS profileDraftUpdatedAt
@@ -139,12 +142,60 @@ export class AccountService {
       JOIN account_onboarding o ON o.account_id=a.account_id
       LEFT JOIN account_profile_drafts pd ON pd.account_id=a.account_id
       WHERE d.person_role='manager' AND a.account_id>?
-      ORDER BY a.account_id LIMIT ?`).bind(after,limit+1)
+      ORDER BY a.account_id LIMIT ?`).bind(this.now(),this.now(),after,limit+1)
       .all<{accountId:string;accountRevision:number;role:string;name:string|null;
-        status:string;onboardingStage:string;onboardingRevision:number;profileDraftUpdatedAt:string|null}>();
+        status:string;onboardingStage:string;onboardingRevision:number;profileDraftUpdatedAt:string|null;
+        createdAt:string;lastSeenAt:string|null;activeSessions:number}>();
     const rows=result.results??[],hasMore=rows.length>limit,managers=rows.slice(0,limit);
     return {contract:"boi-manager-intake.v2" as const,verified:true,
       managers,nextCursor:hasMore?managers[managers.length-1].accountId:null};
+  }
+
+  /** Owner-only, audited soft archive. Never hard-delete identities, history or D1 rows.
+   * All active sessions and manager permissions are revoked atomically; the
+   * account revision is the CAS guard and prevents stale tab deletion. */
+  async archiveManager(owner:{role:string;actor:string},input:Record<string,unknown>) {
+    if(owner.role!=="owner" || !owner.actor || !this.v2Enabled) fail("OWNER_REQUIRED",403);
+    const id=input.accountId;
+    const expected=input.expectedRevision;
+    const reason=input.reason;
+    if(typeof id!=="string" || !ACCOUNT.test(id) || input.confirmation!==id
+      || !Number.isSafeInteger(expected) || typeof reason!=="string"
+      || reason.trim().length<10 || reason.length>300) fail("ACCOUNT_INPUT",400);
+    const row=await this.row(id);
+    if(row.person_role!=="manager")fail("TARGET_ROLE_FORBIDDEN",403);
+    if(row.status==="blocked")fail("ACCOUNT_ALREADY_BLOCKED",409);
+    if(row.status!=="pending"&&row.status!=="approved")fail("ACCOUNT_STATE_CONFLICT",409);
+    if(row.revision!==expected)fail("ACCOUNT_CAS_CONFLICT",409);
+    const statements:D1PreparedStatement[]=[
+      this.db.prepare(`UPDATE accounts SET revision=revision+1 WHERE account_id=? AND revision=?
+        AND EXISTS (SELECT 1 FROM device_access d
+          WHERE d.device_id=accounts.storage_device_id AND d.person_role='manager'
+          AND d.status IN ('pending','approved'))`).bind(id,expected),
+      this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+        SELECT ?,'owner.manager.archive',?,CASE WHEN changes()=1 THEN ? ELSE NULL END`)
+        .bind(owner.actor,id,reason.trim()),
+      this.db.prepare(`UPDATE device_access SET status='blocked',management_enabled=0,
+        blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+        WHERE device_id=? AND person_role='manager' AND status IN ('pending','approved')`).bind(row.storage_device_id),
+      this.db.prepare("UPDATE account_manager_permissions SET enabled=0 WHERE account_id=?").bind(id),
+      this.db.prepare("UPDATE account_sessions SET revoked=1 WHERE account_id=?").bind(id),
+      this.db.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=?").bind(id),
+      this.db.prepare(`UPDATE account_entitlements SET state='suspended',revision=revision+1,
+        changed_by=? WHERE account_id=? AND state='active'`).bind(owner.actor,id),
+      this.db.prepare(`UPDATE account_onboarding SET stage='suspended',revision=revision+1,
+        updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND stage='active'`).bind(id)
+    ];
+    try{await this.db.batch(statements);}
+    catch(error){
+      if(error instanceof Error && /NOT NULL.*purpose/i.test(error.message))fail("ACCOUNT_CAS_CONFLICT",409);
+      throw error;
+    }
+    const verified=await this.ownerRead(id);
+    if(verified.revision!==expected+1 || verified.status!=="blocked"
+      || verified.permissions.some(p=>p.configured))fail("ACCOUNT_READBACK_FAILED",503);
+    return {verified:true,accountId:id,revision:verified.revision,status:"blocked",
+      archived:true,retainedHistory:true};
   }
 
   // Owner-only control bridge: read-only, cursor-bounded visibility across
