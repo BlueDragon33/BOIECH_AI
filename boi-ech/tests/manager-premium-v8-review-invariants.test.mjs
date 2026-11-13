@@ -37,7 +37,8 @@ test("V8 reviewer and training manager authorize same trusted principal inside D
  assert.match(workflow,/c\.generation=s\.generation/);
  assert.match(train,/principal\.accountId!==actor\.accountId/);
  assert.match(train,/managerStorageDeviceId=canonical\.storage_device_id/);
- assert.match(train,/visibleSessions=sessions\.filter/);
+ assert.match(train,/visibleSessions=sessions;/);
+ assert.match(train,/visiblePeople=people;/);
  assert.match(train,/unassignedLearners:visiblePeople\.filter/);
  const core=read("account-core.server.ts");
  assert.match(core,/const quotaSQL = this\.v2Enabled/);
