@@ -59,6 +59,20 @@ test("Hard purge deletes device binding, sessions and sync metadata, not account
   await assert.rejects(()=>api(f.db,owner,{action:"purge",...request(a,{expectedStatus:"blocked"})}),e=>e.code==="DEVICE_BINDING_NOT_FOUND");
  }finally{f.close();}
 });
+test("Owner hard purge of the last device cannot let a fresh login auto-approve itself",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const a=await pair(f,60106),api=f.load("owner-device-bindings.server.ts").ownerDeviceBinding;
+  await api(f.db,owner,{action:"revoke",...request(a)});
+  await api(f.db,owner,{action:"purge",...request(a,{expectedStatus:"blocked"})});
+  const pair=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
+  const publicKey=await crypto.subtle.exportKey("jwk",pair.publicKey);
+  const fresh=await f.service.login({login:"fixture60106",password:"Local-only unique passphrase 60106",
+    publicKey},"verified-login");
+  const principal=await f.service.session(fresh.token);
+  assert.equal(principal.deviceApproved,false,"existing account with zero bindings must not auto-trust a new browser");
+  await assert.rejects(()=>f.service.authorize(fresh.token),e=>e.code==="DEVICE_APPROVAL_REQUIRED");
+ }finally{f.close();}
+});
 test("An obsolete pending second-browser link can be purged while preserving the trusted login device",async()=>{
  const f=accountStack({v2:true,singleReview:true});try{
   const a=await pair(f,60105);
