@@ -78,7 +78,7 @@ async function send(body: Record<string, unknown>) {
   if (!response.ok) throw Object.assign(new Error(data.error ?? "Chưa xác minh được thao tác tài khoản."), {
     code: typeof data.code==="string" ? data.code : "ACCOUNT_SERVICE_UNAVAILABLE"
   });
-  return data as { recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
+  return data as { ok?:boolean; recoveryCode?: string; accountId?: string; account?: Account; matched?:boolean; verified?:boolean;
     devices?:Array<{device_id:string;approved:number;created_at:string}>;trial?:TrialLease;challenge?:string };
 }
 function reloadPreservingPendingManagerInvite(token: string) {
