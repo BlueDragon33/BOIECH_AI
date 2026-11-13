@@ -66,3 +66,8 @@ WHEN NOT (
  OR (OLD.stage='legacy_hold' AND NEW.stage='profile_review')
 )
 BEGIN SELECT RAISE(ABORT,'ONBOARDING_INVALID_TRANSITION'); END;
+--> statement-breakpoint
+-- Seats are now owned at registration, not at activation. A previously
+-- registered user must not lose the ability to finish an already-admitted
+-- profile solely because Owner lowered the *new registration* limit.
+DROP TRIGGER IF EXISTS account_activation_capacity;
