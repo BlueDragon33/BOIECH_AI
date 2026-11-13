@@ -30,6 +30,11 @@ WITH owner_legacy AS (
    AND (o.account_id IS NULL OR o.stage='legacy_hold')
    AND NOT EXISTS(SELECT 1 FROM manager_device_assignments m
      WHERE m.target_device_id=d.device_id)
+   AND NOT EXISTS(SELECT 1 FROM course_audit_log mr
+     WHERE mr.target=d.device_id AND mr.action='manager_device_approved')
+   AND NOT EXISTS(SELECT 1 FROM account_audit ar
+     WHERE ar.target=a.account_id AND ar.action IN
+      ('account.review.first','account.profile.activated','account.profile.auto-activated'))
    AND EXISTS(SELECT 1 FROM course_audit_log h
      WHERE h.target=d.device_id
        AND h.action IN ('learning_device_free_approved','learning_device_payment_verified'))
