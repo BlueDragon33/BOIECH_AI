@@ -144,3 +144,57 @@ test("Signed production account route rejects public manager signup, and automat
 });
 import {readFileSync} from "node:fs";
 function requireSource(relative){return readFileSync(new URL(relative,import.meta.url),"utf8");}
+
+
+test("Genuine phone collision is identified and failed activation remains atomic",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const first=await reg(f,75901,"teacher");
+  await f.flow.completeProfileWithoutReview(first.token,profile(75901,"teacher"));
+  const next=await reg(f,75902,"teacher");
+  await assert.rejects(()=>f.flow.completeProfileWithoutReview(next.token,{
+   ...profile(75902,"teacher"),phone:profile(75901,"teacher").phone
+  }),error=>error.code==="PROFILE_PHONE_IN_USE");
+  assert.equal((await f.flow.ownStatus(next.token)).stage,"requested");
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_entitlements WHERE account_id=?")
+    .get(next.account.accountId).n,0);
+  const fixed=await f.flow.completeProfileWithoutReview(next.token,profile(75902,"teacher"));
+  assert.equal(fixed.stage,"active");
+ }finally{f.close();}
+});
+
+test("Non-phone D1 state constraint is not falsely reported as duplicate contact",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const account=await reg(f,75903,"teacher");
+  f.sqlite.exec(`CREATE TRIGGER test_forced_profile_state_conflict BEFORE UPDATE OF status
+   ON device_access WHEN NEW.status='approved' AND NEW.person_role='teacher'
+   BEGIN SELECT RAISE(ABORT,'ONBOARDING_INVALID_TRANSITION'); END`);
+  await assert.rejects(()=>f.flow.completeProfileWithoutReview(account.token,profile(75903,"teacher")),
+   error=>error.code==="PROFILE_STATE_CONFLICT");
+  assert.equal((await f.flow.ownStatus(account.token)).stage,"requested");
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_entitlements WHERE account_id=?")
+   .get(account.account.accountId).n,0);
+ }finally{f.close();}
+});
+
+test("Reviewed legacy account is still able to complete after new no-review rollout",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const manager=await invitedManager(f,75904);
+  await f.flow.completeProfileWithoutReview(manager.token,profile(75904,"manager"));
+  const teacher=await reg(f,75905,"teacher");
+  const pending=await f.flow.ownStatus(teacher.token);
+  const reviewed=await f.flow.firstReview({kind:"manager",token:manager.token},
+   teacher.account.accountId,pending.revision);
+  assert.equal(reviewed.stage,"profile_required");
+  const completed=await f.flow.submitProfile(teacher.token,{
+   ...profile(75905,"teacher"),expectedRevision:reviewed.revision
+  });
+  assert.equal(completed.stage,"active");
+  const route=requireSource("../app/api/accounts/route.ts");
+  assert.match(route,/currentStage|const stage=config\.singleReview/);
+  assert.match(route,/stage==="requested"/);
+  assert.match(route,/workflow\.submitProfile\(token,p\)/);
+ }finally{f.close();}
+});
