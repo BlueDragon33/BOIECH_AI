@@ -18,7 +18,7 @@ type Account = { accountId: string; status: string; role: string; name: string; 
   profileDraftFields?:Record<string,string>|null;
   canReadRegistrants?: boolean; securityQuestionConfigured?:boolean;
   sessionExpiresAt?:number; sessionIdleExpiresAt?:number };
-type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
+type Device = { device_id: string; revoked: number; approved?: number; created_at: string; display_label?:string|null; current?:boolean };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
 type AuthContact = "email" | "phone";
 const fieldLabels: Record<string,string> = {
@@ -532,9 +532,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         <div className={styles.settingSectionTitle}><span>▣</span><div><h3>Thiết bị đã liên kết</h3>
           <p>{devices.filter(d=>!d.revoked).length}/3 thiết bị · Dữ liệu lấy từ phiên hiện tại</p></div></div>
         <div className={styles.deviceList}>{devices.map(device=><article className={styles.deviceItem} key={device.device_id}>
-          <div><strong>Thiết bị {device.device_id.slice(0,8).toUpperCase()}</strong>
+          <div><strong>{device.display_label||"Thiết bị chưa nhận diện"} {device.current?<span className={styles.currentDeviceBadge}>In use</span>:null}</strong>
             <small>{device.revoked?"Đã thu hồi":v2&&device.approved===0?"Đang chờ xác nhận":"Thiết bị tin cậy"}
-              {" · "}{device.created_at}</small></div>
+              {" · "}{device.created_at} · Mã {device.device_id.slice(0,8).toUpperCase()}</small></div>
           {!device.revoked&&v2&&device.approved===0&&account?.deviceApproved===true?
             <form onSubmit={e=>{e.preventDefault();const el=e.currentTarget;const password=new FormData(el).get("password");
               void run(async()=>{await send({action:"approve-device",deviceId:device.device_id,password});
@@ -542,7 +542,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
               <label>Mật khẩu xác nhận<input name="password" type="password" required autoComplete="current-password" disabled={busy}/></label>
               <button disabled={busy} type="submit">Xác nhận thiết bị</button>
             </form>:null}
-          {!device.revoked&&(!v2||account?.deviceApproved===true)?
+          {!device.revoked&&!device.current&&(!v2||account?.deviceApproved===true)?
             <button type="button" className={styles.revokeButton} disabled={busy}
               onClick={()=>{if(window.confirm("Thu hồi thiết bị này? Các phiên của thiết bị sẽ bị vô hiệu hóa."))void run(async()=>{
                 await send({action:"revoke-device",deviceId:device.device_id});await reload();broadcast();
