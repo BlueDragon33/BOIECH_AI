@@ -9,12 +9,14 @@ function requireOwner(owner: Owner) {
 export async function readAccountCapacity(db: D1Database, owner: Owner) {
  requireOwner(owner);
  const response = await db.prepare(`SELECT p.person_role AS role,p.account_limit AS accountLimit,p.revision,
+   COALESCE(c.rejected_attempts,0) AS rejectedAttempts,c.last_rejected_at AS lastRejectedAt,
    (SELECT COUNT(*) FROM accounts a
      JOIN device_access d ON d.device_id=a.storage_device_id
      WHERE a.login IS NOT NULL AND d.person_role=p.person_role) AS used
-  FROM account_admission_limits p ORDER BY CASE p.person_role
+  FROM account_admission_limits p LEFT JOIN account_capacity_alerts c ON c.person_role=p.person_role
+  ORDER BY CASE p.person_role
    WHEN 'manager' THEN 0 WHEN 'teacher' THEN 1 ELSE 2 END`).all<{
-    role: string; accountLimit: number; revision: number; used: number
+    role: string; accountLimit: number; revision: number; used: number;rejectedAttempts:number;lastRejectedAt:string|null
   }>();
  const limits = response.results ?? [];
  if (limits.length !== 3 || limits.some(x => !roles.has(x.role))) throw new AccountError('ACCOUNT_POLICY_UNAVAILABLE', 503);
