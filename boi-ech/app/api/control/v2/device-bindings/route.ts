@@ -18,7 +18,7 @@ export async function POST(request:Request){
   let input:Record<string,unknown>;
   try{const value=JSON.parse(raw);if(!value||typeof value!=="object"||Array.isArray(value))throw new Error();
    input=value as Record<string,unknown>;}catch{throw new AccountError("ACCOUNT_INPUT",400);}
-  if(!["inspect","revoke","purge"].includes(String(input.action)))throw new AccountError("ACCOUNT_INPUT",400);
+  if(!["inspect","revoke","purge","ban"].includes(String(input.action)))throw new AccountError("ACCOUNT_INPUT",400);
   return controlResponse(await ownerDeviceBinding(await getCourseDatabase(),owner,input),200,request);
  }catch(error){return withControlCors(request,accountErrorResponse(error));}
 }
