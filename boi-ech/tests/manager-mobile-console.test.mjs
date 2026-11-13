@@ -110,7 +110,7 @@ test('P2 five-item mobile dock and header settings preserve all destinations wit
  let selected;let writes=0;const render=harness(props({setTab:value=>{selected=value;},onCommand:async()=>{writes++;return true;}}));
  const tree=render();const nav=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='Điều phối đào tạo — năm mục chính');
  assert.ok(nav);const buttons=elements(nav).filter(n=>n.type==='button');assert.equal(buttons.length,5);
- assert.deepEqual(buttons.map(n=>text(n)),['Trang chủ','Kiểm duyệt','Lịch','Lớp học','Nhân sự']);
+ assert.deepEqual(buttons.map(n=>text(n)),['Trang chủ','Gia hạn','Lịch','Lớp học','Nhân sự']);
  assert.ok(!tree.some(n=>n.type==='section'&&n.props['aria-label']==='Ứng dụng điều phối'),'redundant launcher must be gone');
  const settings=tree.find(n=>n.type==='button'&&n.props['aria-label']==='Mở cài đặt điều phối');
  assert.ok(settings,'Settings remains directly accessible on mobile via header');
