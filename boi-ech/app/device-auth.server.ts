@@ -790,7 +790,7 @@ export async function saveDeviceRegistration(payload: Record<string, unknown>, s
       }
     }
   } catch (error) {
-    if (error instanceof Error && /device_access\.phone|device_access_phone_unique/i.test(error.message)) {
+    if (error instanceof Error && /PHONE_NATIONAL_DUPLICATE|device_access\.phone|device_access_phone_unique/i.test(error.message)) {
       throw new DeviceAccessError("Số điện thoại này đã được đăng ký cho một thiết bị khác.", 409, "PHONE_ALREADY_REGISTERED");
     }
     if (error instanceof Error && /device_access\.person_role|device_access\.person_code|device_access_person_identity_unique/i.test(error.message)) {
