@@ -13,7 +13,7 @@ export async function blockBoiAccount(db:D1Database,owner:Owner,input:Record<str
  const id=input.accountId,rev=input.expectedRevision;
  const reason=input.reason;
  if(typeof id!=="string"||!ID.test(id)||input.confirmation!==id||
-    !Number.isSafeInteger(rev)||Number(rev)<1||typeof reason!=="string"||
+    !Number.isSafeInteger(rev)||Number(rev)<0||typeof reason!=="string"||
     reason.trim().length<10||reason.length>300)throw new AccountError("ACCOUNT_BLOCK_INPUT",400);
  const row=await db.prepare(`SELECT a.account_id,a.login,a.revision,d.status,
   a.storage_device_id,d.person_role
