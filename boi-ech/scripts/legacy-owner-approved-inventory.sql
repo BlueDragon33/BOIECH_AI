@@ -1,4 +1,4 @@
--- BOIECH_AI Owner legacy-intake inventory, READ ONLY. Never run DELETE from this query.
+-- BOIECH_AI Owner legacy-intake inventory. READ ONLY: no data mutations.
 -- Strict selection: historical Owner approval event, no V2 login, no manager assignment,
 -- never a manager account. Auto-approved devices without Owner event are NOT guessed.
 -- Run only after verifying current Cloudflare D1 boi-ech-db and PITR bookmark.
