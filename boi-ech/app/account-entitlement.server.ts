@@ -172,18 +172,32 @@ export async function managerRenewableAccounts(db:D1Database,accounts:AccountSer
  await accounts.capability(actor,"manager.manage.assigned");
  const result=await db.prepare(`SELECT a.account_id AS accountId,d.learner_name AS name,
   d.person_role AS role,e.expires_at AS expiresAt,e.revision,
+  prog.completed_json AS completedJson,
   e.state AS entitlementState,o.stage AS onboardingStage
   FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
   JOIN account_onboarding o ON o.account_id=a.account_id
   JOIN account_entitlements e ON e.account_id=a.account_id
+  LEFT JOIN device_profiles prog ON prog.device_id=d.device_id
   WHERE d.person_role IN ('learner','teacher') AND d.status='approved'
     AND o.stage='active' AND e.state='active'
   ORDER BY d.person_role,a.account_id LIMIT 501`).all<{
    accountId:string;name:string;role:string;expiresAt:string;revision:number;
-   entitlementState:string;onboardingStage:string
+   entitlementState:string;onboardingStage:string;completedJson:string|null
   }>();
  if(!Array.isArray(result.results)||result.results.length>500)reject("ACCOUNT_RESULT_LIMIT",413);
- return {verified:true,contract:"boi-manager-renew.v1",accounts:result.results};
+ const records=result.results.map(row=>{
+  let progress:{completed:number;total:number}|null=null;
+  if(typeof row.completedJson==="string"){
+   try{
+    const value:unknown=JSON.parse(row.completedJson);
+    if(Array.isArray(value)&&value.length<=1000)
+     progress={completed:Math.min(8,new Set(value.filter(x=>typeof x==="string"||typeof x==="number")).size),total:8};
+   }catch{/* No verified lesson progress; show unavailable rather than zero. */}
+  }
+  const {completedJson:_,...account}=row;
+  return {...account,progress};
+ });
+ return {verified:true,contract:"boi-manager-renew.v1",accounts:records};
 }
 export async function managerRenewAccount(db:D1Database,accounts:AccountService,token:string,input:Record<string,unknown>,now=Date.now()){
  const actor=await accounts.authorize(token);
