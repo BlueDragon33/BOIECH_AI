@@ -1,15 +1,4 @@
 import { AccountError } from "../../account-core.server";
-function friendlyDeviceLabel(userAgent:string|null):string{
- const ua=(userAgent??"").slice(0,700);
- const browser=/coc_coc_browser|coc_coc|coc coc/i.test(ua)?"Cốc Cốc":
- /EdgA?\\/|EdgiOS\\//.test(ua)?"Edge":/Firefox\\/|FxiOS\\//.test(ua)?"Firefox":
- /OPR\\/|Opera/i.test(ua)?"Opera":/CriOS\\/|Chrome\\//.test(ua)?"Chrome":
- /Safari\\//.test(ua)?"Safari":"Trình duyệt khác";
- const category=/iPad|Tablet|Android(?!.*Mobile)/i.test(ua)?"Máy tính bảng":
- /Mobile|iPhone|Android/i.test(ua)?"Điện thoại":"Máy tính";
- return category+" · "+browser;
-}
-
 import { normalizeRegistrationContact } from "../../account-contact.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
@@ -17,6 +6,18 @@ import { AccountV2Workflow } from "../../account-v2-workflow.server";
 import { AccountEntitlementService,managerRenewableAccounts,managerRenewAccount } from "../../account-entitlement.server";
 import { AccountTrialService } from "../../account-trial.server";
 import { AccountSecurityQuestionService } from "../../account-security-question.server";
+function friendlyDeviceLabel(userAgent:string|null):string{
+ const ua=(userAgent??"").slice(0,700),lower=ua.toLowerCase();
+ const browser=lower.includes("coc_coc")||lower.includes("coc coc")?"Cốc Cốc":
+  ua.includes("Edg/")||ua.includes("EdgA/")||ua.includes("EdgiOS/")?"Edge":
+  ua.includes("Firefox/")||ua.includes("FxiOS/")?"Firefox":
+  ua.includes("OPR/")||ua.includes("Opera")?"Opera":
+  ua.includes("CriOS/")||ua.includes("Chrome/")?"Chrome":
+  ua.includes("Safari/")?"Safari":"Trình duyệt khác";
+ const category=/iPad|Tablet|Android(?!.*Mobile)/i.test(ua)?"Máy tính bảng":
+  /Mobile|iPhone|Android/i.test(ua)?"Điện thoại":"Máy tính";
+ return category+" · "+browser;
+}
 export const dynamic = "force-dynamic";
 const json = (data: unknown, cookie?: string) => Response.json(data, { headers: { "cache-control": "no-store, private",
   "x-content-type-options": "nosniff", ...(cookie ? { "set-cookie": cookie } : {}) } });
