@@ -240,19 +240,20 @@ export class AccountService {
       if (!row || row.attempts > maximum) fail("RATE_LIMITED", 429);
     }
   }
-  private async issue(accountId: string, publicKey: unknown, expectedGeneration?: number) {
+  private async issue(accountId: string, publicKey: unknown, expectedGeneration?: number, firstRegistration = false) {
     const deviceId = await deviceKeyId(publicKey), token = random(), now = this.now();
     const credential = await this.db.prepare("SELECT generation FROM account_credentials WHERE account_id=?").bind(accountId).first<{ generation: number }>();
     if (!credential || (expectedGeneration !== undefined && credential.generation !== expectedGeneration)) fail("AUTH_FAILED", 401);
     const existing = await this.db.prepare("SELECT revoked FROM account_devices WHERE account_id=? AND device_id=?").bind(accountId, deviceId).first<{ revoked: number }>();
     if (existing?.revoked) fail("DEVICE_REVOKED", 403);
-    // A new key is pending owner confirmation; only the first key of an entirely new account
-    // is trusted at signup. Existence is evaluated inside the D1 write transaction.
+    // Only a real new-account registration may automatically trust its first
+    // device, never a login to an existing account whose final device was
+    // explicitly purged. Existence is evaluated inside the D1 transaction.
     const deviceInsert = this.v2Enabled
       ? this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved)
-          SELECT ?,?,?,CASE WHEN NOT EXISTS(SELECT 1 FROM account_devices WHERE account_id=?) THEN 1 ELSE 0 END
+          SELECT ?,?,?,CASE WHEN ?=1 AND NOT EXISTS(SELECT 1 FROM account_devices WHERE account_id=?) THEN 1 ELSE 0 END
           WHERE 1 ON CONFLICT(account_id,device_id) DO NOTHING`)
-          .bind(accountId, deviceId, publicKeyJson(publicKey), accountId)
+          .bind(accountId, deviceId, publicKeyJson(publicKey), firstRegistration ? 1 : 0, accountId)
       : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk) VALUES(?,?,?)
           ON CONFLICT(account_id,device_id) DO NOTHING`).bind(accountId, deviceId, publicKeyJson(publicKey));
     const statements = [deviceInsert];
@@ -302,7 +303,7 @@ export class AccountService {
       if (error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE", 409);
       throw error;
     }
-    const issued = await this.issue(accountId, input.publicKey);
+    const issued = await this.issue(accountId, input.publicKey, undefined, true);
     if (issued.deviceId !== keyId) fail("DEVICE_KEY_INVALID", 400);
     return { ...issued, recoveryCode };
   }
@@ -396,7 +397,7 @@ export class AccountService {
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
     }
-    const issued=await this.issue(accountId,input.publicKey);
+    const issued=await this.issue(accountId,input.publicKey,undefined,true);
     if(issued.deviceId!==keyId) fail("DEVICE_KEY_INVALID",400);
     return { ...issued, recoveryCode };
   }
