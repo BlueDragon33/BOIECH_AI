@@ -323,7 +323,24 @@ export async function managerRemoveAccount(db:D1Database,accounts:AccountService
  const batch:D1PreparedStatement[]=[
   db.prepare(`UPDATE account_entitlements SET state='suspended',revision=revision+1,
     changed_by=?,updated_at=CURRENT_TIMESTAMP
-    WHERE account_id=? AND revision=? AND state='active'`).bind(actor.accountId,id,revision),
+    WHERE account_id=? AND revision=? AND state='active'
+    AND EXISTS(SELECT 1 FROM accounts m JOIN device_access d ON d.device_id=m.storage_device_id
+      JOIN account_sessions ss ON ss.account_id=m.account_id
+      JOIN account_devices b ON b.account_id=ss.account_id AND b.device_id=ss.device_id
+      JOIN account_credentials c ON c.account_id=m.account_id AND c.generation=ss.generation
+      JOIN account_onboarding o ON o.account_id=m.account_id
+      JOIN account_entitlements e ON e.account_id=m.account_id
+      JOIN account_manager_permissions p ON p.account_id=m.account_id
+      WHERE m.account_id=? AND ss.token_hash=? AND ss.device_id=?
+        AND ss.revoked=0 AND b.revoked=0 AND b.approved=1
+        AND ss.expires_at>? AND ss.idle_expires_at>?
+        AND d.person_role='manager' AND d.status='approved'
+        AND d.management_enabled=1 AND o.stage='active'
+        AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
+        AND p.scope='manager.manage.assigned' AND p.enabled=1
+        AND (p.expires_at IS NULL OR datetime(p.expires_at)>CURRENT_TIMESTAMP))`)
+     .bind(actor.accountId,id,revision,
+      actor.accountId,actor.sessionHash,actor.deviceId,Date.now(),Date.now()),
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
     VALUES(?,'manager.account.archived',?,CASE WHEN changes()=1 THEN ? ELSE NULL END)`)
     .bind(actor.accountId,id,reason.trim()),
