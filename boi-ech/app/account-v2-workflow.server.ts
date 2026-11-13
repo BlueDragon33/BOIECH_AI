@@ -180,7 +180,7 @@ export class AccountV2Workflow {
       :(typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):"");
     const phoneRaw=raw.replace(/[ ()-]/g,"");
     const phone=phoneRaw.startsWith("+84")?"0"+phoneRaw.slice(3):phoneRaw;
-    if((!manager&&!phone)||phone&&!/^\\+?[0-9]{7,16}$/.test(phone))
+    if((!manager&&!phone)||phone&&!/^\+?[0-9]{7,16}$/.test(phone))
       bad("PROFILE_INVALID",400);
     const code=(manager?"MGR_":role==="teacher"?"GV_":"HV_")
       +actor.storageDeviceId.slice(0,20).toUpperCase();
