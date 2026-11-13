@@ -67,6 +67,41 @@ test("Failed or incomplete profile cannot activate; uninvited managers cannot se
     .get(direct.account.accountId).n,0);
  }finally{f.close();}
 });
+test("Manager can renew teacher/learner but cannot renew manager; expired or revoked manager cannot act",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const m=await invitedManager(f,75101);
+  await f.flow.completeProfileWithoutReview(m.token,profile(75101,"manager"));
+  const l=await reg(f,75102,"learner");
+  await f.flow.completeProfileWithoutReview(l.token,profile(75102,"learner"));
+  const svc=f.load("account-entitlement.server.ts");
+  const listed=await svc.managerRenewableAccounts(f.db,f.service,m.token);
+  assert.equal(listed.verified,true);
+  assert.ok(listed.accounts.some(x=>x.accountId===l.account.accountId&&x.role==="learner"));
+  const before=await f.service.ownerRead(l.account.accountId);
+  const renewed=await svc.managerRenewAccount(f.db,f.service,m.token,{
+    accountId:l.account.accountId,expectedRevision:before.entitlement.revision,
+    days:5,reason:"Authorized manager confirms another five days"
+  });
+  assert.equal(renewed.verified,true);
+  assert.equal(renewed.entitlement.revision,before.entitlement.revision+1);
+  assert.ok(Date.parse(renewed.entitlement.expiresAt)>Date.parse(before.entitlement.expiresAt));
+  await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,l.token,{
+    accountId:m.account.accountId,expectedRevision:1,days:5,
+    reason:"Unauthorized learner attempts an extension"
+  }),e=>e.code==="ACCOUNT_PERMISSION_REQUIRED");
+  await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,m.token,{
+    accountId:m.account.accountId,expectedRevision:1,days:5,
+    reason:"Manager tries renewing another manager"
+  }),e=>e.code==="ACCOUNT_CAS_CONFLICT"||e.code==="ACCOUNT_INPUT");
+  f.sqlite.prepare("UPDATE account_entitlements SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?")
+    .run(m.account.accountId);
+  await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,m.token,{
+    accountId:l.account.accountId,expectedRevision:renewed.entitlement.revision,days:5,
+    reason:"Expired manager cannot issue entitlements"
+  }),e=>e.code==="ACCOUNT_EXPIRED");
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM account_audit WHERE action='manager.entitlement.renew'").get().n,1);
+ }finally{f.close();}
+});
 test("Seat admission is atomic and rejected signup produces an aggregated Owner alert",async()=>{
  const f=accountStack({v2:true,singleReview:true});try{
   f.sqlite.prepare("UPDATE account_admission_limits SET account_limit=1 WHERE person_role='teacher'").run();
