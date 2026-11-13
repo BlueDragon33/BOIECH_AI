@@ -57,7 +57,7 @@ export async function GET(request: Request) {
       // A session lease is not the 30-day account entitlement. Only the
       // server determines renewal eligibility; never expose the bearer token.
       sessionExpiresAt: account.absoluteExpiry,
-      sessionIdleExpiresAt: account.idleExpiry }, devices: await service.devices(token) });
+      sessionIdleExpiresAt: account.idleExpiry }, devices: await service.devices(token, request.headers.get("user-agent")) });
   } catch (error) { return accountErrorResponse(error); }
 }
 export async function POST(request: Request) {
