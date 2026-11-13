@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import {createPortal} from "react-dom";
 import RegistrantReader from "./registrant-reader";
 import ManagerWorkspace from "./manager-workspace";
 import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialog";
@@ -105,6 +106,19 @@ function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) 
    <output aria-live="off">{ms>0?left:"00 ngày 00:00:00"}</output>
    <small>Đến {expiry} · {role==="manager"?"Owner gia hạn":"Cán bộ quản lý gia hạn"}</small>
  </aside>;
+}
+/** Render a live lease only inside the active role header, never over the sidebar. */
+function AccountLeaseInHeader({expiresAt,role}:{expiresAt:string;role:string}){
+ const [target,setTarget]=useState<HTMLElement|null>(null);
+ useEffect(()=>{
+  const id=role==="manager"?"boi-manager-lease-slot":"boi-learner-lease-slot";
+  const locate=()=>{const next=document.getElementById(id);setTarget(value=>value===next?value:next);};
+  locate();
+  const observer=new MutationObserver(locate);
+  observer.observe(document.body,{childList:true,subtree:true});
+  return()=>observer.disconnect();
+ },[role]);
+ return target?createPortal(<AccountLeaseCountdown expiresAt={expiresAt} role={role}/>,target):null;
 }
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -756,7 +770,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       {absoluteTimeLeft>5*60_000 ? <button type="button" disabled={busy} onClick={()=>void extendCurrentSession()}>
         {busy?"Đang xác minh…":"Giữ phiên đăng nhập"}</button>:null}
     </aside> : null}
-    {ready&&active&&v2&&account?.expiresAt?<AccountLeaseCountdown expiresAt={account.expiresAt} role={account.role}/>:null}
+    {ready&&active&&v2&&account?.expiresAt?<AccountLeaseInHeader expiresAt={account.expiresAt} role={account.role}/>:null}
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
       <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
