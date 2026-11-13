@@ -188,13 +188,14 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
  const actor=await accounts.authorize(token);
  if(actor.role!=="manager")reject("ACCOUNT_PERMISSION_REQUIRED",403);
  await accounts.capability(actor,"manager.manage.assigned");
- const target=input.accountId,revision=input.expectedRevision;
- const days=input.days;
+ const target=input.accountId,revision=Number(input.expectedRevision);
+ const days=Number(input.days);
+ const reason=typeof input.reason==="string"?input.reason.trim():"";
  if(typeof target!=="string"||!accountPattern.test(target)||target===actor.accountId
-  ||typeof revision!=="number"||!Number.isSafeInteger(revision)||revision<1
-  ||typeof days!=="number"||!Number.isSafeInteger(days)||days<1||days>365
-  ||typeof input.reason!=="string"||input.reason.trim().length<10||input.reason.length>300)
-  reject("ACCOUNT_INPUT",400);
+  ||!Number.isSafeInteger(revision)||revision<1
+  ||!Number.isSafeInteger(days)||days<1||days>365
+  ||reason.length<10||reason.length>300)
+  throw new AccountEntitlementError("ACCOUNT_INPUT",400);
  const record=await db.prepare(`SELECT e.expires_at,e.state,e.revision,d.person_role AS role
   FROM account_entitlements e JOIN accounts a ON a.account_id=e.account_id
   JOIN device_access d ON d.device_id=a.storage_device_id
@@ -203,7 +204,7 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
     AND d.person_role IN ('learner','teacher')`)
   .bind(target).first<{expires_at:string;state:string;revision:number;role:string}>();
  if(!record||record.state!=="active"||record.revision!==revision)
-  reject("ACCOUNT_CAS_CONFLICT",409);
+  throw new AccountEntitlementError("ACCOUNT_CAS_CONFLICT",409);
  const next=new Date(Math.max(now,Date.parse(record.expires_at))+days*86400000).toISOString();
  if(Date.parse(next)>now+3650*86400000)reject("ACCOUNT_INPUT",400);
  const batch=[
@@ -236,7 +237,7 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
     SELECT ?,'manager.entitlement.renew',?,
     CASE WHEN changes()=1 THEN ? ELSE NULL END`)
-    .bind(actor.accountId,target,`days=${days};${input.reason.trim()}`)
+    .bind(actor.accountId,target,`days=${days};${reason}`)
  ];
  try{await db.batch(batch);}
  catch(error){
