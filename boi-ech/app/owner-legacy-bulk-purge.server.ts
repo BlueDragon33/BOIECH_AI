@@ -1,5 +1,6 @@
 
 import {createHash} from "node:crypto";
+import type {D1PreparedStatement} from "@cloudflare/workers-types";
 import {AccountError} from "./account-core.server";
 import type {getCourseDatabase} from "./device-auth.server";
 type DB=Awaited<ReturnType<typeof getCourseDatabase>>;
@@ -142,9 +143,7 @@ export async function executeLegacyFiveDayPurge(
   // any existing protected link aborts the final device delete by FK/CAS.
   del("device_access","device_id=?",id);
  }
- let results:D1Result[];
- try{results=await db.batch(statements);}
- catch{reject("LEGACY_CLEANUP_STATE_CHANGED",409);}
+ const results=await db.batch(statements).catch(()=>reject("LEGACY_CLEANUP_STATE_CHANGED",409));
  // audit must have inserted one row per confirmed deletion;
  // D1.batch is transactional, and D1 readback is required.
  for(let i=0;i<batch.length;i++){
