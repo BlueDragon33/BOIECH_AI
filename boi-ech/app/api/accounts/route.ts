@@ -1,4 +1,5 @@
 import { AccountError } from "../../account-core.server";
+import {friendlyDeviceLabel} from "../../account-device-label.server";
 import { normalizeRegistrationContact } from "../../account-contact.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     if (p.action === "manager-register") {
       const result=await service.registerManagerWithInvite(p,peer);
       const {token:session,...safe}=result;
+      await service.rememberCurrentDeviceLabel(session,friendlyDeviceLabel(request.headers.get("user-agent")));
       return json({ok:true,...safe},sessionCookie(session));
     }
     if (p.action === "register" || p.action === "login" || p.action === "claim") {
@@ -109,6 +111,7 @@ export async function POST(request: Request) {
       }
       const result = p.action === "register" ? await service.register(p, peer) : p.action === "login" ? await service.login(p, peer) : await service.claim(p, legacyId, peer);
       const { token: session, ...safe } = result;
+      await service.rememberCurrentDeviceLabel(session,friendlyDeviceLabel(request.headers.get("user-agent")));
       return json({ ok: true, ...safe }, sessionCookie(session));
     }
     if (config.v2) {
@@ -135,6 +138,10 @@ export async function POST(request: Request) {
       if (p.action === "review-changes") return json({ onboarding: await workflow.requestChanges(
         {kind:"manager",token},String(p.accountId),p.expectedRevision,p.reason) });
       if (p.action === "approve-device") return json(await service.approveDevice(token,p.deviceId,p.password,peer));
+    }
+    if (p.action === "device-label-update") {
+      await service.rememberCurrentDeviceLabel(token,friendlyDeviceLabel(request.headers.get("user-agent")));
+      return json({ok:true});
     }
     if (p.action === "keepalive") return json(await service.keepAlive(token));
     if (p.action === "rotate") { const result = await service.rotate(token); return json({ ok: true }, sessionCookie(result.token)); }
