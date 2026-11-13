@@ -1,6 +1,6 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 import type { AccountService } from "./account-core.server";
-import {replaceExpiryFromNow,FOREVER_EXPIRES_AT,type AccountTerm} from "./account-term";
+
 
 export class AccountEntitlementError extends Error {
   constructor(public code: string, public status = 403) { super(code); this.name = "AccountEntitlementError"; }
@@ -9,6 +9,21 @@ const reject = (code: string, status = 403): never => { throw new AccountEntitle
 const roles = ["manager", "teacher", "learner"] as const;
 type Role = typeof roles[number];
 const accountPattern = /^acc_[a-f0-9]{64}$/;
+type AccountTerm="7d"|"30d"|"6m"|"1y"|"4y"|"forever";
+const FOREVER_EXPIRES_AT="9999-12-31T23:59:59.000Z";
+function replaceExpiryFromNow(term:AccountTerm,now:number):string{
+ if(!Number.isFinite(now))throw new Error("TIME_INVALID");
+ if(term==="forever")return FOREVER_EXPIRES_AT;
+ const date=new Date(now);
+ if(term==="7d"||term==="30d")date.setTime(now+(term==="7d"?7:30)*86400000);
+ else if(term==="6m"||term==="1y"||term==="4y"){
+  const months=term==="6m"?6:term==="1y"?12:48,day=date.getUTCDate();
+  date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+months);
+  date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));
+ }else throw new Error("TERM_INVALID");
+ return date.toISOString();
+}
+
 type Owner = { actor: string; role: string };
 export type EntitlementRow = {
   account_id: string; state: "active" | "suspended"; activated_at: string;
