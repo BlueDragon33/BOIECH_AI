@@ -1,6 +1,23 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 import type { AccountService } from "./account-core.server";
-import {expiryFromPeriod,ACCESS_PERIODS,FOREVER_EXPIRY} from "./access-period";
+const FOREVER_EXPIRY="9999-12-31T23:59:59.000Z";
+const ACCESS_PERIODS=["7d","30d","6m","1y","4y","forever"] as const;
+/** Time resets from server clock. Month/year lengths are calendar-accurate and clamped. */
+function expiryFromPeriod(now:number,period:unknown){
+ if(period==="forever")return FOREVER_EXPIRY;
+ if(!ACCESS_PERIODS.includes(period as (typeof ACCESS_PERIODS)[number]))
+  throw new AccountEntitlementError("ACCOUNT_INPUT",400);
+ const date=new Date(now);
+ if(!Number.isFinite(date.getTime()))throw new AccountEntitlementError("ACCOUNT_INPUT",400);
+ if(period==="7d"||period==="30d")date.setUTCDate(date.getUTCDate()+(period==="7d"?7:30));
+ else{
+  const months=period==="6m"?6:period==="1y"?12:48;
+  const day=date.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+months);
+  const last=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate();
+  date.setUTCDate(Math.min(day,last));
+ }
+ return date.toISOString();
+}
 
 export class AccountEntitlementError extends Error {
   constructor(public code: string, public status = 403) { super(code); this.name = "AccountEntitlementError"; }
