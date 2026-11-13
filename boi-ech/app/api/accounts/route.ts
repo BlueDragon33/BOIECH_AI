@@ -124,8 +124,13 @@ export async function POST(request: Request) {
       if (p.action === "manager-renew") return json(await managerRenewAccount(await getCourseDatabase(),service,token,p));
       if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
       if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
-      if (p.action === "submit-profile") return json({ onboarding: config.singleReview
-        ? await workflow.completeProfileWithoutReview(token,p) : await workflow.submitProfile(token,p) });
+      if (p.action === "submit-profile") {
+        // Already-reviewed legacy accounts remain profile_required/changes_requested.
+        // Only new requested accounts use profile-first self-activation.
+        const stage=config.singleReview ? (await workflow.ownStatus(token)).stage : null;
+        return json({onboarding:config.singleReview && stage==="requested"
+          ? await workflow.completeProfileWithoutReview(token,p) : await workflow.submitProfile(token,p)});
+      }
       if (p.action === "review-first") return json({ onboarding: await workflow.firstReview({kind:"manager",token},String(p.accountId),p.expectedRevision) });
       if (p.action === "review-changes") return json({ onboarding: await workflow.requestChanges(
         {kind:"manager",token},String(p.accountId),p.expectedRevision,p.reason) });
