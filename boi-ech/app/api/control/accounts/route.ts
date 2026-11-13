@@ -48,6 +48,10 @@ export async function POST(request: Request) {
     // an empty verified inbox while the V2 backend is not actually enabled.
     if (input.action === "manager-inbox-v2") return controlResponse(
       await service.ownerManagerPage(input.after ?? "",input.limit ?? 40),200,request);
+    if (input.action==="block-account") {
+      if(!v2)throw new AccountError("ACCOUNT_V2_REQUIRED",409);
+      return controlResponse(await service.ownerBlockAccount(owner,input),200,request);
+    }
     if (input.action === "archive-manager") {
       if (!v2) throw new AccountError("ACCOUNT_V2_REQUIRED",409);
       return controlResponse(await service.archiveManager(owner,input),200,request);
