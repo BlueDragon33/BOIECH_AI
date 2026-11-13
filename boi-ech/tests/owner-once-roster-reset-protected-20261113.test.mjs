@@ -32,6 +32,11 @@ test("one-time Owner reset erases learners/teachers but preserves exact Thiên S
   assert.equal(preview.candidates,2);
   assert.equal(preview.eligible,2);
   assert.deepEqual(preview.protectedPeople.map(x=>x.deviceId),[son,nghi]);
+  const initialBatch=f.db.batch.bind(f.db);
+  f.db.batch=async statements=>{
+   try{return await initialBatch(statements);}
+   catch(error){console.error("ROSTER_RESET_LOCAL_SQLITE_CAUSE",String(error?.message??error));throw error;}
+  };
   const done=await m.executeOwnerOnceRosterReset(f.db,owner,runArgs(preview));
   assert.equal(done.deleted,2);
   assert.equal(done.state,"completed");
@@ -70,6 +75,11 @@ test("protected payment evidence and certificates are not deleted by ordinary ro
   const preview=await m.previewOwnerOnceRosterReset(f.db,owner);
   assert.equal(preview.eligible,1);assert.equal(preview.retainedForReview,1);
   assert.equal(preview.blockers.payment,1);
+  const initialBatch=f.db.batch.bind(f.db);
+  f.db.batch=async statements=>{
+   try{return await initialBatch(statements);}
+   catch(error){console.error("ROSTER_RESET_LOCAL_SQLITE_CAUSE",String(error?.message??error));throw error;}
+  };
   const done=await m.executeOwnerOnceRosterReset(f.db,owner,runArgs(preview));
   assert.equal(done.deleted,1);assert.equal(done.state,"retention_review");
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM device_access WHERE device_id=?").get(retention).n,1);
