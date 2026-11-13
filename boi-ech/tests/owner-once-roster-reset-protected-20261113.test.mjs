@@ -34,7 +34,11 @@ test("one-time Owner reset erases learners/teachers but preserves exact Thiên S
   assert.deepEqual(preview.protectedPeople.map(x=>x.deviceId),[son,nghi]);
   const initialBatch=f.db.batch.bind(f.db);
   f.db.batch=async statements=>{
-   try{return await initialBatch(statements);}
+   try{return await initialBatch(statements.map((st,index)=>({
+    _run(){try{return st._run();}catch(error){
+     console.error("ROSTER_RESET_ABORT_STMT_INDEX",index,"TOTAL",statements.length,String(error?.message??error));throw error;
+    }}
+   })));}
    catch(error){console.error("ROSTER_RESET_LOCAL_SQLITE_CAUSE",String(error?.message??error));throw error;}
   };
   const done=await m.executeOwnerOnceRosterReset(f.db,owner,runArgs(preview));
@@ -77,7 +81,11 @@ test("protected payment evidence and certificates are not deleted by ordinary ro
   assert.equal(preview.blockers.payment,1);
   const initialBatch=f.db.batch.bind(f.db);
   f.db.batch=async statements=>{
-   try{return await initialBatch(statements);}
+   try{return await initialBatch(statements.map((st,index)=>({
+    _run(){try{return st._run();}catch(error){
+     console.error("ROSTER_RESET_ABORT_STMT_INDEX",index,"TOTAL",statements.length,String(error?.message??error));throw error;
+    }}
+   })));}
    catch(error){console.error("ROSTER_RESET_LOCAL_SQLITE_CAUSE",String(error?.message??error));throw error;}
   };
   const done=await m.executeOwnerOnceRosterReset(f.db,owner,runArgs(preview));
