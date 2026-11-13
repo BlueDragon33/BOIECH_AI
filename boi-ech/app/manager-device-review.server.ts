@@ -31,12 +31,10 @@ export async function managerReviewBoard(actor: PublicDeviceState) {
     db.prepare(`SELECT d.device_id,d.display_code,d.person_role,d.learner_name,d.person_code,
       d.class_name,d.status,d.registration_submitted_at,a.manager_device_id
       FROM device_access d LEFT JOIN manager_device_assignments a ON a.target_device_id=d.device_id
-      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher')
-        AND d.payment_status='unassigned' AND a.target_device_id IS NULL
-        AND d.registration_submitted_at IS NOT NULL)
-        OR a.manager_device_id=?
+      WHERE d.person_role IN ('learner','teacher')
+        AND d.registration_submitted_at IS NOT NULL
       ORDER BY CASE WHEN d.status='pending' THEN 0 ELSE 1 END,d.created_at DESC LIMIT 201`)
-      .bind(actor.deviceId).all<ReviewRow>(),
+      .all<ReviewRow>(),
   ]);
   if ((queued.results?.length ?? 0)>200) {
     throw new DeviceAccessError("Có quá nhiều hồ sơ. Hãy thu hẹp hàng chờ trước khi quản lý.",413,"MANAGER_QUEUE_LIMIT");
