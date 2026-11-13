@@ -58,9 +58,10 @@ async function manifest(db:DB){
 }
 async function cutoff(db:DB){
  const time=await db.prepare("SELECT datetime('now') AS at").first<{at:string}>();
- if(!time?.at||!/^20\d\d-\d\d-\d\d \d\d:\d\d:\d\d$/.test(time.at))
+ const at=time?.at;
+ if(typeof at!=="string"||!/^20\d\d-\d\d-\d\d \d\d:\d\d:\d\d$/.test(at))
   fail("ROSTER_RESET_CLOCK_UNAVAILABLE",503);
- return time.at;
+ return at;
 }
 async function rowsAt(db:DB,at:string){
  const result=await db.prepare(select).bind(at).all<Row>();
