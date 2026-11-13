@@ -1,7 +1,8 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import styles from "./manager-renewal-panel.module.css";
-type Row={accountId:string;name:string;role:"learner"|"teacher";expiresAt:string;revision:number};
+import {accountTerms,replaceExpiryFromNow,FOREVER_EXPIRES_AT,type AccountTerm} from "./account-term";
+type Row={accountId:string;name:string;role:"learner"|"teacher";expiresAt:string;revision:number;progress?:{completed:number;total:number}|null};
 const getError=(value:unknown)=>value instanceof Error?value.message:"Máy chủ chưa xác nhận.";
 async function post(payload:Record<string,unknown>){
  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
@@ -21,7 +22,9 @@ async function post(payload:Record<string,unknown>){
 export default function ManagerRenewalPanel(){
  const [rows,setRows]=useState<Row[]|null>(null);
  const [search,setSearch]=useState(""),[role,setRole]=useState<"all"|"teacher"|"learner">("all");
- const [days,setDays]=useState<Record<string,string>>({});
+ const [terms,setTerms]=useState<Record<string,AccountTerm>>({});
+ const [now,setNow]=useState(()=>Date.now());
+ useEffect(()=>{const id=window.setInterval(()=>setNow(Date.now()),60000);return()=>window.clearInterval(id);},[]);
  const [reason,setReason]=useState("Cán bộ xác nhận gia hạn quyền sử dụng");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const lock=useRef(false);
@@ -36,18 +39,21 @@ export default function ManagerRenewalPanel(){
   }catch(e){setRows(null);setError(getError(e));}finally{setBusy(false);}
  }
  async function renew(record:Row){
-  const n=Number(days[record.accountId]??8);
-  if(lock.current||!Number.isSafeInteger(n)||n<1||n>365||reason.trim().length<10)return;
-  if(!window.confirm("Gia hạn "+n+" ngày cho "+record.name+" ("+record.role+")?"))return;
+  const term=terms[record.accountId]??"30d";
+  if(lock.current||reason.trim().length<10)return;
+  const label=accountTerms.find(x=>x.value===term)?.label??term;
+  const expiry=replaceExpiryFromNow(term,Date.now());
+  if(!window.confirm("ĐẶT LẠI thời hạn "+label+" cho "+record.name+
+    " tính từ hôm nay, không cộng dồn hạn cũ. Hạn mới: "+(term==="forever"?"Vĩnh viễn":new Date(expiry).toLocaleDateString("vi-VN"))+"?"))return;
   lock.current=true;setBusy(true);setError("");setNotice("");
   try{
    const result=await post({action:"manager-renew",accountId:record.accountId,
-    expectedRevision:record.revision,days:n,reason:reason.trim()});
+    expectedRevision:record.revision,term,reason:reason.trim()});
    if(result.verified!==true||result.contract!=="boi-manager-renew.v1"||
     result.accountId!==record.accountId||!result.entitlement?.expiresAt||
     result.entitlement.revision!==record.revision+1)
     throw new Error("Máy chủ chưa đọc lại được gia hạn.");
-   setNotice("Đã gia hạn "+n+" ngày cho "+record.name+".");
+   setNotice("Đã thay thế hạn bằng "+label+" cho "+record.name+" và đọc lại D1.");
    const data=await post({action:"manager-renew-list"});
    if(data.verified!==true||data.contract!=="boi-manager-renew.v1"||
       !Array.isArray(data.accounts))throw new Error("Gia hạn đã lưu, nhưng cần tải lại danh sách.");
@@ -60,7 +66,7 @@ export default function ManagerRenewalPanel(){
  return <section className={styles.panel} aria-label="Gia hạn tài khoản giảng viên và học viên">
   <header><div><small>MANAGER · GIA HẠN TÀI KHOẢN</small><h2>Quản lý thời gian sử dụng</h2>
    <p>Cán bộ có thể gia hạn học viên và giảng viên theo quyền đã được Owner cấp.
-     Không thể gia hạn cán bộ quản lý, tài khoản bị khóa hoặc hồ sơ chưa kích hoạt.</p></div>
+     Chọn thời hạn chính xác và đặt lại từ thời điểm cấp. Không cộng dồn vào hạn cũ; tài khoản khóa không được cấp lại.</p></div>
    <button disabled={busy} onClick={()=>void refresh()}>Đồng bộ LIVE</button></header>
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
   {notice?<p role="status" className={styles.notice}>{notice}</p>:null}
@@ -74,14 +80,27 @@ export default function ManagerRenewalPanel(){
    <textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={300} rows={2}/></label>
   <div className={styles.list}>{filtered.map(x=><article key={x.accountId}>
     <div><strong>{x.name||"Chưa khai báo"}</strong><small>{x.role==="teacher"?"Giảng viên":"Học viên"}</small>
-      <small>Hết hạn {new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(x.expiresAt))}</small>
+      <small>{x.expiresAt===FOREVER_EXPIRES_AT?"Vĩnh viễn":
+        "Hết hạn "+new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(x.expiresAt))}</small>
+      <small>{x.expiresAt===FOREVER_EXPIRES_AT?"Thời hạn không giới hạn":
+        (()=>{const ms=Math.max(0,Date.parse(x.expiresAt)-now);const years=Math.floor(ms/(365.2425*86400000));
+         return years>0?`Còn ${years} năm ${Math.floor((ms-years*365.2425*86400000)/86400000)} ngày`:`Còn ${Math.floor(ms/86400000)} ngày`;})()}</small>
+      {x.role==="learner"?<div className={styles.lessonProgress}>
+        <strong>Tiến độ học tập</strong>
+        {x.progress?<><span>{x.progress.completed}/{x.progress.total} bài đã hoàn thành</span>
+         <progress max={x.progress.total} value={x.progress.completed} aria-label={`Tiến độ của ${x.name}`}/></>
+         :<span>Chưa có tiến độ được xác minh trên D1</span>}
+       </div>:null}
       <code>{x.accountId.slice(0,19)}…</code></div>
-    <label>Số ngày gia hạn<input type="number" min={1} max={365} step={1}
-      value={days[x.accountId]??"8"}
-      disabled={busy} onChange={e=>setDays(v=>({...v,[x.accountId]:e.target.value}))}/></label>
-    <button type="button" disabled={busy||reason.trim().length<10||!Number.isSafeInteger(Number(days[x.accountId]??8))
-      ||Number(days[x.accountId]??8)<1||Number(days[x.accountId]??8)>365}
-      onClick={()=>void renew(x)}>Gia hạn · Xác minh D1</button>
+    <label>Đặt lại thời hạn
+      <select value={terms[x.accountId]??"30d"} disabled={busy}
+       onChange={e=>setTerms(v=>({...v,[x.accountId]:e.target.value as AccountTerm}))}>
+        {accountTerms.map(t=><option value={t.value} key={t.value}>{t.label}</option>)}
+      </select>
+      <small>Hạn mới tính từ ngày cấp, không cộng dồn.</small>
+    </label>
+    <button type="button" disabled={busy||reason.trim().length<10}
+      onClick={()=>void renew(x)}>Lưu hạn mới · Xác minh D1</button>
    </article>)}
    {!rows?<p role="status">{busy?"Đang kiểm tra quyền và dữ liệu D1…":"Chưa có dữ liệu được xác minh."}</p>:
      !filtered.length?<p>Không có tài khoản phù hợp.</p>:null}
