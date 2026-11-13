@@ -29,7 +29,7 @@ export default function ManagerRenewalPanel(){
   }catch(e){setRows(null);setError(e instanceof Error?e.message:"Không thể kết nối D1");}
   finally{setBusy(false);}
  }
- useEffect(()=>{void refresh();/* initial owner-permitted read only */},[]);
+ useEffect(()=>{queueMicrotask(()=>{void refresh();});/* initial read only */},[]);
  async function renew(r:Entry){
   if(busy||reason.trim().length<5)return;
   if(!window.confirm("Gia hạn tài khoản "+(r.name||r.accountId)+" theo thời hạn cấu hình của hệ thống?"))return;
