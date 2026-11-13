@@ -137,6 +137,14 @@ export async function POST(request: Request) {
         {kind:"manager",token},String(p.accountId),p.expectedRevision,p.reason) });
       if (p.action === "approve-device") return json(await service.approveDevice(token,p.deviceId,p.password,peer));
     }
+    if(config.v2 && (p.action==="renewable-accounts" || p.action==="renew-account")) {
+      const actor=await service.authorize(token);
+      if(actor.role!=="manager")throw new AccountError("MANAGER_REQUIRED",403);
+      await service.capability(actor,"manager.manage.assigned");
+      const entitlement=new AccountEntitlementService(await getCourseDatabase());
+      if(p.action==="renewable-accounts")return json(await entitlement.managerRoster());
+      return json(await entitlement.managerRenew(actor,p));
+    }
     if (p.action === "keepalive") return json(await service.keepAlive(token));
     if (p.action === "rotate") { const result = await service.rotate(token); return json({ ok: true }, sessionCookie(result.token)); }
     if (p.action === "recover") return json({ ok: true, ...await service.recover(p, peer) }, sessionCookie(""));
