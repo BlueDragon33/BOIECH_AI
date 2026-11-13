@@ -86,7 +86,7 @@ test("protected payment evidence and certificates are not deleted by ordinary ro
     _run(){
      if(index===1){
       const raw=fs.readFileSync(new URL("../app/owner-once-roster-reset.server.ts",import.meta.url),"utf8");
-      const g=raw.match(/const guard=`([\\s\\S]*?)`;/)?.[1];
+      const g=raw.match(/const guard=`([\s\S]*?)`;/)?.[1];
       const d=f.sqlite.prepare("SELECT d.device_id,d.created_at,d.updated_at,d.status,d.learner_name,a.account_id,a.revision FROM device_access d LEFT JOIN accounts a ON a.storage_device_id=d.device_id WHERE d.device_id=?").get(candidate);
       const protectedA=preview.protectedPeople[0].deviceId,protectedB=preview.protectedPeople[1].deviceId;
       const vals=[candidate,protectedA,protectedB,d.created_at,d.updated_at,d.status,d.learner_name??"",d.account_id??"",d.revision??-1,preview.cutoff,protectedA,protectedB,protectedA,protectedB];
