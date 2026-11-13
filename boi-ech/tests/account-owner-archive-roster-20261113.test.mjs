@@ -17,7 +17,7 @@ async function manager(f,n){
 }
 
 test("Owner roster exposes server registration time, last activity and live session count",async()=>{
- const f=accountStack({v2:true,singleReview:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});try{
   const registered=await manager(f,1);
   const item=(await f.service.ownerManagerPage("",40)).managers.find(a=>a.accountId===registered.account.accountId);
   assert.ok(item);
@@ -28,7 +28,7 @@ test("Owner roster exposes server registration time, last activity and live sess
  }finally{f.close();}
 });
 test("Owner soft-archive requires exact CAS, typed account ID and purpose; revokes sessions without deleting history",async()=>{
- const f=accountStack({v2:true,singleReview:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});try{
   const registered=await manager(f,2),id=registered.account.accountId;
   const before=await f.service.ownerRead(id);
   const cmd={accountId:id,expectedRevision:before.revision,confirmation:id,
