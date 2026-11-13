@@ -8,7 +8,7 @@ const owner={role:"owner",actor:"owner@fixture.invalid"};
 const hash=(account,device)=>createHash("sha256").update(JSON.stringify([account,device])).digest("hex");
 async function pair(f,n) {
  const a=await f.register(n);
- const d=f.sqlite.prepare("SELECT account_id,device_id,created_at,approved,revoked FROM account_devices WHERE account_id=?").get(a.device.account_id);
+ const d=f.sqlite.prepare("SELECT account_id,device_id,created_at,approved,revoked FROM account_devices WHERE account_id=?").get(a.account.accountId);
  return {account:a,device:d,id:hash(d.account_id,d.device_id)};
 }
 const request=(a,extra={})=>({bindingId:a.id,expectedStatus:"approved",
