@@ -5,7 +5,6 @@ import {classKey,classNames,type ResourceKind,type ResourceStatus,type TrainingB
 import {AppIcon,Badge,ResourceStatusBars,personReadiness,eligible,stateText,defaultDisplay,parseDisplayPreferences,type DisplayPreferences} from "./manager-status";
 import {ManagerDetailSheet,ManagerSheet,type DetailTarget} from "./manager-details";
 import styles from "./manager-workspace.module.css";
-import ManagerApprovalPanel from "./manager-approval-panel";
 import ManagerRenewalPanel from "./manager-renewal-panel";
 import ManagerCommandCenter from "./manager-command-center";
 type Tab="overview"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
