@@ -281,7 +281,9 @@ export async function managerRemoveAccount(db:D1Database,accounts:AccountService
  const actor=await accounts.authorize(token);
  if(actor.role!=="manager")reject("ACCOUNT_PERMISSION_REQUIRED",403);
  await accounts.capability(actor,"manager.manage.assigned");
- const id=input.accountId,revision=input.expectedRevision,reason=input.reason;
+ const id=typeof input.accountId==="string"?input.accountId:"";
+ const revision=Number(input.expectedRevision);
+ const reason=typeof input.reason==="string"?input.reason:"";
  if(typeof id!=="string"||!accountPattern.test(id)||id===actor.accountId||
   !Number.isSafeInteger(revision)||(revision as number)<1||
   typeof reason!=="string"||reason.trim().length<10||reason.length>300||
@@ -297,9 +299,10 @@ export async function managerRemoveAccount(db:D1Database,accounts:AccountService
   WHERE a.account_id=?`).bind(id).first<{
   deviceId:string;revision:number;role:string;status:string;stage:string
  }>();
- if(!target||!["learner","teacher"].includes(target.role)||target.status!=="approved"||
+ if(!target)throw new AccountEntitlementError("ACCOUNT_CAS_CONFLICT",409);
+ if(!["learner","teacher"].includes(target.role)||target.status!=="approved"||
   target.stage!=="active"||target.revision!==revision)
-  reject("ACCOUNT_CAS_CONFLICT",409);
+  throw new AccountEntitlementError("ACCOUNT_CAS_CONFLICT",409);
  const batch:D1PreparedStatement[]=[
   db.prepare(`UPDATE account_entitlements SET state='suspended',revision=revision+1,
     changed_by=?,updated_at=CURRENT_TIMESTAMP
