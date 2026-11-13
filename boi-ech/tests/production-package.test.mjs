@@ -6,7 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import yaml from 'js-yaml';
-import { productionPackage, verifyProductionArtifact, verifyPublicAssets } from '../scripts/production-package.mjs';
+import { productionPackage, verifyProductionArtifact, verifyPublicAssets, waitForLiveProductionRevision } from '../scripts/production-package.mjs';
 const revision='a'.repeat(40);
 function settings(){return {success:true,result:{bindings:[{type:'d1',name:'DB',id:'7816425d-ce8a-4b3c-b303-7697fd4a529c'},{type:'secret_text',name:'CONTROL_SERVICE_SECRET'},{type:'plain_text',name:'BOI_ECH_ACCESS_MODE',text:'managed'},{type:'plain_text',name:'EXISTING_POLICY',text:'retained'}]}};}
 test('Production package uses existing boi-ech-db, retains runtime policy and never copies secret values',()=>{
@@ -69,4 +69,65 @@ test('an explicit single-review activation can release without rerunning legacy 
  assert.equal(productionPackage(s,revision,false,true).vars.BOI_ECH_SINGLE_REVIEW,'true');
  assert.throws(()=>productionPackage(settings(),revision,false,true),/requires Account-first V2/);
  assert.throws(()=>verifyProductionArtifact(active,revision,false,true),/single-review/);
+});
+
+test('Cloudflare live revision readback retries stale settings until the exact deployed revision propagates',async()=>{
+ const oldRevision='b'.repeat(40),currentRevision='c'.repeat(40);
+ const source=settings();
+ source.result.bindings.push({type:'plain_text',name:'BOI_ECH_BUILD_REVISION',text:oldRevision});
+ source.result.bindings.push({type:'plain_text',name:'BOI_ECH_DEPLOYMENT_CHANNEL',text:'cloudflare-production'});
+ const fresh=structuredClone(source);
+ fresh.result.bindings.find(b=>b.name==='BOI_ECH_BUILD_REVISION').text=currentRevision;
+ let calls=0,pauses=0;
+ const result=await waitForLiveProductionRevision(async()=>{
+  calls++;
+  return calls<3?structuredClone(source):structuredClone(fresh);
+ },currentRevision,{attempts:4,intervalMs:1,sleep:async()=>{pauses++;}});
+ assert.equal(calls,3);
+ assert.equal(pauses,2);
+ assert.equal(result.revision,currentRevision);
+ assert.equal(result.readbackAttempt,3);
+ assert.equal(result.worker,'boi-ech');
+});
+test('Cloudflare readback remains fail-closed if the wrong revision persists after the bounded retry window',async()=>{
+ const currentRevision='d'.repeat(40),oldRevision='e'.repeat(40);
+ const stale=settings();
+ stale.result.bindings.push({type:'plain_text',name:'BOI_ECH_BUILD_REVISION',text:oldRevision});
+ stale.result.bindings.push({type:'plain_text',name:'BOI_ECH_DEPLOYMENT_CHANNEL',text:'cloudflare-production'});
+ let reads=0,pauses=0;
+ await assert.rejects(()=>waitForLiveProductionRevision(async()=>{reads++;return stale;},
+  currentRevision,{attempts:3,intervalMs:1,sleep:async()=>{pauses++;}}),
+  /Live production revision mismatch after 3 attempts/);
+ assert.equal(reads,3);
+ assert.equal(pauses,2);
+});
+test('Wrong D1 binding or mismatched release policy rejects immediately, never being hidden by retries',async()=>{
+ const currentRevision='f'.repeat(40);
+ for(const change of [
+  s=>s.result.bindings.find(b=>b.type==='d1').id='4094a621-3b81-4533-9694-4a2103e03363',
+  s=>s.result.bindings.find(b=>b.type==='plain_text'&&b.name==='BOI_ECH_ACCESS_MODE').text='unmanaged',
+  s=>s.result.bindings=s.result.bindings.filter(b=>b.type!=='secret_text')
+ ]){
+  const live=settings();change(live);
+  let reads=0,pauses=0;
+  await assert.rejects(()=>waitForLiveProductionRevision(async()=>{reads++;return live;},
+   currentRevision,{attempts:6,intervalMs:1,sleep:async()=>{pauses++;}}));
+  assert.equal(reads,1);
+  assert.equal(pauses,0);
+ }
+});
+test('Single-review activation is verified from live settings, not merely the deployment request',async()=>{
+ const revision='1'.repeat(40);
+ const live=settings();
+ live.result.bindings.push(...Object.entries({
+  BOI_ECH_BUILD_REVISION:revision,BOI_ECH_DEPLOYMENT_CHANNEL:'cloudflare-production',
+  BOI_ECH_ACCOUNT_FIRST:'true',BOI_ECH_ACCOUNT_V2:'true',
+  BOI_ECH_ACCOUNT_ORIGIN:'https://boi-ech.boiech-ai.workers.dev',
+  BOI_ECH_SINGLE_REVIEW:'false'
+ }).map(([name,text])=>({type:'plain_text',name,text})));
+ await assert.rejects(()=>waitForLiveProductionRevision(async()=>live,revision,
+  {activate:true,singleReview:true,attempts:1}),/Live production revision mismatch/);
+ live.result.bindings.find(b=>b.name==='BOI_ECH_SINGLE_REVIEW').text='true';
+ const ok=await waitForLiveProductionRevision(async()=>live,revision,{activate:true,singleReview:true,attempts:1});
+ assert.equal(ok.singleReview,true);
 });
