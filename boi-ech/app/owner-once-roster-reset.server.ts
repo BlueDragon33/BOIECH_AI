@@ -153,7 +153,8 @@ export async function executeOwnerOnceRosterReset(db:DB,actor:Owner,input:Record
   fail("ROSTER_RESET_BACKUP_MISMATCH",409);
  const rows=await rowsAt(db,at),pair=protectedPair(rows);
  if(existing&&(existing.protected_thien_son!==pair.son.device_id||
- existing.protected_dong_nghi!==pair.nghi.device_id))fail("ROSTER_RESET_PROTECTION_CHANGED",409);
+ existing.protected_dong_nghi!==pair.nghi.device_id||
+ existing.protected_quynh!==pair.quynh.device_id))fail("ROSTER_RESET_PROTECTION_CHANGED",409);
  if(input.protectSon!==pair.son.device_id||input.protectNghi!==pair.nghi.device_id||input.protectQuynh!==pair.quynh.device_id)
   fail("ROSTER_RESET_PROTECTION_CHANGED",409);
  if(snapshot(rows)!==input.snapshot)fail("ROSTER_RESET_SCOPE_CHANGED",409);
