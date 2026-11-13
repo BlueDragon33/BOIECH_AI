@@ -1,7 +1,25 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import styles from "./manager-renewal-panel.module.css";
-import {accountTerms,replaceExpiryFromNow,FOREVER_EXPIRES_AT,type AccountTerm} from "./account-term";
+
+type AccountTerm="7d"|"30d"|"6m"|"1y"|"4y"|"forever";
+const FOREVER_EXPIRES_AT="9999-12-31T23:59:59.000Z";
+function replaceExpiryFromNow(term:AccountTerm,now:number):string{
+ if(!Number.isFinite(now))throw new Error("TIME_INVALID");
+ if(term==="forever")return FOREVER_EXPIRES_AT;
+ const date=new Date(now);
+ if(term==="7d"||term==="30d")date.setTime(now+(term==="7d"?7:30)*86400000);
+ else if(term==="6m"||term==="1y"||term==="4y"){
+  const months=term==="6m"?6:term==="1y"?12:48,day=date.getUTCDate();
+  date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+months);
+  date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));
+ }else throw new Error("TERM_INVALID");
+ return date.toISOString();
+}
+
+const accountTerms=[{value:"7d",label:"7 ngày"},{value:"30d",label:"30 ngày"},
+ {value:"6m",label:"6 tháng"},{value:"1y",label:"1 năm"},
+ {value:"4y",label:"4 năm"},{value:"forever",label:"Vĩnh viễn"}] as const;
 type Row={accountId:string;name:string;role:"learner"|"teacher";expiresAt:string;revision:number;progress?:{completed:number;total:number}|null};
 const getError=(value:unknown)=>value instanceof Error?value.message:"Máy chủ chưa xác nhận.";
 async function post(payload:Record<string,unknown>){
