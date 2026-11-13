@@ -47,7 +47,14 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
   increment(teacherBookings,session.teacherId);increment(classBookings,session.classId);increment(roomBookings,session.roomId);
   const resource=byId.get(session.classId);if(resource)increment(classNameBookings,classKey(resource.name));
  }
- const people=(ps.results??[]).map(p=>({...p,name:p.name||p.code,expired:Boolean(p.expired),registered:Boolean(p.registered),bookingCount:p.role==="teacher"?(teacherBookings.get(p.id)??0):(classNameBookings.get(classKey(p.className))??0)}));
+ // Early account-first registrations have NULL learner_name/person_code. Returning
+ // nullable names violates the UI contract and crashes the personnel sort.
+ const people=(ps.results??[]).map(p=>({...p,
+  name:(typeof p.name==="string"&&p.name.trim())||(typeof p.code==="string"&&p.code.trim())||"Hồ sơ chưa hoàn thiện",
+  code:typeof p.code==="string"?p.code:"",
+  className:typeof p.className==="string"?p.className:"",
+  expired:Boolean(p.expired),registered:Boolean(p.registered),
+  bookingCount:p.role==="teacher"?(teacherBookings.get(p.id)??0):(classNameBookings.get(classKey(p.className??""))??0)}));
  const active=(p:TrainingPerson)=>p.status==="approved"&&!p.expired&&p.registered;
  const learnersByClass=new Map<string,number>(),teachersByClass=new Map<string,number>();
  for(const person of people){
