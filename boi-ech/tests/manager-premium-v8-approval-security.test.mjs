@@ -15,7 +15,7 @@ async function activeManager(f,n){
  return m;
 }
 test("V8 real local D1: manager one-review appears in queue, CAS and activation grant 30-day entitlement",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await activeManager(f,9910),l=await f.register(9911,"learner");
   const queued=await f.service.reviewBoard(m.token,"",50);
@@ -35,7 +35,7 @@ test("V8 real local D1: manager one-review appears in queue, CAS and activation 
  }finally{f.close()}
 });
 test("V8 backend RBAC: learner cannot review; manager cannot approve manager",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await activeManager(f,9920),l=await f.register(9921,"learner");
   const another=await f.register(9922,"manager");
@@ -49,7 +49,7 @@ test("V8 backend RBAC: learner cannot review; manager cannot approve manager",as
  }finally{f.close()}
 });
 test("V8 backend security: revoke reviewer session after authorize and before batch => no approval",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await activeManager(f,9930),l=await f.register(9931,"teacher");
   const principal=await f.service.authorize(m.token);
@@ -67,7 +67,7 @@ test("V8 backend security: revoke reviewer session after authorize and before ba
  }finally{f.close()}
 });
 test("V8 backend atomicity: pre-granted manager privilege cannot return 409 after ACTIVE commit",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await f.register(9940,"manager");
   await f.flow.firstReview(owner,m.account.accountId,1);
@@ -80,7 +80,7 @@ test("V8 backend atomicity: pre-granted manager privilege cannot return 409 afte
 });
 
 test("V8 manager V2 quota display follows ACTIVE entitlement, not retired device access expiry",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await activeManager(f,9950),l=await f.register(9951,"learner");
   await f.flow.firstReview({kind:"manager",token:m.token},l.account.accountId,1);
