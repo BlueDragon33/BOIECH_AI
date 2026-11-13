@@ -3,14 +3,18 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const enhancements = fs.readFileSync(new URL("../app/learner-enhancements.tsx", import.meta.url), "utf8");
 const student = fs.readFileSync(new URL("../app/student-role-shell.tsx", import.meta.url), "utf8");
 const coach = fs.readFileSync(new URL("../app/student-adaptive-coach.tsx", import.meta.url), "utf8");
 const teacher = fs.readFileSync(new URL("../app/teacher-role-shell.tsx", import.meta.url), "utf8");
 const teacherApi = fs.readFileSync(new URL("../app/api/teacher/overview/route.ts", import.meta.url), "utf8");
 
-test("L6 mounts adaptive Learner Model on the learner dashboard", () => {
-  assert.match(layout, /import StudentAdaptiveCoach from "\.\/student-adaptive-coach"/);
-  assert.match(layout, /<StudentAdaptiveCoach\s*\/>/);
+test("L6 mounts adaptive Learner Model only on the active learner dashboard", () => {
+  assert.ok(enhancements.includes('import StudentAdaptiveCoach from "./student-adaptive-coach"'));
+  assert.ok(enhancements.includes("<StudentAdaptiveCoach />"));
+  assert.ok(page.includes('deviceAccess.personRole === "learner" ? <LearnerEnhancements />'));
+  assert.ok(!layout.includes("<StudentAdaptiveCoach />"));
   assert.match(layout, /student-adaptive-coach\.css/);
   assert.match(student, /data-student-adaptive-mount/);
 });
