@@ -20,7 +20,7 @@ test("premium is wired to main's Account-first V2 manager workspace without a se
  assert.match(ws,/onCreateResource=\{newResource\}/);
  assert.match(ws,/onCreateSession=\{\(roomId,classId\)=>editSession\(undefined,roomId,classId\)\}/);
  assert.match(ws,/<aside className=\{styles\.desktopRail\}/);
- assert.match(ws,/Kiểm duyệt tài khoản học viên và giảng viên/);
+ assert.match(ws,/Gia hạn học viên và giảng viên/);
  assert.doesNotMatch(ws,/Quản lý tài khoản · phê duyệt hai vòng/);
  assert.match(gate,/ManagerWorkspace/);
  assert.match(gate,/managerDashboard/);
@@ -30,7 +30,7 @@ test("premium approvals are confined to the dedicated manager review tab",()=>{
  assert.match(ws,/tab==="approval"\?<section className=\{styles.accountTools\}/);
  assert.match(ws,/accountControls\?\?/);
  assert.match(ws,/tab==="people"&&filter==="review"/);
- assert.match(ws,/Mở tab Kiểm duyệt tài khoản/);
+ assert.match(ws,/Mở tab Gia hạn tài khoản/);
  assert.match(details,/readOnly=false/);
 });
 test("original premium palette/nav restored but local server/auth/security unchanged",()=>{
@@ -41,6 +41,6 @@ test("original premium palette/nav restored but local server/auth/security uncha
  assert.match(css,/#09132d/);
  const ws=read("manager-workspace.tsx");
  assert.match(ws,/createTrainingClient/);
- assert.match(ws,/ManagerApprovalPanel/);
+ assert.match(ws,/ManagerRenewalPanel/);
  assert.match(ws,/accountControls\?:ReactNode/);
 });
