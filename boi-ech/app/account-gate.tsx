@@ -21,6 +21,19 @@ type Account = { accountId: string; status: string; role: string; name: string; 
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
 type AuthContact = "email" | "phone";
+type DeviceDisplay={label:string;browser:string};
+function currentDeviceDisplay():DeviceDisplay{
+ if(typeof navigator==="undefined")return {label:"Thiết bị đang sử dụng",browser:"Trình duyệt hiện tại"};
+ const ua=navigator.userAgent;
+ const browser=/coc_coc_browser|coc coc|coc_coc/i.test(ua)?"Cốc Cốc":
+  /Edg\//.test(ua)?"Edge":/Firefox\//.test(ua)?"Firefox":
+  /OPR\//.test(ua)?"Opera":/Chrome\//.test(ua)?"Chrome":
+  /Safari\//.test(ua)?"Safari":"Trình duyệt";
+ const category=/iPad|Tablet|Android(?!.*Mobile)/i.test(ua)?"Máy tính bảng":
+  /Mobile|iPhone|Android/i.test(ua)?"Điện thoại":"Máy tính";
+ return {label:category+" · "+browser,browser};
+}
+
 const fieldLabels: Record<string,string> = {
   login:"tên đăng nhập", password:"mật khẩu", passwordConfirm:"mật khẩu xác nhận",
   contactValue:"thông tin liên hệ", securityAnswer:"câu trả lời bảo mật",
@@ -531,10 +544,14 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       <div className={styles.accountSettingPane}>
         <div className={styles.settingSectionTitle}><span>▣</span><div><h3>Thiết bị đã liên kết</h3>
           <p>{devices.filter(d=>!d.revoked).length}/3 thiết bị · Dữ liệu lấy từ phiên hiện tại</p></div></div>
-        <div className={styles.deviceList}>{devices.map(device=><article className={styles.deviceItem} key={device.device_id}>
-          <div><strong>Thiết bị {device.device_id.slice(0,8).toUpperCase()}</strong>
-            <small>{device.revoked?"Đã thu hồi":v2&&device.approved===0?"Đang chờ xác nhận":"Thiết bị tin cậy"}
+        <div className={styles.deviceList}>{devices.map((device,index)=>{
+          const inUse=!device.revoked && Boolean(account?.deviceId) && device.device_id===account?.deviceId;
+          const name=inUse?currentDeviceDisplay().label:"Thiết bị khác "+(index+1)+" · Chưa rõ loại/trình duyệt";
+          return <article className={styles.deviceItem} key={device.device_id}>
+          <div><strong>{name}</strong>
+            <small>{device.revoked?"Đã thu hồi":inUse?"Thiết bị hiện tại":v2&&device.approved===0?"Đang chờ xác nhận":"Thiết bị tin cậy"}
               {" · "}{device.created_at}</small></div>
+          {inUse?<span className={styles.deviceInUse} role="status">● In use</span>:null}
           {!device.revoked&&v2&&device.approved===0&&account?.deviceApproved===true?
             <form onSubmit={e=>{e.preventDefault();const el=e.currentTarget;const password=new FormData(el).get("password");
               void run(async()=>{await send({action:"approve-device",deviceId:device.device_id,password});
@@ -542,12 +559,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
               <label>Mật khẩu xác nhận<input name="password" type="password" required autoComplete="current-password" disabled={busy}/></label>
               <button disabled={busy} type="submit">Xác nhận thiết bị</button>
             </form>:null}
-          {!device.revoked&&(!v2||account?.deviceApproved===true)?
+          {!inUse&&!device.revoked&&(!v2||account?.deviceApproved===true)?
             <button type="button" className={styles.revokeButton} disabled={busy}
               onClick={()=>{if(window.confirm("Thu hồi thiết bị này? Các phiên của thiết bị sẽ bị vô hiệu hóa."))void run(async()=>{
                 await send({action:"revoke-device",deviceId:device.device_id});await reload();broadcast();
               });}}>Thu hồi</button>:null}
-        </article>)}</div>
+        </article>;})}</div>
         {!devices.length?<p role="status">Không đọc được thiết bị nào từ máy chủ.</p>:null}
         {error?<p role="alert" className={styles.error}>{error}</p>:null}
         {notice?<p role="status" className={styles.settingSuccess}>{notice}</p>:null}
