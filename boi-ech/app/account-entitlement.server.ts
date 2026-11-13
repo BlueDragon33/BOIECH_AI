@@ -1,5 +1,6 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 import type { AccountService } from "./account-core.server";
+import {expiryFromPeriod,ACCESS_PERIODS,FOREVER_EXPIRY} from "./access-period";
 
 export class AccountEntitlementError extends Error {
   constructor(public code: string, public status = 403) { super(code); this.name = "AccountEntitlementError"; }
@@ -121,7 +122,7 @@ export class AccountEntitlementService {
     this.owner(actor);
     const id=this.accountId(input.accountId);
     const operation=input.operation;
-    if(!["set-expiry","suspend","resume"].includes(String(operation))
+    if(!["set-expiry","set-preset","suspend","resume"].includes(String(operation))
       || !Number.isSafeInteger(input.expectedRevision) || (input.expectedRevision as number)<1) reject("ACCOUNT_INPUT",400);
     const reason=this.reason(input.reason);
     const current=await this.read(id);
@@ -134,6 +135,9 @@ export class AccountEntitlementService {
       const next=Date.parse(input.expiresAt);
       if(!Number.isFinite(next)||next<=this.now()||next>this.now()+3650*86400000) reject("ACCOUNT_INPUT",400);
       expiry=new Date(next).toISOString();
+    }else if(operation==="set-preset"){
+      if(!ACCESS_PERIODS.includes(input.period as (typeof ACCESS_PERIODS)[number]))reject("ACCOUNT_INPUT",400);
+      expiry=expiryFromPeriod(this.now(),input.period);
     }else if(operation==="suspend")state="suspended";
     else{
       if(Date.parse(expiry)<=this.now()) reject("ACCOUNT_EXPIRED",409);
@@ -190,10 +194,11 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
  await accounts.capability(actor,"manager.manage.assigned");
  const target=input.accountId,revision=Number(input.expectedRevision);
  const days=Number(input.days);
+ const isPreset=typeof input.period==="string";
  const reason=typeof input.reason==="string"?input.reason.trim():"";
  if(typeof target!=="string"||!accountPattern.test(target)||target===actor.accountId
   ||!Number.isSafeInteger(revision)||revision<1
-  ||!Number.isSafeInteger(days)||days<1||days>365
+  ||(isPreset?!ACCESS_PERIODS.includes(input.period as (typeof ACCESS_PERIODS)[number]):!Number.isSafeInteger(days)||days<1||days>365)
   ||reason.length<10||reason.length>300)
   throw new AccountEntitlementError("ACCOUNT_INPUT",400);
  const record=await db.prepare(`SELECT e.expires_at,e.state,e.revision,d.person_role AS role
@@ -205,8 +210,9 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
   .bind(target).first<{expires_at:string;state:string;revision:number;role:string}>();
  if(!record||record.state!=="active"||record.revision!==revision)
   throw new AccountEntitlementError("ACCOUNT_CAS_CONFLICT",409);
- const next=new Date(Math.max(now,Date.parse(record.expires_at))+days*86400000).toISOString();
- if(Date.parse(next)>now+3650*86400000)reject("ACCOUNT_INPUT",400);
+ const next=isPreset?expiryFromPeriod(now,input.period):
+  new Date(Math.max(now,Date.parse(record.expires_at))+days*86400000).toISOString();
+ if(next!==FOREVER_EXPIRY&&Date.parse(next)>now+3650*86400000)reject("ACCOUNT_INPUT",400);
  const batch=[
   db.prepare(`UPDATE account_entitlements SET expires_at=?,revision=revision+1,
     changed_by=?,updated_at=CURRENT_TIMESTAMP
@@ -237,7 +243,7 @@ export async function managerRenewAccount(db:D1Database,accounts:AccountService,
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
     SELECT ?,'manager.entitlement.renew',?,
     CASE WHEN changes()=1 THEN ? ELSE NULL END`)
-    .bind(actor.accountId,target,`days=${days};${reason}`)
+    .bind(actor.accountId,target,`${isPreset?"set-period="+String(input.period):"days="+days};${reason}`)
  ];
  try{await db.batch(batch);}
  catch(error){
