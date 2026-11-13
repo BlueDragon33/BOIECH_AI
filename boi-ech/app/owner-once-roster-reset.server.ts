@@ -16,7 +16,7 @@ type Manifest={
 };
 const ID="2026-11-13-learner-teacher-reset";
 const WORDS={son:"thien son",nghi:"dong nghi",quynh:"ngo tuyet quynh"};
-const CONFIRM="XOA TAT CA TRU THIEN SON VA DONG NGHI";
+const CONFIRM="XOA TAT CA TRU QUYNH THIEN SON DONG NGHI";
 const hash=(v:unknown)=>createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const fail=(code:string,status=409):never=>{throw new AccountError(code,status);};
 const owner=(actor:Owner)=>{if(actor.role!=="owner"||typeof actor.actor!=="string"||
