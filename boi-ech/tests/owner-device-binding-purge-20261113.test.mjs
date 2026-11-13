@@ -64,8 +64,8 @@ test("Owner hard purge of the last device cannot let a fresh login auto-approve 
   const a=await pair(f,60106),api=f.load("owner-device-bindings.server.ts").ownerDeviceBinding;
   await api(f.db,owner,{action:"revoke",...request(a)});
   await api(f.db,owner,{action:"purge",...request(a,{expectedStatus:"blocked"})});
-  const pair=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
-  const publicKey=await crypto.subtle.exportKey("jwk",pair.publicKey);
+  const keys=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);
+  const publicKey=await crypto.subtle.exportKey("jwk",keys.publicKey);
   const fresh=await f.service.login({login:"fixture60106",password:"Local-only unique passphrase 60106",
     publicKey},"verified-login");
   const principal=await f.service.session(fresh.token);
