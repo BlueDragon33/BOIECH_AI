@@ -1,19 +1,20 @@
 -- Blueprint OS 1.3: Owner-authorized, profile-complete auto activation.
--- Default policies apply only when Owner has not previously customized them.
+-- Owner explicitly selected these initial policies; preserve current entitlements,
+-- only change defaults for future self-activations. Later Owner edits override.
 UPDATE account_duration_policies SET default_days=3,revision=revision+1,
- updated_at=CURRENT_TIMESTAMP WHERE role='manager' AND revision=1;
+ updated_at=CURRENT_TIMESTAMP WHERE role='manager' AND default_days<>3;
 --> statement-breakpoint
 UPDATE account_duration_policies SET default_days=8,revision=revision+1,
- updated_at=CURRENT_TIMESTAMP WHERE role IN ('teacher','learner') AND revision=1;
+ updated_at=CURRENT_TIMESTAMP WHERE role IN ('teacher','learner') AND default_days<>8;
 --> statement-breakpoint
 UPDATE account_admission_limits SET account_limit=20,revision=revision+1,
- updated_at=CURRENT_TIMESTAMP WHERE person_role='manager' AND revision=1;
+ updated_at=CURRENT_TIMESTAMP WHERE person_role='manager' AND account_limit<>20;
 --> statement-breakpoint
 UPDATE account_admission_limits SET account_limit=30,revision=revision+1,
- updated_at=CURRENT_TIMESTAMP WHERE person_role='teacher' AND revision=1;
+ updated_at=CURRENT_TIMESTAMP WHERE person_role='teacher' AND account_limit<>30;
 --> statement-breakpoint
 UPDATE account_admission_limits SET account_limit=200,revision=revision+1,
- updated_at=CURRENT_TIMESTAMP WHERE person_role='learner' AND revision=1;
+ updated_at=CURRENT_TIMESTAMP WHERE person_role='learner' AND account_limit<>200;
 --> statement-breakpoint
 -- The old trigger was dropped by 0024 to separate active seats. Reintroduce
 -- an *all-registered account* limit at INSERT, exactly as the Owner requests.
