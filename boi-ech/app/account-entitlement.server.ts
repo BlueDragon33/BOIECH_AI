@@ -73,7 +73,7 @@ export class AccountEntitlementService {
   }
   async list(actor: Owner) {
     this.owner(actor);
-    const rows=await this.db.prepare(`SELECT a.account_id,d.learner_name,d.person_role,d.status,
+    const rows=await this.db.prepare(`SELECT a.account_id,a.revision AS account_revision,d.learner_name,d.person_role,d.status,
       o.stage,d.access_expires_at AS legacy_device_expires_at,d.payment_status,
       e.state AS entitlement_state,e.expires_at,e.activated_at,
       e.revision AS entitlement_revision
@@ -81,12 +81,12 @@ export class AccountEntitlementService {
       LEFT JOIN account_onboarding o ON o.account_id=a.account_id
       LEFT JOIN account_entitlements e ON e.account_id=a.account_id
       ORDER BY a.account_id LIMIT 501`)
-      .all<{account_id:string;learner_name:string;person_role:string;status:string;
+      .all<{account_id:string;account_revision:number;learner_name:string;person_role:string;status:string;
         stage:string|null;legacy_device_expires_at:string|null;payment_status:string;
         entitlement_state:string|null;expires_at:string|null;
         activated_at:string|null;entitlement_revision:number|null}>();
     if ((rows.results?.length ?? 0)>500) reject("ACCOUNT_RESULT_LIMIT",413);
-    return (rows.results??[]).map(r=>({accountId:r.account_id,name:r.learner_name,
+    return (rows.results??[]).map(r=>({accountId:r.account_id,accountRevision:r.account_revision,name:r.learner_name,
       role:r.person_role,deviceStatus:r.status,onboardingStage:r.stage,
       deviceAccessExpiresAt:r.legacy_device_expires_at,
       deviceAccessExpired: Boolean(r.legacy_device_expires_at) && !(Date.parse(r.legacy_device_expires_at as string)>this.now()),
