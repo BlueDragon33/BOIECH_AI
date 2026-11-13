@@ -17,7 +17,7 @@ test("BOI manager never links back to Application-Management",()=>{
 });
 test("Manager no longer exposes fake preview after independent 8h trial implementation",()=>{
  assert.doesNotMatch(manager,/previewOnly|Xem thử không cần cấp quyền|data-manager-preview/);
- assert.match(manager,/ManagerApprovalPanel getProof=\{getProof\}/);
+ assert.match(manager,/ManagerRenewalPanel\/>/);
 });
 test("Teacher manager-owned actions cannot be found in roster UI or API",()=>{
  assert.doesNotMatch(roster,/const mutate|action:"approve"|action:"remove"/);
