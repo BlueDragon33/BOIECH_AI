@@ -204,3 +204,35 @@ test("Reviewed legacy account is still able to complete after new no-review roll
   assert.match(route,/workflow\.submitProfile\(token,p\)/);
  }finally{f.close();}
 });
+
+
+test("Manager archive is role-scoped, CAS-guarded, keeps canonical learner history and revokes sessions",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const m=await invitedManager(f,75150);
+  await f.flow.completeProfileWithoutReview(m.token,profile(75150,"manager"));
+  const learner=await reg(f,75151,"learner");
+  await f.flow.completeProfileWithoutReview(learner.token,profile(75151,"learner"));
+  const svc=f.load("account-entitlement.server.ts");
+  const id=learner.account.accountId;
+  const before=await f.service.ownerRead(id);
+  await assert.rejects(()=>svc.managerRemoveAccount(f.db,f.service,m.token,{
+    accountId:id,expectedRevision:before.entitlement.revision,confirmation:"wrong",
+    reason:"Unauthorized incomplete archive confirmation"
+  }),e=>e.code==="ACCOUNT_INPUT");
+  const done=await svc.managerRemoveAccount(f.db,f.service,m.token,{
+    accountId:id,expectedRevision:before.entitlement.revision,confirmation:id,
+    reason:"Manager verified an archive requested by Owner"
+  });
+  assert.deepEqual({archived:done.archived,deleted:done.deleted,readback:done.readback},
+   {archived:true,deleted:false,readback:true});
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM accounts WHERE account_id=?").get(id).n,1);
+  assert.equal(f.sqlite.prepare("SELECT state FROM account_entitlements WHERE account_id=?").get(id).state,"suspended");
+  assert.equal(f.sqlite.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").get(id).stage,"suspended");
+  assert.equal(f.sqlite.prepare("SELECT revoked FROM account_sessions WHERE account_id=?").get(id).revoked,1);
+  await assert.rejects(()=>f.service.session(learner.token),e=>e.code==="SESSION_INVALID");
+  await assert.rejects(()=>svc.managerRemoveAccount(f.db,f.service,m.token,{
+    accountId:id,expectedRevision:before.entitlement.revision,confirmation:id,
+    reason:"Repeated stale archive should fail closed"
+  }),e=>e.code==="ACCOUNT_CAS_CONFLICT");
+ }finally{f.close();}
+});
