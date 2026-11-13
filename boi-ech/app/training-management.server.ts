@@ -77,14 +77,10 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
   const service=await runtime.accountService(),principal=await service.authorize(await runtime.accountCookieToken());
   if(principal.accountId!==actor.accountId)fail("Thiết bị và phiên không thuộc cùng tài khoản cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
   await service.capability(principal,"manager.manage.assigned");
-  const canonical=await db.prepare("SELECT storage_device_id FROM accounts WHERE account_id=?")
-    .bind(principal.accountId).first<{storage_device_id:string}>();
-  if(!canonical)fail("Không xác minh được thiết bị gốc của cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
-  const assigned=await db.prepare("SELECT target_device_id FROM manager_device_assignments WHERE manager_device_id=?")
-    .bind(canonical.storage_device_id).all<{target_device_id:string}>();
-  const ids=new Set((assigned.results??[]).map(r=>r.target_device_id));
-  visiblePeople=people.filter(p=>ids.has(p.id));
-  visibleSessions=sessions.filter(session=>ids.has(session.teacherId));
+  // All valid managers read the same D1 people and schedule. No shadow
+  // roster or per-manager filter: account identity/progress still stay separate.
+  visiblePeople=people;
+  visibleSessions=sessions;
  }
  return {resources,people:visiblePeople,sessions:visibleSessions,from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
