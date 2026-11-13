@@ -1,5 +1,5 @@
 -- BOIECH_AI Owner legacy-intake inventory. READ ONLY: no data mutations.
--- Strict selection: historical Owner approval event, no V2 login, no manager assignment,
+-- Strict selection: historical Owner approval event, older than five full days since original device creation, no V2 login, no manager assignment,
 -- never a manager account. Auto-approved devices without Owner event are NOT guessed.
 -- Run only after verifying current Cloudflare D1 boi-ech-db and PITR bookmark.
 WITH owner_legacy AS (
@@ -17,6 +17,9 @@ WITH owner_legacy AS (
  LEFT JOIN accounts a ON a.storage_device_id=d.device_id
  LEFT JOIN account_onboarding o ON o.account_id=a.account_id
  WHERE d.person_role IN ('learner','teacher')
+   -- Use source device creation, not mapped accounts.created_at (which may be backfilled later).
+   -- Strictly older than five 24-hour periods on the D1 server clock.
+   AND datetime(d.created_at) < datetime('now','-5 days')
    AND d.registration_submitted_at IS NOT NULL
    AND d.approved_at IS NOT NULL
    AND d.status IN ('approved','blocked')
