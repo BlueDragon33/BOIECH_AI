@@ -250,3 +250,16 @@
  .sheetHeader{padding:12px 14px!important}
  .sheetBody{padding:15px!important}
 }
+
+
+.managerRenderFallback{
+ min-height:100dvh;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+ gap:16px;padding:clamp(22px,5vw,56px);background:#f4f8fd;color:#14365e;font-size:16px;
+}
+.managerRenderFallback h1{font-size:clamp(22px,4vw,31px);line-height:1.25;margin:0;color:#102e55}
+.managerRenderFallback p{max-width:680px;line-height:1.65;margin:0;color:#38597c}
+.managerRenderFallback button{
+ min-height:46px;background:#1654a0;border:1px solid #134781;border-radius:11px;
+ color:#fff;font:inherit;font-weight:800;padding:12px 22px;cursor:pointer;
+}
+.managerRenderFallback button:focus-visible{outline:3px solid #f0b52b;outline-offset:3px}
