@@ -154,6 +154,124 @@ export class AccountV2Workflow {
     if (Number(result[0].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT", 409);
     return this.state(targetId);
   }
+  /**
+   * Account-first V3: completed canonical profile activates immediately.
+   * Manager registration is still cryptographically tied to a consumed Owner
+   * invitation, so public signup cannot self-escalate to manager.
+   * Atomic D1 batch: a failure rolls back profile, activation and entitlement.
+   */
+  async completeProfileWithoutReview(token:string,input:Record<string,unknown>) {
+    if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
+    const actor=await this.accounts.session(token);
+    if(!actor.deviceApproved||actor.status!=="pending")bad("DEVICE_APPROVAL_REQUIRED",403);
+    const state=await this.state(actor.accountId);
+    if(state.stage!=="requested"||state.revision!==input.expectedRevision)
+      bad("ACCOUNT_CAS_CONFLICT",409);
+    const role=state.role,manager=role==="manager";
+    if(!["manager","teacher","learner"].includes(role))bad("ACCOUNT_ROLE_FORBIDDEN",403);
+    const family=field(input.familyName,60),given=field(input.givenName,60);
+    const className=field(manager?input.facultyUnit:input.className,80);
+    const jobTitle=manager?field(input.jobTitle,120):"";
+    const jobPosition=manager?field(input.jobPosition,120):"";
+    const storedContact=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>();
+    if(!storedContact)bad("ACCOUNT_CONTACT_INVALID",409);
+    const raw=storedContact.kind==="phone"?storedContact.value
+      :(typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):"");
+    const phoneRaw=raw.replace(/[ ()-]/g,"");
+    const phone=phoneRaw.startsWith("+84")?"0"+phoneRaw.slice(3):phoneRaw;
+    if((!manager&&!phone)||phone&&!/^\\+?[0-9]{7,16}$/.test(phone))
+      bad("PROFILE_INVALID",400);
+    const code=(manager?"MGR_":role==="teacher"?"GV_":"HV_")
+      +actor.storageDeviceId.slice(0,20).toUpperCase();
+    if(manager){
+      const invite=await this.db.prepare(`SELECT 1 AS ok FROM account_manager_invitations
+        WHERE consumed_by=? AND consumed_at_ms IS NOT NULL AND revoked_at_ms IS NULL`)
+        .bind(actor.accountId).first();
+      if(!invite)bad("MANAGER_INVITATION_INVALID",403);
+    }
+    const entitlement=await new AccountEntitlementService(this.db).grantOnApproval(
+      actor.accountId,role,"profile:completed");
+    const statements:D1PreparedStatement[]=[
+      this.db.prepare(`UPDATE device_access SET learner_name=?,learner_family_name=?,learner_given_name=?,
+        person_code=?,class_name=?,phone=?,registration_submitted_at=CURRENT_TIMESTAMP,
+        status='approved',management_enabled=?,access_group='free',
+        payment_status='free_approved',approved_at=CURRENT_TIMESTAMP,
+        updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND status='pending'
+        AND EXISTS(SELECT 1 FROM account_onboarding o
+          JOIN account_sessions s ON s.account_id=o.account_id
+          JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+          JOIN account_credentials c ON c.account_id=o.account_id AND c.generation=s.generation
+          WHERE o.account_id=? AND o.stage='requested' AND o.revision=?
+          AND s.token_hash=? AND s.device_id=? AND s.revoked=0 AND b.approved=1 AND b.revoked=0
+          AND s.expires_at>(julianday('now')-2440587.5)*86400000
+          AND s.idle_expires_at>(julianday('now')-2440587.5)*86400000
+          AND (NOT EXISTS(SELECT 1 FROM device_access d WHERE d.device_id=?
+            AND d.person_role='manager') OR EXISTS(
+            SELECT 1 FROM account_manager_invitations i
+              WHERE i.consumed_by=? AND i.consumed_at_ms IS NOT NULL AND i.revoked_at_ms IS NULL)))`)
+      .bind(family+" "+given,family,given,code,className,phone,manager?1:0,
+        actor.storageDeviceId,actor.accountId,state.revision,actor.sessionHash,actor.deviceId,
+        actor.storageDeviceId,actor.accountId),
+      this.db.prepare(`UPDATE account_onboarding SET stage='active',
+        revision=revision+1,profile_submitted_at=CURRENT_TIMESTAMP,
+        last_review_note=NULL,updated_at=CURRENT_TIMESTAMP
+        WHERE account_id=? AND stage='requested' AND revision=?
+        AND EXISTS(SELECT 1 FROM accounts a JOIN device_access d
+          ON d.device_id=a.storage_device_id
+          WHERE a.account_id=? AND d.status='approved')
+        AND changes()=1`).bind(actor.accountId,state.revision,actor.accountId)
+    ];
+    if(manager){
+      statements.splice(1,0,this.db.prepare(`INSERT INTO account_manager_profiles
+        (account_id,faculty_unit,job_title,job_position)
+        SELECT ?,?,?,? WHERE changes()=1`).bind(actor.accountId,className,jobTitle,jobPosition));
+    }
+    // The second statement transitions requested->active only after the
+    // preceding successful device write. The first profile insertion changes()
+    // is checked at the manager-profile boundary as well.
+    statements.push(entitlement);
+    if(manager)for(const scope of ["manager.approve.registration","manager.manage.assigned"]){
+      statements.push(this.db.prepare(`INSERT INTO account_manager_permissions
+        (account_id,scope,enabled,expires_at,granted_by)
+        SELECT ?,?,1,NULL,? WHERE EXISTS(
+          SELECT 1 FROM account_onboarding o JOIN account_entitlements e
+            ON e.account_id=o.account_id WHERE o.account_id=?
+            AND o.stage='active' AND e.state='active')`)
+          .bind(actor.accountId,scope,actor.accountId,actor.accountId));
+    }
+    statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+      SELECT ?,'account.profile.auto-activated',?,
+      CASE WHEN EXISTS(SELECT 1 FROM accounts a
+        JOIN device_access d ON d.device_id=a.storage_device_id
+        JOIN account_onboarding o ON o.account_id=a.account_id
+        JOIN account_entitlements e ON e.account_id=a.account_id
+        WHERE a.account_id=? AND o.stage='active' AND d.status='approved'
+          AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
+          AND (d.person_role IN ('learner','teacher')
+            OR (d.person_role='manager' AND d.management_enabled=1
+                AND EXISTS(SELECT 1 FROM account_manager_invitations i
+                  WHERE i.consumed_by=a.account_id AND i.revoked_at_ms IS NULL)
+                AND (SELECT COUNT(*) FROM account_manager_permissions p
+                  WHERE p.account_id=a.account_id AND p.enabled=1
+                  AND p.scope IN ('manager.manage.assigned','manager.approve.registration'))=2)))
+        THEN 'verified device + complete profile; no human approval' ELSE NULL END`)
+      .bind(actor.accountId,actor.accountId,actor.accountId));
+    try {await this.db.batch(statements);}
+    catch(error){
+      if(error instanceof Error && /ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(error.message))
+        bad("ACCOUNT_CAPACITY_REACHED",409);
+      if(error instanceof Error&&/constraint|NOT NULL|ONBOARDING|UNIQUE/i.test(error.message))
+        bad("PROFILE_CONFLICT",409);
+      throw error;
+    }
+    const after=await this.state(actor.accountId);
+    const lease=await new AccountEntitlementService(this.db).read(actor.accountId);
+    if(after.stage!=="active"||after.status!=="approved"||!lease?.active)
+      bad("ACCOUNT_READBACK_FAILED",503);
+    return {...after,expiresAt:lease.expiresAt};
+  }
+
   async submitProfile(token: string, input: Record<string, unknown>) {
     const actor = await this.accounts.session(token);
     const s = await this.state(actor.accountId);
