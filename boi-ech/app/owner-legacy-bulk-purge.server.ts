@@ -92,11 +92,11 @@ export async function executeLegacyFiveDayPurge(
  db:DB,actor:Owner,input:Record<string,unknown>
 ){
  requireOwner(actor);
+ const reason=typeof input.reason==="string"?input.reason.trim():"";
  if(input.confirmation!=="XOA TAI KHOAN CU TREN 5 NGAY"
    ||typeof input.snapshot!=="string"||!/^[a-f0-9]{64}$/.test(input.snapshot)
-   ||typeof input.reason!=="string"||input.reason.trim().length<10||input.reason.length>300)
+   ||reason.length<10||reason.length>300)
    reject("LEGACY_CLEANUP_CONFIRMATION_REQUIRED",400);
- const reason=input.reason.trim();
  const rows=await readRows(db);
  if(snapshot(rows)!==input.snapshot)reject("LEGACY_CLEANUP_STATE_CHANGED",409);
  const batch=rows.filter(safe).slice(0,10);
