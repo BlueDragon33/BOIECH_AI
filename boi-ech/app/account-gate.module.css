@@ -299,3 +299,15 @@
 }
 .sessionLeaseWarning button:disabled { opacity: .6; cursor: wait; }
 .sessionLeaseWarning button:focus-visible { outline: 3px solid #d17c20; outline-offset: 3px; }
+
+.accountExpiryTicker{
+ position:fixed;z-index:140;top:max(8px,env(safe-area-inset-top));
+ right:max(12px,env(safe-area-inset-right));display:flex;align-items:center;
+ flex-wrap:wrap;gap:7px 12px;max-width:min(480px,calc(100vw - 24px));
+ background:#f2f8ff;border:2px solid #285e9e;border-radius:12px;
+ padding:10px 14px;color:#102c4c;font-size:13px;font-variant-numeric:tabular-nums;
+ box-shadow:0 5px 22px #132d4a24;line-height:1.45
+}
+.accountExpiryTicker strong{font-weight:850;color:#13385e}
+.accountExpiryTicker small{font-size:11px;color:#365c82;display:block;width:100%}
+@media(max-width:650px){.accountExpiryTicker{position:sticky;top:0;margin:7px 8px;max-width:calc(100vw - 16px)}}
