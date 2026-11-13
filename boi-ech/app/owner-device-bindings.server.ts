@@ -29,7 +29,7 @@ async function locate(db:DB,id:string){
    JOIN device_access d ON d.device_id=a.storage_device_id
    LEFT JOIN account_onboarding o ON o.account_id=a.account_id
    ORDER BY b.account_id,b.device_id`).all<Row>();
- if(!all.success||!Array.isArray(all.results))fail("DEVICE_BINDING_READ_UNAVAILABLE",503);
+ if(all.success===false||!Array.isArray(all.results))fail("DEVICE_BINDING_READ_UNAVAILABLE",503);
  return all.results.find(row=>bindingHash(row.account_id,row.device_id)===id)??null;
 }
 async function details(db:DB,id:string){
