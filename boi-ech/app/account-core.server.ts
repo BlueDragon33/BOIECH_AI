@@ -828,8 +828,8 @@ export class AccountService {
         access_expires_at=COALESCE(access_expires_at,?),updated_at=CURRENT_TIMESTAMP
         WHERE device_id=? AND status='pending' AND changes()=1`).bind(accessExpiry,target.storage_device_id));
     } else statements.push(this.db.prepare(`UPDATE device_access SET status='blocked',blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
-      WHERE device_id=? AND status='approved' AND EXISTS(SELECT 1 FROM manager_device_assignments WHERE target_device_id=? AND manager_device_id=?) AND ${guard}`)
-      .bind(target.storage_device_id, target.storage_device_id, actor.storageDeviceId, actor.accountId, this.now()));
+      WHERE device_id=? AND status='approved' AND EXISTS(SELECT 1 FROM manager_device_assignments WHERE target_device_id=?) AND ${guard}`)
+      .bind(target.storage_device_id, target.storage_device_id, actor.accountId, this.now()));
     // A failed conditional write must roll back preceding assignment and produce no success audit.
     if (this.v2Enabled && action === "approve") {
       statements.push(this.db.prepare(`UPDATE account_onboarding
