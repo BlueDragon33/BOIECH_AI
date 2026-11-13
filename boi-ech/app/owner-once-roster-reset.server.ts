@@ -11,7 +11,7 @@ type Row={
  payments:number;certificates:number;training:number;content:number;shared:number;
 };
 type Manifest={
- protected_thien_son:string;protected_dong_nghi:string;cutoff_at:string;
+ protected_thien_son:string;protected_dong_nghi:string;cutoff_at:string;backup_bookmark_hash:string;
  state:string;revision:number;removed:number;
 };
 const ID="2026-11-13-learner-teacher-reset";
@@ -53,7 +53,7 @@ const snapshot=(rows:Row[])=>hash(rows.map(r=>[
  r.payments,r.certificates,r.training,r.content,r.shared
 ]));
 async function manifest(db:DB){
- return db.prepare("SELECT protected_thien_son,protected_dong_nghi,cutoff_at,state,revision,removed FROM account_one_time_roster_resets WHERE id=?")
+ return db.prepare("SELECT protected_thien_son,protected_dong_nghi,cutoff_at,backup_bookmark_hash,state,revision,removed FROM account_one_time_roster_resets WHERE id=?")
   .bind(ID).first<Manifest>();
 }
 async function cutoff(db:DB){
@@ -141,6 +141,8 @@ export async function executeOwnerOnceRosterReset(db:DB,actor:Owner,input:Record
  const existing=await manifest(db);
  if(existing&&existing.state!=="running")fail("ROSTER_RESET_ALREADY_FINALIZED",409);
  if(existing&&existing.cutoff_at!==at)fail("ROSTER_RESET_SCOPE_CHANGED",409);
+ if(existing&&existing.backup_bookmark_hash!==hash(backup))
+  fail("ROSTER_RESET_BACKUP_MISMATCH",409);
  const rows=await rowsAt(db,at),pair=protectedPair(rows);
  if(existing&&(existing.protected_thien_son!==pair.son.device_id||
  existing.protected_dong_nghi!==pair.nghi.device_id))fail("ROSTER_RESET_PROTECTION_CHANGED",409);
