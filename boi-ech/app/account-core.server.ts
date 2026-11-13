@@ -534,6 +534,7 @@ export class AccountService {
     const actor = await this.session(token);
     if (this.v2Enabled && !actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
     if (typeof deviceId !== "string" || !TOKEN.test(deviceId)) fail("DEVICE_KEY_INVALID", 400);
+    if(deviceId===actor.deviceId)fail("DEVICE_IN_USE_CANNOT_REVOKE",409);
     const result = await this.db.batch([
       this.db.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=? AND device_id=? AND revoked=0").bind(actor.accountId, deviceId),
       this.audit(actor.accountId, "device.revoked", deviceId, "account session management", true),
