@@ -34,7 +34,7 @@ async function locate(db:DB,id:string){
 }
 async function details(db:DB,id:string){
  const row=await locate(db,id);
- if(!row)fail("DEVICE_BINDING_NOT_FOUND",404);
+ if(!row)throw new AccountError("DEVICE_BINDING_NOT_FOUND",404);
  const now=Date.now();
  const [trusted,sessions,grants,events,active]=await Promise.all([
   db.prepare(`SELECT COUNT(*) AS n FROM account_devices WHERE account_id=? AND device_id<>? AND revoked=0 AND approved=1`)
@@ -62,12 +62,12 @@ async function details(db:DB,id:string){
    preservesAccount:true,preservesLearning:true,preservesAudit:true};
 }
 function verifiedInput(input:Record<string,unknown>,id:string) {
- if(input.confirmation!==id || typeof input.reason!=="string" ||
-    input.reason.trim().length<10 || input.reason.length>300 ||
+ const reason=typeof input.reason==="string"?input.reason.trim():"";
+ if(input.confirmation!==id || reason.length<10 || reason.length>300 ||
     typeof input.expectedCreatedAt!=="string" || !Number.isFinite(Date.parse(input.expectedCreatedAt)) ||
     !["pending","approved","blocked"].includes(String(input.expectedStatus)))
   fail("DEVICE_BINDING_INPUT",400);
- return {reason:input.reason.trim(),createdAt:input.expectedCreatedAt,
+ return {reason,createdAt:input.expectedCreatedAt,
   status:input.expectedStatus as string};
 }
 export async function ownerDeviceBinding(db:DB,actor:Actor,input:Record<string,unknown>){
@@ -77,7 +77,7 @@ export async function ownerDeviceBinding(db:DB,actor:Actor,input:Record<string,u
  if(input.action!=="revoke" && input.action!=="purge")fail("DEVICE_BINDING_INPUT",400);
  const guard=verifiedInput(input,id);
  const row=await locate(db,id);
- if(!row)fail("DEVICE_BINDING_NOT_FOUND",404);
+ if(!row)throw new AccountError("DEVICE_BINDING_NOT_FOUND",404);
  const status=row.revoked===1?"blocked":row.approved===1?"approved":"pending";
  if(row.created_at!==guard.createdAt||status!==guard.status)fail("DEVICE_BINDING_CAS_CONFLICT",409);
  if(input.action==="revoke"){
