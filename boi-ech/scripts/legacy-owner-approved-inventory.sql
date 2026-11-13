@@ -9,8 +9,11 @@ WITH owner_legacy AS (
         EXISTS(SELECT 1 FROM course_certificates c WHERE c.device_id=d.device_id) AS has_certificate,
         EXISTS(SELECT 1 FROM course_activity_events e WHERE e.device_id=d.device_id) AS has_progress,
         EXISTS(SELECT 1 FROM training_sessions t WHERE t.teacher_id=d.device_id) AS has_training,
-        EXISTS(SELECT 1 FROM course_content_versions v
-          WHERE v.created_by IN (d.device_id,a.account_id)) AS has_content,
+        (EXISTS(SELECT 1 FROM course_content_versions v
+          WHERE v.created_by IN (d.device_id,a.account_id)
+             OR v.editor_device_id=d.device_id)
+         OR EXISTS(SELECT 1 FROM content_editor_devices e
+          WHERE e.device_id=d.device_id)) AS has_content,
         EXISTS(SELECT 1 FROM account_sync_records r WHERE r.account_id=a.account_id)
         OR EXISTS(SELECT 1 FROM account_sync_events e WHERE e.account_id=a.account_id) AS has_sync
  FROM device_access d
@@ -22,11 +25,16 @@ WITH owner_legacy AS (
    AND datetime(d.created_at) < datetime('now','-5 days')
    AND d.registration_submitted_at IS NOT NULL
    AND d.approved_at IS NOT NULL
-   AND d.status IN ('approved','blocked')
+   AND d.status IN ('approved','blocked','pending')
    AND (a.account_id IS NULL OR a.login IS NULL)
    AND (o.account_id IS NULL OR o.stage='legacy_hold')
    AND NOT EXISTS(SELECT 1 FROM manager_device_assignments m
      WHERE m.target_device_id=d.device_id)
+   AND NOT EXISTS(SELECT 1 FROM course_audit_log mr
+     WHERE mr.target=d.device_id AND mr.action='manager_device_approved')
+   AND NOT EXISTS(SELECT 1 FROM account_audit ar
+     WHERE ar.target=a.account_id AND ar.action IN
+      ('account.review.first','account.profile.activated','account.profile.auto-activated'))
    AND EXISTS(SELECT 1 FROM course_audit_log h
      WHERE h.target=d.device_id
        AND h.action IN ('learning_device_free_approved','learning_device_payment_verified'))
