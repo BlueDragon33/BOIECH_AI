@@ -175,18 +175,35 @@ export async function managerRenewableAccounts(db:D1Database,accounts:AccountSer
  await accounts.capability(actor,"manager.manage.assigned");
  const result=await db.prepare(`SELECT a.account_id AS accountId,d.learner_name AS name,
   d.person_role AS role,e.expires_at AS expiresAt,e.revision,
-  e.state AS entitlementState,o.stage AS onboardingStage
+  e.state AS entitlementState,o.stage AS onboardingStage,
+  p.completed_json AS completedJson,p.total_active_seconds AS totalActiveSeconds,
+  p.last_activity_at AS lastLearningAt
   FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
   JOIN account_onboarding o ON o.account_id=a.account_id
   JOIN account_entitlements e ON e.account_id=a.account_id
+  LEFT JOIN device_profiles p ON p.device_id=d.device_id
   WHERE d.person_role IN ('learner','teacher') AND d.status='approved'
     AND o.stage='active' AND e.state='active'
   ORDER BY d.person_role,a.account_id LIMIT 501`).all<{
-   accountId:string;name:string;role:string;expiresAt:string;revision:number;
-   entitlementState:string;onboardingStage:string
+   accountId:string;name:string|null;role:string;expiresAt:string;revision:number;
+   entitlementState:string;onboardingStage:string;completedJson:string|null;
+   totalActiveSeconds:number|null;lastLearningAt:string|null
   }>();
  if(!Array.isArray(result.results)||result.results.length>500)reject("ACCOUNT_RESULT_LIMIT",413);
- return {verified:true,contract:"boi-manager-renew.v1",accounts:result.results};
+ const rows=result.results.map(record=>{
+  let completedLessons:number|null=null;
+  if(record.completedJson!==null){
+   try{
+    const items:unknown=JSON.parse(record.completedJson);
+    if(Array.isArray(items))completedLessons=new Set(items.filter(item=>
+     (typeof item==="number"||typeof item==="string")&&/^[1-8]$/.test(String(item))
+    ).map(item=>Number(item))).size;
+   }catch{/* Invalid D1 progress is unknown, never fabricated as zero. */}
+  }
+  const {completedJson,...safe}=record;
+  return {...safe,completedLessons,totalLessons:8};
+ });
+ return {verified:true,contract:"boi-manager-renew.v1",accounts:rows};
 }
 export async function managerRenewAccount(db:D1Database,accounts:AccountService,token:string,input:Record<string,unknown>,now=Date.now()){
  const actor=await accounts.authorize(token);
