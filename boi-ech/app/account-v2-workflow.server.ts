@@ -163,7 +163,8 @@ export class AccountV2Workflow {
   async completeProfileWithoutReview(token:string,input:Record<string,unknown>) {
     if(!this.singleReview)bad("ACCOUNT_V2_REQUIRED",409);
     const actor=await this.accounts.session(token);
-    if(!actor.deviceApproved||actor.status!=="pending")bad("DEVICE_APPROVAL_REQUIRED",403);
+    if(!actor.deviceApproved)bad("DEVICE_APPROVAL_REQUIRED",403);
+    if(actor.status!=="pending")bad("ACCOUNT_CAS_CONFLICT",409);
     const state=await this.state(actor.accountId);
     if(state.stage!=="requested"||state.revision!==input.expectedRevision)
       bad("ACCOUNT_CAS_CONFLICT",409);
