@@ -6,6 +6,20 @@ import { normalizeRegistrationContact } from "./account-contact.server";
 type Authority = { kind: "owner"; actor: string } | { kind: "manager"; token: string };
 type Stage = "requested" | "profile_required" | "profile_review" | "changes_requested" | "active" | "suspended" | "legacy_hold";
 function bad(code: string, status = 403): never { throw new AccountError(code, status); }
+/** A legacy phone UNIQUE failure must not be confused with unrelated D1 constraints. */
+function profileWriteFailure(error: unknown): never {
+  if (!(error instanceof Error)) throw error;
+  const message=error.message;
+  if (/ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(message)) bad("ACCOUNT_CAPACITY_REACHED",409);
+  if (/MANAGER_APPROVAL_FORBIDDEN/.test(message)) bad("ACCOUNT_SCOPE_FORBIDDEN",403);
+  if (/device_access\.phone/i.test(message) && /UNIQUE|constraint/i.test(message))
+    bad("PROFILE_PHONE_IN_USE",409);
+  if (/device_access_person_identity_unique|device_access\.person_(?:code|role)/i.test(message)
+      && /UNIQUE|constraint/i.test(message)) bad("PROFILE_INTERNAL_ID_CONFLICT",409);
+  if (/UNIQUE|constraint|NOT NULL|ONBOARDING|ACCOUNT_REVIEW|MANAGER_TARGET_NOT_ELIGIBLE/i.test(message))
+    bad("PROFILE_STATE_CONFLICT",409);
+  throw error;
+}
 function field(value: unknown, max: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > max || /[\x00-\x1f]/.test(value)) bad("PROFILE_INVALID", 400);
   return value.trim().normalize("NFC");
@@ -272,13 +286,7 @@ export class AccountV2Workflow {
         THEN 'verified device + complete profile; no human approval' ELSE NULL END`)
       .bind(actor.accountId,actor.accountId,actor.accountId));
     try {await this.db.batch(statements);}
-    catch(error){
-      if(error instanceof Error && /ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(error.message))
-        bad("ACCOUNT_CAPACITY_REACHED",409);
-      if(error instanceof Error&&/constraint|NOT NULL|ONBOARDING|UNIQUE/i.test(error.message))
-        bad("PROFILE_CONFLICT",409);
-      throw error;
-    }
+    catch(error){ profileWriteFailure(error); }
     const after=await this.state(actor.accountId);
     const lease=await new AccountEntitlementService(this.db).read(actor.accountId);
     if(after.stage!=="active"||after.status!=="approved"||!lease?.active)
@@ -432,15 +440,7 @@ export class AccountV2Workflow {
           ELSE NULL END`)
         .bind(actor.accountId,actor.accountId,actor.accountId));
       try{await this.db.batch(statements);}
-      catch(error){
-        if(error instanceof Error && /ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(error.message))
-          bad("ACCOUNT_CAPACITY_REACHED",409);
-        if(error instanceof Error && /MANAGER_APPROVAL_FORBIDDEN/.test(error.message))
-          bad("ACCOUNT_SCOPE_FORBIDDEN",403);
-        if(error instanceof Error && /UNIQUE|constraint|NOT NULL|ACCOUNT_REVIEW/i.test(error.message))
-          bad("PROFILE_CONFLICT",409);
-        throw error;
-      }
+      catch(error){ profileWriteFailure(error); }
       const after=await this.state(actor.accountId);
       if(after.stage!=="active" || after.status!=="approved" || after.revision!==s.revision+2)
         bad("ACCOUNT_READBACK_FAILED",503);
@@ -468,10 +468,7 @@ export class AccountV2Workflow {
       this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
         SELECT ?,'account.profile.submitted',?,'submitted for second independent review' WHERE changes()=1`)
         .bind(actor.accountId,actor.accountId),
-    ]).catch(error=>{
-      if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) bad("PROFILE_CONFLICT",409);
-      throw error;
-    });
+    ]).catch(profileWriteFailure);
     if(Number(result[0].meta.changes)!==1 || Number(result[manager?(secondary?3:2):1].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT",409);
     return this.state(actor.accountId);
   }
