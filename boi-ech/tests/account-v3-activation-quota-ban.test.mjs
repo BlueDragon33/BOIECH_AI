@@ -73,8 +73,11 @@ test("Manager can renew teacher/learner but cannot renew manager; expired or rev
   await f.flow.completeProfileWithoutReview(m.token,profile(75101,"manager"));
   const l=await reg(f,75102,"learner");
   await f.flow.completeProfileWithoutReview(l.token,profile(75102,"learner"));
+  f.sqlite.prepare("UPDATE device_profiles SET completed_json=?,total_active_seconds=640 WHERE device_id=?")
+   .run(JSON.stringify(["hoc-tap-01","bai-01","kiem-tra-01","bai-02"]),l.account.storageDeviceId);
   const svc=f.load("account-entitlement.server.ts");
   const listed=await svc.managerRenewableAccounts(f.db,f.service,m.token);
+  assert.equal(listed.accounts.find(x=>x.accountId===l.account.accountId).completedLessons,2);
   assert.equal(listed.verified,true);
   assert.ok(listed.accounts.some(x=>x.accountId===l.account.accountId&&x.role==="learner"));
   const before=await f.service.ownerRead(l.account.accountId);
@@ -85,6 +88,12 @@ test("Manager can renew teacher/learner but cannot renew manager; expired or rev
   assert.equal(renewed.verified,true);
   assert.equal(renewed.entitlement.revision,before.entitlement.revision+1);
   assert.ok(Date.parse(renewed.entitlement.expiresAt)>Date.parse(before.entitlement.expiresAt));
+  const set=await svc.managerRenewAccount(f.db,f.service,m.token,{
+    accountId:l.account.accountId,expectedRevision:renewed.entitlement.revision,
+    period:"7d",reason:"Manager resets to exactly one week, never cumulative"
+  });
+  assert.ok(Math.abs(Date.parse(set.entitlement.expiresAt)-Date.now()-7*msDay)<120000);
+  assert.ok(Date.parse(set.entitlement.expiresAt)<Date.parse(renewed.entitlement.expiresAt));
   await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,l.token,{
     accountId:m.account.accountId,expectedRevision:1,days:5,
     reason:"Unauthorized learner attempts an extension"
@@ -96,10 +105,10 @@ test("Manager can renew teacher/learner but cannot renew manager; expired or rev
   f.sqlite.prepare("UPDATE account_entitlements SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?")
     .run(m.account.accountId);
   await assert.rejects(()=>svc.managerRenewAccount(f.db,f.service,m.token,{
-    accountId:l.account.accountId,expectedRevision:renewed.entitlement.revision,days:5,
+    accountId:l.account.accountId,expectedRevision:set.entitlement.revision,days:5,
     reason:"Expired manager cannot issue entitlements"
   }),e=>e.code==="ACCOUNT_EXPIRED");
-  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM account_audit WHERE action='manager.entitlement.renew'").get().n,1);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM account_audit WHERE action='manager.entitlement.renew'").get().n,2);
  }finally{f.close();}
 });
 test("Seat admission is atomic and rejected signup produces an aggregated Owner alert",async()=>{
@@ -196,5 +205,37 @@ test("Reviewed legacy account is still able to complete after new no-review roll
   assert.match(route,/currentStage|const stage=config\.singleReview/);
   assert.match(route,/stage==="requested"/);
   assert.match(route,/workflow\.submitProfile\(token,p\)/);
+ }finally{f.close();}
+});
+
+
+test("Manager archive is role-scoped, CAS-guarded, keeps canonical learner history and revokes sessions",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const m=await invitedManager(f,75150);
+  await f.flow.completeProfileWithoutReview(m.token,profile(75150,"manager"));
+  const learner=await reg(f,75151,"learner");
+  await f.flow.completeProfileWithoutReview(learner.token,profile(75151,"learner"));
+  const svc=f.load("account-entitlement.server.ts");
+  const id=learner.account.accountId;
+  const before=await f.service.ownerRead(id);
+  await assert.rejects(()=>svc.managerRemoveAccount(f.db,f.service,m.token,{
+    accountId:id,expectedRevision:before.entitlement.revision,confirmation:"wrong",
+    reason:"Unauthorized incomplete archive confirmation"
+  }),e=>e.code==="ACCOUNT_INPUT");
+  const done=await svc.managerRemoveAccount(f.db,f.service,m.token,{
+    accountId:id,expectedRevision:before.entitlement.revision,confirmation:id,
+    reason:"Manager verified an archive requested by Owner"
+  });
+  assert.deepEqual({archived:done.archived,deleted:done.deleted,readback:done.readback},
+   {archived:true,deleted:false,readback:true});
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM accounts WHERE account_id=?").get(id).n,1);
+  assert.equal(f.sqlite.prepare("SELECT state FROM account_entitlements WHERE account_id=?").get(id).state,"suspended");
+  assert.equal(f.sqlite.prepare("SELECT stage FROM account_onboarding WHERE account_id=?").get(id).stage,"suspended");
+  assert.equal(f.sqlite.prepare("SELECT revoked FROM account_sessions WHERE account_id=?").get(id).revoked,1);
+  await assert.rejects(()=>f.service.session(learner.token),e=>e.code==="SESSION_INVALID");
+  await assert.rejects(()=>svc.managerRemoveAccount(f.db,f.service,m.token,{
+    accountId:id,expectedRevision:before.entitlement.revision,confirmation:id,
+    reason:"Repeated stale archive should fail closed"
+  }),e=>e.code==="ACCOUNT_CAS_CONFLICT");
  }finally{f.close();}
 });

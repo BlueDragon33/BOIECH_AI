@@ -534,6 +534,8 @@ export class AccountService {
     const actor = await this.session(token);
     if (this.v2Enabled && !actor.deviceApproved) fail("DEVICE_APPROVAL_REQUIRED");
     if (typeof deviceId !== "string" || !TOKEN.test(deviceId)) fail("DEVICE_KEY_INVALID", 400);
+    // The active P-256 key must remain usable; sign out to end the current session.
+    if (deviceId===actor.deviceId) fail("DEVICE_CURRENT_IN_USE",409);
     const result = await this.db.batch([
       this.db.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=? AND device_id=? AND revoked=0").bind(actor.accountId, deviceId),
       this.audit(actor.accountId, "device.revoked", deviceId, "account session management", true),
@@ -541,13 +543,23 @@ export class AccountService {
     ]);
     if (Number(result[0].meta.changes) !== 1) fail("DEVICE_NOT_FOUND", 404);
   }
-  async devices(token: string) {
+  async devices(token: string, userAgent?:string|null) {
     const actor = await this.session(token);
-    if (this.v2Enabled && !actor.deviceApproved) return [{ device_id: actor.deviceId, approved: 0, revoked: 0 }];
+    if (this.v2Enabled && !actor.deviceApproved)
+      return [{ device_id: actor.deviceId, approved: 0, revoked: 0, current: true, display_label:"Thiết bị đang sử dụng" }];
+    // A display label is optional, best effort, and never used for authorization.
+    if(userAgent){
+      const {deviceDisplayLabel}=await import("./device-display-label");
+      await this.db.prepare("UPDATE account_devices SET display_label=? WHERE account_id=? AND device_id=? AND revoked=0")
+        .bind(deviceDisplayLabel(userAgent),actor.accountId,actor.deviceId).run();
+    }
     const query = this.v2Enabled
-      ? "SELECT device_id,revoked,approved,created_at FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100"
-      : "SELECT device_id,revoked,created_at FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100";
-    return (await this.db.prepare(query).bind(actor.accountId).all()).results;
+      ? "SELECT device_id,revoked,approved,created_at,display_label FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100"
+      : "SELECT device_id,revoked,created_at,display_label FROM account_devices WHERE account_id=? ORDER BY created_at DESC LIMIT 100";
+    const records=(await this.db.prepare(query).bind(actor.accountId).all<{
+      device_id:string;revoked:number;created_at:string;display_label:string|null;
+    }>()).results??[];
+    return records.map(device=>({...device,current:device.device_id===actor.deviceId}));
   }
   async approveDevice(token: string, targetId: unknown, password: unknown, peer: string) {
     if (!this.v2Enabled) fail("ACCOUNT_FEATURE_DISABLED",404);

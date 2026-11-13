@@ -3,7 +3,7 @@ import { normalizeRegistrationContact } from "../../account-contact.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
-import { AccountEntitlementService,managerRenewableAccounts,managerRenewAccount } from "../../account-entitlement.server";
+import { AccountEntitlementService,managerRenewableAccounts,managerRenewAccount,managerRemoveAccount } from "../../account-entitlement.server";
 import { AccountTrialService } from "../../account-trial.server";
 import { AccountSecurityQuestionService } from "../../account-security-question.server";
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
       // A session lease is not the 30-day account entitlement. Only the
       // server determines renewal eligibility; never expose the bearer token.
       sessionExpiresAt: account.absoluteExpiry,
-      sessionIdleExpiresAt: account.idleExpiry }, devices: await service.devices(token) });
+      sessionIdleExpiresAt: account.idleExpiry }, devices: await service.devices(token, request.headers.get("user-agent")) });
   } catch (error) { return accountErrorResponse(error); }
 }
 export async function POST(request: Request) {
@@ -122,6 +122,8 @@ export async function POST(request: Request) {
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
       if (p.action === "manager-renew-list") return json(await managerRenewableAccounts(await getCourseDatabase(),service,token));
       if (p.action === "manager-renew") return json(await managerRenewAccount(await getCourseDatabase(),service,token,p));
+       if (p.action === "manager-set-duration") return json(await managerRenewAccount(await getCourseDatabase(),service,token,p));
+       if (p.action === "manager-archive-account") return json(await managerRemoveAccount(await getCourseDatabase(),service,token,p));
       if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
       if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
       if (p.action === "submit-profile") {

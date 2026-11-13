@@ -52,7 +52,9 @@ test('Wrong role, expired or forged invitation cannot create account and no auth
     {...request(21,'0'.repeat(64)),publicKey:await key()},'peer-21'),e=>e.code==='MANAGER_INVITATION_INVALID');
   await assert.rejects(async()=>f.service.registerManagerWithInvite(
     {...request(22,issued.inviteToken),role:'teacher',publicKey:await key()},'peer-22'),e=>e.code==='ACCOUNT_INPUT');
-  f.sqlite.prepare('UPDATE account_manager_invitations SET expires_at_ms=?').run(Date.now()-1);
+  const expiredNow=Date.now();
+  f.sqlite.prepare('UPDATE account_manager_invitations SET issued_at_ms=?,expires_at_ms=?')
+   .run(expiredNow-3600000,expiredNow-1000);
   await assert.rejects(async()=>f.service.registerManagerWithInvite(
     {...request(23,issued.inviteToken),publicKey:await key()},'peer-23'),e=>e.code==='MANAGER_INVITATION_INVALID');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM accounts').get().n,0);
