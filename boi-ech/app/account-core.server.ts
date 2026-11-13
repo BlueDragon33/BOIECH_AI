@@ -201,6 +201,68 @@ export class AccountService {
       archived:true,retainedHistory:true};
   }
 
+  /** Owner-only account lock and sticky credential/device bans, with CAS and
+   * immediate session revocation. Bans survive any later privacy erasure. */
+  async ownerBlockAccount(owner:{role:string;actor:string},input:Record<string,unknown>) {
+    if(owner.role!=="owner"||!owner.actor||!this.v2Enabled)fail("OWNER_REQUIRED",403);
+    const id=input.accountId,expected=input.expectedRevision,reason=input.reason;
+    if(typeof id!=="string"||!/^acc_[a-f0-9]{64}$/.test(id)||
+      input.confirmation!==id||!Number.isSafeInteger(expected)||
+      typeof reason!=="string"||reason.trim().length<10||reason.length>300)
+      fail("ACCOUNT_INPUT",400);
+    const row=await this.db.prepare(`SELECT a.login,a.revision,a.storage_device_id,d.status
+      FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+      WHERE a.account_id=?`).bind(id).first<{
+        login:string|null;revision:number;storage_device_id:string;status:string
+      }>();
+    if(!row)fail("ACCOUNT_NOT_FOUND",404);
+    if(row.revision!==expected||row.status==="blocked")fail("ACCOUNT_CAS_CONFLICT",409);
+    const statements:D1PreparedStatement[]=[
+      this.db.prepare("UPDATE accounts SET revision=revision+1 WHERE account_id=? AND revision=?")
+        .bind(id,expected)
+    ];
+    if(row.login)statements.push(this.db.prepare(`INSERT INTO account_security_bans(kind,value,actor,reason)
+      SELECT 'login',lower(login),?,? FROM accounts WHERE account_id=? AND revision=?
+      ON CONFLICT(kind,value) DO UPDATE SET actor=excluded.actor,
+       reason=excluded.reason,created_at=CURRENT_TIMESTAMP`)
+      .bind(owner.actor,reason.trim(),id,(expected as number)+1));
+    statements.push(this.db.prepare(`INSERT INTO account_security_bans(kind,value,actor,reason)
+       SELECT 'device',device_id,?,? FROM account_devices WHERE account_id=?
+       ON CONFLICT(kind,value) DO UPDATE SET actor=excluded.actor,reason=excluded.reason,
+        created_at=CURRENT_TIMESTAMP`).bind(owner.actor,reason.trim(),id));
+    statements.push(this.db.prepare(`UPDATE device_access SET status='blocked',
+      management_enabled=0,blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE device_id=? AND status IN ('pending','approved')`).bind(row.storage_device_id));
+    statements.push(this.db.prepare("UPDATE account_sessions SET revoked=1 WHERE account_id=?").bind(id));
+    statements.push(this.db.prepare("UPDATE account_devices SET revoked=1 WHERE account_id=?").bind(id));
+    statements.push(this.db.prepare("UPDATE account_manager_permissions SET enabled=0 WHERE account_id=?").bind(id));
+    statements.push(this.db.prepare(`UPDATE account_entitlements SET state='suspended',
+      changed_by=?,revision=revision+1 WHERE account_id=? AND state='active'`)
+      .bind(owner.actor,id));
+    statements.push(this.db.prepare(`UPDATE account_onboarding SET stage='suspended',
+      revision=revision+1 WHERE account_id=? AND stage='active'`).bind(id));
+    statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+      VALUES(?,'owner.account.permanent-block',?,
+      CASE WHEN EXISTS(SELECT 1 FROM accounts a JOIN device_access d
+        ON d.device_id=a.storage_device_id WHERE a.account_id=?
+        AND a.revision=? AND d.status='blocked') THEN ? ELSE NULL END)`)
+      .bind(owner.actor,id,id,(expected as number)+1,reason.trim()));
+    try{const batch=await this.db.batch(statements);
+      if(Number(batch[0].meta.changes)!==1)fail("ACCOUNT_CAS_CONFLICT",409);
+    }catch(error){
+      if(error instanceof Error&&/constraint|NOT NULL|UNIQUE/i.test(error.message))
+        fail("ACCOUNT_CAS_CONFLICT",409);
+      throw error;
+    }
+    const after=await this.ownerRead(id);
+    if(after.status!=="blocked"||after.revision!==(expected as number)+1)
+      fail("ACCOUNT_READBACK_FAILED",503);
+    const active=await this.db.prepare(`SELECT COUNT(*) AS n FROM account_sessions
+      WHERE account_id=? AND revoked=0`).bind(id).first<{n:number}>();
+    if(Number(active?.n)!==0)fail("ACCOUNT_READBACK_FAILED",503);
+    return {verified:true,accountId:id,status:"blocked",revision:after.revision,
+      banned:true,revokedSessions:true};
+  }
   // Owner-only control bridge: read-only, cursor-bounded visibility across
   // ALL roles. Does not grant any teacher/learner approval power to APP.
   async ownerAllAccounts(after:unknown="",limit:unknown=40){
@@ -393,6 +455,8 @@ export class AccountService {
     } catch(error) {
       if(inviteHash && error instanceof Error && /NOT NULL.*purpose|MANAGER_INVITATION/i.test(error.message))
         fail("MANAGER_INVITATION_INVALID",409);
+      if(error instanceof Error && /ACCOUNT_SECURITY_BANNED|DEVICE_SECURITY_BANNED/.test(error.message))
+        fail("ACCOUNT_SECURITY_BANNED",403);
       if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED",409);
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
@@ -414,6 +478,10 @@ export class AccountService {
     // Generation is rechecked after the expensive KDF so reset cannot race a login.
     const current = await this.db.prepare("SELECT generation FROM account_credentials WHERE account_id=?").bind(row.account_id).first<{ generation: number }>();
     if (current?.generation !== row.generation) fail("AUTH_FAILED", 401);
+    const status=await this.db.prepare(`SELECT d.status FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id
+      WHERE a.account_id=?`).bind(row.account_id).first<{status:string}>();
+    if(status?.status==="blocked")fail("ACCOUNT_BLOCKED",403);
     return this.issue(row.account_id, input.publicKey, row.generation);
   }
   async session(token: string): Promise<Principal> {
