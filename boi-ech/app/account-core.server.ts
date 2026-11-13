@@ -352,8 +352,16 @@ export class AccountService {
     return this.registerV2(input,login,inviteHash);
   }
 
+  private async assertReentryAllowed(login:string,deviceKey:string){
+    const ban=await this.db.prepare(`SELECT kind FROM account_reentry_bans
+      WHERE revoked_at IS NULL AND (kind='login' AND ban_hash=?
+       OR kind='device-key' AND ban_hash=?) LIMIT 1`)
+      .bind(digest(login),deviceKey).first<{kind:string}>();
+    if(ban)fail("ACCOUNT_REENTRY_BLOCKED",403);
+  }
   private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string) {
     const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
+    await this.assertReentryAllowed(login,keyId);
     const verifier = await hashPassword(input.password), accountId = "acc_" + random();
     // Existing accounts/tests remain valid without a question; the new V9 UI
     // requires one when creating an account. The secret is never returned.
@@ -367,7 +375,11 @@ export class AccountService {
           VALUES(?,?,?,'pending',?,CURRENT_TIMESTAMP,0)`)
           .bind(storageId, "BE-"+storageId.slice(0,16).toUpperCase(), publicKeyJson(input.publicKey), role),
         this.db.prepare("INSERT INTO device_profiles(device_id) VALUES(?)").bind(storageId),
-        this.db.prepare("INSERT INTO accounts(account_id,storage_device_id,login) VALUES(?,?,?)").bind(accountId,storageId,login),
+        this.db.prepare(`INSERT INTO accounts(account_id,storage_device_id,login)
+          SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM account_reentry_bans
+            WHERE revoked_at IS NULL AND
+             (kind='login' AND ban_hash=? OR kind='device-key' AND ban_hash=?))`)
+          .bind(accountId,storageId,login,digest(login),keyId),
         this.db.prepare("INSERT INTO account_credentials(account_id,password_verifier,recovery_hash) VALUES(?,?,?)")
           .bind(accountId,verifier,digest(recoveryCode)),
         ...(securityVerifier ? [this.db.prepare(
@@ -394,6 +406,7 @@ export class AccountService {
       if(inviteHash && error instanceof Error && /NOT NULL.*purpose|MANAGER_INVITATION/i.test(error.message))
         fail("MANAGER_INVITATION_INVALID",409);
       if(error instanceof Error && error.message.includes("ACCOUNT_CAPACITY_REACHED")) fail("ACCOUNT_CAPACITY_REACHED",409);
+      if(error instanceof Error && /ACCOUNT_DEVICE_BANNED/.test(error.message)) fail("ACCOUNT_REENTRY_BLOCKED",403);
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
     }
@@ -414,6 +427,12 @@ export class AccountService {
     // Generation is rechecked after the expensive KDF so reset cannot race a login.
     const current = await this.db.prepare("SELECT generation FROM account_credentials WHERE account_id=?").bind(row.account_id).first<{ generation: number }>();
     if (current?.generation !== row.generation) fail("AUTH_FAILED", 401);
+    const keyId=await deviceKeyId(input.publicKey);
+    await this.assertReentryAllowed(login,keyId);
+    const status=await this.db.prepare(`SELECT d.status FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id WHERE a.account_id=?`)
+      .bind(row.account_id).first<{status:string}>();
+    if(status?.status==="blocked")fail("ACCOUNT_BLOCKED",403);
     return this.issue(row.account_id, input.publicKey, row.generation);
   }
   async session(token: string): Promise<Principal> {
