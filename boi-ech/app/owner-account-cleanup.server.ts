@@ -199,3 +199,15 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
  return {ok:true,verified:true,contract:"boi-owner-account-cleanup.v1",
   action:"purge",deleted:true,accountHash:sha(id),auditPreserved:true};
 }
+
+/** Minimal independent post-mutation readback, avoids paging/filter false-negatives. */
+export async function inspectCleanupAccount(db:DB,actor:Actor,input:Record<string,unknown>){
+ guardOwner(actor);
+ const id=input.accountId;
+ if(typeof id!=="string"||!/^acc_[a-f0-9]{64}$/.test(id))
+  throw new AccountError("CLEANUP_INPUT",400);
+ const row=await db.prepare("SELECT account_id FROM accounts WHERE account_id=?")
+  .bind(id).first<{account_id:string}>();
+ return {contract:"boi-owner-account-cleanup.v1",verified:true,
+  action:"inspect",exists:Boolean(row),accountHash:sha(id)};
+}
