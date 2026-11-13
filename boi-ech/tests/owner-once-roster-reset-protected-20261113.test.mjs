@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import {accountStack} from "./helpers/account-stack.mjs";
 const owner={actor:"owner@fixture.invalid",role:"owner"};
 const confirmation="XOA TAT CA TRU THIEN SON VA DONG NGHI";
@@ -33,15 +32,6 @@ test("one-time Owner reset erases learners/teachers but preserves exact Thiên S
   assert.equal(preview.candidates,2);
   assert.equal(preview.eligible,2);
   assert.deepEqual(preview.protectedPeople.map(x=>x.deviceId),[son,nghi]);
-  const initialBatch=f.db.batch.bind(f.db);
-  f.db.batch=async statements=>{
-   try{return await initialBatch(statements.map((st,index)=>({
-    _run(){try{return st._run();}catch(error){
-     console.error("ROSTER_RESET_ABORT_STMT_INDEX",index,"TOTAL",statements.length,String(error?.message??error));throw error;
-    }}
-   })));}
-   catch(error){console.error("ROSTER_RESET_LOCAL_SQLITE_CAUSE",String(error?.message??error));throw error;}
-  };
   const done=await m.executeOwnerOnceRosterReset(f.db,owner,runArgs(preview));
   assert.equal(done.deleted,2);
   assert.equal(done.state,"completed");
@@ -80,25 +70,6 @@ test("protected payment evidence and certificates are not deleted by ordinary ro
   const preview=await m.previewOwnerOnceRosterReset(f.db,owner);
   assert.equal(preview.eligible,1);assert.equal(preview.retainedForReview,1);
   assert.equal(preview.blockers.payment,1);
-  const initialBatch=f.db.batch.bind(f.db);
-  f.db.batch=async statements=>{
-   try{return await initialBatch(statements.map((st,index)=>({
-    _run(){
-     if(index===1){
-      const raw=fs.readFileSync(new URL("../app/owner-once-roster-reset.server.ts",import.meta.url),"utf8");
-      const g=raw.match(/const guard=`([\s\S]*?)`;/)?.[1];
-      const d=f.sqlite.prepare("SELECT d.device_id,d.created_at,d.updated_at,d.status,d.learner_name,a.account_id,a.revision FROM device_access d LEFT JOIN accounts a ON a.storage_device_id=d.device_id WHERE d.device_id=?").get(candidate);
-      const protectedA=preview.protectedPeople[0].deviceId,protectedB=preview.protectedPeople[1].deviceId;
-      const vals=[candidate,protectedA,protectedB,d.created_at,d.updated_at,d.status,d.learner_name??"",d.account_id??"",d.revision??-1,preview.cutoff,protectedA,protectedB,protectedA,protectedB];
-      console.error("ROSTER_DIAG_DATA",JSON.stringify(d),"MANIFEST",JSON.stringify(f.sqlite.prepare("SELECT * FROM account_one_time_roster_resets").all()));
-      console.error("ROSTER_DIAG_GUARD",f.sqlite.prepare("SELECT "+g+" AS allowed").get(...vals).allowed);
-     }
-     try{return st._run();}catch(error){
-     console.error("ROSTER_RESET_ABORT_STMT_INDEX",index,"TOTAL",statements.length,String(error?.message??error));throw error;
-    }}
-   })));}
-   catch(error){console.error("ROSTER_RESET_LOCAL_SQLITE_CAUSE",String(error?.message??error));throw error;}
-  };
   const done=await m.executeOwnerOnceRosterReset(f.db,owner,runArgs(preview));
   assert.equal(done.deleted,1);assert.equal(done.state,"retention_review");
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) n FROM device_access WHERE device_id=?").get(retention).n,1);
