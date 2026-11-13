@@ -76,7 +76,7 @@ type Row = { account_id: string; storage_device_id: string; login: string | null
   phone: string; payment_status: string; access_group: string; access_expires_at: string | null; management_enabled: number };
 export type AccountView = { accountId: string; storageDeviceId: string; login: string | null; revision: number;
   status: string; role: string; name: string; personCode: string; className: string; expiresAt: string | null };
-export type Principal = AccountView & { deviceId: string; sessionHash: string; generation: number; absoluteExpiry: number; issuedAt: number; deviceApproved: boolean };
+export type Principal = AccountView & { deviceId: string; sessionHash: string; generation: number; absoluteExpiry: number; idleExpiry: number; issuedAt: number; deviceApproved: boolean };
 const COLUMNS = `a.account_id,a.storage_device_id,a.login,a.revision,d.status,d.person_role,d.person_code,
  d.learner_name,d.class_name,d.phone,d.payment_status,d.access_group,d.access_expires_at,d.management_enabled`;
 function view(row: Row): AccountView {
@@ -418,17 +418,17 @@ export class AccountService {
   async session(token: string): Promise<Principal> {
     if (!TOKEN.test(token)) fail("SESSION_REQUIRED", 401);
     const now = this.now();
-    const row = await this.db.prepare(`SELECT ${COLUMNS},s.device_id,s.generation,s.expires_at,s.issued_at_ms${this.v2Enabled ? ",b.approved AS device_approved" : ""} FROM account_sessions s
+    const row = await this.db.prepare(`SELECT ${COLUMNS},s.device_id,s.generation,s.expires_at,s.idle_expires_at,s.issued_at_ms${this.v2Enabled ? ",b.approved AS device_approved" : ""} FROM account_sessions s
       JOIN accounts a ON a.account_id=s.account_id JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
       JOIN account_credentials c ON c.account_id=s.account_id AND c.generation=s.generation
       WHERE s.token_hash=? AND s.revoked=0 AND b.revoked=0 AND s.expires_at>? AND s.idle_expires_at>?
       AND s.issued_at_ms+?>?`)
       .bind(digest(token), now, now, HARD_SESSION_MS, now).first<Row & {
-        device_id: string; generation: number; expires_at: number; issued_at_ms: number; device_approved?: number }>();
+        device_id: string; generation: number; expires_at: number; idle_expires_at: number; issued_at_ms: number; device_approved?: number }>();
     if (!row) fail("SESSION_INVALID", 401);
     return { ...view(row), deviceId: row.device_id, sessionHash: digest(token), generation: row.generation,
-      absoluteExpiry: row.expires_at, issuedAt: row.issued_at_ms,
+      absoluteExpiry: row.expires_at, idleExpiry: row.idle_expires_at, issuedAt: row.issued_at_ms,
       deviceApproved: !this.v2Enabled || row.device_approved === 1 };
   }
   async authorize(token: string, protectedModule = true) {
