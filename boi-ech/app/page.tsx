@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { parseLocalQuizBackup } from "./progress-backup";
 import ManagerWorkspace from "./manager-workspace";
+import ManagerRenderBoundary from "./manager-render-boundary";
 import { RegistrationRoles } from "./registration-roles";
 import AiLearningHub, { type AiApiResponse } from "./ai-learning-hub";
 import LocalContentStudio from "./local-content-studio";
@@ -1847,7 +1848,9 @@ export default function Home() {
     );
   }
 
-  if (deviceAccess.personRole === "manager") return <ManagerWorkspace key={`${deviceAccess.deviceId}:${deviceAccess.managementEnabled ? 1 : 0}`} deviceId={deviceAccess.deviceId} getProof={managerProof}/>;
+  if (deviceAccess.personRole === "manager") return <ManagerRenderBoundary key={deviceAccess.deviceId}>
+    <ManagerWorkspace key={`${deviceAccess.deviceId}:${deviceAccess.managementEnabled ? 1 : 0}`} deviceId={deviceAccess.deviceId} getProof={managerProof}/>
+  </ManagerRenderBoundary>;
 
   return (
     <div
