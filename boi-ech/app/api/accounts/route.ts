@@ -53,7 +53,11 @@ export async function GET(request: Request) {
       profileDraftReady:profileDraft?.ready===true,
       profileDraftFields:profileDraft?.fields??null,
       securityQuestionConfigured:question?.configured===true,
-      canReadRegistrants }, devices: await service.devices(token) });
+      canReadRegistrants,
+      // A session lease is not the 30-day account entitlement. Only the
+      // server determines renewal eligibility; never expose the bearer token.
+      sessionExpiresAt: account.absoluteExpiry,
+      sessionIdleExpiresAt: account.idleExpiry }, devices: await service.devices(token) });
   } catch (error) { return accountErrorResponse(error); }
 }
 export async function POST(request: Request) {
@@ -124,6 +128,7 @@ export async function POST(request: Request) {
         {kind:"manager",token},String(p.accountId),p.expectedRevision,p.reason) });
       if (p.action === "approve-device") return json(await service.approveDevice(token,p.deviceId,p.password,peer));
     }
+    if (p.action === "keepalive") return json(await service.keepAlive(token));
     if (p.action === "rotate") { const result = await service.rotate(token); return json({ ok: true }, sessionCookie(result.token)); }
     if (p.action === "recover") return json({ ok: true, ...await service.recover(p, peer) }, sessionCookie(""));
     if (p.action === "logout") { if (token) await service.logout(token); return json({ ok: true }, sessionCookie("")); }
