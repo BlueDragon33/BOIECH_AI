@@ -13,7 +13,7 @@ async function approvedManager(f,n){
  return m;
 }
 test("R2: manager gets ONE Owner approval, completes required profile and atomically activates scoped account",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await approvedManager(f,9201);
   const id=manager.account.accountId;
@@ -37,7 +37,7 @@ test("R2: manager gets ONE Owner approval, completes required profile and atomic
  }finally{f.close()}
 });
 test("R2: learner waits for ONE authorized manager, then profile completion creates assignment+entitlement",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await approvedManager(f,9211);
   await f.flow.submitProfile(manager.token,{...profile(9211),expectedRevision:2});
@@ -62,7 +62,7 @@ test("R2: learner waits for ONE authorized manager, then profile completion crea
  }finally{f.close()}
 });
 test("R2: incomplete profile and stale CAS never create an ACTIVE seat",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await approvedManager(f,9221);
   const id=manager.account.accountId;
@@ -118,7 +118,7 @@ test("Single-review activation rolls back if the user session is revoked before 
  } finally { f.close(); }
 });
 test("R2: revoked manager entitlement blocks learner activation and rolls back ALL profile writes",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await approvedManager(f,9231);
   await f.flow.submitProfile(manager.token,{...profile(9231),expectedRevision:2});
@@ -139,8 +139,8 @@ test("R2: revoked manager entitlement blocks learner activation and rolls back A
  }finally{f.close()}
 });
 test("R2: manager cannot change another manager's application; single-review flag defaults safely OFF",async()=>{
- const f=accountStack({v2:true,singleReview:true});
- const legacy=accountStack({v2:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
+ const legacy=accountStack({legacyPolicy:true,v2:true});
  try{
   const manager=await f.register(9241,"manager");
   await assert.rejects(()=>f.flow.firstReview({kind:"manager",token:manager.token},manager.account.accountId,1),

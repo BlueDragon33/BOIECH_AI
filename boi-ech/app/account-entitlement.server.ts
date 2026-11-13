@@ -1,4 +1,5 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
+import type { AccountService } from "./account-core.server";
 
 export class AccountEntitlementError extends Error {
   constructor(public code: string, public status = 403) { super(code); this.name = "AccountEntitlementError"; }
@@ -72,7 +73,7 @@ export class AccountEntitlementService {
   }
   async list(actor: Owner) {
     this.owner(actor);
-    const rows=await this.db.prepare(`SELECT a.account_id,d.learner_name,d.person_role,d.status,
+    const rows=await this.db.prepare(`SELECT a.account_id,a.revision AS account_revision,d.learner_name,d.person_role,d.status,
       o.stage,d.access_expires_at AS legacy_device_expires_at,d.payment_status,
       e.state AS entitlement_state,e.expires_at,e.activated_at,
       e.revision AS entitlement_revision
@@ -80,12 +81,12 @@ export class AccountEntitlementService {
       LEFT JOIN account_onboarding o ON o.account_id=a.account_id
       LEFT JOIN account_entitlements e ON e.account_id=a.account_id
       ORDER BY a.account_id LIMIT 501`)
-      .all<{account_id:string;learner_name:string;person_role:string;status:string;
+      .all<{account_id:string;account_revision:number;learner_name:string;person_role:string;status:string;
         stage:string|null;legacy_device_expires_at:string|null;payment_status:string;
         entitlement_state:string|null;expires_at:string|null;
         activated_at:string|null;entitlement_revision:number|null}>();
     if ((rows.results?.length ?? 0)>500) reject("ACCOUNT_RESULT_LIMIT",413);
-    return (rows.results??[]).map(r=>({accountId:r.account_id,name:r.learner_name,
+    return (rows.results??[]).map(r=>({accountId:r.account_id,accountRevision:r.account_revision,name:r.learner_name,
       role:r.person_role,deviceStatus:r.status,onboardingStage:r.stage,
       deviceAccessExpiresAt:r.legacy_device_expires_at,
       deviceAccessExpired: Boolean(r.legacy_device_expires_at) && !(Date.parse(r.legacy_device_expires_at as string)>this.now()),
@@ -157,4 +158,95 @@ export class AccountEntitlementService {
       reject("ACCOUNT_READBACK_FAILED",503);
     return after;
   }
+}
+
+/**
+ * Verified manager-only renewal for learners/teachers. Managers cannot renew
+ * another manager, themselves, suspended/banned profiles, or Owner access.
+ * Deliberately independent of account self-service and browser role flags.
+ */
+export async function managerRenewableAccounts(db:D1Database,accounts:AccountService,token:string){
+ const actor=await accounts.authorize(token);
+ if(actor.role!=="manager")reject("ACCOUNT_PERMISSION_REQUIRED",403);
+ await accounts.capability(actor,"manager.manage.assigned");
+ const result=await db.prepare(`SELECT a.account_id AS accountId,d.learner_name AS name,
+  d.person_role AS role,e.expires_at AS expiresAt,e.revision,
+  e.state AS entitlementState,o.stage AS onboardingStage
+  FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+  JOIN account_onboarding o ON o.account_id=a.account_id
+  JOIN account_entitlements e ON e.account_id=a.account_id
+  WHERE d.person_role IN ('learner','teacher') AND d.status='approved'
+    AND o.stage='active' AND e.state='active'
+  ORDER BY d.person_role,a.account_id LIMIT 501`).all<{
+   accountId:string;name:string;role:string;expiresAt:string;revision:number;
+   entitlementState:string;onboardingStage:string
+  }>();
+ if(!Array.isArray(result.results)||result.results.length>500)reject("ACCOUNT_RESULT_LIMIT",413);
+ return {verified:true,contract:"boi-manager-renew.v1",accounts:result.results};
+}
+export async function managerRenewAccount(db:D1Database,accounts:AccountService,token:string,input:Record<string,unknown>,now=Date.now()){
+ const actor=await accounts.authorize(token);
+ if(actor.role!=="manager")reject("ACCOUNT_PERMISSION_REQUIRED",403);
+ await accounts.capability(actor,"manager.manage.assigned");
+ const target=input.accountId,revision=Number(input.expectedRevision);
+ const days=Number(input.days);
+ const reason=typeof input.reason==="string"?input.reason.trim():"";
+ if(typeof target!=="string"||!accountPattern.test(target)||target===actor.accountId
+  ||!Number.isSafeInteger(revision)||revision<1
+  ||!Number.isSafeInteger(days)||days<1||days>365
+  ||reason.length<10||reason.length>300)
+  throw new AccountEntitlementError("ACCOUNT_INPUT",400);
+ const record=await db.prepare(`SELECT e.expires_at,e.state,e.revision,d.person_role AS role
+  FROM account_entitlements e JOIN accounts a ON a.account_id=e.account_id
+  JOIN device_access d ON d.device_id=a.storage_device_id
+  JOIN account_onboarding o ON o.account_id=a.account_id
+  WHERE e.account_id=? AND d.status='approved' AND o.stage='active'
+    AND d.person_role IN ('learner','teacher')`)
+  .bind(target).first<{expires_at:string;state:string;revision:number;role:string}>();
+ if(!record||record.state!=="active"||record.revision!==revision)
+  throw new AccountEntitlementError("ACCOUNT_CAS_CONFLICT",409);
+ const next=new Date(Math.max(now,Date.parse(record.expires_at))+days*86400000).toISOString();
+ if(Date.parse(next)>now+3650*86400000)reject("ACCOUNT_INPUT",400);
+ const batch=[
+  db.prepare(`UPDATE account_entitlements SET expires_at=?,revision=revision+1,
+    changed_by=?,updated_at=CURRENT_TIMESTAMP
+    WHERE account_id=? AND revision=? AND state='active'
+     AND EXISTS(SELECT 1 FROM accounts a
+      JOIN device_access d ON d.device_id=a.storage_device_id
+      JOIN account_onboarding o ON o.account_id=a.account_id
+      WHERE a.account_id=? AND o.stage='active'
+       AND d.status='approved' AND d.person_role IN ('learner','teacher'))
+     AND EXISTS(SELECT 1 FROM accounts m JOIN device_access d
+       ON d.device_id=m.storage_device_id
+       JOIN account_sessions s ON s.account_id=m.account_id
+       JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+       JOIN account_credentials c ON c.account_id=m.account_id AND c.generation=s.generation
+       JOIN account_onboarding o ON o.account_id=m.account_id
+       JOIN account_entitlements e ON e.account_id=m.account_id
+       JOIN account_manager_permissions p ON p.account_id=m.account_id
+       WHERE m.account_id=? AND s.token_hash=? AND s.device_id=?
+         AND s.revoked=0 AND b.revoked=0 AND b.approved=1
+         AND s.expires_at>? AND s.idle_expires_at>?
+         AND d.person_role='manager' AND d.status='approved'
+         AND d.management_enabled=1 AND o.stage='active'
+         AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
+         AND p.scope='manager.manage.assigned' AND p.enabled=1
+         AND (p.expires_at IS NULL OR datetime(p.expires_at)>CURRENT_TIMESTAMP))`)
+    .bind(next,actor.accountId,target,revision,target,
+      actor.accountId,actor.sessionHash,actor.deviceId,now,now),
+  db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+    SELECT ?,'manager.entitlement.renew',?,
+    CASE WHEN changes()=1 THEN ? ELSE NULL END`)
+    .bind(actor.accountId,target,`days=${days};${reason}`)
+ ];
+ try{await db.batch(batch);}
+ catch(error){
+  if(error instanceof Error&&/NOT NULL|constraint|CHECK/i.test(error.message))
+   reject("ACCOUNT_CAS_CONFLICT",409);
+  throw error;
+ }
+ const after=await new AccountEntitlementService(db,()=>now).read(target);
+ if(!after||after.revision!==revision+1||after.expiresAt!==next)
+  reject("ACCOUNT_READBACK_FAILED",503);
+ return {ok:true,verified:true,contract:"boi-manager-renew.v1",entitlement:after,accountId:target};
 }

@@ -17,8 +17,8 @@ function fixture(){
  sqlite.exec(`CREATE TABLE device_access(device_id TEXT PRIMARY KEY,person_role TEXT);
  CREATE TABLE accounts(account_id TEXT PRIMARY KEY,storage_device_id TEXT,login TEXT);
  CREATE TABLE account_devices(account_id TEXT,device_id TEXT,public_key_jwk TEXT,revoked INTEGER DEFAULT 0,PRIMARY KEY(account_id,device_id));
- CREATE TABLE account_audit(actor TEXT,action TEXT,target TEXT,purpose TEXT);`);
- for(const migration of ['0019_account_capacity.sql','0020_account_onboarding_v2.sql','0024_account_active_capacity.sql'])
+ CREATE TABLE account_audit(actor TEXT,action TEXT,target TEXT,purpose TEXT NOT NULL);`);
+ for(const migration of ['0019_account_capacity.sql','0020_account_onboarding_v2.sql','0024_account_active_capacity.sql','0035_registration_capacity_alerts.sql'])
   sqlite.exec(fs.readFileSync(new URL('../drizzle/'+migration,import.meta.url),'utf8'));
  function prepare(sql){let args=[];return {bind(...a){args=a;return this},async all(){return {results:sqlite.prepare(sql).all(...args)}},_run(){const q=sqlite.prepare(sql);const x=q.run(...args);return {meta:{changes:Number(x.changes)}}}}}
  const db={prepare,async batch(stmts){sqlite.exec('BEGIN IMMEDIATE');try{let r=stmts.map(s=>s._run());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
@@ -38,18 +38,18 @@ test('Owner reads actual 5/10/200 roster and can revise with CAS plus an audit t
  }finally{f.sqlite.close()}
 });
 
-test('Owner capacity excludes pending and legacy_hold, counts reserved active and suspended',async()=>{
+test('Owner capacity counts pending and suspended registered identities, excludes unregistered legacy backfill',async()=>{
  const f=fixture();try{
   f.sqlite.exec("INSERT INTO device_access(device_id,person_role) VALUES('m1','manager'),('m2','manager'),('m3','manager')");
   f.sqlite.exec("INSERT INTO accounts(account_id,storage_device_id,login) VALUES('m1','m1','new1'),('m2','m2','new2'),('m3','m3',NULL)");
   const first=await readAccountCapacity(f.db,owner);
-  assert.equal(first.limits.find(x=>x.role==='manager').used,0,'new and historical requests occupy zero active slots');
+  assert.equal(first.limits.find(x=>x.role==='manager').used,2,'new pending identities reserve registration seats, historical NULL-login does not');
   f.sqlite.exec("UPDATE account_onboarding SET stage='profile_required' WHERE account_id='m1'");
   f.sqlite.exec("UPDATE account_onboarding SET stage='profile_review' WHERE account_id='m1'");
   f.sqlite.exec("UPDATE account_onboarding SET stage='active' WHERE account_id='m1'");
   f.sqlite.exec("UPDATE account_onboarding SET stage='suspended' WHERE account_id='m1'");
   const second=await readAccountCapacity(f.db,owner);
-  assert.equal(second.limits.find(x=>x.role==='manager').used,1);
-  assert.equal(second.limits.find(x=>x.role==='manager').remaining,4);
+  assert.equal(second.limits.find(x=>x.role==='manager').used,2);
+  assert.equal(second.limits.find(x=>x.role==='manager').remaining,3);
  }finally{f.sqlite.close()}
 });

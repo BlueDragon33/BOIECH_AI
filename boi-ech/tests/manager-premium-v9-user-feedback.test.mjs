@@ -6,8 +6,8 @@ const read=file=>readFileSync(new URL("../app/"+file,import.meta.url),"utf8");
 test("V9 manager has one dedicated approval module in rail and mobile dock, not every tab",()=>{
  const ws=read("manager-workspace.tsx");
  assert.match(ws,/type Tab="overview"\|"approval"\|/);
- assert.match(ws,/id:"approval",label:"Kiểm duyệt tài khoản"/);
- assert.match(ws,/id:"approval",label:"Kiểm duyệt"/);
+ assert.match(ws,/id:"approval",label:"Gia hạn tài khoản"/);
+ assert.match(ws,/id:"approval",label:"Gia hạn"/);
  assert.match(ws,/tab==="approval"\?<section className=\{styles\.accountTools\}/);
  assert.doesNotMatch(ws,/tab==="people"&&accountControls/);
  assert.match(ws,/if\(next==="review"\)\{selectTab\("approval"\)/);

@@ -13,7 +13,7 @@ const stage=async(f,seed=8801)=>{
  return m;
 };
 test("R4: manager completes five professional fields WITHOUT person code or repeated phone",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await stage(f),id=m.account.accountId;
   const result=await f.flow.submitProfile(m.token,{...profile,expectedRevision:2});
@@ -30,7 +30,7 @@ test("R4: manager completes five professional fields WITHOUT person code or repe
  }finally{f.close();}
 });
 test("R4: missing manager professional fields cannot activate or grant entitlement",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await stage(f,8802),id=m.account.accountId;
   for(const field of ["facultyUnit","jobTitle","jobPosition"]){
@@ -43,7 +43,7 @@ test("R4: missing manager professional fields cannot activate or grant entitleme
  }finally{f.close();}
 });
 test("R4: local Owner cancellation deletes ONLY a pending manager by exact ID and CAS, retains audit",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const m=await stage(f,8803),id=m.account.accountId;
   const cancel=f.load("manager-local-reset.server.ts").cancelLocalPendingManager;
@@ -69,7 +69,7 @@ test("R4: local Owner cancellation deletes ONLY a pending manager by exact ID an
  }finally{f.close();}
 });
 test("R4: active manager, learner and wrong CAS cannot be removed by pending-local cancellation",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const cancel=f.load("manager-local-reset.server.ts").cancelLocalPendingManager;
   const m=await stage(f,8804),id=m.account.accountId;
@@ -96,7 +96,7 @@ test("R4: UI never asks manager for personal code, and reset cannot run outside 
 
 
 test("R4: cancelling an actual redeemed Owner invitation revokes token and frees only that test login",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const invitation=await f.service.issueManagerInvite(owner,1);
   const keys=await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);

@@ -89,6 +89,23 @@ function reloadPreservingPendingManagerInvite(token: string) {
     window.location.replace(window.location.pathname+window.location.search+oneUseFragment);
   } else window.location.reload();
 }
+
+function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) {
+ const [now,setNow]=useState(0);
+ useEffect(()=>{queueMicrotask(()=>setNow(Date.now()));
+  const tick=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(tick);},[]);
+ const ms=Math.max(0,new Date(expiresAt).getTime()-now);
+ const days=Math.floor(ms/86400000),hours=Math.floor(ms%86400000/3600000);
+ const minutes=Math.floor(ms%3600000/60000),seconds=Math.floor(ms%60000/1000);
+ const left=`${days} ngày ${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+ const expiry=new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(expiresAt));
+ return <aside className={styles.leaseClock} role="status" aria-label="Thời gian sử dụng còn lại"
+   data-expiring={ms<=86400000}>
+   <strong>{ms>0?"Thời hạn sử dụng":"Đã hết hạn"}</strong>
+   <output aria-live="off">{ms>0?left:"00 ngày 00:00:00"}</output>
+   <small>Đến {expiry} · {role==="manager"?"Owner gia hạn":"Cán bộ quản lý gia hạn"}</small>
+ </aside>;
+}
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
   const pathname = usePathname();
   // Certificate verification is public and read-only; issuance remains protected by signed device proof.
@@ -395,7 +412,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
       const pending=account?.onboardingStage==="requested";
-      const action=pending?"profile-draft-save":"submit-profile";
+      const action="submit-profile";
       let alreadyActivated=false;
       try {
         await send({...fields,action,expectedRevision:account?.onboardingRevision});
@@ -414,7 +431,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         else if(Number.isInteger(verified.onboardingRevision) &&
           (stage==="requested" || stage==="profile_required" ||
           stage==="changes_requested" || (singleReview && stage==="profile_review"))) {
-          await send({...fields,action:stage==="requested"?"profile-draft-save":"submit-profile",
+          await send({...fields,action:"submit-profile",
             expectedRevision:verified.onboardingRevision});
         } else {
           await reload();
@@ -423,7 +440,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       }
       await reload();
       setNotice(alreadyActivated?"Hồ sơ đã được kích hoạt trên máy chủ."
-        :pending?"Đã lưu hồ sơ để cán bộ có thể kiểm duyệt. Khi được duyệt, bạn sẽ không phải nhập lại thông tin."
+        :pending?"Đã xác minh đầy đủ hồ sơ và tự kích hoạt tài khoản."
         :singleReview?"Đã lưu hồ sơ hợp lệ và kích hoạt tài khoản.":"Đã gửi hồ sơ để xét duyệt.");
     });
   }
@@ -535,8 +552,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   ];
   const accountPanel = <section className={account ? styles.root : `${styles.root} ${styles.authRoot} ${mode==="register" ? styles.authRegister : ""}`} aria-label="Tài khoản Bơi Ếch">
       {!account?<div className={styles.authBrand}><span className={styles.authMark} aria-hidden="true">◉</span><strong>Bơi Ếch</strong><small>HỌC BƠI HIỆU QUẢ · AN TOÀN · BÀI BẢN</small></div>:null}
-      <h1>{account ? (account.onboardingStage==="requested"?"Hồ sơ đăng ký đang chờ xét duyệt":"Tài khoản Bơi Ếch") : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
-      {!account?<p className={styles.authSubtitle}>{mode==="register" ? "Tạo tài khoản và gửi yêu cầu xét duyệt." : mode==="recover" ? "Sử dụng mã khôi phục an toàn đã được cấp." : "Đăng nhập để tiếp tục học tập và giảng dạy."}</p>:null}
+      <h1>{account ? (account.onboardingStage==="requested"?"Hoàn thiện hồ sơ để bắt đầu sử dụng":"Tài khoản Bơi Ếch") : mode==="register" ? "Đăng ký" : mode==="recover" ? "Khôi phục tài khoản" : "Đăng nhập"}</h1>
+      {!account?<p className={styles.authSubtitle}>{mode==="register" ? "Tạo tài khoản bảo mật. Hoàn tất hồ sơ để sử dụng ngay." : mode==="recover" ? "Sử dụng mã khôi phục an toàn đã được cấp." : "Đăng nhập để tiếp tục học tập và giảng dạy."}</p>:null}
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {recovery && <section className={styles.recovery}><h2>Lưu mã khôi phục một lần</h2>
@@ -548,19 +565,19 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         {managerInvite?<p role="status">Bạn đang đăng nhập bằng tài khoản khác. Để sử dụng thư mời Cán bộ quản lý, chọn “Đăng xuất / đổi tài khoản”. Sau khi đăng xuất, biểu mẫu từ link mời sẽ xuất hiện mà không cần xin mã mới.</p>:null}
         {!active && <p role="status" className={styles.pending}>
           {v2 ? account.deviceApproved===false ? "Thiết bị mới chưa được xác nhận. Hãy phê duyệt từ thiết bị đã tin cậy trước khi mở dữ liệu."
-            : account.onboardingStage==="requested" ? "Đã tiếp nhận đăng ký. Đang chờ người có thẩm quyền phê duyệt."
+            : account.onboardingStage==="requested" ? "Đã đăng ký. Hoàn thiện hồ sơ bắt buộc để kích hoạt ngay, không phải chờ duyệt."
             : account.onboardingStage==="profile_required" ? singleReview?(account.profileDraftReady?"Đã được duyệt. Hồ sơ khai trước đã lưu; chỉ cần xác nhận kích hoạt.":"Đã được duyệt. Điền đủ hồ sơ bắt buộc để kích hoạt và vào ứng dụng."):"Đã duyệt lần một. Hãy hoàn thiện hồ sơ để gửi duyệt lần hai."
             : account.onboardingStage==="profile_review" ? (singleReview ? "Hồ sơ đã qua lần duyệt đầu. Xác nhận lại thông tin để hoàn tất kích hoạt." : "Hồ sơ đang được xét duyệt lần hai.")
             : account.onboardingStage==="changes_requested" ? "Hồ sơ cần bổ sung. Hãy cập nhật và gửi lại."
             : account.onboardingStage==="legacy_hold" ? "Hồ sơ cũ cần được đối chiếu trước khi chuyển sang V2."
-            : account.onboardingStage==="active" && account.entitlementActive===false ? "Thời hạn tài khoản đã hết, chưa được cấp hoặc tài khoản đang tạm khóa. Hãy liên hệ Owner để kiểm tra và gia hạn trong Application-Management."
+            : account.onboardingStage==="active" && account.entitlementActive===false ? "Thời hạn tài khoản đã hết, chưa được cấp hoặc tài khoản đang tạm khóa. Học viên/Giảng viên liên hệ Cán bộ quản lý; Cán bộ quản lý liên hệ Owner để gia hạn."
             : "Chưa đủ điều kiện truy cập."
             : account.status === "pending" ? "Chờ duyệt tài khoản. Bạn chỉ cần đăng ký một lần; trạng thái sẽ dùng chung trên mọi thiết bị."
             : "Tài khoản đã bị khóa hoặc hết hạn. Liên hệ cán bộ có thẩm quyền."}</p>}
         {v2 && account.onboardingStage==="requested" ? <section className={styles.pendingJourney} aria-label="Tiến độ đăng ký">
           <div className={styles.pendingTitle}><span aria-hidden="true">◎</span><div><h2>Yêu cầu đang được xử lý</h2>
-           <p>Tài khoản đã được tiếp nhận. Học viên và Giảng viên sẽ do Cán bộ quản lý có quyền xét duyệt; Cán bộ quản lý do Owner duyệt.</p></div></div>
-          <ol className={styles.pendingSteps}><li data-state="done">Đã đăng ký</li><li data-state={account.profileDraftReady?"done":undefined}>{account.profileDraftReady?"Đã lưu hồ sơ":"Khai hồ sơ"}</li><li data-state="current">Đang chờ xét duyệt</li><li>Kích hoạt tài khoản</li></ol>
+           <p>Không cần xét duyệt thủ công. Cán bộ quản lý đăng ký qua lời mời của Owner; hoàn thành thông tin bắt buộc sẽ sử dụng ngay.</p></div></div>
+          <ol className={styles.pendingSteps}><li data-state="done">Đã đăng ký</li><li data-state={account.profileDraftReady?"done":undefined}>{account.profileDraftReady?"Đã lưu hồ sơ":"Khai hồ sơ"}</li><li data-state="current">Hoàn thiện hồ sơ</li><li>Kích hoạt tự động</li></ol>
           <p className={styles.pendingHelp}>Bạn có thể đồng bộ trạng thái mà không đăng ký lại. Hồ sơ và thời hạn sử dụng được kiểm tra tại máy chủ.</p>
         </section> : null}
         {v2&&account.deviceApproved===false?<form className={styles.deviceContactCheck}
@@ -593,7 +610,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           key={`${account.accountId}:${account.onboardingStage}:${account.profileDraftReady}`}
           className={styles.profileForm} onSubmit={e=>{e.preventDefault();void submitProfile(e.currentTarget);}}>
           <header className={styles.profileHeading}>
-            <span className={styles.profileEyebrow}>{account.onboardingStage==="requested"?"BƯỚC 01 · KHAI HỒ SƠ TRƯỚC KHI DUYỆT":"BƯỚC 02 · HỒ SƠ ĐỊNH DANH"}</span>
+            <span className={styles.profileEyebrow}>{account.onboardingStage==="requested"?"BƯỚC 01 · HOÀN THIỆN ĐỂ KÍCH HOẠT":"BƯỚC 02 · HỒ SƠ ĐỊNH DANH"}</span>
             <h2>{account.role==="manager"?"Hồ sơ Cán bộ quản lý":"Hoàn thiện hồ sơ cá nhân"}</h2>
             <p>{account.role==="manager"
               ?"Bổ sung thông tin công tác và phương thức liên hệ còn thiếu. Không cần mã cá nhân hoặc nhập lại liên hệ đã đăng ký."
@@ -625,7 +642,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           </div>
           <footer className={styles.profileFooter}>
             <p>Thông tin được lưu vào hồ sơ Bơi Ếch. Chỉ tài khoản đủ quyền mới được xem hoặc xử lý.</p>
-            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":account.onboardingStage==="requested"?"Lưu hồ sơ để cán bộ xét duyệt":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
+            <button type="submit" disabled={busy}>{busy?"Đang xác minh…":account.onboardingStage==="requested"?"Hoàn tất hồ sơ · Vào ứng dụng":singleReview?"Hoàn tất hồ sơ và kích hoạt":"Gửi hồ sơ để xét duyệt"}</button>
           </footer>
         </form> : null}
         {v2&&singleReview&&trialEnabled&&!trialUsed&&!active&&account.deviceApproved===true&&
@@ -687,15 +704,15 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
             Phê duyệt thiết bị chờ xác nhận thay vì gỡ thiết bị đã liên kết</label>:null}
           {mode === "claim" && <p>Chỉ chuyển hồ sơ bằng trình duyệt đã đăng ký và còn giữ khóa gốc. Tiến độ, quyền và thanh toán cũ được giữ nguyên.</p>}
           {mode === "register" && <>{managerInvite
-           ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; tài khoản vẫn phải chờ Owner duyệt và hoàn thiện hồ sơ.</p>
-           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?<p role="alert">Đăng ký mới yêu cầu Account-first V2. Hiện hệ thống chưa bật V2; không thể tạo hồ sơ bằng biểu mẫu cũ.</p>:<p>Chỉ tạo tài khoản và thiết lập bảo mật tại bước này. Sau một lần duyệt, bổ sung hồ sơ là được kích hoạt ngay, không duyệt lại.</p>}
+           ? <p role="status">Lời mời Cán bộ quản lý do Owner cấp. Mật khẩu và khóa thiết bị được tạo riêng tại trang này; không cần chờ Owner duyệt sau khi hoàn thiện hồ sơ, nhưng lời mời vẫn bắt buộc.</p>
+           : <><RegistrationRoles value={role} onChange={setRole} includeManager={false}/><p role="note">Cán bộ quản lý chỉ đăng ký bằng thư mời do Owner cấp trên Application-Management.</p></>}{!v2?<p role="alert">Đăng ký mới yêu cầu Account-first V2. Hiện hệ thống chưa bật V2; không thể tạo hồ sơ bằng biểu mẫu cũ.</p>:<p>Chỉ tạo tài khoản và thiết lập bảo mật tại bước này. Sau khi nhập đủ hồ sơ bắt buộc, tài khoản tự kích hoạt. Không cần chờ xét duyệt.</p>}
              {v2?<label>Câu hỏi bảo mật: Tên lúc nhỏ của bạn là gì?
                <input name="securityAnswer" type="password" required minLength={2} maxLength={120} autoComplete="new-password" disabled={busy} aria-invalid={Boolean(fieldErrors.securityAnswer)} aria-describedby={fieldErrors.securityAnswer?"auth-security-error":undefined}/>
                {fieldErrors.securityAnswer?<small id="auth-security-error" role="alert" className={styles.fieldError}>{fieldErrors.securityAnswer}</small>:null}
                <small>Hãy ghi nhớ đáp án. Đáp án được mã băm, không thể xem lại; có thể thay đổi tại Trang cá nhân.</small></label>:null}
             <p>Dữ liệu đăng ký được cán bộ được cấp quyền xử lý để xét duyệt, phân lớp và hỗ trợ. Chỉ cán bộ được Owner cấp quyền xem mở rộng mới được xem danh sách ngoài phạm vi được phân công; mỗi lần truy cập đều được ghi nhận.</p>
             <label><input type="checkbox" name="privacyAccepted" required disabled={busy} aria-invalid={Boolean(fieldErrors.privacyAccepted)} aria-describedby={fieldErrors.privacyAccepted?"auth-privacy-error":undefined}/>Tôi đã đọc thông báo xử lý dữ liệu đăng ký.{fieldErrors.privacyAccepted?<small id="auth-privacy-error" role="alert" className={styles.fieldError}>{fieldErrors.privacyAccepted}</small>:null}</label></>}
-          <button type="submit" disabled={busy||(mode==="register"&&!v2)}>{busy ? "Đang xử lý…" : mode === "register" ? "Gửi đăng ký chờ duyệt" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
+          <button type="submit" disabled={busy||(mode==="register"&&!v2)}>{busy ? "Đang xử lý…" : mode === "register" ? "Tạo tài khoản bảo mật" : mode === "claim" ? "Xác minh và chuyển hồ sơ" : mode === "recover" ? "Khôi phục tài khoản" : mode==="devices" ? recoveryDevices.length?"Gỡ thiết bị đã chọn":"Xác minh để xem thiết bị" : "Đăng nhập"}</button>
         </form>
         <div className={styles.authFooter}>
           {mode==="register"?<>Đã có tài khoản? <button type="button" className={styles.authTextLink} disabled={busy} onClick={()=>setMode("login")}>Đăng nhập</button></>
@@ -723,6 +740,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       {absoluteTimeLeft>5*60_000 ? <button type="button" disabled={busy} onClick={()=>void extendCurrentSession()}>
         {busy?"Đang xác minh…":"Giữ phiên đăng nhập"}</button>:null}
     </aside> : null}
+    {ready&&active&&v2&&account?.expiresAt?<AccountLeaseCountdown expiresAt={account.expiresAt} role={account.role}/>:null}
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
       <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}

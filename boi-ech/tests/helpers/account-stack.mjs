@@ -1,10 +1,18 @@
 // Local SQLite platform adapter; authentication, HTTP routes and SQL remain production code.
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import {DatabaseSync} from 'node:sqlite';import ts from 'typescript';
 const nativeRequire=createRequire(import.meta.url),root=fileURLToPath(new URL('../../',import.meta.url));
-export function accountStack({v2=false,singleReview=false}={}){
+export function accountStack({v2=false,singleReview=false,legacyPolicy=false}={}){
  const sqlite=new DatabaseSync(':memory:');sqlite.exec('PRAGMA foreign_keys=ON');
  for(const file of fs.readdirSync(path.join(root,'drizzle')).filter(f=>f.endsWith('.sql')).sort())sqlite.exec(fs.readFileSync(path.join(root,'drizzle',file),'utf8'));
  if(v2)sqlite.exec("INSERT OR IGNORE INTO access_automation_settings(id,default_access_days) VALUES('global',90)");
+ // Explicit compatibility fixture for historical one-review/30-day contract
+ // regression. New policy tests MUST leave this disabled to exercise 3/8-day
+ // leases, revised invitation CAS and registered-seat limits in real D1.
+ if(legacyPolicy)sqlite.exec(`
+  UPDATE account_duration_policies SET default_days=30,revision=1;
+  UPDATE account_admission_limits SET account_limit=CASE person_role
+   WHEN 'manager' THEN 5 WHEN 'teacher' THEN 10 ELSE 200 END,revision=1;
+ `);
  function prepare(sql){let args=[];return{bind(...a){args=a;return this},async first(){return sqlite.prepare(sql).get(...args)??null},async all(){return{results:sqlite.prepare(sql).all(...args)}},async run(){return{meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}},_run(){const st=sqlite.prepare(sql);return /^\s*(?:SELECT|PRAGMA|EXPLAIN)\b/i.test(sql)?{results:st.all(...args),meta:{changes:0}}:{meta:{changes:Number(st.run(...args).changes)}}}}}
  const db={prepare,async batch(stmts){sqlite.exec('BEGIN IMMEDIATE');try{const result=stmts.map(s=>s._run());sqlite.exec('COMMIT');return result}catch(e){sqlite.exec('ROLLBACK');throw e}}};
  let cookie='';const bindings={DB:db,BOI_ECH_ACCOUNT_FIRST:'true',BOI_ECH_ACCOUNT_V2:String(v2),BOI_ECH_SINGLE_REVIEW:String(singleReview),BOI_ECH_ACCOUNT_ORIGIN:'https://fixture.invalid'},cache=new Map();

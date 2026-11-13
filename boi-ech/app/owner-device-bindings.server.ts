@@ -1,5 +1,6 @@
 import {createHash} from "node:crypto";
 import {AccountError} from "./account-core.server";
+import {banBoiDeviceKey} from "./owner-account-ban.server";
 
 type DB = Awaited<ReturnType<typeof import("./device-auth.server").getCourseDatabase>>;
 type Actor = {actor:string;role:string};
@@ -74,12 +75,21 @@ export async function ownerDeviceBinding(db:DB,actor:Actor,input:Record<string,u
  owner(actor);
  const id=validId(input.bindingId);
  if(input.action==="inspect") return details(db,id);
- if(input.action!=="revoke" && input.action!=="purge")fail("DEVICE_BINDING_INPUT",400);
+ if(!["revoke","purge","ban"].includes(String(input.action)))fail("DEVICE_BINDING_INPUT",400);
  const guard=verifiedInput(input,id);
  const row=await locate(db,id);
  if(!row)throw new AccountError("DEVICE_BINDING_NOT_FOUND",404);
  const status=row.revoked===1?"blocked":row.approved===1?"approved":"pending";
  if(row.created_at!==guard.createdAt||status!==guard.status)fail("DEVICE_BINDING_CAS_CONFLICT",409);
+ if(input.action==="ban"){
+  const out=await banBoiDeviceKey(db,actor,{
+    deviceId:row.device_id,confirmation:row.device_id,reason:guard.reason
+  });
+  const after=await details(db,id);
+  if(after.status!=="blocked"||after.dependencies.activeSessions!==0)
+   fail("DEVICE_BINDING_READBACK_FAILED",503);
+  return {...after,action:"ban",ok:true,persistent:out.persistent};
+ }
  if(input.action==="revoke"){
   if(row.revoked===1)fail("DEVICE_BINDING_CAS_CONFLICT",409);
   const results=await db.batch([

@@ -13,7 +13,7 @@ async function activeManager(f,n){
  return m;
 }
 test("V9 canonical profile saved before approval; manager reviews named applicant; activation without retyping",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const manager=await activeManager(f,10101);
   const applicant=await f.register(10102,"learner");
@@ -42,7 +42,7 @@ test("V9 canonical profile saved before approval; manager reviews named applican
  }finally{f.close()}
 });
 test("V9 preapproval saves no access grants; wrong revision fails with no saved profile",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const learner=await f.register(10111,"learner");
   await assert.rejects(()=>f.flow.saveProfileDraft(learner.token,{...learnerProfile(10111),expectedRevision:88}),
@@ -55,7 +55,7 @@ test("V9 preapproval saves no access grants; wrong revision fails with no saved 
  }finally{f.close()}
 });
 test("V9 revoked P-256 session immediately before D1 draft write rolls back",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const l=await f.register(10121,"learner");
   const actor=await f.service.session(l.token);
@@ -74,7 +74,7 @@ test("V9 revoked P-256 session immediately before D1 draft write rolls back",asy
  }finally{f.close()}
 });
 test("V9 manager invitation role retains separate Owner approval; no manager-invited trial can grant rights",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const applicant=await f.register(10131,"manager");
   await f.flow.saveProfileDraft(applicant.token,{...managerProfile(10131),expectedRevision:1});
@@ -86,7 +86,7 @@ test("V9 manager invitation role retains separate Owner approval; no manager-inv
 });
 
 test("V9 Owner all-role directory reads pending profile only via privileged service, no authority mutation",async()=>{
- const f=accountStack({v2:true,singleReview:true});
+ const f=accountStack({legacyPolicy:true,v2:true,singleReview:true});
  try{
   const pending=await f.register(10141,"teacher");
   await f.flow.saveProfileDraft(pending.token,{familyName:"Giang vien",givenName:"Moi",className:"Lop hoc",phone:"",expectedRevision:1});

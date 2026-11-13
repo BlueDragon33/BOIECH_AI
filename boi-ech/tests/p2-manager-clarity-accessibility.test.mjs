@@ -26,7 +26,7 @@ test("P2 desktop rail and mobile dock do not show another launcher grid",()=>{
  assert.doesNotMatch(css,/\.appGrid|\.appLabel/);
  assert.match(manager,/ManagerCommandCenter board=\{board\}/);
  assert.match(manager,/styles\.desktopRail/);
- assert.match(manager,/const dock:[^\n]*Trang chủ[^\n]*Kiểm duyệt[^\n]*Lịch[^\n]*Lớp học[^\n]*Nhân sự/);
+ assert.match(manager,/const dock:[^\n]*Trang chủ[^\n]*Gia hạn[^\n]*Lịch[^\n]*Lớp học[^\n]*Nhân sự/);
  assert.doesNotMatch(manager.match(/const dock:[^\n]*/)?.[0]??"",/Cài đặt/);
 });
 

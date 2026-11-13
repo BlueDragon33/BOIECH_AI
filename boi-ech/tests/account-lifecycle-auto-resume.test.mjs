@@ -68,7 +68,7 @@ test("profile submitted during manager approval retries once against readback an
  assert.match(gateSource,/code!=="ACCOUNT_CAS_CONFLICT"/);
  assert.match(gateSource,/verified\.accountId!==account\?\.accountId/);
  assert.match(gateSource,/verified\.deviceApproved!==true/);
- assert.match(gateSource,/stage==="requested"\?"profile-draft-save":"submit-profile"/);
+ assert.match(gateSource,/action:"submit-profile",\s*expectedRevision:verified\.onboardingRevision/);
  assert.match(gateSource,/expectedRevision:verified\.onboardingRevision/);
  assert.doesNotMatch(gateSource,/action:"register".*expectedRevision:fresh/);
 });

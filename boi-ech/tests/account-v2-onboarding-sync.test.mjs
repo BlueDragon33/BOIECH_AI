@@ -29,7 +29,7 @@ function fixture(){
  INSERT INTO manager_approval_limits VALUES('manager-tier',200,10);
  CREATE TABLE access_automation_settings(id TEXT PRIMARY KEY,default_access_days INTEGER);
  INSERT INTO access_automation_settings VALUES('global',90);`);
- for(const file of ['0018_account_first.sql','0019_account_capacity.sql','0020_account_onboarding_v2.sql','0021_account_verified_sync.sql','0023_account_entitlement.sql','0026_account_contact.sql','0027_manager_professional_profile.sql','0028_account_secondary_contact.sql','0029_account_profile_drafts.sql','0030_account_ui_trials.sql','0031_account_recovery_question.sql','0032_active_session_lease.sql']){
+ for(const file of ['0018_account_first.sql','0019_account_capacity.sql','0020_account_onboarding_v2.sql','0021_account_verified_sync.sql','0023_account_entitlement.sql','0026_account_contact.sql','0027_manager_professional_profile.sql','0028_account_secondary_contact.sql','0029_account_profile_drafts.sql','0030_account_ui_trials.sql','0031_account_recovery_question.sql','0032_active_session_lease.sql','0034_blocked_account_device_hashes.sql','0035_registration_capacity_alerts.sql']){
   sqlite.exec(fs.readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
  }
  function prepare(sql){let args=[];return {bind(...a){args=a;return this},
