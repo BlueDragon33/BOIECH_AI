@@ -96,6 +96,7 @@ export async function executeLegacyFiveDayPurge(
    ||typeof input.snapshot!=="string"||!/^[a-f0-9]{64}$/.test(input.snapshot)
    ||typeof input.reason!=="string"||input.reason.trim().length<10||input.reason.length>300)
    reject("LEGACY_CLEANUP_CONFIRMATION_REQUIRED",400);
+ const reason=input.reason.trim();
  const rows=await readRows(db);
  if(snapshot(rows)!==input.snapshot)reject("LEGACY_CLEANUP_STATE_CHANGED",409);
  const batch=rows.filter(safe).slice(0,10);
@@ -112,7 +113,7 @@ export async function executeLegacyFiveDayPurge(
     CASE WHEN ${transactionGuard} THEN ? ELSE NULL END)`)
    .bind(actor.actor,auditKey,id,row.status,row.created_at,row.approved_at,
     account??"",row.account_revision??-1,
-    `owner-authorized;age>5d;role=${row.role};${input.reason.trim()}`));
+    `owner-authorized;age>5d;role=${row.role};${reason}`));
   const del=(table:string,where:string,...params:(string|null)[])=>
     statements.push(db.prepare(`DELETE FROM ${table} WHERE ${where}`).bind(...params));
   // Account/device sessions, learning data and self-generated progress.
