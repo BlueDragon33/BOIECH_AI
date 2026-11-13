@@ -27,7 +27,7 @@ async function invitedManager(f,n){
 const profile=(n,role)=>({familyName:"Synthetic",givenName:"Active",
  expectedRevision:1,...(role==="manager"?{
  facultyUnit:"Training Center",jobTitle:"Supervisor",jobPosition:"Department Manager",
- }:{className:"Training class",phone:"0912345678"})});
+ }:{className:"Training class",phone:"090"+String(n).padStart(7,"0")})});
 test("Registration limits default 20/30/200; three roles have Owner-controlled 3/8-day leases",async()=>{
  const f=accountStack({v2:true,singleReview:true});
  try{
