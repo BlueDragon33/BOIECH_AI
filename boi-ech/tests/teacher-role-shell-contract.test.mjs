@@ -5,6 +5,8 @@ import fs from "node:fs";
 const shell = fs.readFileSync(new URL("../app/teacher-role-shell.tsx", import.meta.url), "utf8");
 const route = fs.readFileSync(new URL("../app/api/teacher/overview/route.ts", import.meta.url), "utf8");
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const enhancements = fs.readFileSync(new URL("../app/teacher-enhancements.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/teacher-role-shell.css", import.meta.url), "utf8");
 
 test("teacher shell activates only for the registered teacher role", () => {
@@ -44,11 +46,16 @@ test("teacher UI exposes supervision functions and keeps video review media-free
   assert.doesNotMatch(shell, /Duyệt video học viên|Tải video học viên từ server/);
 });
 
-test("root layout mounts learner and teacher role adapters exactly once", () => {
-  assert.match(layout, /import TeacherRoleShell from "\.\/teacher-role-shell"/);
+test("teacher-only DOM observer bundle is lazy and never mounted at root", () => {
+  assert.match(page, /dynamic\(\(\) => import\("\.\/teacher-enhancements"\)/);
+  assert.match(page, /deviceAccess\.personRole === "teacher" \? <TeacherEnhancements \/>/);
+  assert.doesNotMatch(layout, /<TeacherRoleShell \/>/);
+  assert.doesNotMatch(layout, /<StudentRoleShell \/>/);
   assert.match(layout, /import "\.\/teacher-role-shell\.css"/);
-  assert.equal((layout.match(/<TeacherRoleShell \/>/g) ?? []).length, 1);
-  assert.equal((layout.match(/<StudentRoleShell \/>/g) ?? []).length, 1);
+  assert.match(enhancements, /import TeacherRoleShell from "\.\/teacher-role-shell"/);
+  for (const name of ["TeacherRoleShell", "TeacherActionBridge", "TeacherDashboardBlueprint", "TeacherRosterManager"]) {
+    assert.equal((enhancements.match(new RegExp("<" + name + " \/>", "g")) ?? []).length, 1, name);
+  }
 });
 
 test("teacher dashboard derives support flags without changing learner scoring", () => {
