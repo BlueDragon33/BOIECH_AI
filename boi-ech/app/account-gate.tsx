@@ -98,10 +98,10 @@ function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) 
  const ms=Math.max(0,new Date(expiresAt).getTime()-now);
  const days=Math.floor(ms/86400000),hours=Math.floor(ms%86400000/3600000);
  const minutes=Math.floor(ms%3600000/60000),seconds=Math.floor(ms%60000/1000);
- const left=`${days} ngày ${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+ const left=expiresAt.startsWith("9999-")?"Vĩnh viễn":`${days} ngày ${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
  const expiry=new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(expiresAt));
  return <aside className={styles.leaseClock} role="status" aria-label="Thời gian sử dụng còn lại"
-   data-expiring={ms<=86400000}>
+   data-expiring={!expiresAt.startsWith("9999-")&&ms<=86400000}>
    <strong>{ms>0?"Thời hạn sử dụng":"Đã hết hạn"}</strong>
    <output aria-live="off">{ms>0?left:"00 ngày 00:00:00"}</output>
    <small>Đến {expiry} · {role==="manager"?"Owner gia hạn":"Cán bộ quản lý gia hạn"}</small>
