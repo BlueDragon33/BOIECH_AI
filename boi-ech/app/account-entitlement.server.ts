@@ -213,8 +213,8 @@ export async function managerRenewableAccounts(db:D1Database,accounts:AccountSer
    try{
     const items:unknown=JSON.parse(record.completedJson);
     if(Array.isArray(items))completedLessons=new Set(items.filter(item=>
-     (typeof item==="number"||typeof item==="string")&&/^[1-8]$/.test(String(item))
-    ).map(item=>Number(item))).size;
+     typeof item==="string"&&/^bai-0[1-8]$/.test(item)
+    ).map(item=>Number(String(item).slice(-2)))).size;
    }catch{/* Invalid D1 progress is unknown, never fabricated as zero. */}
   }
   const {completedJson,...safe}=record;
