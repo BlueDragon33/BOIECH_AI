@@ -138,3 +138,20 @@ test('a bounded board aggregates large directories without repeated class scans'
   assert.equal(board.people.length,950);assert.equal(board.resources.length,1000);assert.equal(board.sessions.length,1000);assert.equal(board.resources.find(r=>r.id==='class').learnerCount,949);assert.equal(board.people.find(p=>p.role==='learner').bookingCount,1000);t.diagnostic(`Local SQLite board read: ${Math.round(performance.now()-started)}ms, ${comparisons} class comparisons`);
  }finally{f.sqlite.close();}
 });
+
+test('account-first learner without a name or personal code never crashes the manager personnel roster',async()=>{
+ const f=await setup();try{
+  await grant(f);
+  const storageId='b'.repeat(64);
+  f.sqlite.prepare(`INSERT INTO device_access(device_id,display_code,public_key_jwk,status,person_role,registration_submitted_at)
+   VALUES(?,'BE-PENDING-BLANK','{}','pending','learner',CURRENT_TIMESTAMP)`).run(storageId);
+  const response=await f.call();
+  assert.equal(response.status,200,JSON.stringify(response));
+  const person=response.board.people.find(p=>p.id===storageId);
+  assert.equal(person.name,'Hồ sơ chưa hoàn thiện');
+  assert.equal(person.code,'');
+  assert.equal(person.className,'');
+  assert.equal(person.status,'pending');
+  assert.doesNotThrow(()=>response.board.people.slice().sort((a,b)=>String(a.name??'').localeCompare(String(b.name??''),'vi')));
+ }finally{f.sqlite.close();}
+});
