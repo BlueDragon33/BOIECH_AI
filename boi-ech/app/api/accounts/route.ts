@@ -3,7 +3,7 @@ import { normalizeRegistrationContact } from "../../account-contact.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
 import { AccountV2Workflow } from "../../account-v2-workflow.server";
-import { AccountEntitlementService } from "../../account-entitlement.server";
+import { AccountEntitlementService,managerRenewableAccounts,managerRenewAccount } from "../../account-entitlement.server";
 import { AccountTrialService } from "../../account-trial.server";
 import { AccountSecurityQuestionService } from "../../account-security-question.server";
 export const dynamic = "force-dynamic";
@@ -120,6 +120,8 @@ export async function POST(request: Request) {
         return json({trial:p.action === "trial-start" ? await trial.start(token) : await trial.status(token)});
       }
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
+      if (p.action === "manager-renew-list") return json(await managerRenewableAccounts(await getCourseDatabase(),service,token));
+      if (p.action === "manager-renew") return json(await managerRenewAccount(await getCourseDatabase(),service,token,p));
       if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
       if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
       if (p.action === "submit-profile") return json({ onboarding: config.singleReview
