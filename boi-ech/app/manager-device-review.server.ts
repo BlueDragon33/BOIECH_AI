@@ -31,12 +31,10 @@ export async function managerReviewBoard(actor: PublicDeviceState) {
     db.prepare(`SELECT d.device_id,d.display_code,d.person_role,d.learner_name,d.person_code,
       d.class_name,d.status,d.registration_submitted_at,a.manager_device_id
       FROM device_access d LEFT JOIN manager_device_assignments a ON a.target_device_id=d.device_id
-      WHERE (d.status='pending' AND d.person_role IN ('learner','teacher')
-        AND d.payment_status='unassigned' AND a.target_device_id IS NULL
-        AND d.registration_submitted_at IS NOT NULL)
-        OR a.manager_device_id=?
+      WHERE d.person_role IN ('learner','teacher')
+        AND d.registration_submitted_at IS NOT NULL
       ORDER BY CASE WHEN d.status='pending' THEN 0 ELSE 1 END,d.created_at DESC LIMIT 201`)
-      .bind(actor.deviceId).all<ReviewRow>(),
+      .all<ReviewRow>(),
   ]);
   if ((queued.results?.length ?? 0)>200) {
     throw new DeviceAccessError("Có quá nhiều hồ sơ. Hãy thu hẹp hàng chờ trước khi quản lý.",413,"MANAGER_QUEUE_LIMIT");
@@ -96,19 +94,19 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
     deviceId,JSON.stringify({managerDeviceId:actor.deviceId,role:target.person_role}),
   );
   if (action==="block") {
-    if (target.manager_device_id!==actor.deviceId || target.status!=="approved")
-      throw new DeviceAccessError("Chỉ có thể khóa thiết bị đang được chính bạn quản lý.",403,"MANAGER_SCOPE_FORBIDDEN");
+    if (!target.manager_device_id || target.status!=="approved")
+      throw new DeviceAccessError("Chỉ có thể khóa hồ sơ đã được cán bộ quản lý tiếp nhận.",403,"MANAGER_SCOPE_FORBIDDEN");
     const [update, auditWrite]=await db.batch([
       db.prepare(`UPDATE device_access SET status='blocked',
         blocked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       WHERE device_id=? AND status='approved' AND person_role IN ('learner','teacher')
         AND EXISTS(SELECT 1 FROM manager_device_assignments
-          WHERE target_device_id=? AND manager_device_id=?)
+          WHERE target_device_id=?)
         AND EXISTS(SELECT 1 FROM device_access m
           WHERE m.device_id=? AND m.person_role='manager' AND m.management_enabled=1
             AND m.status='approved' AND m.registration_submitted_at IS NOT NULL
             AND (m.access_expires_at IS NULL OR datetime(m.access_expires_at)>CURRENT_TIMESTAMP))`)
-      .bind(deviceId,deviceId,actor.deviceId,actor.deviceId),
+      .bind(deviceId,deviceId,actor.deviceId),
       audit(),
     ]);
     if (Number(update.meta.changes)!==1 || Number(auditWrite.meta.changes)!==1)
@@ -144,8 +142,8 @@ export async function managerReviewCommand(actor: PublicDeviceState, payload: Re
   const current=await db.prepare(`SELECT d.status,a.manager_device_id FROM device_access d
     JOIN manager_device_assignments a ON a.target_device_id=d.device_id WHERE d.device_id=?`)
     .bind(deviceId).first<{status:string;manager_device_id:string}>();
-  if (current?.manager_device_id!==actor.deviceId ||
-      current.status!==(action==="approve"?"approved":"blocked"))
+  if ((action==="approve" && current?.manager_device_id!==actor.deviceId) ||
+      current?.status!==(action==="approve"?"approved":"blocked"))
     throw new DeviceAccessError("Đã gửi lệnh nhưng đọc lại không khớp. Đồng bộ trước khi thử lại.",503,"MANAGER_REVIEW_READBACK_MISMATCH");
   return managerReviewBoard(actor);
 }

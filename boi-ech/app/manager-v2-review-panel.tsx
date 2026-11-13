@@ -128,7 +128,7 @@ export default function ManagerV2ReviewPanel({singleReview=false}:{singleReview?
        person.onboardingStage==="suspended"?"Tạm khóa":
        person.onboardingStage==="profile_review"?"Hồ sơ cũ cần đối soát":
        person.onboardingStage==="changes_requested"?"Cần bổ sung hồ sơ":"Cần kiểm tra trạng thái"}</span>
-      <small>{person.firstReviewMine?"Đang thuộc cán bộ tiếp nhận này":"Không có quyền thay đổi hồ sơ này"}</small>
+      <small>{person.firstReviewMine?"Đang do tài khoản này tiếp nhận":"Hồ sơ nằm trong danh sách quản lý chung"}</small>
      </div>
     </article>)}
     {!progress.length?<p className={styles.empty}>Chưa có hồ sơ đã tiếp nhận trong trang đang xem.</p>:null}

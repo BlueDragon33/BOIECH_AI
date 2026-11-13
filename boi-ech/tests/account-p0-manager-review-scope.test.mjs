@@ -26,7 +26,7 @@ test("P0 reviewer board: only learners/teachers, not manager requests, are visib
   assert.ok(!ids.includes(pendingManager.account.accountId));
  }finally{f.close()}
 });
-test("P0 after first review, new private profile is hidden from unrelated managers",async()=>{
+test("Manager shared roster shows the same learner after another manager first reviews",async()=>{
  const f=accountStack({v2:true});
  try{
   const first=await activateManager(f,920);
@@ -38,6 +38,8 @@ test("P0 after first review, new private profile is hidden from unrelated manage
   const own=(await f.service.reviewBoard(first.token)).devices.find(x=>x.accountId===learner.account.accountId);
   const foreign=(await f.service.reviewBoard(other.token)).devices.find(x=>x.accountId===learner.account.accountId);
   assert.equal(own.onboardingStage,"profile_required");
-  assert.equal(foreign,undefined);
+  assert.equal(foreign?.onboardingStage,"profile_required");
+  assert.equal(foreign?.accountId,own.accountId);
+  assert.equal(foreign?.firstReviewMine,false);
  }finally{f.close()}
 });

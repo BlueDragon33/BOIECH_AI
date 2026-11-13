@@ -12,7 +12,8 @@ function profileWriteFailure(error: unknown): never {
   const message=error.message;
   if (/ACCOUNT_CAPACITY_REACHED|QUOTA_REACHED/.test(message)) bad("ACCOUNT_CAPACITY_REACHED",409);
   if (/MANAGER_APPROVAL_FORBIDDEN/.test(message)) bad("ACCOUNT_SCOPE_FORBIDDEN",403);
-  if (/device_access\.phone/i.test(message) && /UNIQUE|constraint/i.test(message))
+  if (/PHONE_NATIONAL_DUPLICATE/i.test(message)
+    || /device_access\.phone/i.test(message) && /UNIQUE|constraint/i.test(message))
     bad("PROFILE_PHONE_IN_USE",409);
   if (/device_access_person_identity_unique|device_access\.person_(?:code|role)/i.test(message)
       && /UNIQUE|constraint/i.test(message)) bad("PROFILE_INTERNAL_ID_CONFLICT",409);
