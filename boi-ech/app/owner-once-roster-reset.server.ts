@@ -11,11 +11,11 @@ type Row={
  payments:number;certificates:number;training:number;content:number;shared:number;
 };
 type Manifest={
- protected_thien_son:string;protected_dong_nghi:string;cutoff_at:string;backup_bookmark_hash:string;
+ protected_thien_son:string;protected_dong_nghi:string;protected_quynh:string|null;cutoff_at:string;backup_bookmark_hash:string;
  state:string;revision:number;removed:number;
 };
 const ID="2026-11-13-learner-teacher-reset";
-const WORDS={son:"thien son",nghi:"dong nghi"};
+const WORDS={son:"thien son",nghi:"dong nghi",quynh:"ngo tuyet quynh"};
 const CONFIRM="XOA TAT CA TRU THIEN SON VA DONG NGHI";
 const hash=(v:unknown)=>createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const fail=(code:string,status=409):never=>{throw new AccountError(code,status);};
@@ -53,7 +53,7 @@ const snapshot=(rows:Row[])=>hash(rows.map(r=>[
  r.payments,r.certificates,r.training,r.content,r.shared
 ]));
 async function manifest(db:DB){
- return db.prepare("SELECT protected_thien_son,protected_dong_nghi,cutoff_at,backup_bookmark_hash,state,revision,removed FROM account_one_time_roster_resets WHERE id=?")
+ return db.prepare("SELECT protected_thien_son,protected_dong_nghi,protected_quynh,cutoff_at,backup_bookmark_hash,state,revision,removed FROM account_one_time_roster_resets WHERE id=?")
   .bind(ID).first<Manifest>();
 }
 async function cutoff(db:DB){
@@ -71,13 +71,15 @@ async function rowsAt(db:DB,at:string){
 function protectedPair(rows:Row[]){
  const son=rows.filter(r=>samePerson(r.name,WORDS.son));
  const nghi=rows.filter(r=>samePerson(r.name,WORDS.nghi));
+ const quynh=rows.filter(r=>samePerson(r.name,WORDS.quynh));
  // The two protected names are NOT canonical keys. Refuse to guess.
- if(son.length!==1||nghi.length!==1||son[0].device_id===nghi[0].device_id)
+ if(son.length!==1||nghi.length!==1||quynh.length!==1||
+  new Set([son[0]?.device_id,nghi[0]?.device_id,quynh[0]?.device_id]).size!==3)
   fail("ROSTER_RESET_PROTECTED_AMBIGUOUS",409);
- return {son:son[0],nghi:nghi[0]};
+ return {son:son[0],nghi:nghi[0],quynh:quynh[0]};
 }
 function roster(rows:Row[],pair:ReturnType<typeof protectedPair>){
- const candidates=rows.filter(r=>r.device_id!==pair.son.device_id&&r.device_id!==pair.nghi.device_id);
+ const candidates=rows.filter(r=>![pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id].includes(r.device_id));
  return {candidates,ready:candidates.filter(eligible),held:candidates.filter(r=>!eligible(r))};
 }
 export async function previewOwnerOnceRosterReset(db:DB,actor:Owner){
@@ -87,13 +89,14 @@ export async function previewOwnerOnceRosterReset(db:DB,actor:Owner){
  const rows=await rowsAt(db,at);
  const pair=protectedPair(rows);
  if(started&&(started.protected_thien_son!==pair.son.device_id||
-  started.protected_dong_nghi!==pair.nghi.device_id))fail("ROSTER_RESET_PROTECTION_CHANGED",409);
+  started.protected_dong_nghi!==pair.nghi.device_id||started.protected_quynh!==pair.quynh.device_id))fail("ROSTER_RESET_PROTECTION_CHANGED",409);
  const {candidates,ready,held}=roster(rows,pair);
  return {contract:"boi-owner-once-roster-reset.v1",verified:true,applied:false,
   state:started?.state??"not_started",cutoff:at,snapshot:snapshot(rows),
   protectedPeople:[
    {name:pair.son.name,role:pair.son.role,deviceId:pair.son.device_id,accountId:pair.son.account_id},
-   {name:pair.nghi.name,role:pair.nghi.role,deviceId:pair.nghi.device_id,accountId:pair.nghi.account_id}
+   {name:pair.nghi.name,role:pair.nghi.role,deviceId:pair.nghi.device_id,accountId:pair.nghi.account_id},
+   {name:pair.quynh.name,role:pair.quynh.role,deviceId:pair.quynh.device_id,accountId:pair.quynh.account_id}
   ],
   totalLearnersTeachers:rows.length,
   candidates:candidates.length,eligible:ready.length,retainedForReview:held.length,
@@ -108,7 +111,7 @@ export async function previewOwnerOnceRosterReset(db:DB,actor:Owner){
 const guard=`EXISTS(SELECT 1 FROM device_access d
  LEFT JOIN accounts a ON a.storage_device_id=d.device_id
  WHERE d.device_id=? AND d.person_role IN ('learner','teacher')
- AND d.device_id NOT IN (?,?) AND d.created_at=? AND d.updated_at IS ?
+ AND d.device_id NOT IN (?,?,?) AND d.created_at=? AND d.updated_at IS ?
  AND d.status=? AND COALESCE(d.learner_name,'')=?
  AND COALESCE(a.account_id,'')=? AND COALESCE(a.revision,-1)=?
  AND datetime(d.created_at)<=datetime(?)
@@ -124,7 +127,8 @@ const guard=`EXISTS(SELECT 1 FROM device_access d
     WHERE other.device_id<>d.device_id AND other.migrated_from_user_key=d.migrated_from_user_key)))
  AND EXISTS(SELECT 1 FROM account_one_time_roster_resets r
   WHERE r.id='2026-11-13-learner-teacher-reset' AND r.state='running'
-   AND r.protected_thien_son=? AND r.protected_dong_nghi=?)
+   AND r.protected_thien_son=? AND r.protected_dong_nghi=? AND r.protected_quynh=?)
+ AND EXISTS(SELECT 1 FROM device_access p WHERE p.device_id=? AND p.person_role IN ('learner','teacher'))
  AND EXISTS(SELECT 1 FROM device_access p WHERE p.device_id=? AND p.person_role IN ('learner','teacher'))
  AND EXISTS(SELECT 1 FROM device_access p WHERE p.device_id=? AND p.person_role IN ('learner','teacher'))
 )`;
@@ -146,7 +150,7 @@ export async function executeOwnerOnceRosterReset(db:DB,actor:Owner,input:Record
  const rows=await rowsAt(db,at),pair=protectedPair(rows);
  if(existing&&(existing.protected_thien_son!==pair.son.device_id||
  existing.protected_dong_nghi!==pair.nghi.device_id))fail("ROSTER_RESET_PROTECTION_CHANGED",409);
- if(input.protectSon!==pair.son.device_id||input.protectNghi!==pair.nghi.device_id)
+ if(input.protectSon!==pair.son.device_id||input.protectNghi!==pair.nghi.device_id||input.protectQuynh!==pair.quynh.device_id)
   fail("ROSTER_RESET_PROTECTION_CHANGED",409);
  if(snapshot(rows)!==input.snapshot)fail("ROSTER_RESET_SCOPE_CHANGED",409);
  const {ready,held}=roster(rows,pair),batch=ready.slice(0,10);
@@ -154,17 +158,18 @@ export async function executeOwnerOnceRosterReset(db:DB,actor:Owner,input:Record
  const state=final?(held.length?"retention_review":"completed"):"running";
  const updates:D1PreparedStatement[]=[];
  if(!existing)updates.push(db.prepare(`INSERT INTO account_one_time_roster_resets
- (id,protected_thien_son,protected_dong_nghi,cutoff_at,backup_bookmark_hash,started_by)
- VALUES(?,?,?,?,?,?)`).bind(ID,pair.son.device_id,pair.nghi.device_id,at,hash(backup),actor.actor));
+ (id,protected_thien_son,protected_dong_nghi,protected_quynh,cutoff_at,backup_bookmark_hash,started_by)
+ VALUES(?,?,?,?,?,?,?)`).bind(ID,pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id,at,hash(backup),actor.actor));
  for(const row of batch){
   const id=row.device_id,a=row.account_id;
   const insert=db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
    VALUES(?,'owner.once.roster-reset',?,CASE WHEN ${guard} THEN ? ELSE NULL END)`)
    .bind(actor.actor,hash(["one-time",id]),
-    id,pair.son.device_id,pair.nghi.device_id,row.created_at,row.updated_at,row.status,
+    id,pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id,row.created_at,row.updated_at,row.status,
     row.name??"",a??"",row.revision??-1,at,
-    pair.son.device_id,pair.nghi.device_id,pair.son.device_id,pair.nghi.device_id,
-    `one-time-excluding-two;role=${row.role};backup=${hash(backup).slice(0,12)};${reason}`);
+    pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id,
+     pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id,
+    `one-time-excluding-three;role=${row.role};backup=${hash(backup).slice(0,12)};${reason}`);
   updates.push(insert);
   const del=(table:string,where:string,...values:(string|null)[])=>
    updates.push(db.prepare(`DELETE FROM ${table} WHERE ${where}`).bind(...values));
@@ -202,8 +207,8 @@ export async function executeOwnerOnceRosterReset(db:DB,actor:Owner,input:Record
  state=?,removed=removed+?,revision=revision+1,
  finished_at=CASE WHEN ?='running' THEN NULL ELSE CURRENT_TIMESTAMP END
  WHERE id=? AND state='running' AND revision=?
- AND protected_thien_son=? AND protected_dong_nghi=?`)
- .bind(state,batch.length,state,ID,existing?.revision??1,pair.son.device_id,pair.nghi.device_id));
+ AND protected_thien_son=? AND protected_dong_nghi=? AND protected_quynh=?`)
+ .bind(state,batch.length,state,ID,existing?.revision??1,pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id));
  updates.push(db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
  VALUES(?,'owner.once.roster-batch',?,
   CASE WHEN changes()=1 THEN ? ELSE NULL END)`)
@@ -218,12 +223,12 @@ export async function executeOwnerOnceRosterReset(db:DB,actor:Owner,input:Record
    .bind(...ids).first<{n:number}>();
   if(Number(leftover?.n)!==0)fail("ROSTER_RESET_READBACK_FAILED",503);
  }
- const preserved=await db.prepare("SELECT COUNT(*) AS n FROM device_access WHERE device_id IN (?,?)")
-  .bind(pair.son.device_id,pair.nghi.device_id).first<{n:number}>();
- if(Number(preserved?.n)!==2)fail("ROSTER_RESET_PROTECTION_CHANGED",503);
+ const preserved=await db.prepare("SELECT COUNT(*) AS n FROM device_access WHERE device_id IN (?,?,?)")
+  .bind(pair.son.device_id,pair.nghi.device_id,pair.quynh.device_id).first<{n:number}>();
+ if(Number(preserved?.n)!==3)fail("ROSTER_RESET_PROTECTION_CHANGED",503);
  const latest=await previewOwnerOnceRosterReset(db,actor);
  return {contract:latest.contract,verified:true,applied:true,state:latest.state,
   deleted:batch.length,totalDeleted:latest.removedInSession,remaining:latest.eligible,
-  retainedForReview:latest.retainedForReview,protectedCount:2,readback:true,
+  retainedForReview:latest.retainedForReview,protectedCount:3,readback:true,
   snapshot:latest.snapshot,cutoff:latest.cutoff};
 }
