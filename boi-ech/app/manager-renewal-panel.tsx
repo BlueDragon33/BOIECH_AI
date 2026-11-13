@@ -42,7 +42,7 @@ export default function ManagerRenewalPanel(){
   const term=terms[record.accountId]??"30d";
   if(lock.current||reason.trim().length<10)return;
   const label=accountTerms.find(x=>x.value===term)?.label??term;
-  const expiry=replaceExpiryFromNow(term,Date.now());
+  const expiry=replaceExpiryFromNow(term,now);
   if(!window.confirm("ĐẶT LẠI thời hạn "+label+" cho "+record.name+
     " tính từ hôm nay, không cộng dồn hạn cũ. Hạn mới: "+(term==="forever"?"Vĩnh viễn":new Date(expiry).toLocaleDateString("vi-VN"))+"?"))return;
   lock.current=true;setBusy(true);setError("");setNotice("");
