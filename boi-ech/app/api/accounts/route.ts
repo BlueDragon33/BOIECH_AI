@@ -122,6 +122,7 @@ export async function POST(request: Request) {
       if (p.action === "account-state") return json(await workflow.ownStatus(token));
       if (p.action === "manager-renew-list") return json(await managerRenewableAccounts(await getCourseDatabase(),service,token));
       if (p.action === "manager-renew") return json(await managerRenewAccount(await getCourseDatabase(),service,token,p));
+       if (p.action === "manager-set-duration") return json(await managerRenewAccount(await getCourseDatabase(),service,token,p));
       if (p.action === "profile-draft-save") return json({ profileDraft: await workflow.saveProfileDraft(token,p) });
       if (p.action === "profile-draft-activate") return json({ onboarding: await workflow.activateProfileDraft(token) });
       if (p.action === "submit-profile") {
