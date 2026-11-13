@@ -59,6 +59,27 @@ test("Hard purge deletes device binding, sessions and sync metadata, not account
   await assert.rejects(()=>api(f.db,owner,{action:"purge",...request(a,{expectedStatus:"blocked"})}),e=>e.code==="DEVICE_BINDING_NOT_FOUND");
  }finally{f.close();}
 });
+test("An obsolete pending second-browser link can be purged while preserving the trusted login device",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const a=await pair(f,60105);
+  const pendingDevice="c".repeat(64);
+  f.sqlite.prepare("INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved,revoked) VALUES(?,?,'{}',0,0)")
+   .run(a.device.account_id,pendingDevice);
+  const row=f.sqlite.prepare("SELECT account_id,device_id,created_at,approved,revoked FROM account_devices WHERE account_id=? AND device_id=?")
+   .get(a.device.account_id,pendingDevice);
+  const stale={account:a.account,device:row,id:hash(row.account_id,row.device_id)};
+  const api=f.load("owner-device-bindings.server.ts").ownerDeviceBinding;
+  const detail=await api(f.db,owner,{action:"inspect",bindingId:stale.id});
+  assert.equal(detail.status,"pending");
+  assert.equal(detail.dependencies.otherTrustedDevices,1);
+  await api(f.db,owner,{action:"revoke",...request(stale,{expectedStatus:"pending"})});
+  const result=await api(f.db,owner,{action:"purge",...request(stale,{expectedStatus:"blocked"})});
+  assert.equal(result.deleted,true);
+  assert.equal((await f.service.session(a.account.token)).accountId,a.account.accountId,
+    "the unrelated trusted device must remain logged in");
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_devices WHERE account_id=?").get(a.device.account_id).n,1);
+ }finally{f.close();}
+});
 test("Purge blocks stale confirmations; no API grants access to non-Owner or generic control tickets",()=>{
  const route=readFileSync(new URL("../app/api/control/v2/device-bindings/route.ts",import.meta.url),"utf8");
  const service=readFileSync(new URL("../app/owner-device-bindings.server.ts",import.meta.url),"utf8");
