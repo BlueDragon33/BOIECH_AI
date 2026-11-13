@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const enhancements = fs.readFileSync(new URL("../app/teacher-enhancements.tsx", import.meta.url), "utf8");
 const shell = fs.readFileSync(new URL("../app/teacher-role-shell.tsx", import.meta.url), "utf8");
 const roster = fs.readFileSync(new URL("../app/teacher-roster-manager.tsx", import.meta.url), "utf8");
 const rosterRoute = fs.readFileSync(new URL("../app/api/teacher/roster/route.ts", import.meta.url), "utf8");
@@ -98,8 +100,10 @@ test("final visual override uses Vietnamese-safe display font and stays presenta
   }
 });
 
-test("teacher management surfaces are actually mounted in the application shell", () => {
-  assert.match(layout, /<TeacherRoleShell \/>/);
-  assert.match(layout, /<TeacherDashboardBlueprint \/>/);
-  assert.match(layout, /<TeacherRosterManager \/>/);
+test("teacher management surfaces remain mounted only for an active teacher", () => {
+  assert.ok(page.includes('deviceAccess.personRole === "teacher" ? <TeacherEnhancements />'));
+  for (const name of ["TeacherRoleShell", "TeacherDashboardBlueprint", "TeacherRosterManager"]) {
+    assert.ok(enhancements.includes("<" + name + " />"), name);
+    assert.ok(!layout.includes("<" + name + " />"), "no global " + name);
+  }
 });
