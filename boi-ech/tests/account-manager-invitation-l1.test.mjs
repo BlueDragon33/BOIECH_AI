@@ -13,7 +13,7 @@ function request(n,invite){
   managerInviteToken:invite,privacyAccepted:true,securityAnswer:"Ten thoi tho au"};
 }
 test('Owner issues a one-use invitation; DB stores only hash and an immutable audit',async()=>{
- const f=accountStack({v2:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true});try{
   const issued=await f.service.issueManagerInvite(owner,1);
   assert.equal(issued.verified,true);
   assert.match(issued.inviteToken,/^[a-f0-9]{64}$/);
@@ -28,7 +28,7 @@ test('Owner issues a one-use invitation; DB stores only hash and an immutable au
  }finally{f.close()}
 });
 test('Applicant controls own credential+P256; redemption is atomic, pending and cannot replay',async()=>{
- const f=accountStack({v2:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true});try{
   const issued=await f.service.issueManagerInvite(owner,1);
   const input={...request(10,issued.inviteToken),publicKey:await key()};
   const result=await f.service.registerManagerWithInvite(input,'peer-10');
@@ -46,7 +46,7 @@ test('Applicant controls own credential+P256; redemption is atomic, pending and 
  }finally{f.close()}
 });
 test('Wrong role, expired or forged invitation cannot create account and no auth sessions',async()=>{
- const f=accountStack({v2:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true});try{
   const issued=await f.service.issueManagerInvite(owner,1);
   await assert.rejects(async()=>f.service.registerManagerWithInvite(
     {...request(21,'0'.repeat(64)),publicKey:await key()},'peer-21'),e=>e.code==='MANAGER_INVITATION_INVALID');
@@ -60,7 +60,7 @@ test('Wrong role, expired or forged invitation cannot create account and no auth
  }finally{f.close()}
 });
 test('CAS admission revision and quota 20 unused invites are enforced; no plaintext audit',async()=>{
- const f=accountStack({v2:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true});try{
   await assert.rejects(()=>f.service.issueManagerInvite(owner,2),e=>e.code==='MANAGER_INVITATION_CONFLICT');
   const tokens=[];
   for(let i=0;i<20;i++)tokens.push((await f.service.issueManagerInvite(owner,1)).inviteToken);
@@ -71,7 +71,7 @@ test('CAS admission revision and quota 20 unused invites are enforced; no plaint
 });
 
 test('Actual account HTTP manager-register requires one-time invite and returns pending account',async()=>{
- const f=accountStack({v2:true});try{
+ const f=accountStack({legacyPolicy:true,v2:true});try{
   const issued=await f.service.issueManagerInvite(owner,1);
   const response=await f.post('api/accounts/route.ts',{
     action:'manager-register',...request(100,issued.inviteToken),publicKey:await key()
