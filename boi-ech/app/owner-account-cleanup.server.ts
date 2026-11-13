@@ -187,8 +187,7 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
  db.prepare("DELETE FROM device_profiles WHERE device_id=?").bind(storage),
  db.prepare("DELETE FROM device_access WHERE device_id=?").bind(storage),
  ];
- let results:D1Result[];
- try{results=await db.batch(statement);}catch{throw new AccountError("CLEANUP_ELIGIBILITY_CHANGED",409);}
+ const results=await db.batch(statement).catch(()=>{throw new AccountError("CLEANUP_ELIGIBILITY_CHANGED",409);});
  if(Number(results[0].meta.changes)!==1||Number(results[14].meta.changes)!==1||
    Number(results[18].meta.changes)!==1)deny("CLEANUP_READBACK_FAILED",503);
  const [account,device]=await Promise.all([
