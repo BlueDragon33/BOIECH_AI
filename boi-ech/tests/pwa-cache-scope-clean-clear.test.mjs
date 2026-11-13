@@ -53,3 +53,15 @@ test("Service Worker still delegates authenticated API reads to the network", ()
   });
   assert.equal(intercepted, false);
 });
+
+test("PWA controllerchange does not force-refresh an active lesson or video", () => {
+  const sourcePage = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const start = sourcePage.indexOf("const onControllerChange = () => {");
+  const stop = sourcePage.indexOf("navigator.serviceWorker.addEventListener", start);
+  assert.ok(start > 0 && stop > start, "locate controllerchange handler");
+  const handler = sourcePage.slice(start, stop);
+  assert.match(handler, /setUpdateAvailable\(true\)/);
+  assert.doesNotMatch(handler, /location\.reload\(/);
+  assert.match(sourcePage, /onClick=\{\(\) => window\.location\.reload\(\)\}>Tải bản mới/);
+  assert.match(sourcePage, /Lưu phần đang làm trước khi tải lại/);
+});
