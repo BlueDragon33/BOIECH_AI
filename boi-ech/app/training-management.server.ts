@@ -97,15 +97,10 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(!canonical)fail("Không xác minh được thiết bị gốc của cán bộ.","MANAGER_ACCOUNT_MISMATCH",403);
   managerStorageDeviceId=canonical.storage_device_id;
   accountSessionHash=principal.sessionHash;
-  if(payload.action==="assign-person"||payload.action==="save-session"){
-   const target=payload.action==="assign-person"?payload.personId:payload.teacherId;
-   const owned=await (await trainingDatabase()).prepare("SELECT 1 AS allowed FROM manager_device_assignments WHERE manager_device_id=? AND target_device_id=?")
-    .bind(managerStorageDeviceId,target).first<{allowed:number}>();
-   if(!owned)fail("Hồ sơ chưa thuộc phạm vi được phân công.","MANAGER_SCOPE_FORBIDDEN",403);
-  }
+  // One D1 roster across all authorized managers; the signed session,
+  // canonical actor, active entitlement and CAS still guard every write.
  }
- const scopedTarget=actor.accountId&&(payload.action==="assign-person"||payload.action==="save-session")
-  ? String(payload.action==="assign-person"?payload.personId:payload.teacherId):null;
+ const scopedTarget:null=null;
  const authorityGuard=actor.accountId?`EXISTS(SELECT 1 FROM device_access a
   JOIN accounts ca ON ca.storage_device_id=a.device_id
   JOIN account_onboarding o ON o.account_id=ca.account_id
