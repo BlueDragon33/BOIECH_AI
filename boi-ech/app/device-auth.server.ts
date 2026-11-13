@@ -683,10 +683,12 @@ function normalizePersonIdentity(roleValue: unknown, codeValue: unknown) {
 }
 
 function normalizePhone(value: unknown) {
-  const normalized = typeof value === "string" ? value.trim().replace(/[.\s-]/g, "") : "";
-  if (!/^(?:\+84|0)\d{9,10}$/.test(normalized)) {
-    throw new DeviceAccessError("Số điện thoại chưa đúng định dạng Việt Nam.", 400, "INVALID_PHONE");
+  const normalized = typeof value === "string" ? value.trim().replace(/[.()\s-]/g, "") : "";
+  if (!/^\+?[0-9]{7,16}$/.test(normalized)) {
+    throw new DeviceAccessError("Số điện thoại cần 7–16 chữ số, có thể kèm mã quốc gia.", 400, "INVALID_PHONE");
   }
+  // Preserve the legacy VN display form, and retain other countries as entered.
+  // Atomic D1 triggers compare exact national digits after dialing prefixes.
   return normalized.startsWith("+84") ? `0${normalized.slice(3)}` : normalized;
 }
 
