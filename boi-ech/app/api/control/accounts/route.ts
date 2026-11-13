@@ -2,6 +2,7 @@ import { AccountError } from "../../../account-core.server";
 import { cancelLocalPendingManager } from "../../../manager-local-reset.server";
 import { AccountEntitlementService } from "../../../account-entitlement.server";
 import { readAccountCapacity, changeAccountCapacity } from "../../../account-capacity.server";
+import {blockBoiAccount,banBoiDeviceKey} from "../../../owner-account-ban.server";
 import { AccountV2Workflow } from "../../../account-v2-workflow.server";
 import { getCourseDatabase } from "../../../device-auth.server";
 import { accountErrorResponse, accountService, accountConfiguration } from "../../../account-runtime.server";
@@ -42,6 +43,10 @@ export async function POST(request: Request) {
       if (input.action === "review-changes") return controlResponse({ onboarding: await workflow.requestChanges(
         {kind:"owner",actor:owner.actor},String(input.accountId),input.expectedRevision,input.reason) },200,request);
     }
+    if (input.action === "ban-account") return controlResponse(
+      await blockBoiAccount(await getCourseDatabase(),owner,input),200,request);
+    if (input.action === "ban-device") return controlResponse(
+      await banBoiDeviceKey(await getCourseDatabase(),owner,input),200,request);
     if (input.action === "capacity") return controlResponse(await readAccountCapacity(await getCourseDatabase(), owner), 200, request);
     if (input.action === "set-capacity") return controlResponse(await changeAccountCapacity(await getCourseDatabase(), owner, input), 200, request);
     // Owner-only canonical Account-first V2 intake; this contract must not report
