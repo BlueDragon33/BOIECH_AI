@@ -154,9 +154,108 @@ export class AccountV2Workflow {
     if (Number(result[0].meta.changes)!==1) bad("ACCOUNT_CAS_CONFLICT", 409);
     return this.state(targetId);
   }
+  private async selfServiceEnabled() {
+    try {
+      const policy=await this.db.prepare("SELECT enabled FROM account_self_service_settings WHERE id='global'")
+        .first<{enabled:number}>();
+      return policy?.enabled===1;
+    } catch { return false; } // pre-migration fixtures retain their historical workflow
+  }
+  async isSelfService() { return this.selfServiceEnabled(); }
+  /** Complete verified identity profile and activate in one D1 transaction,
+   * without a human review, while preserving capacity, auth and audit gates. */
+  private async activateSelfService(token:string,input:Record<string,unknown>,actor:Awaited<ReturnType<AccountService["session"]>>,s:State) {
+    if(s.stage!=="requested"||s.status!=="pending"||!actor.deviceApproved||
+      input.expectedRevision!==s.revision)bad("ACCOUNT_CAS_CONFLICT",409);
+    const family=field(input.familyName,60),given=field(input.givenName,60);
+    const manager=s.role==="manager",className=field(manager?input.facultyUnit:input.className,80);
+    const title=manager?field(input.jobTitle,120):"";
+    const position=manager?field(input.jobPosition,120):"";
+    const code=(manager?"MGR_":s.role==="teacher"?"GV_":"HV_")+actor.storageDeviceId.slice(0,20).toUpperCase();
+    const contact=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
+      .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>();
+    const raw=contact?.kind==="phone"?contact.value:
+      typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):"";
+    const phone=raw.replace(/[ ()-]/g,"");
+    if(!/^[A-Z0-9._-]+$/.test(code)||phone&&!/^\\+?[0-9]{7,16}$/.test(phone)
+      ||(!manager&&!phone))bad("PROFILE_INVALID",400);
+    const granted=await new AccountEntitlementService(this.db).grantOnApproval(
+      actor.accountId,s.role,"profile:completed");
+    const statements:D1PreparedStatement[]=[
+      this.db.prepare(`UPDATE device_access
+        SET learner_name=?,learner_family_name=?,learner_given_name=?,
+        person_code=?,class_name=?,phone=?,status='approved',
+        management_enabled=?,payment_status='free_approved',access_group='free',
+        registration_submitted_at=CURRENT_TIMESTAMP,approved_at=CURRENT_TIMESTAMP,
+        updated_at=CURRENT_TIMESTAMP
+        WHERE device_id=? AND status='pending' AND EXISTS(
+          SELECT 1 FROM account_onboarding o JOIN account_sessions sess ON sess.account_id=o.account_id
+          JOIN account_devices b ON b.account_id=sess.account_id AND b.device_id=sess.device_id
+          JOIN account_credentials c ON c.account_id=o.account_id AND c.generation=sess.generation
+          WHERE o.account_id=? AND o.stage='requested' AND o.revision=?
+          AND sess.token_hash=? AND sess.device_id=? AND sess.revoked=0
+          AND b.revoked=0 AND b.approved=1
+          AND sess.expires_at>(unixepoch()*1000) AND sess.idle_expires_at>(unixepoch()*1000))`)
+      .bind(family+" "+given,family,given,code,className,phone||null,
+        manager?1:0,actor.storageDeviceId,actor.accountId,s.revision,actor.sessionHash,actor.deviceId),
+      this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+        VALUES(?,'account.profile.self-service',?,
+          CASE WHEN changes()=1 THEN 'self-service verified profile' ELSE NULL END)`)
+        .bind(actor.accountId,actor.accountId)
+    ];
+    if(manager) statements.push(this.db.prepare(`INSERT INTO account_manager_profiles
+      (account_id,faculty_unit,job_title,job_position) SELECT ?,?,?,? WHERE EXISTS(
+       SELECT 1 FROM device_access WHERE device_id=? AND status='approved')
+      ON CONFLICT(account_id) DO UPDATE SET faculty_unit=excluded.faculty_unit,
+        job_title=excluded.job_title,job_position=excluded.job_position,updated_at=CURRENT_TIMESTAMP`)
+      .bind(actor.accountId,className,title,position,actor.storageDeviceId));
+    statements.push(this.db.prepare(`UPDATE account_onboarding SET stage='active',
+      revision=revision+1,profile_submitted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE account_id=? AND stage='requested' AND revision=?
+      AND EXISTS(SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+       WHERE a.account_id=? AND d.status='approved')`)
+      .bind(actor.accountId,s.revision,actor.accountId));
+    statements.push(granted);
+    if(manager)for(const scope of ["manager.approve.registration","manager.manage.assigned"]){
+      statements.push(this.db.prepare(`INSERT INTO account_manager_permissions(account_id,scope,enabled,granted_by)
+        SELECT ?,?,1,? WHERE EXISTS(SELECT 1 FROM account_entitlements e
+         JOIN account_onboarding o ON o.account_id=e.account_id
+         WHERE e.account_id=? AND e.state='active' AND o.stage='active')
+        ON CONFLICT(account_id,scope) DO UPDATE SET enabled=1,granted_by=excluded.granted_by`)
+        .bind(actor.accountId,scope,"self-service:policy",actor.accountId));
+    }
+    statements.push(this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+      VALUES(?,'account.self-service.activated',?,CASE WHEN EXISTS(
+       SELECT 1 FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+       JOIN account_onboarding o ON o.account_id=a.account_id
+       JOIN account_entitlements e ON e.account_id=a.account_id
+       WHERE a.account_id=? AND d.status='approved' AND o.stage='active'
+       AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
+       AND (d.person_role!='manager' OR (d.management_enabled=1 AND
+         (SELECT COUNT(*) FROM account_manager_permissions p
+          WHERE p.account_id=a.account_id AND p.enabled=1 AND
+            p.scope IN ('manager.approve.registration','manager.manage.assigned'))=2))
+      ) THEN 'complete profile + policy-based activation' ELSE NULL END)`)
+      .bind(actor.accountId,actor.accountId,actor.accountId));
+    try{await this.db.batch(statements);}
+    catch(error){
+      if(error instanceof Error&&/ACCOUNT_CAPACITY_REACHED/.test(error.message))
+        bad("ACCOUNT_CAPACITY_REACHED",409);
+      if(error instanceof Error&&/constraint|NOT NULL|UNIQUE/i.test(error.message))
+        bad("PROFILE_CONFLICT",409);
+      throw error;
+    }
+    const after=await this.state(actor.accountId);
+    const lease=await new AccountEntitlementService(this.db).read(actor.accountId);
+    if(after.stage!=="active"||after.status!=="approved"||after.revision!==s.revision+1||
+      lease?.active!==true)bad("ACCOUNT_READBACK_FAILED",503);
+    return after;
+  }
   async submitProfile(token: string, input: Record<string, unknown>) {
     const actor = await this.accounts.session(token);
     const s = await this.state(actor.accountId);
+    if(s.stage==="requested" && await this.selfServiceEnabled())
+      return this.activateSelfService(token,input,actor,s);
     const submittedBeforeSwitch = this.singleReview && s.stage === "profile_review";
     if ((!["profile_required","changes_requested"].includes(s.stage) && !submittedBeforeSwitch) || !Number.isInteger(input.expectedRevision)
       || input.expectedRevision !== s.revision) bad("ACCOUNT_CAS_CONFLICT", 409);
