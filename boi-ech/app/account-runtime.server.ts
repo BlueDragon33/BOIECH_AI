@@ -36,7 +36,7 @@ export async function accountService() {
 export async function accountCookieToken() { return (await cookies()).get(ACCOUNT_COOKIE)?.value ?? ""; }
 export function sessionCookie(token: string) {
   // Host-only cookie: deliberately no Domain attribute. JS never receives a session token.
-  return `${ACCOUNT_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${token ? 28800 : 0}`;
+  return `${ACCOUNT_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${token ? 604800 : 0}`;
 }
 export async function resolveAccountDevice(claimedDeviceId?: unknown) {
   const config = await accountConfiguration();

@@ -6,6 +6,9 @@ import { AccountEntitlementService } from "./account-entitlement.server";
 const KDF = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 };
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const IDLE_MS = 30 * 60 * 1000;
+// Active sessions extend in bounded leases; a real login is required again
+// after seven days, or earlier after 30 minutes with no confirmed activity.
+const HARD_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 const TOKEN = /^[a-f0-9]{64}$/;
 const ACCOUNT = /^acc_[a-f0-9]{64}$/;
 export const ACCOUNT_COOKIE = "__Host-boiech-session";
@@ -73,7 +76,7 @@ type Row = { account_id: string; storage_device_id: string; login: string | null
   phone: string; payment_status: string; access_group: string; access_expires_at: string | null; management_enabled: number };
 export type AccountView = { accountId: string; storageDeviceId: string; login: string | null; revision: number;
   status: string; role: string; name: string; personCode: string; className: string; expiresAt: string | null };
-export type Principal = AccountView & { deviceId: string; sessionHash: string; generation: number; absoluteExpiry: number; deviceApproved: boolean };
+export type Principal = AccountView & { deviceId: string; sessionHash: string; generation: number; absoluteExpiry: number; idleExpiry: number; issuedAt: number; deviceApproved: boolean };
 const COLUMNS = `a.account_id,a.storage_device_id,a.login,a.revision,d.status,d.person_role,d.person_code,
  d.learner_name,d.class_name,d.phone,d.payment_status,d.access_group,d.access_expires_at,d.management_enabled`;
 function view(row: Row): AccountView {
@@ -253,10 +256,10 @@ export class AccountService {
       : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk) VALUES(?,?,?)
           ON CONFLICT(account_id,device_id) DO NOTHING`).bind(accountId, deviceId, publicKeyJson(publicKey));
     const statements = [deviceInsert];
-    statements.push(this.db.prepare(`INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at)
-      SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM account_credentials WHERE account_id=? AND generation=?)
+    statements.push(this.db.prepare(`INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at,issued_at_ms)
+      SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM account_credentials WHERE account_id=? AND generation=?)
        AND EXISTS(SELECT 1 FROM account_devices WHERE account_id=? AND device_id=? AND revoked=0)`)
-      .bind(digest(token), accountId, deviceId, credential.generation, now + SESSION_MS, now + IDLE_MS,
+      .bind(digest(token), accountId, deviceId, credential.generation, now + SESSION_MS, now + IDLE_MS, now,
         accountId, credential.generation, accountId, deviceId));
     statements.push(this.audit(accountId, "session.created", deviceId, "authenticated login", true));
     const result = await this.db.batch(statements).catch(error => {
@@ -415,15 +418,18 @@ export class AccountService {
   async session(token: string): Promise<Principal> {
     if (!TOKEN.test(token)) fail("SESSION_REQUIRED", 401);
     const now = this.now();
-    const row = await this.db.prepare(`SELECT ${COLUMNS},s.device_id,s.generation,s.expires_at${this.v2Enabled ? ",b.approved AS device_approved" : ""} FROM account_sessions s
+    const row = await this.db.prepare(`SELECT ${COLUMNS},s.device_id,s.generation,s.expires_at,s.idle_expires_at,s.issued_at_ms${this.v2Enabled ? ",b.approved AS device_approved" : ""} FROM account_sessions s
       JOIN accounts a ON a.account_id=s.account_id JOIN device_access d ON d.device_id=a.storage_device_id
       JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
       JOIN account_credentials c ON c.account_id=s.account_id AND c.generation=s.generation
-      WHERE s.token_hash=? AND s.revoked=0 AND b.revoked=0 AND s.expires_at>? AND s.idle_expires_at>?`)
-      .bind(digest(token), now, now).first<Row & { device_id: string; generation: number; expires_at: number; device_approved?: number }>();
+      WHERE s.token_hash=? AND s.revoked=0 AND b.revoked=0 AND s.expires_at>? AND s.idle_expires_at>?
+      AND s.issued_at_ms+?>?`)
+      .bind(digest(token), now, now, HARD_SESSION_MS, now).first<Row & {
+        device_id: string; generation: number; expires_at: number; idle_expires_at: number; issued_at_ms: number; device_approved?: number }>();
     if (!row) fail("SESSION_INVALID", 401);
     return { ...view(row), deviceId: row.device_id, sessionHash: digest(token), generation: row.generation,
-      absoluteExpiry: row.expires_at, deviceApproved: !this.v2Enabled || row.device_approved === 1 };
+      absoluteExpiry: row.expires_at, idleExpiry: row.idle_expires_at, issuedAt: row.issued_at_ms,
+      deviceApproved: !this.v2Enabled || row.device_approved === 1 };
   }
   async authorize(token: string, protectedModule = true) {
     const actor = await this.session(token);
@@ -441,14 +447,49 @@ export class AccountService {
     }
     return actor;
   }
+  /**
+   * Same-cookie, origin-checked session renewal. It never returns a token to JS
+   * and cannot convert a revoked device, suspended account or expired session
+   * into an authenticated one. An atomic D1 predicate prevents revoke races.
+   *
+   * GET status polling is intentionally read-only; only foreground use requests
+   * this authenticated POST, bounded by the original seven-day login cap.
+   */
+  async keepAlive(token: string) {
+    const actor = await this.session(token);
+    if (actor.status === "blocked") fail("ACCOUNT_BLOCKED",403);
+    if (actor.status === "approved") await this.authorize(token);
+    const now = this.now();
+    const result = await this.db.prepare(`UPDATE account_sessions
+      SET expires_at=MIN(issued_at_ms+?,MAX(expires_at,?)),
+          idle_expires_at=MIN(issued_at_ms+?,?)
+      WHERE token_hash=? AND revoked=0 AND expires_at>? AND idle_expires_at>?
+        AND issued_at_ms+?>?
+        AND EXISTS (SELECT 1 FROM account_devices b
+          WHERE b.account_id=account_sessions.account_id AND b.device_id=account_sessions.device_id AND b.revoked=0)
+        AND EXISTS (SELECT 1 FROM account_credentials c
+          WHERE c.account_id=account_sessions.account_id AND c.generation=account_sessions.generation)
+        AND EXISTS (SELECT 1 FROM accounts a JOIN device_access d
+          ON d.device_id=a.storage_device_id
+          WHERE a.account_id=account_sessions.account_id AND d.status<>'blocked')`)
+      .bind(HARD_SESSION_MS,now+SESSION_MS,HARD_SESSION_MS,now+IDLE_MS,
+        actor.sessionHash,now,now,HARD_SESSION_MS,now).run();
+    if(Number(result.meta.changes)!==1)fail("SESSION_INVALID",401);
+    const after=await this.db.prepare(`SELECT expires_at,idle_expires_at FROM account_sessions
+      WHERE token_hash=? AND revoked=0`).bind(actor.sessionHash)
+      .first<{expires_at:number;idle_expires_at:number}>();
+    if(!after || after.expires_at<=now || after.idle_expires_at<=now)
+      fail("SESSION_INVALID",401);
+    return {ok:true,sessionExpiresAt:after.expires_at,idleExpiresAt:after.idle_expires_at};
+  }
   async rotate(token: string) {
     const actor = await this.session(token), next = random();
     // DELETE ... RETURNING is not needed: insert replacement only on successful one-use CAS.
     const result = await this.db.batch([
       this.db.prepare("UPDATE account_sessions SET revoked=1 WHERE token_hash=? AND revoked=0").bind(actor.sessionHash),
-      this.db.prepare(`INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at)
-        SELECT ?,?,?,?,?,? WHERE changes()=1`).bind(digest(next), actor.accountId, actor.deviceId, actor.generation,
-          actor.absoluteExpiry, Math.min(actor.absoluteExpiry, this.now() + IDLE_MS)),
+      this.db.prepare(`INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at,issued_at_ms)
+        SELECT ?,?,?,?,?,?,? WHERE changes()=1`).bind(digest(next), actor.accountId, actor.deviceId, actor.generation,
+          actor.absoluteExpiry, Math.min(actor.absoluteExpiry, this.now() + IDLE_MS),actor.issuedAt),
     ]);
     if (Number(result[0].meta.changes) !== 1 || Number(result[1].meta.changes) !== 1) fail("SESSION_CONFLICT", 409);
     return { token: next };
