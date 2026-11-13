@@ -939,6 +939,7 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [notice, setNotice] = useState("");
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [motionPlaying, setMotionPlaying] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [appearanceReady, setAppearanceReady] = useState(false);
@@ -1091,11 +1092,11 @@ export default function Home() {
     let detachServiceWorkerListener: () => void = () => undefined;
     if ("serviceWorker" in navigator) {
       const hadActiveWorker = Boolean(navigator.serviceWorker.controller);
-      let reloadingForUpdate = false;
       const onControllerChange = () => {
-        if (!hadActiveWorker || reloadingForUpdate) return;
-        reloadingForUpdate = true;
-        window.location.reload();
+        if (!hadActiveWorker) return;
+        // Never interrupt a lesson, unsaved answer or local AI analysis.
+        // The user explicitly chooses when to load the new application shell.
+        setUpdateAvailable(true);
       };
       navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
       detachServiceWorkerListener = () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
@@ -1996,6 +1997,12 @@ export default function Home() {
           hasLocalOverride={hasLocalOverride}
         /> : null}
 
+        {updateAvailable && (
+          <div className="notice" role="status" aria-label="Bản cập nhật Bơi Ếch">
+            <span>Đã có bản cập nhật. Lưu phần đang làm trước khi tải lại để tránh gián đoạn.</span>
+            <button type="button" onClick={() => window.location.reload()}>Tải bản mới</button>
+          </div>
+        )}
         {notice && (
           <div className="notice" role="status">
             <span>{notice}</span><button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button>
