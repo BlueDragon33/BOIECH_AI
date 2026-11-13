@@ -16,7 +16,8 @@ type Account = { accountId: string; status: string; role: string; name: string; 
   deviceId?: string; deviceApproved?: boolean; onboardingStage?: string|null; onboardingRevision?: number|null;
   onboardingNote?: string|null; entitlementActive?: boolean; profileDraftReady?:boolean;
   profileDraftFields?:Record<string,string>|null;
-  canReadRegistrants?: boolean; securityQuestionConfigured?:boolean };
+  canReadRegistrants?: boolean; securityQuestionConfigured?:boolean;
+  sessionExpiresAt?:number; sessionIdleExpiresAt?:number };
 type Device = { device_id: string; revoked: number; approved?: number; created_at: string };
 type Mode = "login" | "register" | "claim" | "recover" | "devices";
 type AuthContact = "email" | "phone";
@@ -113,6 +114,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const recoveryOwner = useRef("");
   const lock = useRef(false), mounted = useRef(false), current = useRef("");
   const refreshInFlight=useRef(false);
+  const lastUserEngagementAt=useRef(0);
+  const lastLeaseRenewalAttemptAt=useRef(0);
   const readbackGeneration=useRef(0);
   const observedLifecycle=useRef<ObservedLifecycle|null>(null);
   const activationNeedsDocumentBootstrap=useRef<string|null>(null);
@@ -175,12 +178,40 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     if (!enabled || bypass) return;
     mounted.current = true;
     document.documentElement.dataset.accountFirst = "true";
+    // Activity signals are UX hints, not authentication. Only a valid,
+    // non-revoked server cookie can refresh its bounded lease. A hidden or
+    // abandoned tab must not keep the session alive indefinitely.
+    const engagement=()=>{if(!document.hidden)lastUserEngagementAt.current=Date.now();};
+    const keepAliveIfEngaged=async()=>{
+      const now=Date.now();
+      if(!current.current || now-lastLeaseRenewalAttemptAt.current<4*60_000)return;
+      const mediaPlaying=Array.from(document.querySelectorAll("video")).some(video=>
+        !video.paused && !video.ended && video.readyState>1);
+      // Users awaiting the one-time review must stay signed in while the page
+      // visibly polls. Approved users renew while actively interacting or
+      // watching a lesson, not after abandoning a background tab.
+      if(!needsApprovalPolling && !mediaPlaying &&
+        now-lastUserEngagementAt.current>15*60_000)return;
+      lastLeaseRenewalAttemptAt.current=now;
+      try{await send({action:"keepalive"});}
+      catch{
+        // Never treat an uncertain keepalive transport as logout. The
+        // authoritative readback below distinguishes expired from unavailable.
+      }
+    };
     const refresh = () => {
       if (document.hidden || lock.current || refreshInFlight.current) return;
       refreshInFlight.current=true;
-      void reload().catch(e => { if (mounted.current) setError(accountNetworkError(e)); })
+      void keepAliveIfEngaged().then(()=>reload())
+        .catch(e => { if (mounted.current) setError(accountNetworkError(e)); })
         .finally(()=>{refreshInFlight.current=false;});
     };
+    lastUserEngagementAt.current=Date.now();
+    window.addEventListener("pointerdown",engagement,{passive:true});
+    window.addEventListener("keydown",engagement);
+    window.addEventListener("wheel",engagement,{passive:true});
+    window.addEventListener("touchstart",engagement,{passive:true});
+    window.addEventListener("scroll",engagement,{passive:true,capture:true});
     refresh(); window.addEventListener("focus", refresh); window.addEventListener("pageshow",refresh);
     // A pending registration checks server approval every 20s; active accounts retain 60s refresh.
     // Hidden tabs and ongoing requests are skipped; only authenticated server state grants access.
@@ -195,7 +226,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         channel.onmessage = refresh;
       }
     } catch { /* A blocked cross-tab channel must never block sign-in. */ }
-    return () => { mounted.current = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh); channel?.close(); };
+    return () => {
+      mounted.current = false; window.clearInterval(timer);
+      window.removeEventListener("pointerdown",engagement);
+      window.removeEventListener("keydown",engagement);
+      window.removeEventListener("wheel",engagement);
+      window.removeEventListener("touchstart",engagement);
+      window.removeEventListener("scroll",engagement,true);
+      window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh);
+      channel?.close();
+    };
   }, [enabled, bypass, reload, needsApprovalPolling]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
@@ -397,6 +437,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       }
       if(lease.role!==account?.role)throw new Error("Vai trò thử không khớp với tài khoản.");
       setTrial(lease);
+    });
+  }
+  async function extendCurrentSession(){
+    await run(async()=>{
+      const result=await send({action:"keepalive"});
+      if(result.ok!==true)throw new Error("Máy chủ chưa xác nhận gia hạn phiên.");
+      lastLeaseRenewalAttemptAt.current=Date.now();
+      lastUserEngagementAt.current=Date.now();
+      await reload();
+      setNotice("Phiên đăng nhập đã được gia hạn an toàn từ máy chủ.");
     });
   }
   async function logoutAccount(){
@@ -660,7 +710,19 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       onExit={()=>setTrial(null)}
       onExpired={()=>{setTrial(null);setTrialUsed(true);void reload().catch(e=>setError(accountNetworkError(e)));}}/>;
   }
+  const idleTimeLeft=(account?.sessionIdleExpiresAt??0)-observedNow;
+  const absoluteTimeLeft=(account?.sessionExpiresAt??0)-observedNow;
+  const warnSession=ready&&active&&Boolean(account?.sessionIdleExpiresAt) &&
+    (idleTimeLeft<=5*60_000 || absoluteTimeLeft<=5*60_000);
   return <>
+    {warnSession ? <aside className={styles.sessionLeaseWarning} role="status" aria-live="polite">
+      <strong>Phiên đăng nhập sắp hết hạn</strong>
+      <span>{absoluteTimeLeft<=5*60_000
+        ? "Phiên đã gần giới hạn bảo mật 7 ngày. Hãy lưu các thay đổi và đăng nhập lại khi được yêu cầu."
+        : "Hệ thống chưa ghi nhận hoạt động gần đây. Bạn có thể gia hạn phiên mà không tải lại trang."}</span>
+      {absoluteTimeLeft>5*60_000 ? <button type="button" disabled={busy} onClick={()=>void extendCurrentSession()}>
+        {busy?"Đang xác minh…":"Giữ phiên đăng nhập"}</button>:null}
+    </aside> : null}
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
       <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
