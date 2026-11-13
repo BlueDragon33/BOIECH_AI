@@ -40,7 +40,9 @@ export async function GET(request: Request) {
       ? await (await getCourseDatabase()).prepare("SELECT kind FROM account_contacts WHERE account_id=?")
         .bind(account.accountId).first<{kind:"email"|"phone"}>() : null;
     // Only public account fields leave the server, never the principal/session hash.
-    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview, accountUiTrial:config.uiTrial, account: { accountId: account.accountId, status: account.status, role: account.role,
+    const selfService=config.v2 && await workflow?.isSelfService()===true;
+    return json({ enabled: true, accountV2: config.v2, accountSingleReview: config.singleReview,
+      accountSelfService:selfService, accountUiTrial:config.uiTrial, account: { accountId: account.accountId, status: account.status, role: account.role,
       primaryContactKind:primaryContact?.kind??null,
       name: config.v2 && !account.deviceApproved ? null : account.name,
       storageDeviceId: config.v2 && !account.deviceApproved ? null : account.storageDeviceId,
@@ -85,7 +87,14 @@ export async function POST(request: Request) {
     if (config.v2 && p.action === "approve-recovered-device") return json(await service.approveRecoveredDevice(p,peer));
     // Public Bơi Ếch intake is only for learners/teachers. Manager requests must
     // enter the existing App-Management Owner-controlled workflow, never via this API.
-    if (p.action === "register" && p.role === "manager") throw new AccountError("MANAGER_OWNER_INTAKE_REQUIRED", 403);
+    // Self-service manager registration is permitted only after the new
+    // signed D1 policy migration. The Owner role itself is never public.
+    if(p.action==="register"&&p.role==="manager"){
+      const setting=await (await getCourseDatabase()).prepare(
+        "SELECT enabled FROM account_self_service_settings WHERE id='global'")
+        .first<{enabled:number}>().catch(()=>null);
+      if(setting?.enabled!==1)throw new AccountError("MANAGER_OWNER_INTAKE_REQUIRED",403);
+    }
     // Only public account intake is required to supply one self-declared contact.
     // Do NOT send OTP, or treat matching this string as proof of a trusted device.
     if (config.v2 && (p.action === "register" || p.action === "manager-register")) {
