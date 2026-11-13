@@ -151,7 +151,7 @@ export class AccountEntitlementService {
       WHERE a.account_id=? AND d.person_role IN ('teacher','learner')
         AND o.stage='active' AND d.status='approved'`)
       .bind(id).first<{person_role:string;expires_at:string;state:string;revision:number}>();
-    if(!target||target.state!=="active")reject("ACCOUNT_TARGET_INACTIVE",409);
+    if(!target||target.state!=="active")throw new AccountEntitlementError("ACCOUNT_TARGET_INACTIVE",409);
     if(target.revision!==input.expectedRevision)reject("ACCOUNT_CAS_CONFLICT",409);
     const days=await this.defaultDays(target.person_role);
     const currentMs=Date.parse(target.expires_at);
