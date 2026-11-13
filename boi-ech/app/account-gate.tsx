@@ -417,6 +417,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       try {
         await send({...fields,action,expectedRevision:account?.onboardingRevision});
       } catch(caught) {
+        if((caught as {code?:string})?.code==="PROFILE_PHONE_IN_USE"){
+          // A phone entered at signup is not repeated in the profile form.
+          // In either case the global error remains visible; only focus a
+          // field when the user can actually correct the phone here.
+          const phoneInput=form.elements.namedItem("phone");
+          if(phoneInput instanceof HTMLInputElement){
+            setFieldErrors(previous=>({...previous,phone:accountNetworkError(caught)}));
+            phoneInput.focus();
+          }
+        }
         if((caught as {code?:string})?.code!=="ACCOUNT_CAS_CONFLICT")throw caught;
         // Review can finish while a user is filling the form. Read the
         // canonical state, then retry this one profile submission once with
@@ -627,7 +637,13 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
                 maxLength={name==="phone"?32:name==="familyName"||name==="givenName"?60:name==="facultyUnit"||name==="className"?80:120}
                 autoComplete={name==="familyName"?"family-name":name==="givenName"?"given-name":name==="phone"?"tel":"off"}
                 placeholder={name==="facultyUnit"?"Ví dụ: Khoa Công nghệ thông tin":name==="jobTitle"?"Ví dụ: Giảng viên":name==="jobPosition"?"Ví dụ: Trưởng bộ môn":undefined}
+                aria-invalid={Boolean(fieldErrors[name])}
+                aria-describedby={fieldErrors[name]?`profile-${name}-error`:undefined}
+                onInput={()=>setFieldErrors(previous=>{if(!previous[name])return previous;
+                  const next={...previous};delete next[name];return next;})}
                 disabled={busy}/>
+              {fieldErrors[name]?<small id={`profile-${name}-error`} role="alert" className={styles.fieldError}>
+                {fieldErrors[name]}</small>:null}
             </label>)}
             {account.role==="manager" && account.primaryContactKind ? <label className={styles.profileFieldWide}>
               <span>{account.primaryContactKind==="email"?"Số điện thoại bổ sung":"Email bổ sung"} <small>(không bắt buộc)</small></span>
