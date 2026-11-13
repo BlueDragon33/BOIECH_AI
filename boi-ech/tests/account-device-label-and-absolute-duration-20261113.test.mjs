@@ -20,6 +20,8 @@ test("Owner 4-year lease can be reduced to exactly 7 days without accumulation; 
  const f=accountStack({v2:true,singleReview:true});
  try{
   const a=await f.register(99101,"learner");
+  f.sqlite.prepare("INSERT INTO account_contacts(account_id,kind,value) VALUES(?,'phone','0900009981')")
+   .run(a.account.accountId);
   await f.flow.completeProfileWithoutReview(a.token,{
    expectedRevision:1,familyName:"Example",givenName:"Student",
    className:"Swim",phone:"0900009981"
