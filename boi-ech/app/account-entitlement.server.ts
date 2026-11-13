@@ -116,6 +116,89 @@ export class AccountEntitlementService {
     if(!row || row.revision!==(expectedRevision as number)+1 || row.defaultDays!==defaultDays) reject("ACCOUNT_READBACK_FAILED",503);
     return row;
   }
+  async managerRoster() {
+    const result=await this.db.prepare(`SELECT a.account_id AS accountId,d.learner_name AS name,
+      d.person_role AS role,o.stage,d.status,e.state AS entitlementState,
+      e.expires_at AS expiresAt,e.revision AS entitlementRevision
+      FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+      JOIN account_onboarding o ON o.account_id=a.account_id
+      JOIN account_entitlements e ON e.account_id=a.account_id
+      WHERE d.person_role IN ('learner','teacher') AND o.stage IN ('active','suspended')
+      ORDER BY a.account_id LIMIT 301`).all<{
+        accountId:string;name:string|null;role:string;stage:string;status:string;
+        entitlementState:string;expiresAt:string;entitlementRevision:number
+      }>();
+    if((result.results?.length??0)>300)reject("ACCOUNT_RESULT_LIMIT",413);
+    return {verified:true,records:(result.results??[]).map(r=>({
+      ...r,remainingMs:Math.max(0,Date.parse(r.expiresAt)-this.now())
+    }))};
+  }
+  /** A signed-in manager can renew learner/teacher access, never their own or
+   * other managers' access. A single atomic SQL update verifies the manager's
+   * live session, active lease, permissions and target CAS revision. */
+  async managerRenew(actor:{
+    accountId:string;deviceId:string;sessionHash:string;generation:number;role:string
+  },input:Record<string,unknown>) {
+    if(actor.role!=="manager")reject("MANAGER_REQUIRED",403);
+    const id=this.accountId(input.accountId);
+    if(id===actor.accountId||!Number.isSafeInteger(input.expectedRevision)||
+       (input.expectedRevision as number)<1)reject("ACCOUNT_INPUT",400);
+    const reason=this.reason(input.reason);
+    const target=await this.db.prepare(`SELECT d.person_role,e.expires_at,e.state,e.revision
+      FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
+      JOIN account_onboarding o ON o.account_id=a.account_id
+      JOIN account_entitlements e ON e.account_id=a.account_id
+      WHERE a.account_id=? AND d.person_role IN ('teacher','learner')
+        AND o.stage='active' AND d.status='approved'`)
+      .bind(id).first<{person_role:string;expires_at:string;state:string;revision:number}>();
+    if(!target||target.state!=="active")reject("ACCOUNT_TARGET_INACTIVE",409);
+    if(target.revision!==input.expectedRevision)reject("ACCOUNT_CAS_CONFLICT",409);
+    const days=await this.defaultDays(target.person_role);
+    const currentMs=Date.parse(target.expires_at);
+    if(!Number.isFinite(currentMs))reject("ACCOUNT_INPUT",400);
+    const nextExpiry=new Date(Math.max(this.now(),currentMs)+days*86400000).toISOString();
+    try{
+      await this.db.batch([
+        this.db.prepare(`UPDATE account_entitlements SET expires_at=?,revision=revision+1,
+          changed_by=?,updated_at=CURRENT_TIMESTAMP
+          WHERE account_id=? AND revision=? AND state='active'
+          AND EXISTS(SELECT 1 FROM accounts a JOIN device_access d
+            ON d.device_id=a.storage_device_id JOIN account_onboarding o
+            ON o.account_id=a.account_id WHERE a.account_id=?
+            AND d.person_role IN ('learner','teacher') AND d.status='approved'
+            AND o.stage='active')
+          AND EXISTS(SELECT 1 FROM account_sessions s
+            JOIN account_devices b ON b.account_id=s.account_id AND b.device_id=s.device_id
+            JOIN account_credentials c ON c.account_id=s.account_id AND c.generation=s.generation
+            JOIN accounts a ON a.account_id=s.account_id
+            JOIN device_access d ON d.device_id=a.storage_device_id
+            JOIN account_onboarding o ON o.account_id=a.account_id
+            JOIN account_entitlements e ON e.account_id=a.account_id
+            JOIN account_manager_permissions p ON p.account_id=a.account_id
+            WHERE s.account_id=? AND s.token_hash=? AND s.device_id=?
+              AND s.generation=? AND s.revoked=0 AND b.revoked=0 AND b.approved=1
+              AND s.expires_at>(unixepoch()*1000) AND s.idle_expires_at>(unixepoch()*1000)
+              AND d.status='approved' AND d.person_role='manager' AND d.management_enabled=1
+              AND o.stage='active' AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP
+              AND p.scope='manager.manage.assigned' AND p.enabled=1
+              AND (p.expires_at IS NULL OR p.expires_at>(unixepoch()*1000)))`)
+        .bind(nextExpiry,actor.accountId,id,input.expectedRevision,id,
+          actor.accountId,actor.sessionHash,actor.deviceId,actor.generation),
+        this.db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
+          VALUES(?,'manager.entitlement.renew',?,
+            CASE WHEN changes()=1 THEN ? ELSE NULL END)`)
+          .bind(actor.accountId,id,reason)
+      ]);
+    }catch(error){
+      if(error instanceof Error&&/constraint|NOT NULL|UNIQUE/i.test(error.message))
+        reject("ACCOUNT_CAS_CONFLICT",409);
+      throw error;
+    }
+    const after=await this.read(id);
+    if(!after||after.revision!==(input.expectedRevision as number)+1||
+      after.expiresAt!==nextExpiry)reject("ACCOUNT_READBACK_FAILED",503);
+    return {verified:true,accountId:id,role:target.person_role,entitlement:after};
+  }
   async change(actor:Owner,input:Record<string,unknown>) {
     this.owner(actor);
     const id=this.accountId(input.accountId);
