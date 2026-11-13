@@ -70,3 +70,28 @@ WHEN NOT (
  OR (OLD.stage='legacy_hold' AND NEW.stage='profile_review')
 )
 BEGIN SELECT RAISE(ABORT,'ONBOARDING_INVALID_TRANSITION'); END;
+
+--> statement-breakpoint
+-- Sticky Owner blocklist: survives account deletion. No plaintext passwords,
+-- security answers or device signing secrets are retained.
+CREATE TABLE IF NOT EXISTS account_security_bans (
+ kind TEXT NOT NULL CHECK(kind IN ('login','device')),
+ value TEXT NOT NULL,
+ actor TEXT NOT NULL,
+ reason TEXT NOT NULL CHECK(length(reason)>=10),
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(kind,value)
+);
+--> statement-breakpoint
+-- Race-proof ban enforcement in D1, not only in JavaScript.
+CREATE TRIGGER IF NOT EXISTS account_registration_login_ban
+BEFORE INSERT ON accounts WHEN NEW.login IS NOT NULL
+ AND EXISTS(SELECT 1 FROM account_security_bans
+  WHERE kind='login' AND value=lower(trim(NEW.login)))
+BEGIN SELECT RAISE(ABORT,'ACCOUNT_SECURITY_BANNED'); END;
+--> statement-breakpoint
+CREATE TRIGGER IF NOT EXISTS account_known_device_ban
+BEFORE INSERT ON account_devices
+WHEN EXISTS(SELECT 1 FROM account_security_bans
+ WHERE kind='device' AND value=NEW.device_id)
+BEGIN SELECT RAISE(ABORT,'DEVICE_SECURITY_BANNED'); END;
