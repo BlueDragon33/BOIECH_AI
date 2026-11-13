@@ -91,8 +91,9 @@ function reloadPreservingPendingManagerInvite(token: string) {
 }
 
 function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) {
- const [now,setNow]=useState(Date.now());
- useEffect(()=>{const tick=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(tick);},[]);
+ const [now,setNow]=useState(0);
+ useEffect(()=>{queueMicrotask(()=>setNow(Date.now()));
+  const tick=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(tick);},[]);
  const ms=Math.max(0,new Date(expiresAt).getTime()-now);
  const days=Math.floor(ms/86400000),hours=Math.floor(ms%86400000/3600000);
  const minutes=Math.floor(ms%3600000/60000),seconds=Math.floor(ms%60000/1000);
