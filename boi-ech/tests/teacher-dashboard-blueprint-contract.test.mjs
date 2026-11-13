@@ -5,12 +5,16 @@ import fs from "node:fs";
 const blueprint = fs.readFileSync(new URL("../app/teacher-dashboard-blueprint.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/teacher-dashboard-blueprint.css", import.meta.url), "utf8");
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const enhancements = fs.readFileSync(new URL("../app/teacher-enhancements.tsx", import.meta.url), "utf8");
 
-test("teacher blueprint is mounted after the existing role shell and reference styles", () => {
+test("teacher blueprint mounts after the teacher shell, exclusively for teachers", () => {
   assert.match(layout, /import "\.\/teacher-dashboard-reference\.css";/);
   assert.match(layout, /import "\.\/teacher-dashboard-blueprint\.css";/);
-  assert.match(layout, /import TeacherDashboardBlueprint from "\.\/teacher-dashboard-blueprint";/);
-  assert.match(layout, /<TeacherRoleShell \/>[\s\S]*<TeacherDashboardBlueprint \/>/);
+  assert.ok(enhancements.includes('import TeacherDashboardBlueprint from "./teacher-dashboard-blueprint"'));
+  assert.ok(enhancements.indexOf("<TeacherRoleShell />") < enhancements.indexOf("<TeacherDashboardBlueprint />"));
+  assert.ok(page.includes('deviceAccess.personRole === "teacher" ? <TeacherEnhancements />'));
+  assert.ok(!layout.includes("<TeacherDashboardBlueprint />"));
 });
 
 test("teacher blueprint adds the missing reference controls without creating another data API", () => {
