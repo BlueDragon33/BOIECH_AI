@@ -89,7 +89,7 @@ function check(r:Row,options:{days:number;mode:Mode},now:number){
  const inactive=r.access_status==="approved"&&["active","suspended"].includes(r.stage||"");
  const category=pending?"pending":inactive?"inactive":null;
  const categoryAllowed=category&&(options.mode==="both"||category===options.mode);
- const tooRecent=lastActivity===0||now-lastActivity<=options.days*86400000;
+ const tooRecent=lastActivity===0||(options.days===8 ? now-lastActivity<=7*86400000 : now-lastActivity<options.days*86400000);
  const blockers=dataBlockers(r);
  if(!categoryAllowed||tooRecent)return null;
  return {accountId:r.account_id,name:r.person_name||r.login||"Chưa khai báo",
