@@ -67,6 +67,27 @@ test("Owner threshold switches 3,5,7 and strictly >7 days, with no background de
   await assert.rejects(()=>f.load("owner-account-cleanup.server.ts").inspectCleanup(f.db,owner,{mode:"pending",days:9}),e=>e.code==="CLEANUP_INPUT");
  }finally{f.close();}
 });
+test("Inactive previously-approved account can be selected after 5 days; active user and approved teacher assignments are protected",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const a=await f.register(70107);aged(f,a,9);
+  for(const stage of ["profile_required","profile_review","active"]){
+   f.sqlite.prepare("UPDATE account_onboarding SET stage=? WHERE account_id=?").run(stage,a.account.accountId);
+  }
+  f.sqlite.prepare("UPDATE device_access SET status='approved' WHERE device_id=?")
+   .run(a.account.storageDeviceId);
+  const scan=await preview(f,"inactive",5);
+  const chosen=scan.records.find(x=>x.accountId===a.account.accountId);
+  assert.ok(chosen,"active-stage approved account older than five days must be selectable");
+  assert.equal(chosen.category,"inactive");
+  assert.equal(chosen.eligible,true);
+  const svc=f.load("owner-account-cleanup.server.ts");
+  const deleted=await svc.purgeCleanupAccount(f.db,owner,{
+   action:"purge",mode:"inactive",days:5,accountId:a.account.accountId,
+   confirmation:"XOA TAI KHOAN",reason:"Owner confirms inactive account contains no learning records",snapshot:chosen.snapshot
+  });
+  assert.equal(deleted.deleted,true);
+ }finally{f.close();}
+});
 test("Stale preview, wrong confirmation and non-Owner proof never delete anything",async()=>{
  const {f,a}=await fixture(70106);try{
   const item=(await preview(f)).records[0];
