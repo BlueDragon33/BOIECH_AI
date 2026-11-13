@@ -49,6 +49,43 @@ export async function verifyPublicAssets(files,http=fetch){
   if(r.status!==200||!(file.endsWith('.js')?/javascript|ecmascript/i.test(type):/text\/css/i.test(type)))throw new Error(`Production public asset failed: ${file} HTTP ${r.status}`);
  }
 }
+/**
+ * Cloudflare can report an older Worker settings revision for a short period
+ * immediately after a successful Wrangler deploy. Retry only that observed
+ * revision/flag propagation window; every poll independently validates the
+ * existing Worker name, D1 binding, secret presence and managed policy.
+ * Never turn a permanent mismatch into PASS.
+ */
+export async function waitForLiveProductionRevision(load,revision,{
+ activate=false,singleReview=false,attempts=18,intervalMs=5000,
+ sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+ onPending=()=>{}
+}={}){
+ if(!/^[a-f0-9]{40}$/.test(revision??'')||!Number.isSafeInteger(attempts)||attempts<1||attempts>30
+   ||!Number.isSafeInteger(intervalMs)||intervalMs<0||intervalMs>10000)
+  throw new Error('Production revision readback configuration invalid');
+ let observed='missing';
+ for(let attempt=1;attempt<=attempts;attempt++){
+  const live=await load();
+  // Structural/safety guards must pass on EVERY observation, even a stale one.
+  productionPackage(live,revision);
+  const vars=Object.fromEntries(live.result.bindings.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));
+  observed=typeof vars.BOI_ECH_BUILD_REVISION==='string'?vars.BOI_ECH_BUILD_REVISION:'missing';
+  const verified=observed===revision
+    &&vars.BOI_ECH_DEPLOYMENT_CHANNEL==='cloudflare-production'
+    &&(!activate||accountMode(vars))
+    &&(!singleReview||vars.BOI_ECH_SINGLE_REVIEW==='true');
+  if(verified)return {worker:'boi-ech',database:'boi-ech-db',revision:observed,
+    channel:vars.BOI_ECH_DEPLOYMENT_CHANNEL,
+    accountFirstV2:accountMode(vars),singleReview:vars.BOI_ECH_SINGLE_REVIEW==='true',
+    readbackAttempt:attempt};
+  if(attempt===attempts)break;
+  onPending({attempt,attempts,observedRevision:observed});
+  await sleep(intervalMs);
+ }
+ throw new Error(`Live production revision mismatch after ${attempts} attempts (observed ${observed.slice(0,40)}; expected ${revision}).`);
+}
+
 async function settings(){
  if(String(process.env.CLOUDFLARE_ACCOUNT_ID??'').trim()!==account||!process.env.CLOUDFLARE_API_TOKEN)throw new Error('Existing production credentials unavailable');
  const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/boi-ech/settings`,{headers:{authorization:`Bearer ${process.env.CLOUDFLARE_API_TOKEN}`},redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -80,11 +117,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
   const probes=fs.readdirSync(directory).filter(n=>/^index-.*\.js$/.test(n)||n.endsWith('.css')).map(n=>'assets/'+n);
   await verifyPublicAssets(probes);console.log('Live production JavaScript/CSS asset read-back PASS.');
  }else if(mode==='readback'){
-  const live=await settings(),vars=Object.fromEntries(live.result.bindings.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));
-  productionPackage(live,revision);
-  if(activate&&!accountMode(vars))throw new Error('Live Account-first activation missing');
-  if(singleReview&&vars.BOI_ECH_SINGLE_REVIEW!=='true')throw new Error('Live single-review activation missing');
-  if(vars.BOI_ECH_BUILD_REVISION!==revision||vars.BOI_ECH_DEPLOYMENT_CHANNEL!=='cloudflare-production')throw new Error('Live production revision mismatch');
-  console.log(JSON.stringify({worker:'boi-ech',database:'boi-ech-db',revision:vars.BOI_ECH_BUILD_REVISION,channel:vars.BOI_ECH_DEPLOYMENT_CHANNEL,accountFirstV2:accountMode(vars),singleReview:vars.BOI_ECH_SINGLE_REVIEW==='true'}));
+  const verified=await waitForLiveProductionRevision(settings,revision,{
+   activate,singleReview,
+   onPending:({attempt,attempts,observedRevision})=>
+    console.log(`Worker metadata propagation: observation ${attempt}/${attempts}, revision ${observedRevision.slice(0,12)}; checking again...`)
+  });
+  console.log(JSON.stringify(verified));
  }else throw new Error('Unknown production package mode');
 }
