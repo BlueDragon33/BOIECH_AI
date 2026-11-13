@@ -109,3 +109,18 @@ test("legacy course profile is removed only when its source is not shared",async
    .get(sharedOne,sharedTwo).n,2);
  }finally{f.close();}
 });
+
+test("manager-reviewed history remains protected even when assignment was later removed",async()=>{
+ const f=accountStack({v2:true,singleReview:true});
+ try{
+  const id=fixture(f,"c",9);
+  f.sqlite.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json)
+    VALUES('manager@fixture.invalid','manager_device_approved',?,'{}')`).run(id);
+  const service=f.load("owner-legacy-bulk-purge.server.ts");
+  const p=await service.previewLegacyFiveDayPurge(f.db,owner);
+  assert.equal(p.totalMatched,0);
+  assert.equal(p.eligible,0);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM device_access WHERE device_id=?")
+   .get(id).n,1);
+ }finally{f.close();}
+});
