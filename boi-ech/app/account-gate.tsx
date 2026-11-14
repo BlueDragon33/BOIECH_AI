@@ -67,6 +67,8 @@ function authFieldError(input: HTMLInputElement, form: HTMLFormElement, contactT
 }
 function accountNetworkError(error: unknown) {
   const raw=error instanceof Error?error.message:"";
+  if (/timeout|timed out|aborted due to timeout|TimeoutError/i.test(raw) || (error instanceof Error && error.name === "TimeoutError"))
+    return "Máy chủ xác thực phản hồi quá thời gian. Hãy thử Đồng bộ trạng thái, không gửi đăng ký lại.";
   if (/load failed|failed to fetch|networkerror|network request failed/i.test(raw))
     return "Không kết nối được máy chủ tài khoản. Nếu vừa đăng ký, hãy thử Đăng nhập hoặc Đồng bộ trạng thái trước khi gửi lại để tránh trùng yêu cầu.";
   return raw || "Chưa xác minh được kết nối tài khoản.";
@@ -109,8 +111,12 @@ async function accountReadWithinDeadline<T extends Record<string, unknown>>(
   }
 }
 async function send(body: Record<string, unknown>) {
-  const {response,data} = await accountReadWithinDeadline<{ error?: string; code?: string; [key:string]:unknown }>("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
-    headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  // Keep this send helper self-contained for the existing runtime failure harness.
+  // AbortSignal.timeout remains active while the response body is parsed.
+  const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000) });
+  const data = await readAccountPayload(response) as { error?: string; code?: string; [key:string]:unknown };
   if (!response.ok) throw Object.assign(new Error(data.error ?? "Chưa xác minh được thao tác tài khoản."), {
     code: typeof data.code==="string" ? data.code : "ACCOUNT_SERVICE_UNAVAILABLE"
   });
