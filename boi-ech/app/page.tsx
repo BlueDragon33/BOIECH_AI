@@ -178,7 +178,23 @@ function Icon({ name }: { name: SectionId | "menu" | "close" }) {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("Trình duyệt đang chặn bộ nhớ thiết bị. Hãy cho phép lưu trữ trang trong cài đặt trình duyệt."));
+      return;
+    }
     const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap", 4);
+    let completed = false;
+    const deadline = window.setTimeout(() => {
+      if (completed) return;
+      completed = true;
+      reject(new Error("Bộ nhớ thiết bị chưa phản hồi. Hãy đóng tab Bơi Ếch khác, kiểm tra quyền lưu trữ rồi chọn Thử lại. Không xóa dữ liệu trang."));
+    }, 10000);
+    request.onblocked = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(deadline);
+      reject(new Error("Một tab khác đang khóa bộ nhớ thiết bị. Hãy đóng các tab Bơi Ếch khác rồi thử lại."));
+    };
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("tien-do")) {
         request.result.createObjectStore("tien-do");
@@ -199,8 +215,18 @@ function openDb(): Promise<IDBDatabase> {
         request.result.createObjectStore("thong-ke-hoc");
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      if (completed) { request.result.close(); return; }
+      completed = true;
+      window.clearTimeout(deadline);
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(deadline);
+      reject(request.error ?? new Error("Không mở được bộ nhớ thiết bị."));
+    };
   });
 }
 
@@ -489,22 +515,14 @@ async function writeStoredDeviceCredential(value: StoredDeviceCredential) {
 }
 
 async function getOrCreateDeviceCredential() {
+  // A valid cryptographic signature is mandatory even for previously stored identities.
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    throw new CourseApiError("Trình duyệt không hỗ trợ khóa bảo mật WebCrypto. Hãy sử dụng trình duyệt hiện đại qua HTTPS; không xóa dữ liệu thiết bị đã lưu.", "WEBCRYPTO_REQUIRED");
+  }
   const current = await readStoredDeviceCredential();
-  if (current?.version === 2 && current.publicKey && (current.privateKey || !crypto.subtle)) return current;
-
-  if (!crypto.subtle) {
-    const credential = {
-      version: 2,
-      privateKey: null,
-      publicKey: {
-        kty: "EC",
-        crv: "P-256",
-        x: base64Url(crypto.getRandomValues(new Uint8Array(32))),
-        y: base64Url(crypto.getRandomValues(new Uint8Array(32))),
-      },
-    } satisfies StoredDeviceCredential;
-    await writeStoredDeviceCredential(credential);
-    return credential;
+  if (current?.version === 2 && current.publicKey && current.privateKey) return current;
+  if (current?.version === 2 && current.publicKey && !current.privateKey) {
+    throw new CourseApiError("Thiết bị đã có mã đăng ký nhưng không còn khóa riêng. Hãy dùng quy trình khôi phục thiết bị, không tự tạo mã mới.", "DEVICE_PRIVATE_KEY_REQUIRED");
   }
 
   const generated = await crypto.subtle.generateKey(
@@ -531,19 +549,41 @@ function legacyDeviceToken() {
 }
 
 async function parseDeviceResponse(response: Response) {
-  const data = (await response.json()) as DeviceApiResponse;
+  let data: DeviceApiResponse;
+  try { data = (await response.json()) as DeviceApiResponse; }
+  catch { throw new CourseApiError("Máy chủ xác thực trả dữ liệu không hợp lệ. Hãy thử lại.", "DEVICE_INVALID_RESPONSE", undefined, response.status); }
   if (!response.ok) throw new CourseApiError(data.error ?? "Không thể xác thực thiết bị.", data.code, data.device, response.status);
   return data;
 }
 
+/** Bound the entire device request including JSON body read; do not leave the gate spinning. */
+async function deviceRequest(url: string, options: RequestInit, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return await parseDeviceResponse(response);
+  } catch (cause) {
+    if (controller.signal.aborted) {
+      throw new CourseApiError("Máy chủ xác thực chưa phản hồi trong 12 giây. Kiểm tra kết nối rồi chọn Thử lại.", "DEVICE_TIMEOUT");
+    }
+    if (cause instanceof TypeError) {
+      throw new CourseApiError("Không kết nối được máy chủ xác thực. Kiểm tra Internet và thử lại.", "DEVICE_NETWORK_ERROR");
+    }
+    throw cause;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 async function registerDeviceCredential(credential: StoredDeviceCredential) {
-  const response = await fetch("/api/device", {
+  const data = await deviceRequest("/api/device", {
     method: "POST",
     credentials: "same-origin",
+    cache: "no-store",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "register", publicKey: credential.publicKey, legacyToken: legacyDeviceToken() }),
   });
-  const data = await parseDeviceResponse(response);
   if (!data.device) throw new CourseApiError("Máy chủ chưa trả về trạng thái thiết bị.");
   if (data.device.status === "approved") {
     try { window.localStorage.removeItem("boi-ech-device-token-v1"); } catch { /* Đã chuyển sang khóa không thể xuất. */ }
@@ -552,19 +592,20 @@ async function registerDeviceCredential(credential: StoredDeviceCredential) {
 }
 
 async function signedDeviceProof(credential: StoredDeviceCredential, device: Pick<DeviceAccessState, "deviceId">, signal?: AbortSignal) {
-  const challengeResponse = await fetch("/api/device", {
+  const challengeData = await deviceRequest("/api/device", {
     method: "POST",
     signal,
     credentials: "same-origin",
+    cache: "no-store",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action: "challenge", deviceId: device.deviceId }),
   });
-  const challengeData = await parseDeviceResponse(challengeResponse);
   if (!challengeData.challenge) throw new CourseApiError("Máy chủ chưa tạo được thử thách thiết bị.");
   const message = new TextEncoder().encode(`boi-ech:${device.deviceId}:${challengeData.challenge}`);
-  const signature = credential.privateKey && crypto.subtle
-    ? await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message)
-    : crypto.getRandomValues(new Uint8Array(64)).buffer;
+  if (!credential.privateKey || typeof crypto === "undefined" || !crypto.subtle) {
+    throw new CourseApiError("Không có khóa ký thiết bị hợp lệ. Hãy khôi phục qua quy trình hỗ trợ, không tự động xóa khóa thiết bị.", "DEVICE_PRIVATE_KEY_REQUIRED");
+  }
+  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, credential.privateKey, message);
   return { deviceId: device.deviceId, challenge: challengeData.challenge, signature: base64Url(new Uint8Array(signature)) };
 }
 
@@ -634,14 +675,13 @@ async function issueCertificate(credential: StoredDeviceCredential, device: Devi
 
 async function postDevicePresence(credential: StoredDeviceCredential, device: DeviceAccessState) {
   return withFreshDeviceProof(credential, device, async (proof) => {
-    const response = await fetch("/api/device", {
+    const data = await deviceRequest("/api/device", {
       method: "POST",
       credentials: "same-origin",
       cache: "no-store",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "presence", ...proof }),
     });
-    const data = await parseDeviceResponse(response);
     if (!data.device) throw new CourseApiError("Máy chủ chưa xác nhận trạng thái thiết bị.");
     return data.device;
   });
@@ -653,13 +693,13 @@ async function saveDeviceRegistration(
   fields: LearnerRegistrationFields,
 ) {
   return withFreshDeviceProof(credential, device, async (proof) => {
-    const response = await fetch("/api/device", {
+    const data = await deviceRequest("/api/device", {
       method: "POST",
       credentials: "same-origin",
+      cache: "no-store",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "save-registration", ...fields, ...proof }),
     });
-    const data = await parseDeviceResponse(response);
     if (!data.device) throw new CourseApiError("Máy chủ chưa trả về hồ sơ vừa đăng ký.");
     return data.device;
   });
@@ -801,14 +841,33 @@ function DeviceGate({
   }
 
   return (
-    <main className="device-gate">
-      <section>
+    <main className="device-gate device-gate-premium">
+      <section className="device-gate-premium-shell">
+        <header className="device-gate-premium-header">
+          <div className="device-gate-premium-brand"><span className="device-gate-premium-brand-mark" aria-hidden="true"><i/><i/><i/></span><strong>BƠI ẾCH AI</strong></div>
+          <span className="device-gate-premium-header-status"><span aria-hidden="true">◇</span> CỔNG XÁC THỰC AN TOÀN</span>
+        </header>
+        <div className="device-gate-premium-grid">
+          <div className="device-gate-premium-main">
+        <div className="device-gate-premium-identity">
         <div className="device-gate-mark"><i /><i /><i /></div>
         <span className={`device-gate-status ${blocked ? "blocked" : expired ? "expired" : pending ? "pending" : "checking"}`}>
           {blocked ? "Thiết bị đã bị khóa" : expired ? "Quyền học đã hết hạn" : needsRegistration ? "Nhập thông tin người học" : readyToLearn ? "Thông tin đã được lưu" : paymentRequested ? "Bước 2 · Thanh toán" : pending ? "Đang chờ phân nhóm" : "Đang xác thực thiết bị"}
         </span>
+        </div>
         <h1>{blocked ? "Website chưa thể mở trên thiết bị này." : expired ? "Tài khoản cần được quản trị viên gia hạn." : needsRegistration ? "Đăng ký thông tin sử dụng." : readyToLearn ? `Sẵn sàng ${device?.personRole === "manager" ? "vào khu điều phối" : "vào học"}, ${device?.learnerGivenName ?? "bạn"}.` : proofSubmitted ? "Ảnh chuyển khoản đã gửi." : paymentRequested ? "Tài khoản học tập: 50.000đ." : pending ? "Thông tin đã gửi tới Trung tâm quản trị." : "Đang kiểm tra quyền truy cập…"}</h1>
         <p>{blocked ? "Liên hệ quản trị viên nếu cần mở lại quyền học." : expired ? `Quyền học hết hạn lúc ${device?.accessExpiresAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(device.accessExpiresAt)) : "—"}. Tiến độ đã lưu được giữ nguyên.` : needsRegistration ? "Thông tin được dùng để cá nhân hóa bài học, lưu tiến độ và cấp chứng chỉ hoàn thành." : readyToLearn ? "Thông tin đã được xác nhận. Thời gian và tiến độ học được tự động ghi nhận để đồng bộ với giảng viên." : proofSubmitted ? "Trung tâm sẽ kiểm tra ảnh. Ngay khi xác minh, tài khoản trên thiết bị này sẽ tự động mở." : paymentRequested ? "Quét mã QR MB, chuyển đúng 50.000đ rồi gửi ảnh chuyển khoản để Trung tâm xác minh." : pending ? "Quản trị viên sẽ chọn tài khoản miễn phí hoặc yêu cầu trả phí. Trang tự kiểm tra kết quả mà không cần nhập lại." : error || "Thiết bị đang ký thử thách bảo mật do máy chủ gửi."}</p>
+        <div className="device-gate-premium-steps" aria-label="Các bước xác thực">
+          <div className={`device-gate-premium-step ${device ? "is-done" : "is-current"}`}>
+            <span className="device-gate-premium-step-number">01</span><div><strong>Nhận diện thiết bị</strong><small>{device ? "Đã nhận dữ liệu từ máy chủ" : "Đang tạo và kiểm tra khóa thiết bị"}</small></div><b>{device ? "✓" : "…"}</b>
+          </div>
+          <div className={`device-gate-premium-step ${readyToLearn ? "is-done" : blocked || expired || error ? "is-problem" : "is-current"}`}>
+            <span className="device-gate-premium-step-number">02</span><div><strong>Kiểm tra quyền truy cập</strong><small>{readyToLearn ? "Máy chủ đã xác nhận quyền" : pending ? "Đang chờ quyền được cấp" : error ? "Cần xử lý lỗi kết nối hoặc xác thực" : expired ? "Cần gia hạn tài khoản" : blocked ? "Thiết bị đã bị thu hồi" : "Đối chiếu trạng thái trên máy chủ"}</small></div><b>{readyToLearn ? "✓" : blocked || expired || error ? "!" : "…"}</b>
+          </div>
+          <div className={`device-gate-premium-step ${readyToLearn ? "is-done" : "is-waiting"}`}>
+            <span className="device-gate-premium-step-number">03</span><div><strong>Mở không gian làm việc</strong><small>{readyToLearn ? "Đã sẵn sàng truy cập" : "Chỉ mở khi đủ quyền tài khoản và thiết bị"}</small></div><b>{readyToLearn ? "✓" : "—"}</b>
+          </div>
+        </div>
         {device?.deviceCode ? (
           <div className="device-code-box"><span>Mã thiết bị</span><strong>{device.deviceCode}</strong><button onClick={() => void copyCode()}>{copied ? "Đã sao chép" : "Sao chép mã"}</button></div>
         ) : null}
@@ -839,6 +898,14 @@ function DeviceGate({
         {(localError || error) && !blocked ? <div className="device-gate-error" role="alert">{localError || error}</div> : null}
         {!needsRegistration && !paymentRequested && !readyToLearn ? <button className="device-gate-retry" onClick={onRetry} disabled={checking}>{checking ? "Đang kiểm tra…" : expired ? "Kiểm tra gia hạn" : "Kiểm tra trạng thái ngay"}</button> : null}
         <small>Khóa riêng chỉ lưu trong trình duyệt này. Xóa dữ liệu trang hoặc đổi trình duyệt sẽ tạo một mã thiết bị mới và cần duyệt lại.</small>
+          </div>
+          <aside className="device-gate-premium-art" aria-hidden="true">
+            <div className="device-gate-premium-orbit"><span className="device-gate-premium-orbit-inner"><span className="device-gate-premium-shield">♢<span>⌑</span></span></span></div>
+            <div className="device-gate-premium-art-label">SECURE DEVICE ACCESS</div>
+            <div className="device-gate-premium-art-caption">Bảo mật thiết bị · Xác thực bởi máy chủ</div>
+          </aside>
+        </div>
+        <footer className="device-gate-premium-footer"><span aria-hidden="true">♧</span> Mỗi quyền truy cập được xác nhận trên máy chủ · Không chia sẻ khóa riêng hoặc mã khôi phục</footer>
       </section>
     </main>
   );
@@ -1346,16 +1413,18 @@ export default function Home() {
 
   useEffect(() => {
     if (!deviceCredential || deviceAccess?.status !== "pending") return;
+    let inFlight = false;
     const timer = window.setInterval(() => {
+      if (document.hidden || !navigator.onLine || inFlight) return;
+      inFlight = true;
       registerDeviceCredential(deviceCredential)
         .then((access) => {
           setDeviceAccess(access);
-          if (access.status === "approved") {
-            if (access.registrationComplete && !access.accessExpired) setHasEnteredLearning(true);
-            setDeviceError("");
-          }
+          setDeviceError("");
+          if (access.status === "approved" && access.registrationComplete && !access.accessExpired) setHasEnteredLearning(true);
         })
-        .catch((error) => setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị."));
+        .catch((error) => setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị."))
+        .finally(() => { inFlight = false; });
     }, 10_000);
     return () => window.clearInterval(timer);
   }, [deviceAccess?.status, deviceCredential]);
@@ -1582,10 +1651,11 @@ export default function Home() {
   }
 
   async function refreshDeviceAccess() {
-    if (!deviceCredential) return;
     setDeviceChecking(true);
     try {
-      const access = await registerDeviceCredential(deviceCredential);
+      const credential = deviceCredential ?? await getOrCreateDeviceCredential();
+      if (!deviceCredential) setDeviceCredential(credential);
+      const access = await registerDeviceCredential(credential);
       setDeviceAccess(access);
       if (access.status === "approved" && access.registrationComplete && !access.accessExpired) setHasEnteredLearning(true);
       setDeviceError("");

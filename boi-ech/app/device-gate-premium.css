@@ -1,0 +1,161 @@
+/* Blueprint OS 1.3 — Owner approved premium access gate.
+ * A presentation-only skin: all authorization still comes from the server. */
+.device-gate.device-gate-premium {
+  --gate-accent: #55ede7;
+  --gate-foreground: #f7fcff;
+  --gate-muted: #bfd4df;
+  min-height: 100dvh;
+  padding: clamp(12px, 2.2vw, 36px);
+  color: var(--gate-foreground);
+  background: radial-gradient(ellipse at 82% 9%, #0a5f70 0, transparent 35%),
+    radial-gradient(ellipse at 15% 75%, #053b57 0, transparent 40%),
+    linear-gradient(145deg, #03121f 0%, #001522 52%, #061e32 100%);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+.device-gate.device-gate-premium > .device-gate-premium-shell {
+  width: min(1420px, 100%);
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+  background: linear-gradient(153deg, rgba(5,38,59,.99), rgba(1,18,35,.99));
+  border: 1px solid rgba(87,223,231,.36);
+  border-radius: clamp(20px, 2.3vw, 32px);
+  box-shadow: 0 35px 100px #0008, inset 0 1px 0 #a9ffff15;
+  backdrop-filter: none;
+}
+.device-gate-premium-header {
+  display:flex;align-items:center;gap:18px;justify-content:space-between;
+  min-height:82px;padding:16px clamp(20px,3.5vw,48px);
+  border-bottom:1px solid #3bbdcb40;
+  background:linear-gradient(110deg, #041a2e, #0633489c, #031523);
+}
+.device-gate-premium-brand { display:flex;align-items:center;gap:18px;min-width:0 }
+.device-gate-premium-brand strong { font-size:clamp(18px,2vw,26px);font-weight:900;letter-spacing:-.025em;color:#fff;white-space:nowrap }
+.device-gate-premium-brand-mark {
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  width:48px;height:48px;flex-shrink:0;border-radius:15px;
+  background:linear-gradient(145deg,#2dd9db,#85eee7);box-shadow:0 0 25px #14dfe740;
+}
+.device-gate-premium-brand-mark i {display:block;width:6px;background:#064352;transform:skew(-19deg);border-radius:8px}
+.device-gate-premium-brand-mark i:nth-child(1) {height:18px}
+.device-gate-premium-brand-mark i:nth-child(2) {height:29px}
+.device-gate-premium-brand-mark i:nth-child(3) {height:23px}
+.device-gate-premium-header-status {
+  color:#a5ffff;font-weight:850;letter-spacing:.02em;font-size:12px;
+  padding:10px 16px;border:1px solid #43e5e46b;border-radius:999px;
+  background:#01526363;box-shadow:inset 0 0 18px #36e5da14;
+}
+.device-gate-premium-header-status span {color:#6afbf0;margin-right:5px}
+.device-gate-premium-grid {display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.9fr);gap:clamp(18px,2vw,30px);padding:clamp(20px,2.6vw,40px)}
+.device-gate-premium-main {min-width:0}
+.device-gate-premium-identity {display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.device-gate.device-gate-premium .device-gate-mark {
+  margin:0;width:64px;height:64px;flex-shrink:0;border-radius:20px;
+  box-shadow:0 12px 40px #19e0d039;
+}
+.device-gate.device-gate-premium .device-gate-status {
+  font-size:12px;line-height:1.3;letter-spacing:.06em;border:1px solid #31cacc4b;
+  background:#0b58605e;color:#b0fff7;
+}
+.device-gate.device-gate-premium h1 {margin:20px 0 10px;font-size:clamp(29px,3.2vw,44px);line-height:1.15;letter-spacing:-.027em;color:#fff;max-width:740px}
+.device-gate-premium-main > p {margin:0 0 16px;max-width:740px;color:#cce2ec;font-size:clamp(14px,1.3vw,17px);line-height:1.65}
+.device-gate-premium-main > p a {color:#82f9f4;text-decoration:underline;text-underline-offset:4px}
+.device-gate-premium-steps {display:grid;gap:12px;margin:28px 0;padding:0}
+.device-gate-premium-step {
+  display:grid;grid-template-columns:46px minmax(0,1fr) 34px;align-items:center;gap:14px;
+  min-height:86px;padding:14px 16px;border:1px solid #23677a;border-radius:16px;
+  background:linear-gradient(115deg,#073249e8,#082537cf);
+}
+.device-gate-premium-step.is-current {border-color:#48ede8;box-shadow:inset 3px 0 0 #55f8ed,0 0 22px #10bbca15}
+.device-gate-premium-step.is-done {border-color:#247a80;background:linear-gradient(110deg,#104748,#092b3b)}
+.device-gate-premium-step.is-problem {border-color:#eaa586;background:#5d2f3447}
+.device-gate-premium-step.is-waiting {opacity:.84}
+.device-gate-premium-step-number {display:grid;place-items:center;width:42px;height:42px;border:1px solid #46899a;border-radius:50%;font-weight:900;color:#bcf4f3;background:#0a3349}
+.device-gate-premium-step strong {display:block;color:#fff;font-size:clamp(15px,1.4vw,18px);line-height:1.4}
+.device-gate-premium-step small {display:block;margin-top:3px;color:#c2dce4;font-size:12px;line-height:1.5}
+.device-gate-premium-step b {justify-self:end;text-align:center;font-size:21px;color:#6ff2e7}
+.device-gate-premium-step.is-problem b {color:#ffbe9e}
+.device-gate-premium-main .device-code-box {margin:18px 0;padding:17px;border-color:#378d95}
+.device-gate-premium-main .device-gate-retry,
+.device-gate-premium-main .device-enter-learning {
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:49px;margin-top:10px;padding:10px 24px;border:1px solid #3fdcd8;border-radius:13px;
+  background:#034954;color:#e2ffff;font-size:15px;font-weight:850;
+  cursor:pointer;box-shadow:0 6px 19px #0b97ad26;
+}
+.device-gate-premium-main .device-enter-learning {background:linear-gradient(110deg,#29d3d0,#7deddf);color:#04363b}
+.device-gate-premium-main .device-gate-retry:disabled {background:#143748;color:#b3c5ca;cursor:wait;opacity:.85}
+.device-gate-premium-main .device-gate-error {border:1px solid #f3ada4;background:#552c37;color:#ffe8e7;line-height:1.6}
+.device-gate-premium-main > small {display:block;margin-top:24px;color:#c6dbe3;font-size:12px;line-height:1.6}
+.device-gate-premium-art {
+  min-width:0;align-self:start;min-height:510px;padding:32px 20px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:23px;border:1px solid #22869a;background:
+    radial-gradient(circle at 48% 42%,#0d788270,transparent 45%),
+    radial-gradient(circle at center,#052e46,#021b2e 75%);
+  overflow:hidden;position:relative;text-align:center;
+}
+.device-gate-premium-art::before {
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,#4bdde808 0 1px,transparent 1px 24px);
+  mask-image:linear-gradient(to top,#000,transparent 42%);
+}
+.device-gate-premium-orbit {
+  display:grid;place-items:center;position:relative;width:min(100%,330px);aspect-ratio:1;border-radius:50%;
+  border:2px dashed #2fe2e5a5;box-shadow:inset 0 0 45px #00c4d629,0 0 35px #00d7d11f;
+  background:radial-gradient(circle,#06546955,transparent 65%);
+}
+.device-gate-premium-orbit::before,.device-gate-premium-orbit::after {
+  content:"";position:absolute;inset:9%;border:1px solid #43edf56e;border-radius:50%;
+}
+.device-gate-premium-orbit::after {inset:20%;border-style:dashed;border-color:#63e8e84d}
+.device-gate-premium-orbit-inner {display:grid;place-items:center;width:65%;height:65%;border-radius:50%;background:#07394a87}
+.device-gate-premium-shield {
+  position:relative;display:grid;place-items:center;width:125px;height:145px;
+  clip-path:polygon(50% 0,94% 19%,92% 70%,50% 100%,8% 70%,6% 19%);
+  background:linear-gradient(150deg,#45f4e9,#167f99 30%,#14637d 75%,#48f1e8);
+  color:#d8ffff;font-size:94px;line-height:1;text-shadow:0 0 14px #5dece9;
+  filter:drop-shadow(0 0 15px #1ceae9);
+}
+.device-gate-premium-shield span {position:absolute;display:grid;place-items:center;width:72px;height:74px;top:32px;left:27px;font-size:53px;color:#efffff;background:#043647ad;border:2px solid #59eeee;border-radius:12px}
+.device-gate-premium-art-label {margin-top:36px;color:#5af0ef;font-size:12px;font-weight:900;letter-spacing:.22em}
+.device-gate-premium-art-caption {margin-top:10px;color:#b6d9e4;font-size:13px;line-height:1.6}
+.device-gate-premium-footer {
+  display:flex;justify-content:center;align-items:center;gap:9px;
+  padding:18px 24px;border-top:1px solid #2967797a;
+  color:#c0d8e0;font-size:12px;text-align:center;line-height:1.5;
+}
+.device-gate-premium-footer span {font-size:18px;color:#77eee8}
+.device-gate.device-gate-premium :is(button,a,input):focus-visible {outline:3px solid #ffd889;outline-offset:3px}
+.device-gate-premium-main :is(.device-registration-form,.device-payment-form) {background:#05283d;border-color:#3e8c99}
+@media(max-width:980px) {
+  .device-gate-premium-grid {grid-template-columns:minmax(0,1fr)}
+  .device-gate-premium-art {min-height:200px;flex-direction:row;gap:20px;padding:18px}
+  .device-gate-premium-orbit {width:130px;flex-shrink:0}
+  .device-gate-premium-shield {width:65px;height:75px;font-size:50px}
+  .device-gate-premium-shield span {width:38px;height:40px;top:16px;left:13px;font-size:28px;border-radius:6px}
+  .device-gate-premium-art-label {margin-top:0}
+}
+@media(max-width:560px) {
+  .device-gate.device-gate-premium {padding:10px}
+  .device-gate-premium-header {padding:13px 16px;gap:12px;flex-wrap:wrap}
+  .device-gate-premium-header-status {font-size:10px;padding:8px 12px}
+  .device-gate-premium-grid {padding:18px 14px;gap:16px}
+  .device-gate-premium-identity {gap:10px}
+  .device-gate.device-gate-premium .device-gate-mark {width:47px;height:47px;border-radius:14px}
+  .device-gate-premium-step {grid-template-columns:36px minmax(0,1fr) 22px;gap:10px;padding:12px}
+  .device-gate-premium-step-number {width:35px;height:35px;font-size:13px}
+  .device-gate-premium-art {min-height:150px;gap:12px}
+  .device-gate-premium-orbit {width:95px}
+  .device-gate-premium-shield {width:49px;height:55px;font-size:35px}
+  .device-gate-premium-shield span {width:30px;height:30px;top:12px;left:10px;font-size:20px}
+  .device-gate-premium-art-label {font-size:10px;letter-spacing:.09em}
+  .device-gate-premium-art-caption {font-size:11px}
+  .device-gate-premium-footer {padding:15px 12px}
+}
+@media(prefers-reduced-motion:reduce) {
+ .device-gate.device-gate-premium *, .device-gate.device-gate-premium *::before,
+ .device-gate.device-gate-premium *::after {animation:none!important;transition:none!important}
+}

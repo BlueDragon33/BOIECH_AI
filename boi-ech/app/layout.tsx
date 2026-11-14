@@ -33,6 +33,7 @@ import "./video-analysis-v37.css";
 import "./teacher-premium-v9-layout-clean.css";
 import "./role-readable-v9.css";
 import "./modal-contrast-v9.css";
+import "./device-gate-premium.css";
 import MultiAccountSwitcher from "./multi-account-switcher";
 
 const geistSans = Geist({
