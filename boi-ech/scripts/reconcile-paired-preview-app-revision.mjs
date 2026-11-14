@@ -10,8 +10,15 @@ export function readAndAttestAppSource(appRoot,expectedSha){
  if(!SHA.test(expectedSha??""))die("App source must be pinned to an exact commit.");
  const actual=execFileSync("git",["-C",appRoot,"rev-parse","HEAD"],{encoding:"utf8",timeout:5000}).trim();
  if(actual!==expectedSha)die("App source HEAD differs from the reviewed commit.");
+ // Application-Management tracks tsconfig.tsbuildinfo, even though tsc --noEmit
+ // rewrites this disposable compiler cache during the already-PASS regression.
+ // A cache-byte change is not a source change. Any other tracked modification
+ // (including code, package lock, config, templates and workflow) MUST block.
  const changed=execFileSync("git",["-C",appRoot,"diff","--name-only","HEAD","--"],{encoding:"utf8",timeout:5000}).trim();
- if(changed)die("App tracked source changed after its reviewed checkout.");
+ const changes=changed?changed.split(/\\r?\\n/).filter(Boolean):[];
+ const prohibited=changes.filter(file=>file!=="tsconfig.tsbuildinfo");
+ if(prohibited.length)die("App tracked source changed after reviewed checkout: "+prohibited.map(file=>JSON.stringify(file)).join(", "));
+ if(changes.length)console.log("App tracked TypeScript incremental cache changed during CI; no tracked source modification accepted.");
  const prepared=fs.readFileSync(path.join(appRoot,"wrangler.cloudflare.jsonc"),"utf8");
  const matches=[...prepared.matchAll(/"APPLICATION_MANAGEMENT_BUILD_REVISION"\s*:\s*"([^"]*)"/g)];
  if(matches.length!==1||matches[0][1]!==expectedSha)
