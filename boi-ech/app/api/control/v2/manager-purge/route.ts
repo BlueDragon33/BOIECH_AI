@@ -20,7 +20,8 @@ export async function POST(request:Request){
   const db=await getCourseDatabase();
   const options={...input,mode:"manager",days:0};
   const payload=input.action==="preview"?await inspectCleanup(db,actor,options)
-   :input.action==="inspect"?await inspectCleanupAccount(db,actor,options)
+   :input.action==="inspect"?{...await inspectCleanupAccount(db,actor,options),
+    contract:"boi-owner-manager-purge.v1"}
    :input.action==="purge"?await purgeCleanupAccount(db,actor,options)
    :(()=>{throw new AccountError("CLEANUP_INPUT",400)})();
   return controlResponse(payload,200,request);
