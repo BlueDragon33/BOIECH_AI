@@ -1,7 +1,7 @@
 import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import { DeviceAccessError, getCourseDatabase, type PublicDeviceState } from "./device-auth.server";
 import { TRAINING_SCHEMA } from "./training-schema";
-import { classKey, classNames, type TrainingBoard, type TrainingPerson, type TrainingResource, type TrainingSession, type TrainingClassLeader, type TrainingPeriod } from "./training-types";
+import { classKey, classNames, type TrainingBoard, type TrainingPerson, type TrainingResource, type TrainingSession, type TrainingClassLeader, type TrainingPeriod, type TrainingLeaderHistory } from "./training-types";
 let schemaReady:Promise<unknown>|undefined;
 export async function trainingDatabase() {
  const db=await getCourseDatabase();
@@ -20,7 +20,7 @@ export function requireManager(actor:PublicDeviceState) { if(actor.personRole!==
 const AUTH_GUARD=`EXISTS(SELECT 1 FROM device_access a WHERE a.device_id=? AND a.person_role='manager' AND a.management_enabled=1 AND a.status='approved' AND a.registration_submitted_at IS NOT NULL AND (a.access_expires_at IS NULL OR datetime(a.access_expires_at)>CURRENT_TIMESTAMP))`;
 export async function trainingBoard(from:string,to:string,actor?:PublicDeviceState):Promise<TrainingBoard> {
  const db=await trainingDatabase();
- const [rs,ps,ss,ls,periods]=await Promise.all([
+ const [rs,ps,ss,ls,periods,leaderHistory]=await Promise.all([
  db.prepare('SELECT id,kind,name,parent_id AS parentId,capacity,required_teachers AS requiredTeachers,status,version FROM training_resources ORDER BY name LIMIT 1001').all<TrainingResource>(),
  db.prepare(`SELECT d.device_id AS id,d.learner_name AS name,d.person_code AS code,d.person_role AS role,
  COALESCE(d.class_name,'') AS className,d.status,
@@ -40,6 +40,11 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  db.prepare(`SELECT class_id AS classId,slot,source,member_device_id AS memberDeviceId,display_name AS displayName,
  birth_date AS birthDate,military_rank AS militaryRank,battalion,version,updated_at AS updatedAt FROM training_class_leaders ORDER BY class_id,slot LIMIT 1001`).all<TrainingClassLeader>(),
  db.prepare(`SELECT number,start_time AS startTime,end_time AS endTime,timezone,version FROM training_periods ORDER BY number LIMIT 25`).all<TrainingPeriod>(),
+ db.prepare(`SELECT id,class_id AS classId,slot,previous_version AS previousVersion,previous_source AS previousSource,
+ previous_member_device_id AS previousMemberDeviceId,previous_display_name AS previousDisplayName,
+ previous_birth_date AS previousBirthDate,previous_military_rank AS previousMilitaryRank,
+ previous_battalion AS previousBattalion,replaced_at AS replacedAt
+ FROM training_class_leader_history ORDER BY replaced_at DESC LIMIT 1000`).all<TrainingLeaderHistory>(),
  ]);
  if([rs,ps,ss,ls].some(r=>(r.results?.length??0)>1000))fail("Khoảng xem có hơn 1.000 bản ghi. Thu hẹp thời gian hoặc liên hệ quản trị; chưa thể hiển thị tổng số đầy đủ.","TRAINING_RESULT_LIMIT",413);
  const sourceResources=rs.results??[];
@@ -95,7 +100,7 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
   visiblePeople=people;
   visibleSessions=sessions;
  }
- return {resources,people:visiblePeople,sessions:visibleSessions,leaders:ls.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
+ return {resources,people:visiblePeople,sessions:visibleSessions,leaders:ls.results??[],leaderHistory:leaderHistory.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
 export async function trainingCommand(actor:PublicDeviceState,payload:Record<string,unknown>) {
  requireManager(actor);
