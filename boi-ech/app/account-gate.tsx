@@ -856,7 +856,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     </aside> : null}
     {ready&&active&&v2&&account?.expiresAt?<AccountLeaseCountdown expiresAt={account.expiresAt} role={account.role}/>:null}
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
-      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
+      <ManagerWorkspace deviceId={account.storageDeviceId} accountId={account.accountId} getProof={getManagerProof}
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
         accountName={account.name||"Cán bộ quản lý"}/>
     </div> : null}
