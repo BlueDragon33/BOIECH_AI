@@ -69,12 +69,14 @@ export function useBoiSyncNotices(scope:string) {
       }
     } catch { /* Cross-tab storage event remains available. */ }
     window.addEventListener(signalName,onWindow);
+    window.addEventListener("boi:manual-sync:acknowledged",syncFromStorage);
     window.addEventListener("storage",onStorage);
     navigator.serviceWorker?.addEventListener("message",onServiceWorker);
     queueMicrotask(syncFromStorage);
     return()=>{
       live=false;
       window.removeEventListener(signalName,onWindow);
+      window.removeEventListener("boi:manual-sync:acknowledged",syncFromStorage);
       window.removeEventListener("storage",onStorage);
       navigator.serviceWorker?.removeEventListener("message",onServiceWorker);
       channel?.close();
@@ -85,6 +87,7 @@ export function useBoiSyncNotices(scope:string) {
     const seen=new Set(observedIds);
     store(scope,read(scope).filter(event=>!seen.has(event.id)));
     setIds(previous=>previous.filter(id=>!seen.has(id)));
+    window.dispatchEvent(new CustomEvent("boi:manual-sync:acknowledged",{detail:{scope}}));
   },[scope]);
   return {count:ids.length,ids,acknowledge};
 }
