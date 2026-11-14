@@ -123,7 +123,8 @@ function check(r:Row,options:{days:number;mode:Mode},now:number){
  }
  if(!categoryAllowed||tooRecent)return null;
  return {accountId:r.account_id,name:r.person_name||r.login||"Chưa khai báo",
-  role:r.person_role,category,createdAt:r.account_created_at,
+  role:r.person_role,category,accessStatus:r.access_status,activeSessions:Number(r.active_sessions)||0,
+  createdAt:r.account_created_at,
   lastSeenAt:r.last_seen_at,latestLoginAt:lastLogin?new Date(lastLogin).toISOString():null,
   inactiveDays:Math.max(0,Math.floor((now-lastActivity)/86400000)),stage:r.stage,
   eligible:blockers.length===0,blockers,snapshot:snapshot(r,options)};
