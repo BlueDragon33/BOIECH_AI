@@ -47,14 +47,25 @@ test("source checkout and prepared revision must both attest exact App HEAD, and
  const git=(...argv)=>execFileSync("git",["-C",root,...argv],{encoding:"utf8",timeout:5000}).trim();
  try{
   git("init","--quiet");git("config","user.email","ci@example.invalid");git("config","user.name","CI Fixture");
-  fs.writeFileSync(path.join(root,"source.txt"),"pinned App code");git("add","source.txt");git("commit","--quiet","-m","fixture pinned app");
+  fs.writeFileSync(path.join(root,"source.txt"),"pinned App code");
+  fs.writeFileSync(path.join(root,"tsconfig.tsbuildinfo"),"pinned compiler cache");
+  git("add","source.txt","tsconfig.tsbuildinfo");git("commit","--quiet","-m","fixture pinned app");
   const actual=git("rev-parse","HEAD");
   fs.writeFileSync(path.join(root,"wrangler.cloudflare.jsonc"),JSON.stringify({name:"application-management-preview",
    vars:{APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL:"cloudflare-preview",APPLICATION_MANAGEMENT_BUILD_REVISION:actual}}));
   assert.equal(readAndAttestAppSource(root,actual),true);
+  fs.writeFileSync(path.join(root,"tsconfig.tsbuildinfo"),"rewritten by tsc --noEmit");
+  assert.equal(readAndAttestAppSource(root,actual),true,
+    "tracked incremental compiler cache does not change reviewed App source identity");
   assert.throws(()=>readAndAttestAppSource(root,parent),/source HEAD differs/);
   fs.writeFileSync(path.join(root,"source.txt"),"tampered code");
   assert.throws(()=>readAndAttestAppSource(root,actual),/tracked source changed/);
+  fs.writeFileSync(path.join(root,"source.txt"),"pinned App code");
+  fs.writeFileSync(path.join(root,"tsconfig.tsbuildinfo"),"pinned compiler cache");
+  fs.writeFileSync(path.join(root,"source.txt"),"tampered again");
+  fs.writeFileSync(path.join(root,"tsconfig.tsbuildinfo"),"rewritten by tsc");
+  assert.throws(()=>readAndAttestAppSource(root,actual),/source.txt/,
+    "source and cache modified together must still fail closed");
   fs.writeFileSync(path.join(root,"source.txt"),"pinned App code");
   fs.writeFileSync(path.join(root,"wrangler.cloudflare.jsonc"),JSON.stringify({vars:{
     APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL:"cloudflare-preview",APPLICATION_MANAGEMENT_BUILD_REVISION:parent}}));
