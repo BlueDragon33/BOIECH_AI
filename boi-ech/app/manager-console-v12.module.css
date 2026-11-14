@@ -96,3 +96,10 @@
 .building>summary>span:nth-child(2){min-width:0}
 @media(max-width:620px){.campusNodes{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.campusArtwork{height:90px}.console .campusNode{min-height:162px;padding:8px 5px}.campusNode strong{font-size:12px}.buildingArtwork{width:95px;height:72px}.building>summary strong{font-size:16px}}
 @media(max-width:360px){.campusArtwork{height:75px}.console .campusNode{min-height:144px}}
+
+/* Swimming template is a distinct basin building, not a generic classroom. */
+.console .campusNode:has(.campusArtwork svg[aria-label*="bể bơi"]){border-color:#47c7ed;background:linear-gradient(155deg,#104c77,#052b52)}
+.console .roomIcon:has(svg[aria-label*="Bể bơi"]){width:76px;height:57px;background:#12536c;border-color:#56cae7}
+.roomIcon svg[aria-label*="Bể bơi"]{width:68px;height:53px}
+@media(max-width:475px){.console .roomIcon:has(svg[aria-label*="Bể bơi"]){width:62px;height:49px}
+ .roomIcon svg[aria-label*="Bể bơi"]{width:58px;height:45px}}
