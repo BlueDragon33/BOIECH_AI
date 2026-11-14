@@ -12,9 +12,9 @@ const core=read("device-auth.server.ts");
 const transpiled=ts.transpileModule(identity,{compilerOptions:{
   target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,
 }}).outputText;
-const module={exports:{}};
-new Function("module","exports",transpiled)(module,module.exports);
-const {preserveAccountDeviceReadback}=module.exports;
+const compiledModule={exports:{}};
+new Function("module","exports",transpiled)(compiledModule,compiledModule.exports);
+const {preserveAccountDeviceReadback}=compiledModule.exports;
 
 const id="a".repeat(64), accountId="acc_"+"b".repeat(64);
 const server={
