@@ -59,6 +59,9 @@ export async function checkPreviewStack(env = process.env, fetcher = fetch, depl
     if (variable(boi,"BOI_ECH_DEPLOYMENT_CHANNEL") !== "cloudflare-preview" || variable(app,"APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL") !== "cloudflare-preview") throw new Error("Live Preview channel mismatch.");
     if (!env.CONTROL_OWNER_EMAILS || /@example\.(?:com|test|invalid)\b/i.test(env.CONTROL_OWNER_EMAILS) || variable(app,"CONTROL_OWNER_EMAILS") !== env.CONTROL_OWNER_EMAILS) throw new Error("Live App Preview Owner policy mismatch or example identity.");
     if (boi.some(b => b.type === "r2_bucket")) throw new Error("FREE Preview must not introduce R2.");
+    if (variable(boi,"APPLICATION_MANAGEMENT_ORIGIN") !== `https://${APP}.boiech-ai.workers.dev`) {
+      throw new Error("Live Bơi Ếch Preview control Origin policy mismatch; refuse bridge writes.");
+    }
   }
   return { boiWorker: BOI, appWorker: APP, boiD1: policy.name, appD1: APP_D1 };
 }
@@ -105,6 +108,36 @@ export async function verifyV2SummaryLive(secret, fetcher = fetch) {
     totalAccountsVerified: true, personalRowsReturned: false };
 }
 
+/** Cloudflare secret rotation may take a short time to reach its runtime.
+ * Retry ONLY explicit control-credential rejection, not role, origin, WAF,
+ * unknown HTTP failures or bodyless 403. Never log a bearer or response body. */
+export async function readBoiPreviewRuntime(secret, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+  const origin = `https://${APP}.boiech-ai.workers.dev`;
+  const url = `https://${BOI}.boiech-ai.workers.dev/api/control/status`;
+  const delays = [0, 1000, 2000, 4000, 8000];
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    if (delays[attempt]) await pause(delays[attempt]);
+    const response = await fetcher(url, {
+      method:"GET",
+      headers: { authorization:`Bearer ${secret}`, origin, "x-control-role":"viewer" },
+      cache:"no-store", redirect:"error", signal:AbortSignal.timeout(20_000),
+    });
+    if (response.ok) return await response.json();
+    let code = "UNKNOWN";
+    if (response.status === 403) {
+      try {
+        const payload = await response.json();
+        if (typeof payload?.code === "string" && /^CONTROL_[A-Z_]+$/.test(payload.code)) code = payload.code;
+      } catch { /* Cloudflare HTML/challenge is not trusted as an app error. */ }
+    }
+    if (response.status === 403 &&
+        (code === "CONTROL_SERVICE_FORBIDDEN" || code === "CONTROL_TICKET_FORBIDDEN") &&
+        attempt < delays.length - 1) continue;
+    throw new Error(`Deployed Boi Preview runtime check failed: HTTP ${response.status}; safe code ${code}.`);
+  }
+  throw new Error("Deployed Boi Preview runtime readback exhausted retry policy.");
+}
+
 export async function installPreviewBridge(env = process.env, fetcher = fetch) {
   if (env.PREVIEW_BRIDGE_CONFIRMATION !== "INSTALL_PREVIEW_BRIDGE") throw new Error("INSTALL_PREVIEW_BRIDGE confirmation is required to create or rotate the shared credential on the two named Preview Workers.");
   const result = await checkPreviewStack(env, fetcher, true);
@@ -112,12 +145,7 @@ export async function installPreviewBridge(env = process.env, fetcher = fetch) {
   const secret = randomBytes(48).toString("base64url");
   for (const worker of [BOI, APP]) await api(worker, "secrets", { name:"CONTROL_SERVICE_SECRET", type:"secret_text", text:secret });
   // Read back actual runtime + D1 access with the new key. No key is returned or logged.
-  const boiResponse = await fetcher(`https://${BOI}.boiech-ai.workers.dev/api/control/status`, {
-    headers: { authorization:`Bearer ${secret}`, origin:`https://${APP}.boiech-ai.workers.dev`, "x-control-role":"viewer" },
-    redirect:"error", signal:AbortSignal.timeout(20_000),
-  });
-  if (!boiResponse.ok) throw new Error(`Deployed Boi Preview runtime check failed: HTTP ${boiResponse.status}.`);
-  const status = await boiResponse.json();
+  const status = await readBoiPreviewRuntime(secret, fetcher);
   if (status.ok !== true || status.application !== "boi-ech" || status.deployment?.revision !== env.GITHUB_SHA || status.deployment.channel !== "cloudflare-preview" || status.deployment.paymentStorageReady !== false) throw new Error("Deployed Boi Preview runtime revision, D1 or FREE storage check failed.");
   const appResponse = await fetcher(`https://${APP}.boiech-ai.workers.dev/__deployment`, {
     headers:{accept:"application/json"}, redirect:"error", signal:AbortSignal.timeout(20_000),
