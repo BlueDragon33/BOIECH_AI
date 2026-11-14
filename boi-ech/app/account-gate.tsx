@@ -516,7 +516,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       if(!controller.signal.aborted)setRoleBootstrap(result);
     }).catch(cause=>{
       if(!disposed && (!controller.signal.aborted || timedOut))
-        setRoleBootstrapError(cause instanceof Error?cause.message:"Không thể xác minh không gian học tập.");
+        setRoleBootstrapError(timedOut
+          ? "Máy chủ chưa hoàn tất xác thực dữ liệu sau 20 giây. Chọn Thử lại; không xóa khóa hoặc dữ liệu thiết bị."
+          : cause instanceof Error?cause.message:"Không thể xác minh không gian học tập.");
     }).finally(()=>window.clearTimeout(timeout));
     return()=>{disposed=true;window.clearTimeout(timeout);controller.abort();};
   },[roleNeedsBootstrap,account?.accountId,account?.storageDeviceId,account?.role,roleBootstrapAttempt]);
