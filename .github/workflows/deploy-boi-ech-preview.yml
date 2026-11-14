@@ -153,6 +153,8 @@ jobs:
         working-directory: application-management-preview-source
         run: npm run cloudflare:artifact:check
 
+      - name: Attest pinned App checkout and reconcile ONLY the verified parent-SHA packaging defect
+        run: node boi-ech/scripts/reconcile-paired-preview-app-revision.mjs
       - name: Verify BOTH generated Preview Worker revision identities before any remote D1 mutation
         run: node boi-ech/scripts/assert-paired-preview-artifact-revisions.mjs
 
