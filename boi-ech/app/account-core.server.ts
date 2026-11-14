@@ -11,6 +11,9 @@ const IDLE_MS = 30 * 60 * 1000;
 const HARD_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 const TOKEN = /^[a-f0-9]{64}$/;
 const ACCOUNT = /^acc_[a-f0-9]{64}$/;
+// Classified at the trusted API boundary from HTTP client hints, never from request JSON.
+// This is a browser session category, not cryptographic proof of physical hardware.
+export type AccountClientClass = "desktop" | "phone" | "tablet";
 export const ACCOUNT_COOKIE = "__Host-boiech-session";
 export class AccountError extends Error {
   constructor(public code: string, public status = 403) { super(code); this.name = "AccountError"; }
@@ -240,23 +243,41 @@ export class AccountService {
       if (!row || row.attempts > maximum) fail("RATE_LIMITED", 429);
     }
   }
-  private async issue(accountId: string, publicKey: unknown, expectedGeneration?: number, firstRegistration = false) {
+  private async issue(accountId: string, publicKey: unknown, expectedGeneration?: number, firstRegistration = false,
+    clientClass: AccountClientClass = "desktop") {
     const deviceId = await deviceKeyId(publicKey), token = random(), now = this.now();
     const credential = await this.db.prepare("SELECT generation FROM account_credentials WHERE account_id=?").bind(accountId).first<{ generation: number }>();
     if (!credential || (expectedGeneration !== undefined && credential.generation !== expectedGeneration)) fail("AUTH_FAILED", 401);
     const existing = await this.db.prepare("SELECT revoked FROM account_devices WHERE account_id=? AND device_id=?").bind(accountId, deviceId).first<{ revoked: number }>();
     if (existing?.revoked) fail("DEVICE_REVOKED", 403);
-    // Only a real new-account registration may automatically trust its first
-    // device, never a login to an existing account whose final device was
-    // explicitly purged. Existence is evaluated inside the D1 transaction.
+    // Portable phone/tablet sessions still require password, account activation,
+    // an unrevoked P-256 key, entropy limits, and session expiry. They do NOT
+    // require a second browser-approval operation or occupy desktop key slots.
+    // Client classification based on UA is a usability policy, not hardware attestation.
+    const portable = clientClass !== "desktop";
     const deviceInsert = this.v2Enabled
-      ? this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved)
-          SELECT ?,?,?,CASE WHEN ?=1 AND NOT EXISTS(SELECT 1 FROM account_devices WHERE account_id=?) THEN 1 ELSE 0 END
+      ? this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved,client_class)
+          SELECT ?,?,?,CASE WHEN ?=1 OR (?=1 AND NOT EXISTS(
+            SELECT 1 FROM account_devices WHERE account_id=?
+          )) THEN 1 ELSE 0 END,?
           WHERE 1 ON CONFLICT(account_id,device_id) DO NOTHING`)
-          .bind(accountId, deviceId, publicKeyJson(publicKey), firstRegistration ? 1 : 0, accountId)
-      : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk) VALUES(?,?,?)
-          ON CONFLICT(account_id,device_id) DO NOTHING`).bind(accountId, deviceId, publicKeyJson(publicKey));
-    const statements = [deviceInsert];
+          .bind(accountId, deviceId, publicKeyJson(publicKey), portable ? 1 : 0,
+            firstRegistration ? 1 : 0, accountId, clientClass)
+      : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,client_class)
+          VALUES(?,?,?,?) ON CONFLICT(account_id,device_id) DO NOTHING`)
+          .bind(accountId, deviceId, publicKeyJson(publicKey), clientClass);
+    const statements: D1PreparedStatement[] = [deviceInsert];
+    if (this.v2Enabled && portable) {
+      // A previously pending browser key may be used from a phone/tablet after
+      // a fresh password login. Revoked keys stay revoked (and banned keys are
+      // rejected by assertReentryAllowed before issuing any session).
+      statements.push(this.db.prepare(`UPDATE account_devices SET approved=1,client_class=?
+        WHERE account_id=? AND device_id=? AND revoked=0 AND approved=0`)
+        .bind(clientClass, accountId, deviceId));
+      statements.push(this.audit(accountId, "account.portable-session.verified", deviceId,
+        "password-authenticated phone/tablet session; not a physical-device attestation", true));
+    }
+    const sessionIndex = statements.length;
     statements.push(this.db.prepare(`INSERT INTO account_sessions(token_hash,account_id,device_id,generation,expires_at,idle_expires_at,issued_at_ms)
       SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM account_credentials WHERE account_id=? AND generation=?)
        AND EXISTS(SELECT 1 FROM account_devices WHERE account_id=? AND device_id=? AND revoked=0)`)
@@ -268,10 +289,10 @@ export class AccountService {
       if (error instanceof Error && error.message.includes("ACCOUNT_DEVICE_LIMIT_REACHED")) fail("DEVICE_LIMIT_REACHED", 409);
       throw error;
     });
-    if (Number(result[1].meta.changes) !== 1) fail("SESSION_CONFLICT", 409);
+    if (Number(result[sessionIndex].meta.changes) !== 1) fail("SESSION_CONFLICT", 409);
     return { token, deviceId, account: view(await this.row(accountId)) };
   }
-  async register(input: Record<string, unknown>, peer: string) {
+  async register(input: Record<string, unknown>, peer: string, clientClass: AccountClientClass = "desktop") {
     const login = loginName(input.login);
     await this.throttle(login, peer, "register", 5);
     if (input.privacyAccepted !== true || !["learner", "manager", "teacher"].includes(String(input.role))) fail("ACCOUNT_INPUT", 400);
@@ -304,7 +325,7 @@ export class AccountService {
       if (error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE", 409);
       throw error;
     }
-    const issued = await this.issue(accountId, input.publicKey, undefined, true);
+    const issued = await this.issue(accountId, input.publicKey, undefined, true, clientClass);
     if (issued.deviceId !== keyId) fail("DEVICE_KEY_INVALID", 400);
     return { ...issued, recoveryCode };
   }
@@ -337,7 +358,7 @@ export class AccountService {
     return { inviteToken:token, expiresAt:new Date(expires).toISOString(), verified:true };
   }
 
-  async registerManagerWithInvite(input: Record<string,unknown>, peer:string) {
+  async registerManagerWithInvite(input: Record<string,unknown>, peer:string, clientClass: AccountClientClass = "desktop") {
     if (!this.v2Enabled) fail("ACCOUNT_V2_REQUIRED", 409);
     if(input.role !== "manager" || input.privacyAccepted!==true) fail("ACCOUNT_INPUT", 400);
     const login=loginName(input.login);
@@ -421,11 +442,11 @@ export class AccountService {
       if(error instanceof Error && /UNIQUE|constraint/i.test(error.message)) fail("REGISTRATION_UNAVAILABLE",409);
       throw error;
     }
-    const issued=await this.issue(accountId,input.publicKey,undefined,true);
+    const issued=await this.issue(accountId,input.publicKey,undefined,true,clientClass);
     if(issued.deviceId!==keyId) fail("DEVICE_KEY_INVALID",400);
     return { ...issued, recoveryCode };
   }
-  async login(input: Record<string, unknown>, peer: string) {
+  async login(input: Record<string, unknown>, peer: string, clientClass: AccountClientClass = "desktop") {
     const login = loginName(input.login);
     await this.throttle(login, peer, "login");
     const row = await this.db.prepare(`SELECT a.account_id,c.password_verifier,c.generation FROM accounts a
@@ -444,7 +465,7 @@ export class AccountService {
       JOIN device_access d ON d.device_id=a.storage_device_id WHERE a.account_id=?`)
       .bind(row.account_id).first<{status:string}>();
     if(status?.status==="blocked")fail("ACCOUNT_BLOCKED",403);
-    return this.issue(row.account_id, input.publicKey, row.generation);
+    return this.issue(row.account_id, input.publicKey, row.generation, false, clientClass);
   }
   async session(token: string): Promise<Principal> {
     if (!TOKEN.test(token)) fail("SESSION_REQUIRED", 401);
