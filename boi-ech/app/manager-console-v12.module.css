@@ -80,3 +80,19 @@
 .leaderSlots{grid-template-columns:1fr}.detailSlotGrid{grid-template-columns:1fr}.roomGrid{grid-template-columns:1fr;padding:10px}
 .building>summary{padding:12px}.roomHeading{flex-wrap:wrap}.roomActions button{flex:1 1 40%}.rosterRow{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.console *{animation:none!important;transition:none!important}}
+
+/* Building-first room overview: the gallery changes the selected real building. */
+.campusOverview{position:relative;overflow:hidden;min-width:0;background:radial-gradient(ellipse at 50% 35%,#194b82,#061b39 75%);border:1px solid #478fc0;border-radius:21px;padding:16px}
+.campusTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:2px 7px 14px}
+.campusTitle strong{font-size:19px}.campusTitle small{font-size:12px;color:#c7e7f9}
+.campusNodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px}
+.console .campusNode{display:grid;justify-items:center;align-content:start;gap:5px;background:linear-gradient(140deg,#163c71d9,#091e3ed9);border:1px solid #477ab4;min-height:207px;padding:10px 8px 14px;text-align:center}
+.console .campusNode[aria-pressed=true]{border-color:#91f5fc;box-shadow:inset 0 0 0 1px #91f5fc,0 0 16px #22aff633;background:linear-gradient(145deg,#1d5985,#123c68)}
+.campusArtwork{display:block;width:min(100%,195px);height:130px;pointer-events:none;filter:drop-shadow(0 9px 13px #0006)}
+.campusArtwork svg,.buildingArtwork svg{width:100%;height:100%;display:block}
+.campusNode strong{font-size:15px;line-height:1.3}.campusNode small{font-size:11px}
+.buildingArtwork{display:block;width:145px;height:94px;flex:none;filter:drop-shadow(0 8px 9px #0005)}
+.building>summary{min-height:116px;background:linear-gradient(95deg,#0d4775,#07314f)}
+.building>summary>span:nth-child(2){min-width:0}
+@media(max-width:620px){.campusNodes{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.campusArtwork{height:90px}.console .campusNode{min-height:162px;padding:8px 5px}.campusNode strong{font-size:12px}.buildingArtwork{width:95px;height:72px}.building>summary strong{font-size:16px}}
+@media(max-width:360px){.campusArtwork{height:75px}.console .campusNode{min-height:144px}}
