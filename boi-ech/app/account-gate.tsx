@@ -248,6 +248,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
     return ()=>{live=false};
   },[enabled,bypass]);
+  const waitingForApproval = Boolean(account && (account.status !== "approved" ||
+    account.onboardingStage !== "active" || account.deviceApproved === false || account.entitlementActive === false));
   useEffect(() => {
     if (!enabled || bypass) return;
     mounted.current = true;
@@ -262,9 +264,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       const mediaPlaying=Array.from(document.querySelectorAll("video")).some(video=>
         !video.paused && !video.ended && video.readyState>1);
       // Users awaiting the one-time review must stay signed in while the page
-      // visibly polls. Approved users renew while actively interacting or
+      // receives a real refresh signal. Approved users renew while actively interacting or
       // watching a lesson, not after abandoning a background tab.
-      if(!needsApprovalPolling && !mediaPlaying &&
+      if(!waitingForApproval && !mediaPlaying &&
         now-lastUserEngagementAt.current>15*60_000)return;
       lastLeaseRenewalAttemptAt.current=now;
       try{await send({action:"keepalive"});}
@@ -329,7 +331,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       navigator.serviceWorker?.removeEventListener("message",onRemoteNotification);
       channel?.close();
     };
-  }, [enabled, bypass, reload]);
+  }, [enabled, bypass, reload, waitingForApproval]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
       account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
