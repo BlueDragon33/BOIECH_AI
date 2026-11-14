@@ -7,10 +7,12 @@ type Mode="pending"|"inactive"|"both"|"manager";
 type Row={
  account_id:string;login:string|null;account_created_at:string;revision:number;
  storage_device_id:string;person_role:string|null;person_name:string|null;
+ payment_status:string|null;payment_proof_key:string|null;
  access_status:string;last_seen_at:string|null;stage:string|null;
  latest_login_ms:number|null;active_sessions:number;
  sync_records:number;sync_events:number;activity_events:number;payments:number;certificates:number;
  ai_quizzes:number;ai_feedback:number;ai_interactions:number;assessments:number;
+ content_editor_devices:number;authored_editor_versions:number;legacy_profile_links:number;
  training_sessions:number;training_commands:number;manager_assignments:number;content_versions:number;
  total_seconds:number|null;completed_json:string|null;scores_json:string|null;attempts_json:string|null;
 };
@@ -39,6 +41,7 @@ const snapshot=(row:Row,options:{days:number;mode:Mode})=>sha([
 ]);
 const query=`SELECT a.account_id,a.login,a.created_at AS account_created_at,a.revision,
  a.storage_device_id,d.person_role,d.learner_name AS person_name,
+ d.payment_status,d.payment_proof_key,
  d.status AS access_status,d.last_seen_at,o.stage,
  (SELECT MAX(COALESCE(NULLIF(s.issued_at_ms,0),s.expires_at-28800000))
   FROM account_sessions s WHERE s.account_id=a.account_id) AS latest_login_ms,
@@ -59,6 +62,9 @@ const query=`SELECT a.account_id,a.login,a.created_at AS account_created_at,a.re
   WHERE m.target_device_id=a.storage_device_id OR m.manager_device_id=a.storage_device_id) AS manager_assignments,
  (SELECT COUNT(*) FROM course_content_versions c
   WHERE c.created_by IN (a.account_id,a.storage_device_id)) AS content_versions,
+ (SELECT COUNT(*) FROM course_content_versions c WHERE c.editor_device_id=a.storage_device_id) AS authored_editor_versions,
+ (SELECT COUNT(*) FROM content_editor_devices c WHERE c.device_id=a.storage_device_id) AS content_editor_devices,
+ (SELECT COUNT(*) FROM course_profiles p WHERE p.device_hash=a.storage_device_id) AS legacy_profile_links,
  p.total_active_seconds AS total_seconds,p.completed_json,p.scores_json,p.attempts_json
  FROM accounts a JOIN device_access d ON d.device_id=a.storage_device_id
  LEFT JOIN account_onboarding o ON o.account_id=a.account_id
@@ -73,13 +79,16 @@ const dataBlockers=(r:Row):string[]=>{
  if(Number(r.activity_events)>0||Number(r.total_seconds)>0||
   !["[]","",null].includes(r.completed_json)||!["{}","",null].includes(r.scores_json)||
   !["{}","",null].includes(r.attempts_json))result.push("Đã có tiến độ học");
- if(Number(r.payments)>0)result.push("Có lịch sử thanh toán");
+ if(Number(r.payments)>0||r.payment_status==="paid_verified"||r.payment_proof_key)
+  result.push("Có lịch sử thanh toán");
  if(Number(r.certificates)>0)result.push("Đã có chứng nhận");
  if(Number(r.ai_quizzes)>0||Number(r.ai_feedback)>0||Number(r.ai_interactions)>0||
   Number(r.assessments)>0)result.push("Có lịch sử AI/đánh giá");
  if(Number(r.training_sessions)>0||Number(r.training_commands)>0||
   Number(r.manager_assignments)>0)result.push("Có phân công/lịch đào tạo");
- if(Number(r.content_versions)>0)result.push("Có nội dung giảng dạy đã tạo");
+ if(Number(r.content_versions)>0||Number(r.authored_editor_versions)>0||Number(r.content_editor_devices)>0)
+  result.push("Có nội dung giảng dạy đã tạo");
+ if(Number(r.legacy_profile_links)>0)result.push("Có hồ sơ học tập cũ gắn thiết bị");
  return result;
 };
 function check(r:Row,options:{days:number;mode:Mode},now:number){
@@ -163,6 +172,7 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
      AND NOT EXISTS(SELECT 1 FROM account_sync_events WHERE account_id=a.account_id)
      AND NOT EXISTS(SELECT 1 FROM course_activity_events WHERE device_id=a.storage_device_id)
      AND NOT EXISTS(SELECT 1 FROM payment_reviews WHERE device_id=a.storage_device_id)
+     AND d.payment_status IS NOT 'paid_verified' AND d.payment_proof_key IS NULL
      AND NOT EXISTS(SELECT 1 FROM course_certificates WHERE device_id=a.storage_device_id)
      AND NOT EXISTS(SELECT 1 FROM ai_quiz_sessions WHERE device_id=a.storage_device_id)
      AND NOT EXISTS(SELECT 1 FROM ai_feedback WHERE device_id=a.storage_device_id)
@@ -174,7 +184,9 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
      AND NOT EXISTS(SELECT 1 FROM manager_device_assignments
        WHERE target_device_id=a.storage_device_id OR manager_device_id=a.storage_device_id)
      AND NOT EXISTS(SELECT 1 FROM course_content_versions
-       WHERE created_by=a.storage_device_id OR created_by=a.account_id)
+       WHERE created_by=a.storage_device_id OR created_by=a.account_id OR editor_device_id=a.storage_device_id)
+     AND NOT EXISTS(SELECT 1 FROM content_editor_devices WHERE device_id=a.storage_device_id)
+     AND NOT EXISTS(SELECT 1 FROM course_profiles WHERE device_hash=a.storage_device_id)
      AND NOT EXISTS(SELECT 1 FROM device_profiles WHERE device_id=a.storage_device_id
        AND (total_active_seconds>0 OR completed_json<>'[]' OR scores_json<>'{}' OR attempts_json<>'{}')))`;
  const storage=r.storage_device_id;
