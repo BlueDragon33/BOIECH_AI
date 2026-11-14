@@ -41,6 +41,8 @@ export default function ManagerRenewalPanel(){
  const [rows,setRows]=useState<Row[]|null>(null);
  const [search,setSearch]=useState(""),[role,setRole]=useState<"all"|"teacher"|"learner">("all");
  const [terms,setTerms]=useState<Record<string,AccountTerm>>({});
+ const [editing,setEditing]=useState<string|null>(null);
+ const dialogRef=useRef<HTMLElement|null>(null);
  const [now,setNow]=useState(()=>Date.now());
  useEffect(()=>{const id=window.setInterval(()=>setNow(Date.now()),60000);return()=>window.clearInterval(id);},[]);
  const [reason,setReason]=useState("Cán bộ xác nhận gia hạn quyền sử dụng");
@@ -75,54 +77,94 @@ export default function ManagerRenewalPanel(){
    const data=await post({action:"manager-renew-list"});
    if(data.verified!==true||data.contract!=="boi-manager-renew.v1"||
       !Array.isArray(data.accounts))throw new Error("Gia hạn đã lưu, nhưng cần tải lại danh sách.");
-   setRows(data.accounts);
+   setRows(data.accounts);setEditing(null);
   }catch(e){setError(getError(e));}finally{lock.current=false;setBusy(false);}
  }
  useEffect(()=>{queueMicrotask(()=>{void refresh();});},[]);
  const filtered=(rows??[]).filter(x=>(role==="all"||x.role===role)
   &&(x.name+" "+x.accountId).toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")));
+ useEffect(()=>{
+  if(!editing)return;
+  const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  const overflow=document.body.style.overflow;document.body.style.overflow="hidden";
+  const timer=window.setTimeout(()=>dialogRef.current?.focus(),0);
+  const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"&&!busy){event.preventDefault();setEditing(null);}};
+  document.addEventListener("keydown",onKey);
+  return()=>{window.clearTimeout(timer);document.body.style.overflow=overflow;document.removeEventListener("keydown",onKey);
+    if(previous?.isConnected)previous.focus({preventScroll:true});};
+ },[editing,busy]);
+ const activeRecord=filtered.find(item=>item.accountId===editing)??null;
+ // Editing is an opt-in modal: keep the roster compact on large and small screens.
  return <section className={styles.panel} aria-label="Gia hạn tài khoản giảng viên và học viên">
-  <header><div><small>MANAGER · GIA HẠN TÀI KHOẢN</small><h2>Quản lý thời gian sử dụng</h2>
-   <p>Cán bộ có thể gia hạn học viên và giảng viên theo quyền đã được Owner cấp.
-     Chọn thời hạn chính xác và đặt lại từ thời điểm cấp. Không cộng dồn vào hạn cũ; tài khoản khóa không được cấp lại.</p></div>
-   <button disabled={busy} onClick={()=>void refresh()}>Đồng bộ LIVE</button></header>
+  <header className={styles.heading}>
+   <div><small>MANAGER · QUYỀN SỬ DỤNG</small><h2>Thời hạn tài khoản</h2>
+    <p>Học viên và giảng viên · Chạm vào biểu tượng lịch để xem và điều chỉnh thời hạn. Mỗi thay đổi có nhật ký và xác minh D1.</p></div>
+   <button type="button" disabled={busy} onClick={()=>void refresh()}>↻ Làm mới</button>
+  </header>
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
   {notice?<p role="status" className={styles.notice}>{notice}</p>:null}
   <div className={styles.tools}>
-   <label>Tìm tài khoản<input value={search} onChange={e=>setSearch(e.target.value)}
-    placeholder="Tên học viên / giảng viên…"/></label>
-   <label>Vai trò<select value={role} onChange={e=>setRole(e.target.value as typeof role)}>
-     <option value="all">Tất cả</option><option value="learner">Học viên</option><option value="teacher">Giảng viên</option></select></label>
+    <label>Tìm tài khoản<input type="search" value={search} onChange={e=>setSearch(e.target.value)}
+      placeholder="Tên học viên / giảng viên…"/></label>
+    <label>Vai trò<select value={role} onChange={e=>setRole(e.target.value as typeof role)}>
+      <option value="all">Tất cả</option><option value="learner">Học viên</option><option value="teacher">Giảng viên</option>
+    </select></label>
   </div>
-  <label className={styles.reason}>Lý do gia hạn (bắt buộc)
-   <textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={300} rows={2}/></label>
-  <div className={styles.list}>{filtered.map(x=><article key={x.accountId}>
-    <div><strong>{x.name||"Chưa khai báo"}</strong><small>{x.role==="teacher"?"Giảng viên":"Học viên"}</small>
-      <small>{x.expiresAt===FOREVER_EXPIRES_AT?"Vĩnh viễn":
-        "Hết hạn "+new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(x.expiresAt))}</small>
-      <small>{x.expiresAt===FOREVER_EXPIRES_AT?"Thời hạn không giới hạn":
-        (()=>{const ms=Math.max(0,Date.parse(x.expiresAt)-now);const years=Math.floor(ms/(365.2425*86400000));
-         return years>0?`Còn ${years} năm ${Math.floor((ms-years*365.2425*86400000)/86400000)} ngày`:`Còn ${Math.floor(ms/86400000)} ngày`;})()}</small>
-      {x.role==="learner"?<div className={styles.lessonProgress}>
-        <strong>Tiến độ học tập</strong>
-        {x.progress?<><span>{x.progress.completed}/{x.progress.total} bài đã hoàn thành</span>
-         <progress max={x.progress.total} value={x.progress.completed} aria-label={`Tiến độ của ${x.name}`}/></>
-         :<span>Chưa có tiến độ được xác minh trên D1</span>}
-       </div>:null}
-      <code>{x.accountId.slice(0,19)}…</code></div>
-    <label>Đặt lại thời hạn
-      <select value={terms[x.accountId]??"30d"} disabled={busy}
-       onChange={e=>setTerms(v=>({...v,[x.accountId]:e.target.value as AccountTerm}))}>
-        {accountTerms.map(t=><option value={t.value} key={t.value}>{t.label}</option>)}
-      </select>
-      <small>Hạn mới tính từ ngày cấp, không cộng dồn.</small>
-    </label>
-    <button type="button" disabled={busy||reason.trim().length<10}
-      onClick={()=>void renew(x)}>Lưu hạn mới · Xác minh D1</button>
-   </article>)}
-   {!rows?<p role="status">{busy?"Đang kiểm tra quyền và dữ liệu D1…":"Chưa có dữ liệu được xác minh."}</p>:
-     !filtered.length?<p>Không có tài khoản phù hợp.</p>:null}
+  {rows?<p className={styles.summary} role="status">Đã xác minh {rows.length} tài khoản · Đang hiển thị {filtered.length} · Quyền gia hạn theo phạm vi cán bộ được cấp</p>:null}
+  <div className={styles.list}>
+    {filtered.map(x=>{
+      const left=x.expiresAt===FOREVER_EXPIRES_AT?null:Math.max(0,Math.ceil((Date.parse(x.expiresAt)-now)/86400000));
+      return <article className={styles.accountTile} key={x.accountId}>
+        <div className={styles.identity}>
+          <span className={styles.avatar} aria-hidden="true">{x.role==="teacher"?"♧":"♙"}</span>
+          <div><strong>{x.name||"Chưa khai báo"}</strong>
+            <small>{x.role==="teacher"?"Giảng viên":"Học viên"} · {x.expiresAt===FOREVER_EXPIRES_AT?"Không giới hạn":
+              left===0?"Hết hạn":`Còn ${left} ngày`}</small></div>
+        </div>
+        <div className={styles.termSummary}>
+          <span>Hết hạn</span><strong>{x.expiresAt===FOREVER_EXPIRES_AT?"Vĩnh viễn":
+            new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(x.expiresAt))}</strong>
+          {x.role==="learner"&&x.progress?<small>{x.progress.completed}/{x.progress.total} bài đã hoàn thành</small>:null}
+        </div>
+        <button type="button" className={styles.editIcon} disabled={busy}
+          aria-label={`Mở gia hạn cho ${x.name||"tài khoản"}`}
+          onClick={()=>{setEditing(x.accountId);setError("");}}
+          title="Chi tiết và gia hạn">◷ <span>Điều chỉnh</span></button>
+      </article>;
+    })}
+    {!rows?<p role="status">{busy?"Đang xác minh D1…":"Chưa có dữ liệu được xác minh."}</p>:
+      !filtered.length?<p>Không có tài khoản phù hợp.</p>:null}
   </div>
-  <footer>Gia hạn được ghi nhật ký; máy chủ tự khóa quyền khi hết hạn nếu không được gia hạn.</footer>
+  {activeRecord?<div className={styles.backdrop} role="presentation"
+    onMouseDown={event=>{if(event.target===event.currentTarget&&!busy)setEditing(null);}}>
+    <section ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true"
+      aria-label={`Gia hạn tài khoản ${activeRecord.name}`} tabIndex={-1}>
+      <header><div><small>GIA HẠN CÓ XÁC MINH · ACCOUNT-FIRST V2</small>
+        <h2>Điều chỉnh thời hạn</h2><p>{activeRecord.name} · {activeRecord.role==="teacher"?"Giảng viên":"Học viên"}</p></div>
+        <button type="button" className={styles.close} disabled={busy} aria-label="Đóng gia hạn"
+          onClick={()=>setEditing(null)}>✕</button></header>
+      <div className={styles.details}>
+        <div><small>Đang có hiệu lực đến</small><strong>{activeRecord.expiresAt===FOREVER_EXPIRES_AT?"Vĩnh viễn":
+          new Intl.DateTimeFormat("vi-VN",{dateStyle:"medium",timeStyle:"short"}).format(new Date(activeRecord.expiresAt))}</strong></div>
+        {activeRecord.role==="learner"?<div><small>Tiến độ học tập</small>
+          <strong>{activeRecord.progress?`${activeRecord.progress.completed}/${activeRecord.progress.total} bài`:"Chưa xác minh"}</strong></div>:null}
+      </div>
+      <label>Đặt lại thời hạn
+        <select value={terms[activeRecord.accountId]??"30d"} disabled={busy}
+          onChange={e=>setTerms(v=>({...v,[activeRecord.accountId]:e.target.value as AccountTerm}))}>
+          {accountTerms.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+        </select></label>
+      <p className={styles.warning}>Hạn mới tính từ thời điểm cấp, không cộng dồn. Tài khoản đang khóa không được gia hạn để vượt quyền.</p>
+      <label>Lý do gia hạn (bắt buộc, tối thiểu 10 ký tự)
+        <textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={300} rows={3}/></label>
+      {error?<p className={styles.error} role="alert">{error}</p>:null}
+      <div className={styles.actions}>
+        <button type="button" disabled={busy} onClick={()=>setEditing(null)}>Hủy</button>
+        <button type="button" disabled={busy||reason.trim().length<10}
+          onClick={()=>void renew(activeRecord)}>Xác nhận · Lưu và đọc lại D1</button>
+      </div>
+    </section>
+  </div>:null}
+  <footer>Chỉ tài khoản có trạng thái hợp lệ mới được gia hạn. Mọi thao tác đều được kiểm tra quyền phía máy chủ.</footer>
  </section>;
 }
