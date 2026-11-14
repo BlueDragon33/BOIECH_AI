@@ -463,19 +463,22 @@ export async function portableWorkspaceCredential(): Promise<StoredDeviceCredent
  * The storage anchor and account session are server-bound; challenge is signed
  * with the same P-256 key as the canonical account's first trusted device.
  */
-export async function portableManagerProof(storageDeviceId: string) {
+export async function portableManagerProof(storageDeviceId: string, signal?:AbortSignal) {
   if(!/^[a-f0-9]{64}$/.test(storageDeviceId)) throw new Error("Mã thiết bị tài khoản chưa hợp lệ.");
   const credential=await readActiveCredential();
   if(!credential?.privateKey) throw new Error("Thiếu khóa P-256 của tài khoản. Hãy đăng nhập lại trên thiết bị đã xác nhận.");
+  signal?.throwIfAborted();
   const response=await fetch("/api/accounts",{
-    method:"POST",credentials:"same-origin",cache:"no-store",
+    method:"POST",credentials:"same-origin",cache:"no-store",signal,
     headers:{"content-type":"application/json"},
     body:JSON.stringify({action:"legacy-challenge",deviceId:storageDeviceId})
   });
   const result=await response.json() as {challenge?:string;error?:string};
   if(!response.ok||!result.challenge) throw new Error(result.error??"Không nhận được thử thách ký thiết bị.");
+  signal?.throwIfAborted();
   const signature=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},credential.privateKey,
     new TextEncoder().encode(`boi-ech:${storageDeviceId}:${result.challenge}`));
+  signal?.throwIfAborted();
   let binary="";
   new Uint8Array(signature).forEach(byte=>{binary+=String.fromCharCode(byte);});
   return {deviceId:storageDeviceId,challenge:result.challenge,
