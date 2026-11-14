@@ -20,9 +20,20 @@ export async function GET(request: Request) {
     }
 
     const db = await getCourseDatabase();
-    const result = await db.prepare(
-      "SELECT account_id, device_id, approved, revoked FROM account_devices ORDER BY account_id, device_id",
-    ).all<{ account_id: string; device_id: string; approved: number; revoked: number }>();
+    const ownerView = new URL(request.url).searchParams.get("view") === "owner";
+    // The existing v2 contract remains minimal for generic consumers. The
+    // explicit Owner-only view joins an account identity + browser-session
+    // class. A P-256 browser key must NEVER be advertised as a physical phone.
+    const result = await db.prepare(ownerView
+      ? `SELECT b.account_id,b.device_id,b.approved,b.revoked,b.device_label,b.client_class,
+           d.learner_name,d.person_role
+         FROM account_devices b JOIN accounts a ON a.account_id=b.account_id
+         JOIN device_access d ON d.device_id=a.storage_device_id
+         ORDER BY b.account_id,b.device_id`
+      : "SELECT account_id, device_id, approved, revoked FROM account_devices ORDER BY account_id, device_id",
+    ).all<{ account_id: string; device_id: string; approved: number; revoked: number;
+      device_label?: string | null; client_class?: string | null;
+      learner_name?: string | null; person_role?: string | null }>();
     if (!result.success || !Array.isArray(result.results)) {
       throw new DeviceAccessError("Chưa xác minh được danh sách thiết bị.", 503, "BOI_DEVICE_REGISTRY_UNAVAILABLE");
     }
@@ -31,12 +42,20 @@ export async function GET(request: Request) {
       // Expose only a stable identifier for the binding, without its account or key ID.
       const deviceId = createHash("sha256").update(JSON.stringify([row.account_id, row.device_id])).digest("hex");
       const status = row.revoked === 1 ? "blocked" : row.approved === 1 ? "approved" : "pending";
-      return { deviceId, status };
+      if (!ownerView) return { deviceId, status };
+      const role = row.person_role === "manager" || row.person_role === "teacher" || row.person_role === "learner"
+        ? row.person_role : null;
+      const clientClass = row.client_class === "phone" || row.client_class === "tablet" ? row.client_class : "desktop";
+      return { deviceId, status, account: {
+          accountId: row.account_id, name: row.learner_name?.trim() || null, role,
+        },
+        browserLabel: row.device_label?.trim() || null, clientClass,
+      };
     });
     return controlResponse({
       ok: true,
       application: "boi-ech",
-      contract: "boi-device-registry.v2",
+      contract: ownerView ? "boi-device-registry-owner.v1" : "boi-device-registry.v2",
       readOnly: true,
       devices,
       counts: { total: devices.length },
