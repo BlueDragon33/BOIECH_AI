@@ -1,0 +1,82 @@
+
+.console{--v12-bg:#041e30;--v12-panel:#082d42;--v12-strong:#f6fcff;--v12-muted:#bbd6e2;--v12-line:#367d92;--v12-glow:#52f3e7;
+ display:grid;gap:20px;color:var(--v12-strong);background:radial-gradient(ellipse at 85% 0%,#085b6f88,transparent 48%),linear-gradient(150deg,#041b31,#063348 65%,#061e30);padding:clamp(15px,2.6vw,29px);border-radius:26px;border:1px solid #3fa8ac69;box-shadow:0 14px 50px #0002;font-size:15px;min-width:0}
+.console *{box-sizing:border-box}.console h3,.console h4,.console strong{color:var(--v12-strong)}
+.console button{color:var(--v12-strong);background:#0a3c54;border:1px solid #388ca2;min-height:44px;border-radius:12px;padding:8px 12px;cursor:pointer;font-weight:650;text-align:left}
+.console button:hover:not(:disabled){background:#0e5267;border-color:#76f7e8}.console button:disabled{opacity:.55;cursor:wait}
+.console :focus-visible{outline:3px solid #ffe49b;outline-offset:3px}
+.console p,.console small{color:var(--v12-muted);line-height:1.55}.console label{display:grid;gap:5px;font-weight:650;color:#e4fbff}
+.console input,.console select{width:100%;min-height:43px;color:#fff;background:#0a344b;border:1px solid #4b94a7;border-radius:11px;padding:8px 12px;font:inherit;min-width:0}
+.console input::placeholder{color:#accfdb}
+.hero{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 5px 8px}
+.eyebrow{font-size:11px;letter-spacing:.14em;font-weight:800;color:#a1fcf1}
+.hero h3{font-size:clamp(24px,3vw,34px);margin:10px 0 5px;display:flex;align-items:center;gap:12px;line-height:1.2}
+.hero p{margin:0;font-size:14px}.heroStat{min-width:105px;border:1px solid #3cb4c0;border-radius:19px;padding:13px;text-align:center;background:#093d54;display:grid;gap:2px}
+.heroStat strong{font-size:31px;font-variant-numeric:tabular-nums;color:#8effef}.heroStat small{color:#c4f2f0;font-size:12px}
+.toolbar{display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,.5fr) auto;gap:13px;align-items:end;padding:15px;background:#042337ab;border:1px solid #27788b8c;border-radius:18px}
+.toolbar label{font-size:12px}.readback{font-size:12px;color:#e1fafb;padding:11px 4px}.readback small{display:block;font-size:11px}
+.classGrid,.staffGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.classCard,.teacherCard{background:linear-gradient(130deg,#082c43,#042538);border:1px solid #368ea4;border-radius:20px;padding:18px;box-shadow:0 4px 15px #0002;min-width:0}
+.classCard:hover,.teacherCard:hover{border-color:#55d6d4}
+.classCardOpen,.teacherIdentity{width:100%;display:flex;align-items:center;gap:13px;min-width:0;background:transparent!important;border:0!important;padding:0!important}
+.classCardOpen>span:nth-child(2),.teacherIdentity>span:nth-child(2){display:grid;gap:3px;flex:1;min-width:0}
+.classCardOpen strong{font-size:21px}.classCardOpen small,.teacherIdentity small{font-size:12px;color:#aee6e7}
+.classEmblem,.avatar,.roomIcon,.buildingIcon{display:grid;place-items:center;flex:none;background:linear-gradient(140deg,#0e8591,#0b435e);color:#9ffff2;border-radius:14px;border:1px solid #3be8de;width:53px;height:53px;font-weight:900}
+.openChevron{font-size:23px;color:#acfffa}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:15px 0}
+.metrics span{display:grid;gap:1px;padding:9px;border-radius:10px;background:#0d4359a6;text-align:center}
+.metrics strong{font-size:17px;font-variant-numeric:tabular-nums}.metrics small{font-size:10px}
+.progress{height:8px;border-radius:20px;background:#356479;overflow:hidden}.progress>span{display:block;height:100%;background:linear-gradient(90deg,#21d9cd,#8afbea);border-radius:20px}
+.cardMeta{margin:12px 0;color:#c9ebef;font-size:12px}
+.leaderSlots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.leaderSlots button{display:flex;align-items:center;gap:9px;min-width:0;text-align:left;background:#0b3852}
+.leaderSlots button>span:last-child{display:grid;gap:2px;min-width:0}
+.leaderSlots strong{font-size:13px;overflow-wrap:anywhere}.leaderSlots small{font-size:11px;color:#b4edee}.leaderSlots em{font-style:normal;font-size:10px;color:#ffe19b}
+.slotIcon,.largePlus{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:13px;border:1px solid #48b9c5;background:#0b5267;color:#7cfdf0;font-size:25px;font-weight:800}
+.detailButton{display:flex;width:100%;justify-content:space-between;align-items:center;background:#086b74!important;border-color:#35ccc8!important;text-align:center!important}
+.staffGrid{gap:14px}.teacherIdentity .avatar{border-radius:50%;font-size:20px}.teacherIdentity strong{font-size:18px}
+.teacherClasses{margin:15px 0;padding:10px;border:1px solid #3b7e8f;border-radius:12px}
+.teacherClasses>small{font-size:12px}.teacherClasses>div{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+.teacherClasses>div span{padding:5px 10px;border-radius:10px;background:#1b6471;color:#edffff;font-size:12px;font-weight:650}
+.teacherSchedule{display:grid;gap:7px;margin-bottom:15px}.teacherSchedule>strong{color:#92fbe9}
+.teacherSchedule>div{display:grid;padding:9px 12px;border:1px solid #376c84;border-radius:11px}
+.teacherSchedule>div span{font-size:13px}.teacherSchedule>div small{font-size:11px}
+.buildings{display:grid;gap:19px}.building{border:1px solid #2bc0c9;border-radius:22px;background:#092c42;overflow:hidden}
+.building>summary{display:flex;align-items:center;gap:14px;min-height:90px;padding:15px 20px;cursor:pointer;background:linear-gradient(95deg,#064b60,#062b44);list-style:none}
+.building>summary::-webkit-details-marker{display:none}.building>summary>span:nth-child(2){display:grid;gap:3px;flex:1}
+.building>summary strong{font-size:22px}.building>summary small{font-size:12px}
+.roomGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,255px),1fr));gap:13px;padding:18px}
+.roomCard{min-width:0;border-radius:18px;background:linear-gradient(125deg,#053a4f,#082b45);border:1px solid #368ca8;padding:14px;display:grid;gap:12px}
+.roomHeading{display:flex;align-items:center;gap:9px}.roomHeading>span:nth-child(2){flex:1;min-width:0;display:grid}
+.roomHeading strong{font-size:20px}.roomHeading small{font-size:11px}
+.roomIcon{width:47px;height:47px}.roomState{font-size:11px;color:#dbf9ff;border-radius:99px;border:1px solid #4291bc;background:#0a546e;padding:5px 8px;font-weight:700;text-align:center}
+.roomState[data-state=occupied]{color:#c3ffe0;background:#13543b;border-color:#42b684}
+.roomState[data-state=upcoming]{color:#ffecb4;background:#705512;border-color:#dab442}
+.roomState[data-state=unavailable]{color:#ffced0;background:#703a45;border-color:#b76f7c}
+.roomDetails{display:grid;gap:5px}.roomDetails p{margin:0;font-size:12px;color:#d3e7f2}.roomDetails strong{color:#fff}
+.roomFree{min-height:90px;display:grid;place-items:center;margin:0;color:#b8d6e1}
+.roomActions{display:flex;gap:5px;flex-wrap:wrap}.roomActions button{flex:1 1 30%;text-align:center;font-size:11px;min-height:40px;padding:6px}
+.buildingAdd{margin:0 18px 18px;text-align:center;background:#086a75!important;border-color:#46d4ce!important}
+.empty{grid-column:1/-1;border:1px dashed #55a0b3;border-radius:16px;padding:24px;text-align:center}
+.classDetail{display:grid;gap:16px}.hierarchy{display:grid;gap:3px;border:1px solid #75cddd;border-radius:13px;padding:14px;background:#124758}
+.hierarchy strong{color:#fff}.hierarchy span{font-size:15px;color:#dff}.hierarchy small{font-size:12px;color:#c5e5eb}
+.detailSlotGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.detailSlotGrid button{display:grid;justify-items:center;text-align:center;gap:7px;border:1px solid #438c9b;border-radius:15px;background:#0a4051;padding:17px}
+.detailSlotGrid strong{font-size:13px}.detailSlotGrid small{color:#b4ebeb}
+.largePlus{width:56px;height:56px;font-size:32px;border-radius:16px}
+.rosterTop{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.rosterTop button{font-size:12px;background:#08656b}.rosterRow{display:flex;align-items:center;gap:11px;padding:11px;border:1px solid #397f95;border-radius:13px;background:#0a3448}
+.rosterRow>span:nth-child(2),.rosterRow>span:first-child:not(.avatar){flex:1;display:grid;gap:3px;min-width:0}.rosterRow strong{font-size:14px}.rosterRow small{font-size:11px}
+.rosterRow button{font-size:12px;flex:none}.unassigned{display:grid;gap:9px;padding:14px;border:1px solid #67d2cd;border-radius:14px;background:#0d4a59}
+.unassigned p{font-size:12px;margin:0}
+.leaderForm{display:grid;gap:14px}.leaderForm label{display:grid;gap:6px;font-size:13px}.leaderForm input,.leaderForm select{min-height:44px}
+.formHint{font-size:12px}.provisional{padding:13px;background:#635027;border:1px solid #d8bb62;border-radius:12px;color:#fff3c9!important}
+.formActions{display:flex;gap:10px;flex-wrap:wrap}.formActions>button{flex:1 1 130px;text-align:center}
+.save{background:#0a8b80!important;color:#fff!important;border-color:#6ce5d8!important}
+.history{border-top:1px solid #50778e;padding-top:14px;margin-top:14px}.history h4{font-size:14px;margin-bottom:9px}.history p{font-size:13px;padding:8px;border-radius:8px;background:#0d344a}
+.history small{display:block}
+@media(max-width:790px){.toolbar{grid-template-columns:1fr 1fr}.readback{grid-column:1/-1}.classGrid,.staffGrid{grid-template-columns:1fr}}
+@media(max-width:475px){.console{padding:12px;border-radius:15px}.heroStat{min-width:72px}.toolbar{grid-template-columns:1fr}.readback{grid-column:auto}
+.leaderSlots{grid-template-columns:1fr}.detailSlotGrid{grid-template-columns:1fr}.roomGrid{grid-template-columns:1fr;padding:10px}
+.building>summary{padding:12px}.roomHeading{flex-wrap:wrap}.roomActions button{flex:1 1 40%}.rosterRow{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){.console *{animation:none!important;transition:none!important}}

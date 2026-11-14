@@ -140,13 +140,59 @@ jobs:
         run: CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH=wrangler.cloudflare.preview.jsonc npm run build
       - name: Build App Preview before any remote D1 mutation
         working-directory: application-management-preview-source
+        env:
+          # Critical: the Vite/Cloudflare build generates the deployed revision
+          # from GITHUB_SHA. This secondary checkout has its own pinned commit.
+          # Do not publish the BOIECH_AI commit as the App Management revision.
+          GITHUB_SHA: ${{ env.APPLICATION_MANAGEMENT_BUILD_REVISION }}
         run: CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH=wrangler.cloudflare.jsonc npm run build
+      - name: Restore only attested pinned App Preview config after build
+        working-directory: application-management-preview-source
+        shell: bash
+        env:
+          REVIEWED_APP_SHA: ${{ env.APPLICATION_MANAGEMENT_BUILD_REVISION }}
+          PARENT_GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          APP_CHECKOUT_SHA="$(git -C "$GITHUB_WORKSPACE/application-management-preview-source" rev-parse HEAD)"
+          if [[ "$APP_CHECKOUT_SHA" != "$REVIEWED_APP_SHA" ]]; then
+            echo "::error::App checkout SHA differs from reviewed source (actual=${APP_CHECKOUT_SHA:0:12}, expected=${REVIEWED_APP_SHA:0:12})."
+            exit 1
+          fi
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const file = fs.readFileSync("wrangler.cloudflare.jsonc", "utf8");
+          const matched = [...file.matchAll(/^\s*"APPLICATION_MANAGEMENT_BUILD_REVISION"\s*:\s*"([^"]+)"\s*,?\s*$/gm)];
+          const actual = matched.length === 1 ? matched[0][1] : null;
+          const allowed = [process.env.REVIEWED_APP_SHA, process.env.PARENT_GITHUB_SHA];
+          if (!actual || !allowed.includes(actual)) {
+            throw new Error("Unexpected or duplicate prepared App revision before post-build recovery; no remote writes.");
+          }
+          if (!/^\s*"name"\s*:\s*"application-management-preview"\s*,?\s*$/m.test(file) ||
+              !/^\s*"APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL"\s*:\s*"cloudflare-preview"\s*,?\s*$/m.test(file) ||
+              !file.includes(process.env.APPLICATION_MANAGEMENT_PREVIEW_D1_DATABASE_ID)) {
+            throw new Error("Prepared App Preview identity, channel or D1 was altered; fail closed.");
+          }
+          console.log("Prepared App Preview pre-recovery revision attested: " + actual.slice(0, 12));
+          NODE
+          # Re-materialize only the local generated JSONC from the exact pinned
+          # App source and exact reviewed SHA. This cannot touch D1 or Workers.
+          # Explicit child-process GITHUB_SHA is required by the pinned App's
+          # prepare script, which prioritizes it over the reviewed App SHA.
+          # Never rely on overriding GitHub Actions' built-in GITHUB_SHA.
+          env GITHUB_SHA="$REVIEWED_APP_SHA" npm run cloudflare:preview:prepare
+
       - name: Verify generated Preview artifact before any remote D1 mutation
         working-directory: boi-ech
         run: npm run cloudflare:artifact:check
       - name: Verify generated App Preview artifact before any remote D1 mutation
         working-directory: application-management-preview-source
         run: npm run cloudflare:artifact:check
+
+      - name: Attest pinned App checkout and reconcile ONLY the verified parent-SHA packaging defect
+        run: node boi-ech/scripts/reconcile-paired-preview-app-revision.mjs
+      - name: Verify BOTH generated Preview Worker revision identities before any remote D1 mutation
+        run: node boi-ech/scripts/assert-paired-preview-artifact-revisions.mjs
 
       - name: Apply isolated Preview migrations
         working-directory: boi-ech

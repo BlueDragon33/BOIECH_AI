@@ -35,6 +35,9 @@ test('real client uses fresh signed proofs, keeps a command after lost reply, an
    const html=renderToStaticMarkup(React.createElement(TrainingDashboard,{board,tab,setTab:()=>{},busy:false,notice:'',onCommand:async()=>false,onWindowChange:()=>{}}));
    assert.match(html,/Cán bộ quản lý/);
    if(tab==='schedule')assert.match(html,/Chưa có buổi học phù hợp/);
+   else if(tab==='people')assert.match(html,/Nhân sự giảng viên/);
+   else if(tab==='class')assert.match(html,/V12 · Lớp học/);
+   else if(tab==='room')assert.match(html,/Phòng học theo tòa/);
    else assert.match(html,/data-tone=/);
    assert.ok(!html.includes('0900000110'));
   }
@@ -66,8 +69,8 @@ test('premium owner controls never leak; manager-only review lives in the dedica
  assert.doesNotMatch(overview,/Quản lý tài khoản · phê duyệt hai vòng/);
  assert.doesNotMatch(overview,/<summary>Duyệt học viên và giảng viên<\/summary>/);
  assert.doesNotMatch(people,/<summary>Duyệt học viên và giảng viên<\/summary>/);
- assert.match(people,/Danh sách Học viên/);
- assert.match(people,/Danh sách Giảng viên/);
+ assert.match(people,/Nhân sự giảng viên/);
+ assert.doesNotMatch(people,/Danh sách Học viên/,"learner roster belongs under classes");
  assert.match(approval,/<summary>Duyệt học viên và giảng viên<\/summary>/);
 });
 test('manager approval policy resolves the disabled feature and shows a retryable error on service failure',async()=>{

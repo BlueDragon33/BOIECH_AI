@@ -143,12 +143,17 @@ test('the schedule time window can be collapsed and reopened',()=>{
  assert.equal(toggle().props['aria-expanded'],true);toggle().props.onClick();assert.equal(toggle().props['aria-expanded'],false);
  toggle().props.onClick();assert.equal(toggle().props['aria-expanded'],true);
 });
-test('availability filter excludes unassigned and inactive-class people',()=>{
- const b=board();b.resources.push({...resource,id:'archived',name:'Old',status:'archived',state:'inactive'});
- b.people=[person,{...person,id:'unassigned',name:'Chưa phân lớp',className:''},{...person,id:'old',name:'Lớp cũ',className:'Old'}];
- const render=harness(props({board:b,tab:'people'}));
- render().find(n=>n.type==='select'&&elements(n).some(x=>x.type==='option'&&x.props.value==='available')).props.onChange({target:{value:'available'}});
- assert.deepEqual(render().filter(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Xem hồ sơ')).map(n=>text(n).includes('Học viên mẫu')), [true]);
+test('V12 personnel tab routes exclusively to teachers with no learners displayed',()=>{
+ const b=board();b.people=[person,{...person,id:'teacher',name:'Giảng viên mẫu',role:'teacher',className:'A'}];
+ const tree=harness(props({board:b,tab:'people'}))();
+ const panel=tree.find(n=>typeof n.type==='function'&&n.type.name==='ManagerConsoleV12');
+ assert.ok(panel,'V12 personnel panel should replace the old mixed-role roster');
+ assert.equal(panel.props.tab,'people');
+ const {default:V12}=load('app/manager-console-v12.tsx');
+ const html=renderToStaticMarkup(React.createElement(V12,{...panel.props}));
+ assert.match(html,/Giảng viên mẫu/);
+ assert.doesNotMatch(html,/Học viên mẫu/);
+ assert.doesNotMatch(html,/Chưa phân lớp.*Học viên/);
 });
 test('command center reaches class setup after a building exists without duplicate launcher',()=>{
  let selected;const b=board();b.resources=b.resources.filter(r=>r.kind!=='class');
@@ -160,9 +165,8 @@ test('replacing inactive memberships requires an explicit confirmation and keeps
  const b=board();b.resources.push({...resource,id:'old',name:'Old',status:'archived',state:'inactive'});
  b.people=[{...person,id:'teacher',role:'teacher',className:'A; Old'}];const commands=[];
  const render=harness(props({board:b,tab:'people',onCommand:async payload=>{commands.push(payload);return true;}}));
- const icon=render().find(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Xem hồ sơ giảng viên'));assert.ok(icon);icon.props.onClick();
- const personSheet=render().find(n=>n.props?.target?.kind==='person');assert.ok(personSheet);
- personSheet.props.onAssignPerson(b.people[0]);let tree=render();
+ const panel=render().find(n=>typeof n.type==='function'&&n.type.name==='ManagerConsoleV12');assert.ok(panel);
+ panel.props.onAssignPerson(b.people[0]);let tree=render();
  assert.ok(tree.some(n=>n.type==='p'&&text(n).includes('A; Old')));
  assert.equal(tree.find(n=>n.type==='button'&&text(n)==='Lưu phân công').props.disabled,true);
  tree.filter(n=>n.type==='form').at(-1).props.onSubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));assert.equal(commands.length,0);
@@ -180,7 +184,8 @@ test('class detail uses canonical memberships and current source sessions, omitt
 });
 test('editing a resource keeps its optimistic version and preserves a rejected draft',async()=>{
  let sent;const render=harness(props({tab:'class',onCommand:async payload=>{sent=payload;return false;}}));
- render().find(n=>n.type==='button'&&text(n)==='Chỉnh sửa').props.onClick();let tree=render();
+ const panel=render().find(n=>typeof n.type==='function'&&n.type.name==='ManagerConsoleV12');assert.ok(panel);
+ panel.props.onEditResource(resource);let tree=render();
  const name=tree.find(n=>n.type==='input'&&n.props.maxLength===50);name.props.onChange({target:{value:'A sửa'}});
  tree=render();await tree.filter(n=>n.type==='form').at(-1).props.onSubmit({preventDefault(){}});await new Promise(r=>setImmediate(r));
  assert.equal(sent.expectedVersion,7);assert.equal(sent.name,'A sửa');assert.equal(render().find(n=>n.type==='input'&&n.props.maxLength===50).props.value,'A sửa');

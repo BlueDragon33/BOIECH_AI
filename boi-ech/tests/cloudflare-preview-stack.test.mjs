@@ -10,7 +10,7 @@ function fixture(change=()=>{}) {
  const calls=[];
  const settings={
   "bauman-control-preview":{bindings:[]},
-  "boi-ech-preview":{bindings:[{name:"DB",type:"d1",id:borrowed},{name:"BOI_ECH_BUILD_REVISION",type:"plain_text",text:env.GITHUB_SHA},{name:"BOI_ECH_DEPLOYMENT_CHANNEL",type:"plain_text",text:"cloudflare-preview"}]},
+  "boi-ech-preview":{bindings:[{name:"DB",type:"d1",id:borrowed},{name:"BOI_ECH_BUILD_REVISION",type:"plain_text",text:env.GITHUB_SHA},{name:"BOI_ECH_DEPLOYMENT_CHANNEL",type:"plain_text",text:"cloudflare-preview"},{name:"APPLICATION_MANAGEMENT_ORIGIN",type:"plain_text",text:"https://application-management-preview.boiech-ai.workers.dev"}]},
   "application-management-preview":{bindings:[{name:"DB",type:"d1",id:appId},{name:"APPLICATION_MANAGEMENT_PREVIEW_ACCESS_SECRET",type:"secret_text"},{name:"MANAGED_APP_CREDENTIAL_ENCRYPTION_KEY",type:"secret_text"},{name:"CONTROL_OWNER_EMAILS",type:"plain_text",text:env.CONTROL_OWNER_EMAILS},{name:"APPLICATION_MANAGEMENT_BUILD_REVISION",type:"plain_text",text:env.APPLICATION_MANAGEMENT_BUILD_REVISION},{name:"APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL",type:"plain_text",text:"cloudflare-preview"}]},
  };
  change(settings);
@@ -55,6 +55,16 @@ test('stack preflight refuses a Preview bound to Production or missing retained 
  for(const change of [s=>s['application-management-preview'].bindings[0].id='8a626342-21fd-46a7-bfbd-1c3c4866c999',s=>s['application-management-preview'].bindings=s['application-management-preview'].bindings.filter(b=>b.name!=='APPLICATION_MANAGEMENT_PREVIEW_ACCESS_SECRET')]){
   const f=fixture(change);await assert.rejects(checkPreviewStack(env,f.fetcher));
   assert.ok(f.calls.every(c=>!c.method||c.method==='GET'));
+ }
+});
+test('missing or wrong live Preview Origin stops bridge before credential mutation',async()=>{
+ for (const change of [
+  settings=>settings['boi-ech-preview'].bindings=settings['boi-ech-preview'].bindings.filter(x=>x.name!=='APPLICATION_MANAGEMENT_ORIGIN'),
+  settings=>settings['boi-ech-preview'].bindings.find(x=>x.name==='APPLICATION_MANAGEMENT_ORIGIN').text='https://application-management.boiech-ai.workers.dev'
+ ]) {
+  const f=fixture(change);
+  await assert.rejects(installPreviewBridge({...env,PREVIEW_BRIDGE_CONFIRMATION:'INSTALL_PREVIEW_BRIDGE'},f.fetcher),/Origin policy mismatch/);
+  assert.equal(f.calls.some(c=>c.method==='PUT'),false);
  }
 });
 test('bridge installation needs exact action confirmation and only writes both named Preview secrets',async()=>{

@@ -1,7 +1,7 @@
 import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import { DeviceAccessError, getCourseDatabase, type PublicDeviceState } from "./device-auth.server";
 import { TRAINING_SCHEMA } from "./training-schema";
-import { classKey, classNames, type TrainingBoard, type TrainingPerson, type TrainingResource, type TrainingSession } from "./training-types";
+import { classKey, classNames, type TrainingBoard, type TrainingPerson, type TrainingResource, type TrainingSession, type TrainingClassLeader, type TrainingPeriod, type TrainingLeaderHistory } from "./training-types";
 let schemaReady:Promise<unknown>|undefined;
 export async function trainingDatabase() {
  const db=await getCourseDatabase();
@@ -20,7 +20,7 @@ export function requireManager(actor:PublicDeviceState) { if(actor.personRole!==
 const AUTH_GUARD=`EXISTS(SELECT 1 FROM device_access a WHERE a.device_id=? AND a.person_role='manager' AND a.management_enabled=1 AND a.status='approved' AND a.registration_submitted_at IS NOT NULL AND (a.access_expires_at IS NULL OR datetime(a.access_expires_at)>CURRENT_TIMESTAMP))`;
 export async function trainingBoard(from:string,to:string,actor?:PublicDeviceState):Promise<TrainingBoard> {
  const db=await trainingDatabase();
- const [rs,ps,ss]=await Promise.all([
+ const [rs,ps,ss,ls,periods,leaderHistory]=await Promise.all([
  db.prepare('SELECT id,kind,name,parent_id AS parentId,capacity,required_teachers AS requiredTeachers,status,version FROM training_resources ORDER BY name LIMIT 1001').all<TrainingResource>(),
  db.prepare(`SELECT d.device_id AS id,d.learner_name AS name,d.person_code AS code,d.person_role AS role,
  COALESCE(d.class_name,'') AS className,d.status,
@@ -34,9 +34,19 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  LEFT JOIN account_onboarding o ON o.account_id=a.account_id
  LEFT JOIN account_entitlements e ON e.account_id=a.account_id
  WHERE d.person_role IN ('learner','teacher') ORDER BY d.learner_name LIMIT 1001`).all<TrainingPerson>(),
- db.prepare(`SELECT id,title,class_id AS classId,room_id AS roomId,teacher_id AS teacherId,starts_at AS startsAt,ends_at AS endsAt,status,version FROM training_sessions WHERE starts_at<? AND ends_at>? ORDER BY starts_at LIMIT 1001`).bind(to,from).all<TrainingSession>(),
+ db.prepare(`SELECT id,title,class_id AS classId,room_id AS roomId,teacher_id AS teacherId,
+ assistant_teacher_id AS assistantTeacherId,period_start AS periodStart,period_end AS periodEnd,
+ starts_at AS startsAt,ends_at AS endsAt,status,version FROM training_sessions WHERE starts_at<? AND ends_at>? ORDER BY starts_at LIMIT 1001`).bind(to,from).all<TrainingSession>(),
+ db.prepare(`SELECT class_id AS classId,slot,source,member_device_id AS memberDeviceId,display_name AS displayName,
+ birth_date AS birthDate,military_rank AS militaryRank,battalion,version,updated_at AS updatedAt FROM training_class_leaders ORDER BY class_id,slot LIMIT 1001`).all<TrainingClassLeader>(),
+ db.prepare(`SELECT number,start_time AS startTime,end_time AS endTime,timezone,version FROM training_periods ORDER BY number LIMIT 25`).all<TrainingPeriod>(),
+ db.prepare(`SELECT id,class_id AS classId,slot,previous_version AS previousVersion,previous_source AS previousSource,
+ previous_member_device_id AS previousMemberDeviceId,previous_display_name AS previousDisplayName,
+ previous_birth_date AS previousBirthDate,previous_military_rank AS previousMilitaryRank,
+ previous_battalion AS previousBattalion,replaced_at AS replacedAt
+ FROM training_class_leader_history ORDER BY replaced_at DESC LIMIT 1000`).all<TrainingLeaderHistory>(),
  ]);
- if([rs,ps,ss].some(r=>(r.results?.length??0)>1000))fail("Khoảng xem có hơn 1.000 bản ghi. Thu hẹp thời gian hoặc liên hệ quản trị; chưa thể hiển thị tổng số đầy đủ.","TRAINING_RESULT_LIMIT",413);
+ if([rs,ps,ss,ls].some(r=>(r.results?.length??0)>1000))fail("Khoảng xem có hơn 1.000 bản ghi. Thu hẹp thời gian hoặc liên hệ quản trị; chưa thể hiển thị tổng số đầy đủ.","TRAINING_RESULT_LIMIT",413);
  const sourceResources=rs.results??[];
  const byId=new Map(sourceResources.map(resource=>[resource.id,resource]));
  const sessions=ss.results??[];
@@ -45,7 +55,7 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  function increment(map:Map<string,number>,key:string){map.set(key,(map.get(key)??0)+1);}
  for(const session of sessions){
   if(session.status==="cancelled")continue;
-  increment(teacherBookings,session.teacherId);increment(classBookings,session.classId);increment(roomBookings,session.roomId);
+  increment(teacherBookings,session.teacherId);if(session.assistantTeacherId)increment(teacherBookings,session.assistantTeacherId);increment(classBookings,session.classId);increment(roomBookings,session.roomId);
   const resource=byId.get(session.classId);if(resource)increment(classNameBookings,classKey(resource.name));
  }
  // Early account-first registrations have NULL learner_name/person_code. Returning
@@ -90,7 +100,7 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
   visiblePeople=people;
   visibleSessions=sessions;
  }
- return {resources,people:visiblePeople,sessions:visibleSessions,from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
+ return {resources,people:visiblePeople,sessions:visibleSessions,leaders:ls.results??[],leaderHistory:leaderHistory.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
 export async function trainingCommand(actor:PublicDeviceState,payload:Record<string,unknown>) {
  requireManager(actor);
@@ -144,9 +154,85 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(startsAt>=endsAt||Date.parse(endsAt)-Date.parse(startsAt)>86400000)fail("Giờ kết thúc phải sau giờ bắt đầu, tối đa 24 giờ.");
   if(!["scheduled","completed","cancelled"].includes(String(status)))fail("Trạng thái buổi học không hợp lệ.");
   if(status==="completed"&&Date.parse(endsAt)>Date.now())fail("Chưa thể hoàn thành buổi học chưa kết thúc.");
-  command={action,id:sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,version};
-  write=version===0?db.prepare(`INSERT INTO training_sessions(id,title,class_id,room_id,teacher_id,starts_at,ends_at,status,version) SELECT ?,?,?,?,?,?,?,?,1 WHERE ${authorityGuard}`).bind(sessionId,title,classId,roomId,teacherId,startsAt,endsAt,status,...authorityBindings)
-  :db.prepare(`UPDATE training_sessions SET title=?,class_id=?,room_id=?,teacher_id=?,starts_at=?,ends_at=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=? AND ${authorityGuard}`).bind(title,classId,roomId,teacherId,startsAt,endsAt,status,sessionId,version,...authorityBindings);
+
+  const assistantTeacherId=payload.assistantTeacherId? id(payload.assistantTeacherId):null;
+  const periodStart=payload.periodStart===null||payload.periodStart===undefined?null:integer(payload.periodStart,1,24);
+  const periodEnd=payload.periodEnd===null||payload.periodEnd===undefined?null:integer(payload.periodEnd,1,24);
+  if(assistantTeacherId===teacherId)fail("Giảng viên phụ không thể đồng thời là giảng viên chính.");
+  if((periodStart===null)!==(periodEnd===null)||(periodStart!==null&&periodEnd!==null&&periodStart>periodEnd))fail("Khoảng tiết học không hợp lệ.");
+  if(periodStart!==null&&periodEnd!==null){
+   const [startPeriod,endPeriod]=await Promise.all([
+    db.prepare("SELECT number FROM training_periods WHERE number=?").bind(periodStart).first(),
+    db.prepare("SELECT number FROM training_periods WHERE number=?").bind(periodEnd).first()
+   ]);
+   if(!startPeriod||!endPeriod)fail("Hãy cấu hình các tiết học trước khi xếp lịch.");
+  }
+  command={action,id:sessionId,title,classId,roomId,teacherId,assistantTeacherId,periodStart,periodEnd,startsAt,endsAt,status,version};
+  write=version===0?
+    db.prepare(`INSERT INTO training_sessions(id,title,class_id,room_id,teacher_id,assistant_teacher_id,period_start,period_end,starts_at,ends_at,status,version)
+     SELECT ?,?,?,?,?,?,?,?,?,?,?,1 WHERE ${authorityGuard}`)
+       .bind(sessionId,title,classId,roomId,teacherId,assistantTeacherId,periodStart,periodEnd,startsAt,endsAt,status,...authorityBindings)
+    :db.prepare(`UPDATE training_sessions SET title=?,class_id=?,room_id=?,teacher_id=?,assistant_teacher_id=?,period_start=?,period_end=?,
+        starts_at=?,ends_at=?,status=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=? AND ${authorityGuard}`)
+       .bind(title,classId,roomId,teacherId,assistantTeacherId,periodStart,periodEnd,startsAt,endsAt,status,sessionId,version,...authorityBindings);
+
+ } else if(action==="save-leader") {
+  const classId=id(payload.classId),slot=payload.slot,source=payload.source;
+  if(slot!=="cadre"&&slot!=="student")fail("Chức danh trong lớp không hợp lệ.");
+  if(!["none","cadre","class","outside"].includes(String(source)))fail("Nguồn người được chọn không hợp lệ.");
+  if((slot==="cadre"&&source!=="cadre"&&source!=="none")||
+     (slot==="student"&&source!=="class"&&source!=="outside"&&source!=="none"))
+   fail("Vị trí và nguồn người được chọn không phù hợp.");
+  const version=integer(payload.expectedVersion,0,1000000);
+  const memberDeviceId=typeof payload.memberDeviceId==="string"&&payload.memberDeviceId?id(payload.memberDeviceId):null;
+  let displayName:string|null=null,birthDate:string|null=null,militaryRank:string|null=null,battalion:string|null=null;
+  if(source!=="none"){
+    displayName=text(payload.displayName,80);
+    if(slot==="cadre"){
+      if(memberDeviceId)fail("Cán bộ khung là hồ sơ chức danh, không phải tài khoản.");
+      birthDate=text(payload.birthDate,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)||new Date(birthDate+"T00:00:00Z").toISOString().slice(0,10)!==birthDate)fail("Ngày sinh không hợp lệ.");
+      militaryRank=text(payload.militaryRank,60);
+      battalion=text(payload.battalion,60);
+    }else if(memberDeviceId){
+      const candidate=await db.prepare(`SELECT d.person_role AS role,d.class_name AS className,d.status,
+         d.registration_submitted_at AS registered,c.name AS targetClass
+         FROM device_access d CROSS JOIN training_resources c
+         WHERE d.device_id=? AND c.id=? AND c.kind='class' AND c.status='active'`)
+        .bind(memberDeviceId,classId).first<{role:string;className:string|null;status:string;registered:string|null;targetClass:string}>();
+      if(!candidate||candidate.role!=="learner"||!candidate.registered)
+        fail("Chỉ được chọn hồ sơ học viên có đăng ký.","TRAINING_PERSON_NOT_FOUND",404);
+      const inClass=classKey(candidate.className??"")===classKey(candidate.targetClass);
+      if(source==="class"&&(!inClass||candidate.status!=="approved"))
+        fail("Lớp trưởng trong lớp phải được phân vào lớp và đang được duyệt.","TRAINING_LEADER_CLASS_MISMATCH",409);
+      if(source==="outside"&&inClass)
+        fail("Học viên đã thuộc lớp; hãy chọn nguồn Trong lớp.");
+    }else if(source==="class")fail("Học viên trong lớp phải chọn từ hồ sơ đã đăng ký.");
+  }
+  if(!await db.prepare("SELECT id FROM training_resources WHERE id=? AND kind='class' AND status='active'").bind(classId).first())
+    fail("Lớp không còn hoạt động.","TRAINING_RESOURCE_UNAVAILABLE",409);
+  command={action,classId,slot,source,memberDeviceId,displayName,birthDate,militaryRank,battalion,version};
+  write=version===0?
+    db.prepare(`INSERT INTO training_class_leaders(class_id,slot,source,member_device_id,display_name,birth_date,military_rank,battalion,version)
+       SELECT ?,?,?,?,?,?,?,?,1 WHERE ${authorityGuard}`)
+      .bind(classId,slot,source,memberDeviceId,displayName,birthDate,militaryRank,battalion,...authorityBindings)
+    :db.prepare(`UPDATE training_class_leaders SET source=?,member_device_id=?,display_name=?,birth_date=?,military_rank=?,battalion=?,
+       version=version+1,updated_at=CURRENT_TIMESTAMP WHERE class_id=? AND slot=? AND version=? AND ${authorityGuard}`)
+      .bind(source,memberDeviceId,displayName,birthDate,militaryRank,battalion,classId,slot,version,...authorityBindings);
+ } else if(action==="save-period") {
+  const number=integer(payload.number,1,24),version=integer(payload.expectedVersion,0,1000000);
+  const startTime=text(payload.startTime,5),endTime=text(payload.endTime,5),timezone=text(payload.timezone,60);
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)||startTime>=endTime)
+    fail("Giờ tiết học không hợp lệ.");
+  try{new Intl.DateTimeFormat("en-US",{timeZone:timezone}).format(new Date());}
+  catch{fail("Múi giờ IANA không hợp lệ.");}
+  command={action,number,startTime,endTime,timezone,version};
+  write=version===0?
+    db.prepare(`INSERT INTO training_periods(number,start_time,end_time,timezone,version) SELECT ?,?,?,?,1 WHERE ${authorityGuard}`)
+      .bind(number,startTime,endTime,timezone,...authorityBindings)
+    :db.prepare(`UPDATE training_periods SET start_time=?,end_time=?,timezone=?,version=version+1,updated_at=CURRENT_TIMESTAMP
+       WHERE number=? AND version=? AND ${authorityGuard}`)
+      .bind(startTime,endTime,timezone,number,version,...authorityBindings);
  } else if(action==="assign-person") {
   const personId=id(payload.personId),expectedClassName=typeof payload.expectedClassName==="string"?payload.expectedClassName:fail("Thiếu lớp hiện tại để kiểm tra thay đổi đồng thời.");
   const target=await db.prepare("SELECT person_role AS role FROM device_access WHERE device_id=? AND person_role IN ('learner','teacher') AND registration_submitted_at IS NOT NULL").bind(personId).first<{role:string}>();
