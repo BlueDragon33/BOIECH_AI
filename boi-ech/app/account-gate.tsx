@@ -86,8 +86,24 @@ async function readAccountPayload(response: Response): Promise<Record<string, un
     throw new Error("Máy chủ tài khoản tạm gián đoạn. Nếu vừa đăng ký, hãy kiểm tra lại trạng thái trước khi gửi lại để tránh tạo yêu cầu trùng.");
   throw new Error("Máy chủ trả dữ liệu không đúng định dạng. Hãy chọn Đồng bộ trạng thái hoặc thử lại sau.");
 }
+
+/** Bound all account-auth network waits so a dead request cannot freeze sign-in. */
+async function accountFetch(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (cause) {
+    if (controller.signal.aborted) {
+      throw new Error("Máy chủ tài khoản chưa phản hồi trong 15 giây. Chọn Đồng bộ trạng thái hoặc Thử đọc lại phiên, không đăng ký lại.");
+    }
+    throw cause;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 async function send(body: Record<string, unknown>) {
-  const response = await fetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
+  const response = await accountFetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const data = await readAccountPayload(response) as { error?: string; code?: string; [key:string]:unknown };
   if (!response.ok) throw Object.assign(new Error(data.error ?? "Chưa xác minh được thao tác tài khoản."), {
@@ -176,7 +192,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const readbackId=++readbackGeneration.current;
-    const response = await fetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
+    const response = await accountFetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
     const data = await readAccountPayload(response) as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
     // A polling GET can finish after a successful profile submit/readback.
     // Never allow that stale reply to roll the UI back to a pending state.
@@ -200,7 +216,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     if (!mounted.current || readbackId !== readbackGeneration.current) return;
     current.current = data.account?.accountId ?? "";
     setObservedNow(Date.now()); setAccount(data.account ?? null);
-    setDevices(data.devices ?? []); setReady(true);
+    setDevices(data.devices ?? []); setReady(true); setError("");
   }, []);
   useEffect(()=>{
     if(!enabled||bypass)return;
@@ -455,7 +471,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         // Review can finish while a user is filling the form. Read the
         // canonical state, then retry this one profile submission once with
         // the new revision; never resubmit an account registration.
-        const response=await fetch("/api/accounts",{credentials:"same-origin",cache:"no-store"});
+        const response=await accountFetch("/api/accounts",{credentials:"same-origin",cache:"no-store"});
         const fresh=await readAccountPayload(response) as {account?:Account|null};
         const verified=fresh.account;
         if(!response.ok || !verified || verified.accountId!==account?.accountId ||
