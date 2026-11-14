@@ -85,13 +85,16 @@ test("An obsolete pending second-browser link can be purged while preserving the
   const api=f.load("owner-device-bindings.server.ts").ownerDeviceBinding;
   const detail=await api(f.db,owner,{action:"inspect",bindingId:stale.id});
   assert.equal(detail.status,"pending");
+  assert.equal(detail.purgeAllowed,true,"Owner can delete an unapproved browser key directly");
   assert.equal(detail.dependencies.otherTrustedDevices,1);
-  await api(f.db,owner,{action:"revoke",...request(stale,{expectedStatus:"pending"})});
-  const result=await api(f.db,owner,{action:"purge",...request(stale,{expectedStatus:"blocked"})});
+  const result=await api(f.db,owner,{action:"purge",...request(stale,{expectedStatus:"pending"})});
   assert.equal(result.deleted,true);
+  assert.deepEqual(f.sqlite.prepare("SELECT action FROM account_audit WHERE target=? ORDER BY id").all(stale.id)
+   .map(x=>x.action),["owner.device-binding.purge"]);
   assert.equal((await f.service.session(a.account.token)).accountId,a.device.account_id,
     "the unrelated trusted device must remain logged in");
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_devices WHERE account_id=?").get(a.device.account_id).n,1);
+  assert.equal(f.sqlite.prepare("PRAGMA foreign_key_check").all().length,0);
  }finally{f.close();}
 });
 test("Purge blocks stale confirmations; no API grants access to non-Owner or generic control tickets",()=>{

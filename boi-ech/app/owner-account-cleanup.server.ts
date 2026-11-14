@@ -37,6 +37,7 @@ function time(value:unknown){
 }
 const snapshot=(row:Row,options:{days:number;mode:Mode})=>sha([
  row.account_id,row.account_created_at,row.revision,row.last_seen_at,row.latest_login_ms,
+ row.active_sessions,
  row.access_status,row.stage,options.days,options.mode
 ]);
 const query=`SELECT a.account_id,a.login,a.created_at AS account_created_at,a.revision,
@@ -72,9 +73,15 @@ const query=`SELECT a.account_id,a.login,a.created_at AS account_created_at,a.re
  WHERE a.account_id>? ORDER BY a.account_id LIMIT 101`;
 const managerQuery=query.replace("WHERE a.account_id>? ORDER BY a.account_id LIMIT 101",
  "WHERE d.person_role='manager' AND a.account_id>? ORDER BY a.account_id LIMIT 101");
-const dataBlockers=(r:Row):string[]=>{
+const dataBlockers=(r:Row,mode:Mode):string[]=>{
  const result:string[]=[];
- if(Number(r.active_sessions)>0)result.push("Phiên đăng nhập còn hiệu lực");
+ // An Owner can delete an unactivated manager even if its temporary login
+ // token remains live. The same atomic D1 transaction deletes ALL its sessions.
+ // This exception never applies to active/approved managers, or other roles.
+ if(Number(r.active_sessions)>0 && !(mode==="manager" && r.person_role==="manager"
+   && r.access_status==="pending" &&
+   ["requested","profile_required","profile_review","changes_requested"].includes(r.stage||"")))
+   result.push("Phiên đăng nhập còn hiệu lực");
  if(Number(r.sync_records)>0||Number(r.sync_events)>0)result.push("Có dữ liệu học tập/đồng bộ");
  if(Number(r.activity_events)>0||Number(r.total_seconds)>0||
   !["[]","",null].includes(r.completed_json)||!["{}","",null].includes(r.scores_json)||
@@ -105,7 +112,7 @@ function check(r:Row,options:{days:number;mode:Mode},now:number){
  const categoryAllowed=category&&(options.mode==="both"||category===options.mode);
  const tooRecent=options.mode==="manager"?false:
    lastActivity===0||(options.days===8 ? now-lastActivity<=7*86400000 : now-lastActivity<options.days*86400000);
- const blockers=dataBlockers(r);
+ const blockers=dataBlockers(r,options.mode);
  if(options.mode==="manager"){
    if(!["pending","blocked"].includes(r.access_status))
      blockers.push("Tài khoản đang hoạt động hoặc đã được duyệt");
@@ -116,7 +123,8 @@ function check(r:Row,options:{days:number;mode:Mode},now:number){
  }
  if(!categoryAllowed||tooRecent)return null;
  return {accountId:r.account_id,name:r.person_name||r.login||"Chưa khai báo",
-  role:r.person_role,category,createdAt:r.account_created_at,
+  role:r.person_role,category,accessStatus:r.access_status,activeSessions:Number(r.active_sessions)||0,
+  createdAt:r.account_created_at,
   lastSeenAt:r.last_seen_at,latestLoginAt:lastLogin?new Date(lastLogin).toISOString():null,
   inactiveDays:Math.max(0,Math.floor((now-lastActivity)/86400000)),stage:r.stage,
   eligible:blockers.length===0,blockers,snapshot:snapshot(r,options)};
@@ -174,8 +182,8 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
      AND d.last_seen_at IS ? AND d.status=? AND o.stage=? ${managerGuard}
      AND COALESCE((SELECT MAX(COALESCE(NULLIF(issued_at_ms,0),expires_at-28800000))
         FROM account_sessions WHERE account_id=a.account_id),0)=?
-     AND NOT EXISTS(SELECT 1 FROM account_sessions WHERE account_id=a.account_id
-        AND revoked=0 AND expires_at>? AND idle_expires_at>?)
+     ${options.mode==="manager" ? "" : `AND NOT EXISTS(SELECT 1 FROM account_sessions WHERE account_id=a.account_id
+        AND revoked=0 AND expires_at>? AND idle_expires_at>?)`}
      AND NOT EXISTS(SELECT 1 FROM account_sync_records WHERE account_id=a.account_id)
      AND NOT EXISTS(SELECT 1 FROM account_sync_events WHERE account_id=a.account_id)
      AND NOT EXISTS(SELECT 1 FROM course_activity_events WHERE device_id=a.storage_device_id)
@@ -202,7 +210,8 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
  db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
   SELECT ?,'owner.account.cleanup-purge',?,CASE WHEN ${eligibleGuard} THEN ? ELSE NULL END`)
  .bind(actor.actor,sha(id),id,r.revision,r.account_created_at,r.last_seen_at,
-  r.access_status,r.stage,Number(r.latest_login_ms)||0,now,now,
+  r.access_status,r.stage,Number(r.latest_login_ms)||0,
+  ...(options.mode==="manager"?[]:[now,now]),
   `age=${options.days};mode=${options.mode};${input.reason.trim()}`),
  db.prepare("UPDATE account_manager_invitations SET consumed_by=NULL,consumed_at_ms=NULL,revoked_at_ms=?,revision=revision+1 WHERE consumed_by=?").bind(now,id),
  db.prepare("DELETE FROM account_sync_grants WHERE account_id=?").bind(id),
