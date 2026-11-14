@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
-import {createTrainingClient,type TrainingProof,type TrainingWindow} from "./training-client";
+import {createTrainingClient,initialTrainingWindow,type TrainingProof,type TrainingWindow} from "./training-client";
 import {classKey,classNames,type ResourceKind,type ResourceStatus,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession} from "./training-types";
 import {AppIcon,Badge,ResourceStatusBars,personReadiness,eligible,stateText,defaultDisplay,parseDisplayPreferences,type DisplayPreferences} from "./manager-status";
 import {ManagerDetailSheet,ManagerSheet,type DetailTarget} from "./manager-details";
@@ -18,7 +18,7 @@ const dock:{id:Tab;label:string}[]=[{id:"overview",label:"Trang chủ"},{id:"app
 function localDate(iso:string){const d=new Date(iso);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
 function dateLabel(iso:string){return new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(iso));}
 function utc(value:string){const d=new Date(value);if(!Number.isFinite(d.getTime())||localDate(d.toISOString())!==value)throw new Error("Ngày giờ không hợp lệ trong múi giờ hiện tại.");return d.toISOString();}
-function currentWindow(){const start=new Date();start.setMinutes(0,0,0);return {from:start.toISOString(),to:new Date(start.getTime()+3600000).toISOString()};}
+const currentWindow=initialTrainingWindow;
 type ResourceDraft={id:string;kind:ResourceKind;name:string;parentId:string;capacity:number;requiredTeachers:number;status:ResourceStatus;expectedVersion:number};
 type SessionDraft={id:string;title:string;classId:string;roomId:string;teacherId:string;startsAt:string;endsAt:string;status:TrainingSession["status"];expectedVersion:number};
 
@@ -154,9 +154,10 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  </div></main>;
 }
 
-export default function ManagerWorkspace({deviceId,accountId,getProof,onOpenAccount,onLogout,accountName}:{deviceId:string;accountId?:string;getProof:(signal?:AbortSignal)=>Promise<TrainingProof>;onOpenAccount?:()=>void;onLogout?:()=>void;accountName?:string}){
+export default function ManagerWorkspace({deviceId,accountId,initialBoard,initialWindow,getProof,onOpenAccount,onLogout,accountName}:{deviceId:string;accountId?:string;initialBoard?:TrainingBoard;initialWindow?:TrainingWindow;getProof:(signal?:AbortSignal)=>Promise<TrainingProof>;onOpenAccount?:()=>void;onLogout?:()=>void;accountName?:string}){
  const client=useMemo(()=>createTrainingClient(getProof),[getProof]);
- const [board,setBoard]=useState<TrainingBoard|null>(null);const [windowRange,setWindowRange]=useState<TrainingWindow>(currentWindow);const [tab,setTab]=useState<Tab>("overview");
+ const [board,setBoard]=useState<TrainingBoard|null>(initialBoard??null);const [windowRange,setWindowRange]=useState<TrainingWindow>(()=>initialWindow??currentWindow());const [tab,setTab]=useState<Tab>("overview");
+ const skipPreloadedRead=useRef(Boolean(initialBoard));
  const [appearance,setAppearance]=useState<DisplayPreferences>(defaultDisplay);
  useEffect(()=>{try{const raw=window.localStorage.getItem("boi-manager-display-v1");queueMicrotask(()=>setAppearance(parseDisplayPreferences(raw)));}catch{}},[]);
  function changeAppearance(next:DisplayPreferences){setAppearance(next);try{window.localStorage.setItem("boi-manager-display-v1",JSON.stringify(next));}catch{}}
@@ -201,7 +202,12 @@ export default function ManagerWorkspace({deviceId,accountId,getProof,onOpenAcco
    }
    acknowledge(observed);
  }
- useEffect(()=>{const controller=new AbortController();queueMicrotask(()=>{if(!controller.signal.aborted)void refresh(controller.signal);});return()=>controller.abort();},[refresh]);
+ useEffect(()=>{
+  if(skipPreloadedRead.current){skipPreloadedRead.current=false;return;}
+  const controller=new AbortController();
+  queueMicrotask(()=>{if(!controller.signal.aborted)void refresh(controller.signal);});
+  return()=>controller.abort();
+ },[refresh]);
  async function command(payload:Record<string,unknown>){if(lock.current)return false;lock.current=true;setBusy(true);setNotice("");setNoticeError(false);try{const range=payload.action==="save-session"?{from:String(payload.startsAt),to:String(payload.endsAt)}:windowRange;const next=await client.mutate(payload,range);setBoard(next);if(range.from!==windowRange.from||range.to!==windowRange.to)setWindowRange(range);setNotice("Đã lưu và đọc lại dữ liệu điều phối.");
    if(accountId)broadcastBoiChange(`manager:${accountId}`);
    return true;}catch(error){setNoticeError(true);setNotice(error instanceof Error?error.message:"Chưa xác minh được thay đổi. Bản nháp được giữ nguyên.");return false;}finally{lock.current=false;setBusy(false);}}
