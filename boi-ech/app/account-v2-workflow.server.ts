@@ -192,11 +192,26 @@ export class AccountV2Workflow {
     const storedContact=await this.db.prepare("SELECT kind,value FROM account_contacts WHERE account_id=?")
       .bind(actor.accountId).first<{kind:"email"|"phone";value:string}>();
     if(!storedContact)bad("ACCOUNT_CONTACT_INVALID",409);
+    // The manager profile UI collects its optional phone in secondaryContact
+    // when the primary signup contact is email (R5). Never read input.phone
+    // for this manager flow: it is not a field on the manager form.
+    let secondary:{kind:"email"|"phone";value:string}|null=null;
+    if(manager && input.secondaryContact!==undefined && input.secondaryContact!==null){
+      if(typeof input.secondaryContact!=="string")bad("ACCOUNT_CONTACT_INVALID",400);
+      if(input.secondaryContact.trim()){
+        secondary=normalizeRegistrationContact(
+          storedContact.kind==="email"?"phone":"email",input.secondaryContact);
+      }
+    }
     const raw=storedContact.kind==="phone"?storedContact.value
-      :(typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):"");
-    const phoneRaw=raw.replace(/[ ()-]/g,"");
-    const phone=phoneRaw.startsWith("+84")?"0"+phoneRaw.slice(3):phoneRaw;
-    if((!manager&&!phone)||phone&&!/^\+?[0-9]{7,16}$/.test(phone))
+      :manager?(secondary?.kind==="phone"?secondary.value:null)
+      :(typeof input.phone==="string"&&input.phone.trim()?field(input.phone,32):null);
+    const phoneRaw=raw?.replace(/[ ()-]/g,"")??"";
+    // SQLite UNIQUE allows multiple NULL values, but it does not allow
+    // repeated empty strings. The optional manager phone must be SQL NULL
+    // when absent, never an empty string with a false duplicate warning.
+    const phone=phoneRaw?(phoneRaw.startsWith("+84")?"0"+phoneRaw.slice(3):phoneRaw):null;
+    if((!manager&&!phone)||(phone!==null&&!/^\+?[0-9]{7,16}$/.test(phone)))
       bad("PROFILE_INVALID",400);
     const code=(manager?"MGR_":role==="teacher"?"GV_":"HV_")
       +actor.storageDeviceId.slice(0,20).toUpperCase();
@@ -259,6 +274,15 @@ export class AccountV2Workflow {
     // The second statement transitions requested->active only after the
     // preceding successful device write. The first profile insertion changes()
     // is checked at the manager-profile boundary as well.
+    // Persist the optional secondary contact only AFTER the guarded onboarding
+    // transition. Otherwise a contact write could alter changes() and weaken
+    // the existing manager first-write CAS chain.
+    if(manager && secondary){
+      statements.push(this.db.prepare(`UPDATE account_contacts
+        SET secondary_kind=?,secondary_value=?,updated_at=CURRENT_TIMESTAMP
+        WHERE account_id=? AND kind=?`)
+        .bind(secondary.kind,secondary.value,actor.accountId,storedContact.kind));
+    }
     statements.push(entitlement);
     if(manager)for(const scope of ["manager.approve.registration","manager.manage.assigned"]){
       statements.push(this.db.prepare(`INSERT INTO account_manager_permissions

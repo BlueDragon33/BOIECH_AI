@@ -436,9 +436,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
           // A phone entered at signup is not repeated in the profile form.
           // In either case the global error remains visible; only focus a
           // field when the user can actually correct the phone here.
-          const phoneInput=form.elements.namedItem("phone");
+          const fieldName=account?.role==="manager"&&account.primaryContactKind==="email"
+            ?"secondaryContact":"phone";
+          const phoneInput=form.elements.namedItem(fieldName);
           if(phoneInput instanceof HTMLInputElement){
-            setFieldErrors(previous=>({...previous,phone:accountNetworkError(caught)}));
+            setFieldErrors(previous=>({...previous,[fieldName]:accountNetworkError(caught)}));
             phoneInput.focus();
           }
         }
@@ -671,7 +673,13 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
                 autoComplete={account.primaryContactKind==="email"?"tel":"email"}
                 maxLength={account.primaryContactKind==="email"?32:254}
                 placeholder={account.primaryContactKind==="email"?"Ví dụ: +84 912 345 678":"Ví dụ: ten@example.com"}
+                aria-invalid={Boolean(fieldErrors.secondaryContact)}
+                aria-describedby={fieldErrors.secondaryContact?"profile-secondary-contact-error":undefined}
+                onInput={()=>setFieldErrors(previous=>{if(!previous.secondaryContact)return previous;
+                  const next={...previous};delete next.secondaryContact;return next;})}
                 disabled={busy}/>
+              {fieldErrors.secondaryContact?<small id="profile-secondary-contact-error" role="alert"
+                className={styles.fieldError}>{fieldErrors.secondaryContact}</small>:null}
               <small>Chỉ là thông tin liên hệ tự khai; không dùng thay xác minh thiết bị hoặc cấp quyền truy cập.</small>
             </label> : null}
           </div>
