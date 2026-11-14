@@ -88,11 +88,17 @@ async function readAccountPayload(response: Response): Promise<Record<string, un
 }
 
 /** Bound all account-auth network waits so a dead request cannot freeze sign-in. */
-async function accountFetch(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+async function accountReadWithinDeadline<T extends Record<string, unknown>>(
+  url: string, options: RequestInit = {}, timeoutMs = 15000
+): Promise<{ response: Response; data: T }> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    // Keep the deadline active while parsing the body; network headers alone
+    // do not guarantee that a readable authorization verdict has arrived.
+    const data = await readAccountPayload(response) as T;
+    return { response, data };
   } catch (cause) {
     if (controller.signal.aborted) {
       throw new Error("Máy chủ tài khoản chưa phản hồi trong 15 giây. Chọn Đồng bộ trạng thái hoặc Thử đọc lại phiên, không đăng ký lại.");
@@ -103,9 +109,8 @@ async function accountFetch(url: string, options: RequestInit = {}, timeoutMs = 
   }
 }
 async function send(body: Record<string, unknown>) {
-  const response = await accountFetch("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
+  const {response,data} = await accountReadWithinDeadline<{ error?: string; code?: string; [key:string]:unknown }>("/api/accounts", { method: "POST", credentials: "same-origin", cache: "no-store",
     headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  const data = await readAccountPayload(response) as { error?: string; code?: string; [key:string]:unknown };
   if (!response.ok) throw Object.assign(new Error(data.error ?? "Chưa xác minh được thao tác tài khoản."), {
     code: typeof data.code==="string" ? data.code : "ACCOUNT_SERVICE_UNAVAILABLE"
   });
@@ -192,8 +197,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const readbackId=++readbackGeneration.current;
-    const response = await accountFetch("/api/accounts", { credentials: "same-origin", cache: "no-store" });
-    const data = await readAccountPayload(response) as { account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string };
+    const {response,data} = await accountReadWithinDeadline<{ account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string }>("/api/accounts", { credentials: "same-origin", cache: "no-store" });
     // A polling GET can finish after a successful profile submit/readback.
     // Never allow that stale reply to roll the UI back to a pending state.
     if (!mounted.current || readbackId !== readbackGeneration.current) return;
@@ -471,8 +475,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         // Review can finish while a user is filling the form. Read the
         // canonical state, then retry this one profile submission once with
         // the new revision; never resubmit an account registration.
-        const response=await accountFetch("/api/accounts",{credentials:"same-origin",cache:"no-store"});
-        const fresh=await readAccountPayload(response) as {account?:Account|null};
+        const {response,data:fresh}=await accountReadWithinDeadline<{account?:Account|null}>("/api/accounts",{credentials:"same-origin",cache:"no-store"});
         const verified=fresh.account;
         if(!response.ok || !verified || verified.accountId!==account?.accountId ||
           verified.deviceApproved!==true)throw caught;
