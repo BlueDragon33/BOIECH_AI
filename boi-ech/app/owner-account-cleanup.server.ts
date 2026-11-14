@@ -3,7 +3,7 @@ import {AccountError} from "./account-core.server";
 import type {getCourseDatabase} from "./device-auth.server";
 type DB=Awaited<ReturnType<typeof getCourseDatabase>>;
 type Actor={actor:string;role:string};
-type Mode="pending"|"inactive"|"both";
+type Mode="pending"|"inactive"|"both"|"manager";
 type Row={
  account_id:string;login:string|null;account_created_at:string;revision:number;
  storage_device_id:string;person_role:string|null;person_name:string|null;
@@ -23,7 +23,8 @@ function guardOwner(actor:Actor){
 function criteria(input:Record<string,unknown>){
  const days=Number(input.days);
  const mode=input.mode;
- if(![3,5,7,8].includes(days)||!["pending","inactive","both"].includes(String(mode)))
+ if(!([3,5,7,8].includes(days)&&["pending","inactive","both"].includes(String(mode))
+   &&!(days===0&&mode==="manager"))
   throw new AccountError("CLEANUP_INPUT",400);
  return {days,mode:mode as Mode};
 }
@@ -63,6 +64,8 @@ const query=`SELECT a.account_id,a.login,a.created_at AS account_created_at,a.re
  LEFT JOIN account_onboarding o ON o.account_id=a.account_id
  LEFT JOIN device_profiles p ON p.device_id=a.storage_device_id
  WHERE a.account_id>? ORDER BY a.account_id LIMIT 101`;
+const managerQuery=query.replace("WHERE a.account_id>? ORDER BY a.account_id LIMIT 101",
+ "WHERE d.person_role='manager' AND a.account_id>? ORDER BY a.account_id LIMIT 101");
 const dataBlockers=(r:Row):string[]=>{
  const result:string[]=[];
  if(Number(r.active_sessions)>0)result.push("Phiên đăng nhập còn hiệu lực");
@@ -87,9 +90,14 @@ function check(r:Row,options:{days:number;mode:Mode},now:number){
  const pending=r.access_status==="pending"&&
   ["requested","profile_required","profile_review","changes_requested"].includes(r.stage||"");
  const inactive=r.access_status==="approved"&&["active","suspended"].includes(r.stage||"");
- const category=pending?"pending":inactive?"inactive":null;
+ const manager=r.person_role==="manager"&&["pending","blocked"].includes(r.access_status)
+   &&(r.access_status==="blocked"||
+     ["requested","profile_required","profile_review","changes_requested"].includes(r.stage||""));
+ const category=options.mode==="manager"?(manager?"manager":null)
+   :pending?"pending":inactive?"inactive":null;
  const categoryAllowed=category&&(options.mode==="both"||category===options.mode);
- const tooRecent=lastActivity===0||(options.days===8 ? now-lastActivity<=7*86400000 : now-lastActivity<options.days*86400000);
+ const tooRecent=options.mode==="manager"?false:
+   lastActivity===0||(options.days===8 ? now-lastActivity<=7*86400000 : now-lastActivity<options.days*86400000);
  const blockers=dataBlockers(r);
  if(!categoryAllowed||tooRecent)return null;
  return {accountId:r.account_id,name:r.person_name||r.login||"Chưa khai báo",
@@ -104,17 +112,21 @@ export async function inspectCleanup(db:DB,actor:Actor,input:Record<string,unkno
  const options=criteria(input);
  const cursor=typeof input.cursor==="string"?input.cursor:"";
  if(cursor&&!/^acc_[a-f0-9]{64}$/.test(cursor))throw new AccountError("CLEANUP_INPUT",400);
- const all=await db.prepare(query).bind(now,now,cursor).all<Row>();
+ const all=await db.prepare(options.mode==="manager"?managerQuery:query)
+  .bind(now,now,cursor).all<Row>();
  if(!Array.isArray(all.results))throw new AccountError("CLEANUP_READ_UNAVAILABLE",503);
  const records=all.results.slice(0,100).map(r=>check(r,options,now))
   .filter((x):x is NonNullable<typeof x>=>x!==null);
- return {ok:true,verified:true,contract:"boi-owner-account-cleanup.v1",
+ return {ok:true,verified:true,contract:options.mode==="manager"
+   ?"boi-owner-manager-purge.v1":"boi-owner-account-cleanup.v1",
   days:options.days,mode:options.mode,records,
   hasMore:all.results.length>100,
   nextCursor:all.results.length>100?all.results[99].account_id:null,
   scanned:Math.min(100,all.results.length),eligible:records.filter(r=>r.eligible).length,
   protected:records.filter(r=>!r.eligible).length,
-  warning:"Chỉ quét 100 tài khoản mỗi trang; không tự động xóa. Lịch sử kiểm toán được giữ lại."};
+  warning:options.mode==="manager"
+   ?"Chỉ Owner mới được xóa hồ sơ quản lý chưa kích hoạt hoặc đã khóa, không có dữ liệu và không còn phiên hoạt động. Một tài khoản mỗi lần; không xóa tự động. Lưu nhật ký kiểm toán phi cá nhân."
+   :"Chỉ quét 100 tài khoản mỗi trang; không tự động xóa. Lịch sử kiểm toán được giữ lại."};
 }
 export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,unknown>,
  now=Date.now()){
@@ -135,10 +147,14 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
  // SQLite D1 batch is one transaction. Guard status, revision, lastSeen,
  // newest session and protected dependencies before deleting any personal data.
  // If anything changes the NOT NULL audit purpose aborts the entire batch.
+ const managerGuard=options.mode==="manager"
+   ?`AND d.person_role='manager' AND d.status IN ('pending','blocked')
+      AND (d.status='blocked' OR o.stage IN ('requested','profile_required','profile_review','changes_requested'))`
+   :"";
  const eligibleGuard=`EXISTS(SELECT 1 FROM accounts a JOIN device_access d
    ON d.device_id=a.storage_device_id JOIN account_onboarding o ON o.account_id=a.account_id
    WHERE a.account_id=? AND a.revision=? AND a.created_at=?
-     AND d.last_seen_at IS ? AND d.status=? AND o.stage=?
+     AND d.last_seen_at IS ? AND d.status=? AND o.stage=? ${managerGuard}
      AND COALESCE((SELECT MAX(COALESCE(NULLIF(issued_at_ms,0),expires_at-28800000))
         FROM account_sessions WHERE account_id=a.account_id),0)=?
      AND NOT EXISTS(SELECT 1 FROM account_sessions WHERE account_id=a.account_id
@@ -195,7 +211,8 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
   db.prepare("SELECT device_id FROM device_access WHERE device_id=?").bind(storage).first()
  ]);
  if(account||device)deny("CLEANUP_READBACK_FAILED",503);
- return {ok:true,verified:true,contract:"boi-owner-account-cleanup.v1",
+ return {ok:true,verified:true,contract:options.mode==="manager"
+   ?"boi-owner-manager-purge.v1":"boi-owner-account-cleanup.v1",
   action:"purge",deleted:true,accountHash:sha(id),auditPreserved:true};
 }
 
