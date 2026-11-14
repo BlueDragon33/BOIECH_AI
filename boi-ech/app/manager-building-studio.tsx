@@ -76,7 +76,7 @@ export default function ManagerBuildingStudio({board,busy,onCreateBuilding,onEdi
       <span className={styles.art}><CampusBuildingArt variant={index}/></span>
       <strong>{building.name}</strong>
       <span className={styles.buildingInfo}>{linked.length} phòng <span aria-hidden="true">·</span> {occupied} đang học</span>
-      <span className={styles.state} data-status={building.status}>{buildingStatus[building.status]}</span>
+      <span className={styles.state} data-status={building.status} data-tone={building.state}>{buildingStatus[building.status]}</span>
      </button>;
     })}
     {!visible.length?<div className={styles.noBuilding}><strong>{buildings.length?"Không có tòa phù hợp":"Chưa có tòa nhà"}</strong>
@@ -88,7 +88,7 @@ export default function ManagerBuildingStudio({board,busy,onCreateBuilding,onEdi
   {current?<div className={styles.detail} aria-live="polite">
     <div className={styles.detailHeader}>
      <div><span className={styles.eyebrow}>CHI TIẾT TÒA ĐANG CHỌN</span><h4>{current.name}</h4>
-      <span className={styles.state} data-status={current.status}>{buildingStatus[current.status]}</span></div>
+      <span className={styles.state} data-status={current.status} data-tone={current.state}>{buildingStatus[current.status]}</span></div>
      <div className={styles.actions}>
       <button type="button" onClick={()=>onEditBuilding(current)} disabled={busy}>Cấu hình tòa</button>
       <button type="button" className={styles.create} onClick={()=>onCreateRoom(current.id)} disabled={busy||current.status!=="active"}>＋ Thêm phòng</button>
