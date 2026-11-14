@@ -3,9 +3,11 @@ export type TrainingProof={deviceId:string;challenge:string;signature:string};
 export type TrainingWindow={from:string;to:string};
 /** Same UTC window is used for the authenticated preload and the manager UI. */
 export function initialTrainingWindow(): TrainingWindow {
- const start = new Date();
- start.setMinutes(0,0,0);
- return {from:start.toISOString(),to:new Date(start.getTime()+3600000).toISOString()};
+ // A manager's default "Hôm nay" view is the actual local civil day (DST-safe).
+ // Serialize timezone-aware instants for the server; never infer class periods.
+ const start = new Date();start.setHours(0,0,0,0);
+ const end = new Date(start);end.setDate(end.getDate()+1);
+ return {from:start.toISOString(),to:end.toISOString()};
 }
 
 export function createTrainingClient(getProof:(signal?:AbortSignal)=>Promise<TrainingProof>){
