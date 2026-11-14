@@ -10,6 +10,7 @@ import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
 import { isUnlimitedAccountExpiry } from "./account-term";
 import { accountServerActive, recoveryMustRemainVisible } from "./account-lifecycle-client";
+import AccountVerificationShowcase from "./account-verification-showcase";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
@@ -187,6 +188,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [recoveryDevices,setRecoveryDevices]=useState<Array<{device_id:string;approved:number;created_at:string}>>([]);
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [enteredAccountId, setEnteredAccountId] = useState("");
   const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({});
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [contactType,setContactType]=useState<"email"|"phone">("email");
@@ -245,8 +247,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
     return ()=>{live=false};
   },[enabled,bypass]);
-  const needsApprovalPolling=Boolean(account && (account.status!=="approved" ||
-    account.onboardingStage!=="active" || account.deviceApproved===false || account.entitlementActive===false));
   useEffect(() => {
     if (!enabled || bypass) return;
     mounted.current = true;
@@ -272,44 +272,63 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         // authoritative readback below distinguishes expired from unavailable.
       }
     };
+    // Conditional sync: no recurring server polling. Only real external
+    // notifications, cross-tab changes, manual refresh, reconnect or resume.
+    // An incoming event is a hint: the server always revalidates authorization.
+    let queuedAfterCurrent = false;
     const refresh = () => {
-      if (document.hidden || lock.current || refreshInFlight.current) return;
-      refreshInFlight.current=true;
-      void keepAliveIfEngaged().then(()=>reload())
+      if (document.hidden || lock.current) return;
+      if (refreshInFlight.current) { queuedAfterCurrent = true; return; }
+      refreshInFlight.current = true;
+      void keepAliveIfEngaged().then(() => reload())
         .catch(e => { if (mounted.current) setError(accountNetworkError(e)); })
-        .finally(()=>{refreshInFlight.current=false;});
+        .finally(() => {
+          refreshInFlight.current = false;
+          if (queuedAfterCurrent && mounted.current) {
+            queuedAfterCurrent = false;
+            refresh();
+          }
+        });
     };
-    lastUserEngagementAt.current=Date.now();
+    const onVisibility = () => { if (!document.hidden) refresh(); };
+    const onRemoteNotification = (event: MessageEvent) => {
+      if (event.data?.type === "boi-ech-account-changed") refresh();
+    };
+    lastUserEngagementAt.current = Date.now();
     window.addEventListener("pointerdown",engagement,{passive:true});
     window.addEventListener("keydown",engagement);
     window.addEventListener("wheel",engagement,{passive:true});
     window.addEventListener("touchstart",engagement,{passive:true});
     window.addEventListener("scroll",engagement,{passive:true,capture:true});
     refresh(); window.addEventListener("focus", refresh); window.addEventListener("pageshow",refresh);
-    // A pending registration checks server approval every 20s; active accounts retain 60s refresh.
-    // Hidden tabs and ongoing requests are skipped; only authenticated server state grants access.
-    const timer = window.setInterval(() => { if(mounted.current) setObservedNow(Date.now()); refresh(); },
-      needsApprovalPolling ? 20000 : 60000);
-    // BroadcastChannel can be unavailable/disabled in private browsing.
-    // Focus, pageshow and the existing polling interval remain the fallback.
+    window.addEventListener("online",refresh);
+    document.addEventListener("visibilitychange",onVisibility);
+    window.addEventListener("boi:account:changed",refresh);
+    navigator.serviceWorker?.addEventListener("message",onRemoteNotification);
+    // A cross-tab mutation propagates instantly without background GET polling.
+    // Cloudflare cannot push remote approvals without an active push transport.
     let channel: BroadcastChannel | null = null;
     try {
       if (typeof BroadcastChannel !== "undefined") {
         channel = new BroadcastChannel("boiech-account-auth");
         channel.onmessage = refresh;
       }
-    } catch { /* A blocked cross-tab channel must never block sign-in. */ }
+    } catch { /* Focus/online/manual refresh remain available. */ }
     return () => {
-      mounted.current = false; window.clearInterval(timer);
+      mounted.current = false;
       window.removeEventListener("pointerdown",engagement);
       window.removeEventListener("keydown",engagement);
       window.removeEventListener("wheel",engagement);
       window.removeEventListener("touchstart",engagement);
       window.removeEventListener("scroll",engagement,true);
       window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh);
+      window.removeEventListener("online",refresh);
+      document.removeEventListener("visibilitychange",onVisibility);
+      window.removeEventListener("boi:account:changed",refresh);
+      navigator.serviceWorker?.removeEventListener("message",onRemoteNotification);
       channel?.close();
     };
-  }, [enabled, bypass, reload, needsApprovalPolling]);
+  }, [enabled, bypass, reload]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
       account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
@@ -797,6 +816,22 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         <p className={styles.authFootnote}>Hồ sơ cũ được bảo toàn. Việc liên kết tài khoản cần xác minh quyền sở hữu trước khi chuyển dữ liệu.</p>
       </>}
     </section>;
+  // The legacy loading login card is replaced by the full-screen verification
+  // ceremony. An error never advances to READY/GO without server approval.
+  if (!ready) return <AccountVerificationShowcase phase="checking" error={error} busy={busy}
+    onRetry={() => void run(() => reload())} onGo={() => undefined}/>;
+  // Show the ceremony once per validated account in this mounted document.
+  // Once GO has appeared for 1s, enter automatically; still no auth bypass.
+  if (active && account && enteredAccountId !== account.accountId) {
+    return <AccountVerificationShowcase phase="verified" accountName={account.name}
+      role={account.role==="manager"?"Cán bộ quản lý":account.role==="teacher"?"Giảng viên":"Học viên"}
+      error={error} busy={busy}
+      onRetry={() => void run(() => reload())}
+      onGo={() => {
+        if (accountServerActive(account, v2, Date.now())) setEnteredAccountId(account.accountId);
+        else { setError("Quyền truy cập đã thay đổi. Hãy xác thực lại với máy chủ."); void reload().catch(() => undefined); }
+      }}/>;
+  }
   if(ready&&account&&!active&&trial?.state==="active"&&account.role===trial.role){
     return <AccountTrialSandbox key={account.accountId} lease={trial}
       onExit={()=>setTrial(null)}
