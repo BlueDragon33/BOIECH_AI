@@ -489,11 +489,14 @@ async function writeStoredDeviceCredential(value: StoredDeviceCredential) {
 }
 
 async function getOrCreateDeviceCredential() {
-  const current = await readStoredDeviceCredential();
-  if (current?.version === 2 && current.publicKey && (current.privateKey || !crypto.subtle)) return current;
-
+  // A valid cryptographic signature is mandatory even for previously stored identities.
   if (typeof crypto === "undefined" || !crypto.subtle) {
     throw new CourseApiError("Trình duyệt không hỗ trợ khóa bảo mật WebCrypto. Hãy sử dụng trình duyệt hiện đại qua HTTPS; không xóa dữ liệu thiết bị đã lưu.", "WEBCRYPTO_REQUIRED");
+  }
+  const current = await readStoredDeviceCredential();
+  if (current?.version === 2 && current.publicKey && current.privateKey) return current;
+  if (current?.version === 2 && current.publicKey && !current.privateKey) {
+    throw new CourseApiError("Thiết bị đã có mã đăng ký nhưng không còn khóa riêng. Hãy dùng quy trình khôi phục thiết bị, không tự tạo mã mới.", "DEVICE_PRIVATE_KEY_REQUIRED");
   }
 
   const generated = await crypto.subtle.generateKey(
