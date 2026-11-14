@@ -58,7 +58,7 @@ async function details(db:DB,id:string){
     createdAt:row.account_created_at,revision:row.account_revision},
    dependencies:{sessions:sessions?.n??0,activeSessions:active?.n??0,
     syncGrants:grants?.n??0,syncEvents:events?.n??0,otherTrustedDevices:trusted?.n??0},
-   purgeAllowed:row.revoked===1,
+   purgeAllowed:row.revoked===1||status==="pending",
    // D1 audit and canonical account records remain outside a device-binding purge.
    preservesAccount:true,preservesLearning:true,preservesAudit:true};
 }
@@ -109,12 +109,18 @@ export async function ownerDeviceBinding(db:DB,actor:Actor,input:Record<string,u
   if(after.status!=="blocked"||after.dependencies.activeSessions!==0)fail("DEVICE_BINDING_READBACK_FAILED",503);
   return {...after,action:"revoke",ok:true};
  }
- if(row.revoked!==1)fail("DEVICE_BINDING_REVOKE_FIRST",409);
+ // Pending browser keys are not approved and may be removed in one atomic
+ // Owner-signed operation. Approved keys must still be revoked first.
+ if(row.revoked!==1&&status!=="pending")fail("DEVICE_BINDING_REVOKE_FIRST",409);
+ const pending=status==="pending";
  // All sessions and per-device sync metadata must go before their FK parent.
  // Account-scoped progress, login, entitlement and immutable audit survive.
  const guardRow=`EXISTS(SELECT 1 FROM account_devices b WHERE b.account_id=?
   AND b.device_id=? AND b.revoked=1 AND b.created_at=?)`;
  const results=await db.batch([
+  ...(pending?[db.prepare(`UPDATE account_devices SET revoked=1
+    WHERE account_id=? AND device_id=? AND created_at=? AND approved=0 AND revoked=0`)
+    .bind(row.account_id,row.device_id,guard.createdAt)]:[]),
   db.prepare(`DELETE FROM account_sync_events WHERE account_id=? AND device_id=? AND ${guardRow}`)
    .bind(row.account_id,row.device_id,row.account_id,row.device_id,guard.createdAt),
   db.prepare(`DELETE FROM account_sync_grants WHERE account_id=? AND device_id=? AND ${guardRow}`)
@@ -127,7 +133,9 @@ export async function ownerDeviceBinding(db:DB,actor:Actor,input:Record<string,u
     SELECT ?,'owner.device-binding.purge',?,? WHERE changes()=1`)
    .bind(actor.actor,id,guard.reason),
  ]);
- if(Number(results[3].meta.changes)!==1||Number(results[4].meta.changes)!==1)
+ if((pending&&Number(results[0].meta.changes)!==1)||
+   Number(results[pending?4:3].meta.changes)!==1||
+   Number(results[pending?5:4].meta.changes)!==1)
   fail("DEVICE_BINDING_CAS_CONFLICT",409);
  const found=await locate(db,id);
  if(found)fail("DEVICE_BINDING_READBACK_FAILED",503);
