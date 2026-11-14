@@ -296,7 +296,7 @@ export class AccountService {
     const login = loginName(input.login);
     await this.throttle(login, peer, "register", 5);
     if (input.privacyAccepted !== true || !["learner", "manager", "teacher"].includes(String(input.role))) fail("ACCOUNT_INPUT", 400);
-    if (this.v2Enabled) return this.registerV2(input, login);
+    if (this.v2Enabled) return this.registerV2(input, login, undefined, clientClass);
     const role = String(input.role);
     const rawPhone = bounded(input.phone, 32).replace(/[ ()-]/g, "");
     const phone = rawPhone.startsWith("+84") ? "0" + rawPhone.slice(3) : rawPhone;
@@ -371,7 +371,7 @@ export class AccountService {
       WHERE invite_hash=? AND consumed_at_ms IS NULL AND revoked_at_ms IS NULL AND expires_at_ms>?`)
       .bind(inviteHash,now).first<{valid:number}>();
     if(!available) fail("MANAGER_INVITATION_INVALID",409);
-    return this.registerV2(input,login,inviteHash);
+    return this.registerV2(input,login,inviteHash,clientClass);
   }
 
   private async recordCapacityRejection(role:string){
@@ -391,7 +391,8 @@ export class AccountService {
       .bind(digest(login),deviceKey).first<{kind:string}>();
     if(ban)fail("ACCOUNT_REENTRY_BLOCKED",403);
   }
-  private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string) {
+  private async registerV2(input: Record<string, unknown>, login: string, inviteHash?: string,
+    clientClass: AccountClientClass = "desktop") {
     const role = String(input.role), keyId = await deviceKeyId(input.publicKey);
     await this.assertReentryAllowed(login,keyId);
     const verifier = await hashPassword(input.password), accountId = "acc_" + random();
