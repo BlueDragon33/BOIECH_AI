@@ -53,7 +53,8 @@ test("mobile session approval does not waive password, account state or explicit
   assert.match(core, /await this\.assertReentryAllowed\(login,keyId\)/);
   assert.match(core, /if\s*\(existing\?\.revoked\) fail\("DEVICE_REVOKED", 403\)/);
   assert.match(core, /client_class=\?/);
-  assert.match(core, /WHERE account_id=\? AND device_id=\? AND revoked=0 AND approved=0/);
+  assert.match(core, /WHERE account_id=\? AND device_id=\? AND revoked=0/);
+  assert.match(core, /approved=0 OR client_class<>\?/);
   assert.match(core, /account\.portable-session\.verified/);
   assert.match(core, /if \(!actor\.deviceApproved\) fail\("DEVICE_APPROVAL_REQUIRED"\)/);
   assert.match(core, /await new AccountEntitlementService\(this\.db,this\.now\)\.assertActive\(actor\.accountId\)/);
