@@ -124,6 +124,9 @@ export default function AccountVerificationShowcase({
           </div>
           <aside className={styles.visual}>
             <div className={styles.ring} data-mode={orbitState}>
+              <span className={styles.gear} aria-hidden="true"/>
+              <span className={styles.tinyOrbit} aria-hidden="true"/>
+              <span className={styles.innerOrbit} aria-hidden="true"/>
               <div className={styles.ringInside}>
                 <strong role="status" aria-live="polite" className={styles.orbitWord}>
                   {error ? "ERROR" : isGo ? "GO" : isReady ? "READY" : "CHECKING..."}
