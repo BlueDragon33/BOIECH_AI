@@ -11,6 +11,7 @@ import { accountTransitionNeedsReload } from "./account-scope";
 import { isUnlimitedAccountExpiry } from "./account-term";
 import { accountServerActive, recoveryMustRemainVisible } from "./account-lifecycle-client";
 import AccountVerificationShowcase from "./account-verification-showcase";
+import ConditionalSyncAgent from "./conditional-sync-agent";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
@@ -842,6 +843,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const warnSession=ready&&active&&Boolean(account?.sessionIdleExpiresAt) &&
     (idleTimeLeft<=5*60_000 || absoluteTimeLeft<=5*60_000);
   return <>
+    {ready && active && account && enteredAccountId === account.accountId ? <ConditionalSyncAgent accountId={account.accountId}/> : null}
     {warnSession ? <aside className={styles.sessionLeaseWarning} role="status" aria-live="polite">
       <strong>Phiên đăng nhập sắp hết hạn</strong>
       <span>{absoluteTimeLeft<=5*60_000
