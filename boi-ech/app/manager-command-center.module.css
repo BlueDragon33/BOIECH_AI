@@ -233,3 +233,10 @@
  .commandCenter .buildingNode{min-height:180px;padding:8px 4px}
  .commandCenter .buildingIllustration{width:100%;height:97px}}
 @media(max-width:370px){.commandCenter .buildingIllustration{height:80px}.commandCenter .buildingNode{min-height:164px}}
+
+/* Pool schematic in the live hierarchy; never counted until saved as a real room. */
+.commandCenter .poolRoomArt{display:grid;place-items:center;flex:none;width:49px;height:40px;background:#145276;border-radius:10px;border:1px solid #63d2f2}
+.commandCenter .poolRoomArt svg{width:46px;height:34px;display:block}
+.commandCenter .buildingNode:has(svg[aria-label*="bể bơi"]){border-color:#62c7ec;background:linear-gradient(140deg,#114c80,#071e4b)}
+@media(max-width:720px){.commandCenter .poolRoomArt{width:39px;height:34px}
+ .commandCenter .poolRoomArt svg{width:37px;height:30px}}
