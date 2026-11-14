@@ -20,7 +20,7 @@ type DB=D1Database;
 type Criteria={days:7|14|30};
 const daysValue=(input:Record<string,unknown>):Criteria=>{
  if(input.days!==7&&input.days!==14&&input.days!==30)deny("ROSTER_CLEANUP_INPUT","Chọn thời gian 7, 14 hoặc 30 ngày.",400);
- return {days:input.days};
+ return {days:input.days as Criteria["days"]};
 };
 const when=(s:string|null):number=>{
  if(!s)return 0;
@@ -140,15 +140,16 @@ export async function purgeManagerRosterRecord(actor:PublicDeviceState,input:Rec
 export async function purgeManagerRosterDb(db:DB,principal:{accountId:string;sessionHash:string},input:Record<string,unknown>,now=Date.now()) {
  const {accountId,sessionHash}=principal;
  const options=daysValue(input);
+ const reason=typeof input.reason==="string"?input.reason.trim():"";
  if(typeof input.deviceId!=="string"||!/^[a-f0-9-]{16,80}$/i.test(input.deviceId)
   ||typeof input.snapshot!=="string"||!/^[a-f0-9]{64}$/.test(input.snapshot)
   ||input.confirmation!=="XOA HO SO CU"
-  ||typeof input.reason!=="string"||input.reason.trim().length<10||input.reason.length>300)
+  ||reason.length<10||reason.length>300)
   deny("ROSTER_CLEANUP_CONFIRMATION_REQUIRED","Cần xác nhận và lý do đủ rõ.",400);
  const row=await db.prepare(query.replace("AND d.device_id>?\n ORDER BY d.device_id LIMIT 101",
   "AND d.device_id=? ORDER BY d.device_id LIMIT 101"))
   .bind(input.deviceId).first<Row>();
- if(!row)deny("ROSTER_CLEANUP_NOT_FOUND","Hồ sơ không còn tồn tại.",404);
+ if(!row)throw new DeviceAccessError("Hồ sơ không còn tồn tại.",404,"ROSTER_CLEANUP_NOT_FOUND");
  const seen=described(row,options,now);
  if(!seen.eligible||seen.snapshot!==input.snapshot)
   deny("ROSTER_CLEANUP_CHANGED","Hồ sơ hoặc điều kiện an toàn đã thay đổi; hãy quét lại.");
@@ -182,7 +183,7 @@ export async function purgeManagerRosterDb(db:DB,principal:{accountId:string;ses
    .bind(accountId,sha(["manager-legacy-roster",id]),id,row.person_role,row.status,
     row.created_at,row.last_seen_at,row.registration_submitted_at,
     accountId,sessionHash,
-    "Manager archived unused legacy roster record: "+input.reason.trim()),
+    "Manager archived unused legacy roster record: "+reason),
   db.prepare("DELETE FROM device_challenges WHERE device_id=?").bind(id),
   db.prepare("DELETE FROM device_profiles WHERE device_id=?").bind(id),
   db.prepare("DELETE FROM device_access WHERE device_id=? AND person_role=? AND status=? AND created_at=?")
