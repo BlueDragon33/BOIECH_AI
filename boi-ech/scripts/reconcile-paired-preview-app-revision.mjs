@@ -15,7 +15,7 @@ export function readAndAttestAppSource(appRoot,expectedSha){
  // A cache-byte change is not a source change. Any other tracked modification
  // (including code, package lock, config, templates and workflow) MUST block.
  const changed=execFileSync("git",["-C",appRoot,"diff","--name-only","HEAD","--"],{encoding:"utf8",timeout:5000}).trim();
- const changes=changed?changed.split(/\\r?\\n/).filter(Boolean):[];
+ const changes=changed?changed.split(/\r?\n/).filter(Boolean):[];
  const prohibited=changes.filter(file=>file!=="tsconfig.tsbuildinfo");
  if(prohibited.length)die("App tracked source changed after reviewed checkout: "+prohibited.map(file=>JSON.stringify(file)).join(", "));
  if(changes.length)console.log("App tracked TypeScript incremental cache changed during CI; no tracked source modification accepted.");
