@@ -146,7 +146,8 @@ CREATE TRIGGER IF NOT EXISTS training_session_v12_update BEFORE UPDATE ON traini
   THEN RAISE(ABORT,'TRAINING_CONFLICT') END;
 END;
 --> statement-breakpoint
--- Never block emergency account revocation or change of role; guard only unsafe class reassignment.\nCREATE TRIGGER IF NOT EXISTS training_assistant_assignment_guard BEFORE UPDATE OF class_name ON device_access
+-- Never block emergency account revocation or change of role; guard only unsafe class reassignment.
+CREATE TRIGGER IF NOT EXISTS training_assistant_assignment_guard BEFORE UPDATE OF class_name ON device_access
  WHEN EXISTS(SELECT 1 FROM training_sessions s JOIN training_resources c ON c.id=s.class_id
   WHERE s.assistant_teacher_id=NEW.device_id AND s.status='scheduled' AND datetime(s.ends_at)>CURRENT_TIMESTAMP
     AND (NEW.person_role!='teacher' OR NEW.status!='approved'
