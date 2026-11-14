@@ -43,13 +43,16 @@ export default function AccountVerificationShowcase({
 
   // A revocation/failed readback invalidates any previously displayed READY/GO.
   useEffect(() => {
-    if (error || phase !== "verified") {
-      setStage(0);
-      return;
-    }
+    // State recovery is scheduled after the current render; this avoids a
+    // synchronous effect cascade and immediately invalidates any GO callback.
     const completed = [sessionOk, accessOk, workspaceOk];
     const firstMissing = completed.findIndex(verified => !verified);
-    if (firstMissing !== -1) setStage(previous => Math.min(previous, firstMissing));
+    if (!error && phase === "verified" && firstMissing === -1) return;
+    const timer = window.setTimeout(() => {
+      if (error || phase !== "verified") setStage(0);
+      else setStage(previous => Math.min(previous, firstMissing));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [error, phase, sessionOk, accessOk, workspaceOk]);
 
   useEffect(() => {
