@@ -12,7 +12,7 @@ import ManagerConsoleV12 from "./manager-console-v12";
 import ManagerBuildingStudio from "./manager-building-studio";
 import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,PRACTICE_POOL_ROOM_ID,
  PRACTICE_POOL_ROOM_NAME,PRACTICE_POOL_DRAFT_CAPACITY,existingPracticePoolBuilding,
- existingPracticePoolRoom} from "./manager-practice-pool";
+ existingPracticePoolRoom,isPracticePoolRoom} from "./manager-practice-pool";
 import {readPendingSync,flushVerifiedSync} from "./verified-sync-client";
 import {useBoiSyncNotices,broadcastBoiChange} from "./manual-sync-notices";
 type Tab="overview"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
@@ -76,7 +76,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  function editSession(s?:TrainingSession,preferredRoomId="",preferredClassId=""){setDetail(null);setSession(s?{...s,
  assistantTeacherId:s.assistantTeacherId??"",periodStart:s.periodStart??null,periodEnd:s.periodEnd??null,
  startsAt:localDate(s.startsAt),endsAt:localDate(s.endsAt),expectedVersion:s.version}:
- {id:crypto.randomUUID(),title:"",classId:preferredClassId,roomId:preferredRoomId,teacherId:"",assistantTeacherId:"",
+ {id:crypto.randomUUID(),title:board.resources.some(r=>r.id===preferredRoomId&&isPracticePoolRoom(r))?"Thực hành bơi ếch":"",classId:preferredClassId,roomId:preferredRoomId,teacherId:"",assistantTeacherId:"",
  periodStart:null,periodEnd:null,startsAt:localDate(board.from),endsAt:localDate(board.to),status:"scheduled",expectedVersion:0});setFormError("");}
  async function submitResource(event:FormEvent){event.preventDefault();if(resource&&await onCommand({action:"save-resource",...resource}))setResource(null);}
  async function submitSession(event:FormEvent){event.preventDefault();if(!session)return;try{setFormError("");if(await onCommand({action:"save-session",...session,startsAt:utc(session.startsAt),endsAt:utc(session.endsAt)}))setSession(null);}catch(error){setFormError(error instanceof Error?error.message:"Ngày giờ chưa hợp lệ.");}}
