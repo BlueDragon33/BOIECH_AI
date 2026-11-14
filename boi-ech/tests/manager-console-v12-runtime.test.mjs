@@ -101,3 +101,24 @@ test("V12: unprivileged learner cannot create leaders or teaching periods",async
     timezone:"Etc/UTC",expectedVersion:0},learner)).status,403);
  }finally{f.sqlite.close();}
 });
+
+
+test("V12: Owner can revoke and delete a learner device without a leader FK deadlock",async()=>{
+ const f=await setup();try{
+  await grant(f);await resources(f);
+  const learner=await person(f,"learner",506,"A");
+  const selected=await f.call({action:"save-leader",classId:"class",slot:"student",source:"class",
+    memberDeviceId:learner.device.deviceId,displayName:"Học viên đã chọn",expectedVersion:0});
+  assert.equal(selected.status,200,JSON.stringify(selected));
+  f.sqlite.prepare("UPDATE device_access SET status='blocked' WHERE device_id=?").run(learner.device.deviceId);
+  let current=f.sqlite.prepare("SELECT source,member_device_id,version FROM training_class_leaders WHERE class_id='class' AND slot='student'").get();
+  assert.equal(current.source,"outside");
+  assert.equal(current.version,2);
+  f.sqlite.prepare("DELETE FROM device_access WHERE device_id=?").run(learner.device.deviceId);
+  current=f.sqlite.prepare("SELECT source,member_device_id,version FROM training_class_leaders WHERE class_id='class' AND slot='student'").get();
+  assert.equal(current.source,"outside");
+  assert.equal(current.member_device_id,null);
+  assert.equal(current.version,3);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM training_class_leader_history WHERE class_id='class'").get().n,2);
+ }finally{f.sqlite.close();}
+});
