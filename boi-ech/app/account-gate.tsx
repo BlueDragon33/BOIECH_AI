@@ -425,6 +425,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     if (field) field.value = "";
     const answerInput=form.elements.namedItem("securityAnswer") as HTMLInputElement|null;
     if(answerInput) answerInput.value="";
+    // Present real CHECKING immediately after a valid form submission,
+    // instead of leaving the old card stuck at "Đang xử lý…".
+    const showGate=mode==="login"||mode==="claim"||mode==="register";
+    if(showGate)setAuthSubmitting(true);
+    try {
     await run(async () => {
       if(mode==="recover"&&v2&&recoveryMethod==="question"){
         const login=String(fields.login||"").trim().toLowerCase();
@@ -470,6 +475,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       if (mode === "recover") { setMode("login"); setNotice("Đã đổi mật khẩu và thu hồi các phiên cũ. Hãy lưu mã khôi phục mới."); }
       await reload(mode === "claim"); broadcast();
     });
+    } finally { if(showGate)setAuthSubmitting(false); }
   }
   async function compareContact(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
@@ -494,21 +500,25 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       || (account.role!=="learner"&&account.role!=="teacher")) return;
     const accountId=account.accountId;
     const controller=new AbortController();
+    let disposed=false, timedOut=false;
     // All three milestones are real: GET session -> authorized device ->
     // course/teacher readback + role bundle loaded. No fake completion timer.
     queueMicrotask(()=>{
       if(!controller.signal.aborted){setRoleDeviceVerified(null);setRoleBootstrap(null);setRoleBootstrapError("");}
     });
-    const timeout=window.setTimeout(()=>controller.abort(new Error("Quá thời gian tải dữ liệu. Hãy chọn Thử lại.")),20000);
+    const timeout=window.setTimeout(()=>{
+      timedOut=true;
+      controller.abort(new Error("Quá thời gian xác thực dữ liệu học tập (20 giây). Chọn Thử lại, không xóa dữ liệu trình duyệt."));
+    },20000);
     void loadAccountWorkspace(accountId,account.storageDeviceId,account.role,controller.signal,device=>{
       if(!controller.signal.aborted)setRoleDeviceVerified({accountId,device});
     }).then(result=>{
       if(!controller.signal.aborted)setRoleBootstrap(result);
     }).catch(cause=>{
-      if(!controller.signal.aborted || controller.signal.reason instanceof Error)
+      if(!disposed && (!controller.signal.aborted || timedOut))
         setRoleBootstrapError(cause instanceof Error?cause.message:"Không thể xác minh không gian học tập.");
     }).finally(()=>window.clearTimeout(timeout));
-    return()=>{window.clearTimeout(timeout);controller.abort();};
+    return()=>{disposed=true;window.clearTimeout(timeout);controller.abort();};
   },[roleNeedsBootstrap,account?.accountId,account?.storageDeviceId,account?.role,roleBootstrapAttempt]);
   const managerNeedsBootstrap = Boolean(enabled && !bypass && ready && active && v2 &&
     account?.role==="manager" && account.storageDeviceId && pathname==="/" &&
