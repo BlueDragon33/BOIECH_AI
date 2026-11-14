@@ -16,9 +16,9 @@ async function registerManager(f,suffix){
   publicKey,managerInviteToken:invite.inviteToken
  },"manager-purge-fixture");
 }
-const module=(f)=>f.load("owner-account-cleanup.server.ts");
-const preview=(f)=>module(f).inspectCleanup(f.db,owner,{mode:"manager",days:0});
-const purge=(f,r,override={})=>module(f).purgeCleanupAccount(f.db,owner,{
+const cleanupModule=(f)=>f.load("owner-account-cleanup.server.ts");
+const preview=(f)=>cleanupModule(f).inspectCleanup(f.db,owner,{mode:"manager",days:0});
+const purge=(f,r,override={})=>cleanupModule(f).purgeCleanupAccount(f.db,owner,{
  mode:"manager",days:0,accountId:r.accountId,snapshot:r.snapshot,
  confirmation:"XOA TAI KHOAN",reason:"Owner xác nhận xóa tài khoản cán bộ cũ không có dữ liệu",...override
 });
