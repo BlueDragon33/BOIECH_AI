@@ -178,7 +178,23 @@ function Icon({ name }: { name: SectionId | "menu" | "close" }) {
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("Trình duyệt đang chặn bộ nhớ thiết bị. Hãy cho phép lưu trữ trang trong cài đặt trình duyệt."));
+      return;
+    }
     const request = indexedDB.open(document.documentElement.dataset.accountLocalDatabase || "boi-ech-doc-lap", 4);
+    let completed = false;
+    const deadline = window.setTimeout(() => {
+      if (completed) return;
+      completed = true;
+      reject(new Error("Bộ nhớ thiết bị chưa phản hồi. Hãy đóng tab Bơi Ếch khác, kiểm tra quyền lưu trữ rồi chọn Thử lại. Không xóa dữ liệu trang."));
+    }, 10000);
+    request.onblocked = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(deadline);
+      reject(new Error("Một tab khác đang khóa bộ nhớ thiết bị. Hãy đóng các tab Bơi Ếch khác rồi thử lại."));
+    };
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains("tien-do")) {
         request.result.createObjectStore("tien-do");
@@ -199,8 +215,18 @@ function openDb(): Promise<IDBDatabase> {
         request.result.createObjectStore("thong-ke-hoc");
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      if (completed) { request.result.close(); return; }
+      completed = true;
+      window.clearTimeout(deadline);
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(deadline);
+      reject(request.error ?? new Error("Không mở được bộ nhớ thiết bị."));
+    };
   });
 }
 
