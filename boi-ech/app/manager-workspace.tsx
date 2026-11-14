@@ -34,6 +34,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  const [cleanupTarget,setCleanupTarget]=useState<string|null>(null);
  const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
  const classes=board.resources.filter(r=>r.kind==="class"&&r.status==="active");
+ const configuredPeriods=board.periods??[]; // defensive for older verified previews and test fixtures
  const label=(id:string)=>board.resources.find(r=>r.id===id)?.name||id;
  const matches=(value:string)=>value.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"));
  function selectTab(next:Tab){setTab(next);setFilter("all");setQuery("");setDetail(null);setShowWindow(next==="schedule");}
@@ -156,11 +157,11 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
   {tab==="schedule"?<section className={styles.grid} aria-label="Danh sách buổi học">{sessions.map(s=><article key={s.id} className={styles.card}><div className={styles.cardHeading}><h2>{s.title}</h2><Badge tone={s.status==="cancelled"?"inactive":"full"}>{s.status==="cancelled"?"Đã hủy":s.status==="completed"?"Hoàn thành":"Đã xếp"}</Badge></div><p className={styles.sessionTime}>{dateLabel(s.startsAt)} → {dateLabel(s.endsAt)}</p><p>{label(s.classId)} · {label(s.roomId)}</p><small>{board.people.find(p=>p.id===s.teacherId)?.name||"Giảng viên không còn trong danh sách"}</small><button type="button" disabled={busy} onClick={()=>editSession(s)}>Đổi lịch / trạng thái</button></article>)}{!sessions.length&&<div className={styles.emptyState}><AppIcon name="schedule"/><strong>Chưa có buổi học phù hợp</strong><p>Đổi bộ lọc, khoảng xem hoặc xếp buổi học mới.</p></div>}</section>:null}
   {tab==="settings"?<section className={styles.settings} aria-label="Cài đặt khu điều phối"><div className={styles.card}><h3>Tài khoản cán bộ</h3><p>Truy cập bảo mật cá nhân, thiết bị tin cậy và quyền phiên đăng nhập.</p><button type="button" className={styles.settingRow} onClick={onOpenAccount}><AppIcon name="settings"/><span>Mở Trang cá nhân<small>Bảo mật · Thiết bị · Đăng xuất</small></span><span aria-hidden="true">›</span></button></div><div className={styles.card}><h3>Giao diện trên thiết bị này</h3><label>Giao diện<select aria-label="Giao diện" value={appearance.theme} onChange={event=>onAppearanceChange({...appearance,theme:event.target.value as DisplayPreferences["theme"]})}><option value="system">Theo thiết bị</option><option value="light">Sáng</option><option value="dark">Tối</option></select></label><label>Cỡ chữ<select aria-label="Cỡ chữ" value={appearance.textSize} onChange={event=>onAppearanceChange({...appearance,textSize:event.target.value as DisplayPreferences["textSize"]})}><option value="standard">Tiêu chuẩn</option><option value="large">Dễ đọc hơn</option></select></label><small>Chỉ lưu lựa chọn hiển thị trên thiết bị này.</small></div><div className={styles.card}><h3>Giờ học theo tiết · cấu hình thật</h3>
   <p>Giờ và múi giờ do cán bộ thiết lập; không tự giả định giờ bắt đầu của các tiết.</p>
-  {board.periods.length?board.periods.map(p=><button type="button" className={styles.settingRow} key={p.number} onClick={()=>setPeriodEditor({...p,expectedVersion:p.version})}>
+  {configuredPeriods.length?configuredPeriods.map(p=><button type="button" className={styles.settingRow} key={p.number} onClick={()=>setPeriodEditor({...p,expectedVersion:p.version})}>
     <span>Tiết {p.number} · {p.startTime}–{p.endTime}<small>{p.timezone} · Chỉnh sửa</small></span><span aria-hidden="true">›</span>
   </button>):<small>Chưa cấu hình tiết học nào.</small>}
-  <button type="button" onClick={()=>setPeriodEditor({number:board.periods.length?Math.min(24,Math.max(...board.periods.map(p=>p.number))+1):1,
-    startTime:"",endTime:"",timezone:"",expectedVersion:0})} disabled={busy||board.periods.length>=24}>+ Thêm tiết học</button>
+  <button type="button" onClick={()=>setPeriodEditor({number:configuredPeriods.length?Math.min(24,Math.max(...configuredPeriods.map(p=>p.number))+1):1,
+    startTime:"",endTime:"",timezone:"",expectedVersion:0})} disabled={busy||configuredPeriods.length>=24}>+ Thêm tiết học</button>
 </div><div className={styles.card}><h3>Thiết lập đào tạo</h3>{(["building","room","class"] as Tab[]).map(id=><button type="button" className={styles.settingRow} key={id} onClick={()=>selectTab(id)}><AppIcon name={id}/><span>{apps.find(a=>a.id===id)?.label}<small>{id==="class"?"Sĩ số & giảng viên phụ trách":id==="room"?"Tòa, sức chứa & trạng thái":"Không gian & danh sách phòng"}</small></span><span aria-hidden="true">›</span></button>)}</div></section>:null}
   {periodEditor?<ManagerSheet title={"Thiết lập tiết "+periodEditor.number} busy={busy}
      error={formError||(noticeError?notice:"")} onClose={()=>{setPeriodEditor(null);setFormError("");}}>
@@ -190,11 +191,11 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  </select></label>
  <label>Từ tiết<select value={session.periodStart??""} onChange={event=>setSession({...session,
  periodStart:event.target.value?Number(event.target.value):null})}>
- <option value="">Chưa chọn tiết</option>{board.periods.map(p=><option key={p.number} value={p.number}>Tiết {p.number} · {p.startTime}</option>)}
+ <option value="">Chưa chọn tiết</option>{configuredPeriods.map(p=><option key={p.number} value={p.number}>Tiết {p.number} · {p.startTime}</option>)}
  </select></label>
  <label>Đến tiết<select value={session.periodEnd??""} onChange={event=>setSession({...session,
  periodEnd:event.target.value?Number(event.target.value):null})}>
- <option value="">Chưa chọn tiết</option>{board.periods.map(p=><option key={p.number} value={p.number}>Tiết {p.number} · {p.endTime}</option>)}
+ <option value="">Chưa chọn tiết</option>{configuredPeriods.map(p=><option key={p.number} value={p.number}>Tiết {p.number} · {p.endTime}</option>)}
  </select></label><label>Bắt đầu<input type="datetime-local" required value={session.startsAt} onChange={event=>setSession({...session,startsAt:event.target.value})}/></label><label>Kết thúc<input type="datetime-local" required value={session.endsAt} onChange={event=>setSession({...session,endsAt:event.target.value})}/></label><button type="button" onClick={checkWindow}>Kiểm tra khung giờ này</button><label>Trạng thái<select value={session.status} onChange={event=>setSession({...session,status:event.target.value as TrainingSession["status"]})}><option value="scheduled">Đã xếp</option><option value="completed">Hoàn thành</option><option value="cancelled">Đã hủy · trả lại chỗ trống</option></select></label><small>Giờ theo {timezone}. Hệ thống kiểm tra lại sức chứa, lớp, phòng và giảng viên khi lưu.</small><div className={styles.actions}><button>Lưu và xác minh</button><button type="button" onClick={()=>setSession(null)}>Hủy chỉnh sửa</button></div></fieldset></form></section></ManagerSheet>:null}
   {detail?<ManagerDetailSheet target={detail} board={board} busy={busy} readOnly={tab==="people"&&filter==="review"} onClose={()=>setDetail(null)} onEditResource={editResource} onAssignPerson={assignPerson} onEditSession={editSession}
     onInspectCleanup={getProof?person=>{setDetail(null);setCleanupTarget(person.id);}:undefined}/>:null}
