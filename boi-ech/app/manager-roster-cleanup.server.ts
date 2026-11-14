@@ -13,7 +13,7 @@ type Row={
  linked_accounts:number;payment_status:string|null;payment_proof_key:string|null;
  payments:number;certificates:number;activities:number;ai_quizzes:number;ai_feedback:number;
  ai_interactions:number;assessments:number;training_sessions:number;training_commands:number;
- assignments:number;content_versions:number;editors:number;controls:number;
+ assignments:number;content_versions:number;editors:number;controls:number;legacy_profile_links:number;
  total_seconds:number|null;completed_json:string|null;scores_json:string|null;attempts_json:string|null;
 };
 type DB=D1Database;
@@ -43,6 +43,7 @@ const protectedData=`(
  OR EXISTS(SELECT 1 FROM course_content_versions v WHERE v.created_by=d.device_id OR v.editor_device_id=d.device_id)
  OR EXISTS(SELECT 1 FROM content_editor_devices v WHERE v.device_id=d.device_id)
  OR EXISTS(SELECT 1 FROM ai_device_controls v WHERE v.device_id=d.device_id)
+ OR EXISTS(SELECT 1 FROM course_profiles cp WHERE cp.device_hash=d.device_id)
  OR EXISTS(SELECT 1 FROM device_profiles p WHERE p.device_id=d.device_id
    AND (COALESCE(p.total_active_seconds,0)>0 OR COALESCE(p.completed_json,'[]')<>'[]'
      OR COALESCE(p.scores_json,'{}')<>'{}' OR COALESCE(p.attempts_json,'{}')<>'{}'))
@@ -64,6 +65,7 @@ const query=`SELECT d.device_id,d.person_role,d.learner_name,d.class_name,d.stat
  (SELECT COUNT(*) FROM course_content_versions v WHERE v.created_by=d.device_id OR v.editor_device_id=d.device_id) content_versions,
  (SELECT COUNT(*) FROM content_editor_devices v WHERE v.device_id=d.device_id) editors,
  (SELECT COUNT(*) FROM ai_device_controls v WHERE v.device_id=d.device_id) controls,
+ (SELECT COUNT(*) FROM course_profiles cp WHERE cp.device_hash=d.device_id) legacy_profile_links,
  p.total_active_seconds AS total_seconds,p.completed_json,p.scores_json,p.attempts_json
  FROM device_access d LEFT JOIN device_profiles p ON p.device_id=d.device_id
  WHERE d.person_role IN ('learner','teacher') AND d.device_id>?
@@ -97,6 +99,7 @@ const reasons=(r:Row,days:number,now:number)=>{
  if(r.training_sessions||r.training_commands||r.assignments||r.content_versions||r.editors)
   why.push("Có lịch học, phân công hoặc nội dung");
  if(r.controls)why.push("Có cấu hình thiết bị cần giữ");
+ if(Number(r.legacy_profile_links)>0)why.push("Có hồ sơ học tập cũ liên kết");
  return {why,last};
 };
 const fingerprint=(r:Row,days:number)=>sha([r.device_id,r.person_role,r.status,
@@ -168,12 +171,14 @@ export async function purgeManagerRosterDb(db:DB,principal:{accountId:string;ses
       JOIN account_entitlements me ON me.account_id=ma.account_id
       JOIN account_manager_permissions mp ON mp.account_id=ma.account_id
       JOIN account_sessions ms ON ms.account_id=ma.account_id
+      JOIN account_devices mb ON mb.account_id=ms.account_id AND mb.device_id=ms.device_id
+      JOIN account_credentials mc ON mc.account_id=ma.account_id AND mc.generation=ms.generation
       WHERE ma.account_id=? AND md.person_role='manager' AND md.management_enabled=1
         AND md.status='approved' AND mo.stage='active' AND me.state='active'
         AND datetime(me.expires_at)>CURRENT_TIMESTAMP
         AND mp.scope='manager.manage.assigned' AND mp.enabled=1
         AND (mp.expires_at IS NULL OR mp.expires_at>(julianday('now')-2440587.5)*86400000)
-        AND ms.token_hash=? AND ms.revoked=0
+        AND ms.token_hash=? AND ms.revoked=0 AND mb.approved=1 AND mb.revoked=0
         AND ms.expires_at>(julianday('now')-2440587.5)*86400000
         AND ms.idle_expires_at>(julianday('now')-2440587.5)*86400000))`;
  const id=row.device_id;
