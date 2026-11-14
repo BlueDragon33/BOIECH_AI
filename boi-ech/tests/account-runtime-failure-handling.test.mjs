@@ -64,13 +64,16 @@ test("server-coded authentication errors preserve per-field routing and do not b
   assert.match(source,/setFieldErrors\(previous=>\(\{\.\.\.previous,\[target\]/);
 });
 
-test("periodic approval polling continues unchanged and cross-tab sync is best-effort",()=>{
-  assert.match(source,/needsApprovalPolling \? 20000 : 60000/);
-  assert.match(source,/document\.hidden \|\| lock\.current \|\| refreshInFlight\.current/);
+test("account state refresh is event-driven without fixed-interval server polling",()=>{
+  assert.doesNotMatch(source,/needsApprovalPolling \? 20000 : 60000/);
+  assert.doesNotMatch(source,/window\.setInterval\(\(\) => \{ if\(mounted\.current\)/);
+  assert.match(source,/if \(document\.hidden \|\| lock\.current\) return/);
+  assert.match(source,/if \(refreshInFlight\.current\) \{ queuedAfterCurrent = true; return; \}/);
   assert.match(source,/if \(typeof BroadcastChannel !== "undefined"\)/);
   assert.match(source,/if \(typeof BroadcastChannel === "undefined"\) return/);
   assert.match(source,/channel\?\.close\(\)/);
   assert.match(source,/window\.addEventListener\("focus", refresh\)/);
   assert.match(source,/window\.addEventListener\("pageshow",refresh\)/);
-  assert.doesNotMatch(source,/setInterval\(.*2000\)/);
+  assert.match(source,/window\.addEventListener\("online",refresh\)/);
+  assert.match(source,/navigator\.serviceWorker\?\.addEventListener\("message",onRemoteNotification\)/);
 });

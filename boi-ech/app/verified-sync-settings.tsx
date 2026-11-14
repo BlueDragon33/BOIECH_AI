@@ -24,12 +24,28 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
  },[accountId]);
  useEffect(()=>{let alive=true;void Promise.resolve().then(()=>{if(alive)return refresh();}).catch(e=>{if(alive)setError(e instanceof Error?e.message:"Không đọc được trạng thái.");});
   return()=>{alive=false};},[refresh]);
+ // Update visible counts when a real local queue event or server ACK arrives;
+ // no interval or unsolicited timer-based network polling.
+ useEffect(()=>{
+  let alive=true;
+  const onChanged=(event:Event)=>{
+   const detail=(event as CustomEvent<{accountId?:string}>).detail;
+   if(detail?.accountId!==accountId)return;
+   void readPendingSync(accountId).then(local=>{
+    if(alive){setPending(local.pending);setConflicts(local.conflicts);}
+   }).catch(()=>undefined);
+  };
+  window.addEventListener("boi:sync:queued",onChanged);
+  window.addEventListener("boi:sync:completed",onChanged);
+  return()=>{alive=false;window.removeEventListener("boi:sync:queued",onChanged);window.removeEventListener("boi:sync:completed",onChanged);};
+ },[accountId]);
  async function toggle(event:FormEvent<HTMLFormElement>,scope:Scope,enabled:boolean){
   event.preventDefault();
   if(busy)return;
   const form=event.currentTarget;const password=String(new FormData(form).get("password")||"");form.reset();
   setBusy(true);setError("");setNotice("");
   try{await call(accountId,{action:"consent",scope,enabled,password});await refresh();
+   window.dispatchEvent(new CustomEvent("boi:sync:grant-changed",{detail:{accountId}}));
    if(scope==="learning-progress")setCanonical(null);
    setNotice(enabled?"Đã xác nhận phạm vi đồng bộ cho thiết bị này.":"Đã thu hồi quyền đồng bộ của thiết bị này.");}
   catch(e){setError(e instanceof Error?e.message:"Đồng bộ chưa được xác nhận.");}
@@ -54,7 +70,7 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
   finally{setBusy(false);}
  }
  return <details style={{marginBlock:"1rem"}}><summary><strong>Đồng bộ có xác nhận</strong> · Chưa gửi: {pending} · Xung đột: {conflicts}</summary>
-  <p>Đồng bộ chỉ áp dụng cho tiến độ học và tùy chọn học tập. Video, mật khẩu, hồ sơ cá nhân không được sao chép tự động.</p>
+  <p>Đồng bộ có điều kiện: chỉ gửi khi có dữ liệu chờ, nhận thông báo thay đổi, kết nối mạng lại hoặc người dùng chọn đồng bộ. Không hỏi máy chủ theo timer. Video, mật khẩu, hồ sơ cá nhân không được sao chép tự động.</p>
   {error?<p role="alert">{error}</p>:null}{notice?<p role="status">{notice}</p>:null}
   {(["learning-progress","study-preferences"] as const).map(scope=>{
     const enabled=grants.some(g=>g.scope===scope&&g.enabled===1);

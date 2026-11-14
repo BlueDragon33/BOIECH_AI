@@ -54,8 +54,10 @@ test("one-time recovery code remains visible without auto-reload on activation",
  assert.match(css,/@media\(max-width:600px\)/);
 });
 
-test("approval polling at 20s and automatic draft activation still work without extra clicks",()=>{
- assert.match(gateSource,/needsApprovalPolling \? 20000 : 60000/);
+test("event-driven approval and automatic draft activation work without extra clicks",()=>{
+ assert.doesNotMatch(gateSource,/needsApprovalPolling \? 20000 : 60000/);
+ assert.match(gateSource,/window\.addEventListener\("online",refresh\)/);
+ assert.match(gateSource,/window\.addEventListener\("boi:account:changed",refresh\)/);
  assert.match(gateSource,/account\.onboardingStage==="profile_required"/);
  assert.match(gateSource,/account\.profileDraftReady!==true/);
  assert.match(gateSource,/action:"profile-draft-activate"/);

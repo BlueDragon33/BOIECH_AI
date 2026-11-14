@@ -54,7 +54,17 @@ const EMPTY_META: AccountMeta = {
 
 function openAccountDb(databaseName = DB_NAME) {
   return new Promise<IDBDatabase>((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("Trình duyệt chặn lưu trữ cục bộ. Bật lưu trữ để xác thực an toàn.")); return;
+    }
     const request = indexedDB.open(databaseName, DB_VERSION);
+    let settled = false;
+    const deadline = window.setTimeout(() => {
+      if (!settled) { settled = true; reject(new Error("Bộ nhớ tài khoản chưa phản hồi. Đóng các tab Bơi Ếch khác và thử lại, không xóa dữ liệu.")); }
+    }, 10000);
+    request.onblocked = () => {
+      if (!settled) { settled = true; window.clearTimeout(deadline); reject(new Error("Bộ nhớ tài khoản bị khóa bởi tab khác. Đóng tab đó rồi chọn xác thực lại.")); }
+    };
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains("tien-do")) db.createObjectStore("tien-do");
@@ -64,8 +74,14 @@ function openAccountDb(databaseName = DB_NAME) {
       if (!db.objectStoreNames.contains("ban-rieng")) db.createObjectStore("ban-rieng");
       if (!db.objectStoreNames.contains("thong-ke-hoc")) db.createObjectStore("thong-ke-hoc");
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      if (settled) { request.result.close(); return; }
+      settled = true; window.clearTimeout(deadline); resolve(request.result);
+    };
+    request.onerror = () => {
+      if (settled) return;
+      settled = true; window.clearTimeout(deadline); reject(request.error);
+    };
   });
 }
 
@@ -369,10 +385,26 @@ export default function MultiAccountSwitcher() {
 async function portableValue(key: string, value?: unknown) {
   // Separate database: restoreLocalState clears ban-rieng, so metadata must never live there.
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("Trình duyệt chặn lưu trữ hồ sơ. Bật quyền lưu trữ để tiếp tục.")); return;
+    }
     const request = indexedDB.open("boiech-portable-local-v1", 1);
+    let settled = false;
+    const deadline = window.setTimeout(() => {
+      if (!settled) { settled = true; reject(new Error("Kho hồ sơ chưa phản hồi. Đóng tab Bơi Ếch khác rồi thử lại, không xóa dữ liệu.")); }
+    }, 10000);
     request.onupgradeneeded = () => request.result.createObjectStore("states");
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onblocked = () => {
+      if (!settled) { settled = true; window.clearTimeout(deadline); reject(new Error("Kho hồ sơ đang bị tab khác khóa. Đóng tab đó rồi thử lại.")); }
+    };
+    request.onsuccess = () => {
+      if (settled) { request.result.close(); return; }
+      settled = true; window.clearTimeout(deadline); resolve(request.result);
+    };
+    request.onerror = () => {
+      if (settled) return;
+      settled = true; window.clearTimeout(deadline); reject(request.error);
+    };
   });
   return new Promise<unknown>((resolve, reject) => {
     const tx = db.transaction("states", value === undefined ? "readonly" : "readwrite");

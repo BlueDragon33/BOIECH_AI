@@ -10,7 +10,9 @@ test("authorized device profile refreshes when the learner app becomes active", 
   assert.match(page, /document\.addEventListener\("visibilitychange", syncVisibleDeviceProfile\)/);
   assert.match(page, /window\.addEventListener\("focus", syncVisibleDeviceProfile\)/);
   assert.match(page, /window\.addEventListener\("online", syncVisibleDeviceProfile\)/);
-  assert.match(page, /window\.setInterval\(sendPresence, 60_000\)/);
+  assert.doesNotMatch(page, /window\.setInterval\(sendPresence, 60_000\)/);
+  assert.match(page, /lastPresenceAt < 10_000/);
+  assert.match(page, /navigator\.serviceWorker\?\.addEventListener\("message", onPush\)/);
 });
 
 test("live device profile listeners are fully cleaned up", async () => {
@@ -19,7 +21,9 @@ test("live device profile listeners are fully cleaned up", async () => {
   assert.match(page, /document\.removeEventListener\("visibilitychange", syncVisibleDeviceProfile\)/);
   assert.match(page, /window\.removeEventListener\("focus", syncVisibleDeviceProfile\)/);
   assert.match(page, /window\.removeEventListener\("online", syncVisibleDeviceProfile\)/);
-  assert.match(page, /window\.clearInterval\(timer\)/);
+  assert.match(page, /navigator\.serviceWorker\?\.removeEventListener\("message", onPush\)/);
+  assert.match(page, /window\.removeEventListener\("pageshow", syncVisibleDeviceProfile\)/);
+  assert.doesNotMatch(page, /window\.setInterval\(sendPresence, 60_000\)/);
 });
 
 test("student role snapshot observes device-managed shell attributes", async () => {

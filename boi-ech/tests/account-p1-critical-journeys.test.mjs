@@ -107,12 +107,13 @@ test("P1 new browser login cannot bypass trusted-device approval or read canonic
   } finally { f.close(); }
 });
 
-test("P1 pending-account polling still uses 20 seconds and never treats client state as approval", () => {
-  assert.match(gate, /needsApprovalPolling \? 20000 : 60000/);
-  assert.match(gate, /document\.hidden \|\| lock\.current \|\| refreshInFlight\.current/);
-  assert.match(gate, /account\.onboardingStage!=="active"/);
-  assert.match(gate, /account\.deviceApproved===false/);
-  assert.match(gate, /account\.entitlementActive===false/);
+test("P1 pending account uses conditional notifications and never trusts client state as approval", () => {
+  assert.doesNotMatch(gate, /needsApprovalPolling \? 20000 : 60000/);
+  assert.match(gate, /if \(document\.hidden \|\| lock\.current\) return/);
+  assert.match(gate, /if \(refreshInFlight\.current\) \{ queuedAfterCurrent = true; return; \}/);
+  assert.match(gate, /account\.onboardingStage !== "active"/);
+  assert.match(gate, /account\.deviceApproved === false/);
+  assert.match(gate, /account\.entitlementActive === false/);
   assert.match(gate, /action:"profile-draft-activate"/);
   assert.match(gate, /accountServerActive\(account, v2, observedNow\)/);
   const contract=readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");

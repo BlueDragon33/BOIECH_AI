@@ -39,15 +39,19 @@ test("confirmation mismatch uses confirmation field, not a global alert alone",(
    assert.ok(source.includes(check),check);
  assert.ok(css.includes(".authForm .fieldError"));
 });
-test("pending approval checks server at 20s with no overlapping refresh",()=>{
- for(const check of ["needsApprovalPolling ? 20000 : 60000",
-   'account.onboardingStage!=="active"',
-   "document.hidden || lock.current || refreshInFlight.current",
-   "refreshInFlight.current=false",
+test("pending approval rechecks only on real events with no overlapping refresh",()=>{
+ for(const check of [
+   'account.onboardingStage !== "active"',
+   "if (document.hidden || lock.current) return",
+   "if (refreshInFlight.current) { queuedAfterCurrent = true; return; }",
+   "refreshInFlight.current = false",
+   'window.addEventListener("boi:account:changed",refresh)',
+   'window.addEventListener("online",refresh)',
    'action:"profile-draft-activate"',
    "attemptedAutoActivation.current.delete(key)",
    "accountServerActive(account, v2, observedNow)"])
    assert.ok(source.includes(check),check);
+ assert.doesNotMatch(source,/needsApprovalPolling \? 20000 : 60000/);
 });
 test("approved UI still requires exact server-side entitlement and trusted device",()=>{
  const contract=fs.readFileSync(new URL("../app/account-lifecycle-client.ts",import.meta.url),"utf8");

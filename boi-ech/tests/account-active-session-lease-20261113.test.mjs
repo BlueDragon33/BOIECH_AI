@@ -115,10 +115,12 @@ test("CSRF is enforced, status GET is read-only, and lease renewal response leak
 });
 test("Browser renewals require foreground engagement; background tabs and polling cannot act as perpetual auth",()=>{
  const source=readFileSync(new URL("../app/account-gate.tsx",import.meta.url),"utf8");
- assert.match(source,/document.hidden \|\| lock.current \|\| refreshInFlight.current/);
+ assert.match(source,/document.hidden \|\| lock.current/);
+ assert.match(source,/if \(refreshInFlight.current\) \{ queuedAfterCurrent = true; return; \}/);
  assert.match(source,/now-lastUserEngagementAt.current>15\*60_000/);
  assert.match(source,/action:"keepalive"/);
  assert.match(source,/Phiên đăng nhập sắp hết hạn/);
  assert.match(source,/Giữ phiên đăng nhập/);
- assert.match(source,/needsApprovalPolling \? 20000 : 60000/);
+ assert.match(source,/window.addEventListener\("focus", refresh\)/);
+ assert.doesNotMatch(source,/needsApprovalPolling \? 20000 : 60000/);
 });
