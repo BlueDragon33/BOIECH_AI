@@ -64,7 +64,7 @@ const query=`SELECT d.device_id,d.person_role,d.learner_name,d.class_name,d.stat
  (SELECT COUNT(*) FROM course_content_versions v WHERE v.created_by=d.device_id OR v.editor_device_id=d.device_id) content_versions,
  (SELECT COUNT(*) FROM content_editor_devices v WHERE v.device_id=d.device_id) editors,
  (SELECT COUNT(*) FROM ai_device_controls v WHERE v.device_id=d.device_id) controls,
- p.total_active_seconds,p.completed_json,p.scores_json,p.attempts_json
+ p.total_active_seconds AS total_seconds,p.completed_json,p.scores_json,p.attempts_json
  FROM device_access d LEFT JOIN device_profiles p ON p.device_id=d.device_id
  WHERE d.person_role IN ('learner','teacher') AND d.device_id>?
  ORDER BY d.device_id LIMIT 101`;
