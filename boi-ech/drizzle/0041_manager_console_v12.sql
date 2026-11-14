@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS training_class_leaders (
  class_id TEXT NOT NULL REFERENCES training_resources(id),
  slot TEXT NOT NULL CHECK(slot IN ('cadre','student')),
  source TEXT NOT NULL CHECK(source IN ('none','cadre','class','outside')),
- member_device_id TEXT REFERENCES device_access(device_id),
+ member_device_id TEXT, -- verified on manager write; no FK blocking Owner's safe account purge
  display_name TEXT,
  birth_date TEXT,
  military_rank TEXT,
@@ -83,6 +83,14 @@ CREATE TRIGGER IF NOT EXISTS training_leader_student_class_guard AFTER UPDATE OF
    SET source='outside',member_device_id=CASE WHEN NEW.person_role='learner' THEN NEW.device_id ELSE NULL END,
        version=version+1,updated_at=CURRENT_TIMESTAMP
    WHERE slot='student' AND source='class' AND member_device_id=NEW.device_id;
+ END;
+--> statement-breakpoint
+CREATE TRIGGER IF NOT EXISTS training_leader_deleted_member_guard AFTER DELETE ON device_access
+ WHEN EXISTS(SELECT 1 FROM training_class_leaders l WHERE l.slot='student' AND l.member_device_id=OLD.device_id)
+ BEGIN
+  UPDATE training_class_leaders SET source='outside',member_device_id=NULL,
+    version=version+1,updated_at=CURRENT_TIMESTAMP
+  WHERE slot='student' AND member_device_id=OLD.device_id;
  END;
 --> statement-breakpoint
 CREATE TRIGGER IF NOT EXISTS training_leader_class_rename_guard BEFORE UPDATE OF name ON training_resources
