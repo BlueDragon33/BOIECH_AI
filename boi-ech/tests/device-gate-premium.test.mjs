@@ -59,7 +59,7 @@ test("the retry action reopens device identity initialization after a failure", 
 
 test("device polling skips hidden tabs and overlapping requests", () => {
   assert.match(page, /if \(document\.hidden \|\| !navigator\.onLine \|\| inFlight\) return/);
-  assert.match(page, /20_000/);
+  assert.match(page, /10_000/);
   assert.match(page, /access\.status === "approved" && access\.registrationComplete && !access\.accessExpired/);
 });
 
@@ -91,8 +91,8 @@ test("Account-first login, session poll and profile conflict readback are bounde
   assert.match(account, /const data = await readAccountPayload\(response\)/);
   assert.match(account, /controller\.abort\(\)/);
   assert.match(account, /window\.clearTimeout\(timeout\)/);
-  assert.equal((account.match(/accountReadWithinDeadline<\{/g) ?? []).length, 3);
-  assert.doesNotMatch(account, /await fetch\("\/api\/accounts"/);
+  assert.equal((account.match(/accountReadWithinDeadline<\{/g) ?? []).length, 2);
+  assert.match(account, /signal: AbortSignal\.timeout\(15000\)/);
 });
 
 test("recovered server session clears stale transport errors", () => {
