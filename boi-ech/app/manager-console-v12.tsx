@@ -55,7 +55,8 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
  const cls=classes.find(x=>x.id===selectedClass);
  const inClass=cls?learners.filter(p=>belongs(p,cls)):[];
  const unassigned=learners.filter(p=>p.registered&&(!p.className.trim()||!classes.some(c=>belongs(p,c))));
- const notInClass=cls?learners.filter(p=>p.registered&&!belongs(p,cls)):[];
+ const editorClass=classes.find(c=>c.id===leaderEditor?.classId);
+ const notInClass=editorClass?learners.filter(p=>p.registered&&!belongs(p,editorClass)):[];
  const leader=(id:string,slot:Slot)=>board.leaders?.find(l=>l.classId===id&&l.slot===slot);
  const todaySessions=board.sessions.filter(s=>s.status!=="cancelled");
  const observed=Date.parse(board.observedAt);
@@ -248,7 +249,7 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
          .map(p=><option key={p.id} value={p.id}>{p.name} · {p.className||"Chưa phân lớp"}</option>)}
       </select>
      </label>
-     {leaderEditor.source==="outside"?<p className={styles.provisional}>Nguồn bên ngoài được lưu là **chờ liên kết**. Không tự tạo tài khoản, cấp quyền hoặc thay đổi sĩ số lớp.</p>:null}
+     {leaderEditor.source==="outside"?<p className={styles.provisional}>Nguồn bên ngoài được lưu là chờ liên kết. Không tự tạo tài khoản, cấp quyền hoặc thay đổi sĩ số lớp.</p>:null}
     </>:null}
     <label>Họ tên<input required maxLength={80} value={leaderEditor.displayName}
        readOnly={leaderEditor.slot==="student"&&!!leaderEditor.memberDeviceId}
