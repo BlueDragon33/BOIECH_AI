@@ -78,7 +78,7 @@ async function requireAccountManager(actor:PublicDeviceState) {
  if(principal.accountId!==actor.accountId)
   deny("MANAGER_ACCOUNT_MISMATCH","Phiên đăng nhập không khớp cán bộ.",403);
  await service.capability(principal,"manager.manage.assigned");
- return principal.accountId;
+ return {accountId:principal.accountId,sessionHash:principal.sessionHash};
 }
 const reasons=(r:Row,days:number,now:number)=>{
  const why:string[]=[];
@@ -116,6 +116,13 @@ export async function previewManagerRosterCleanup(actor:PublicDeviceState,input:
  const cursor=typeof input.cursor==="string"?input.cursor:"";
  if(cursor&&!/^[a-f0-9-]{16,80}$/i.test(cursor))deny("ROSTER_CLEANUP_INPUT","Mã trang không hợp lệ.",400);
  const db=await trainingDatabase();
+ return inspectManagerRosterDb(db,input,now);
+}
+/** SQL-only harness; public HTTP entry always authenticates before invoking. */
+export async function inspectManagerRosterDb(db:DB,input:Record<string,unknown>,now=Date.now()) {
+ const options=daysValue(input);
+ const cursor=typeof input.cursor==="string"?input.cursor:"";
+ if(cursor&&!/^[a-f0-9-]{16,80}$/i.test(cursor))deny("ROSTER_CLEANUP_INPUT","Mã trang không hợp lệ.",400);
  const res=await db.prepare(query).bind(cursor).all<Row>();
  if(!Array.isArray(res.results))deny("ROSTER_CLEANUP_UNVERIFIED","Chưa xác minh được danh sách D1.",503);
  const rows=res.results.slice(0,LIMIT).map(r=>described(r,options,now));
@@ -126,14 +133,18 @@ export async function previewManagerRosterCleanup(actor:PublicDeviceState,input:
   warning:"Chỉ hồ sơ chưa từng duyệt, chưa gắn tài khoản, chưa có dữ liệu mới đủ điều kiện. Không xóa tự động."};
 }
 export async function purgeManagerRosterRecord(actor:PublicDeviceState,input:Record<string,unknown>,now=Date.now()){
- const accountId=await requireAccountManager(actor);
+ const principal=await requireAccountManager(actor);
+ return purgeManagerRosterDb(await trainingDatabase(),principal,input,now);
+}
+/** Called from an authenticated wrapper only. SQL authorization is rechecked in batch. */
+export async function purgeManagerRosterDb(db:DB,principal:{accountId:string;sessionHash:string},input:Record<string,unknown>,now=Date.now()) {
+ const {accountId,sessionHash}=principal;
  const options=daysValue(input);
  if(typeof input.deviceId!=="string"||!/^[a-f0-9-]{16,80}$/i.test(input.deviceId)
   ||typeof input.snapshot!=="string"||!/^[a-f0-9]{64}$/.test(input.snapshot)
   ||input.confirmation!=="XOA HO SO CU"
   ||typeof input.reason!=="string"||input.reason.trim().length<10||input.reason.length>300)
   deny("ROSTER_CLEANUP_CONFIRMATION_REQUIRED","Cần xác nhận và lý do đủ rõ.",400);
- const db=await trainingDatabase();
  const row=await db.prepare(query.replace("AND d.device_id>?\n ORDER BY d.device_id LIMIT 101",
   "AND d.device_id=? ORDER BY d.device_id LIMIT 101"))
   .bind(input.deviceId).first<Row>();
@@ -150,13 +161,27 @@ export async function purgeManagerRosterRecord(actor:PublicDeviceState,input:Rec
     AND datetime(d.created_at)<datetime('now','-${options.days} days')
     AND (d.last_seen_at IS NULL OR datetime(d.last_seen_at)<datetime('now','-${options.days} days'))
     AND (d.registration_submitted_at IS NULL OR datetime(d.registration_submitted_at)<datetime('now','-${options.days} days'))
-    AND NOT ${protectedData})`;
+    AND NOT ${protectedData}
+    AND EXISTS(SELECT 1 FROM accounts ma JOIN device_access md ON md.device_id=ma.storage_device_id
+      JOIN account_onboarding mo ON mo.account_id=ma.account_id
+      JOIN account_entitlements me ON me.account_id=ma.account_id
+      JOIN account_manager_permissions mp ON mp.account_id=ma.account_id
+      JOIN account_sessions ms ON ms.account_id=ma.account_id
+      WHERE ma.account_id=? AND md.person_role='manager' AND md.management_enabled=1
+        AND md.status='approved' AND mo.stage='active' AND me.state='active'
+        AND datetime(me.expires_at)>CURRENT_TIMESTAMP
+        AND mp.scope='manager.manage.assigned' AND mp.enabled=1
+        AND (mp.expires_at IS NULL OR mp.expires_at>(julianday('now')-2440587.5)*86400000)
+        AND ms.token_hash=? AND ms.revoked=0
+        AND ms.expires_at>(julianday('now')-2440587.5)*86400000
+        AND ms.idle_expires_at>(julianday('now')-2440587.5)*86400000))`;
  const id=row.device_id;
  const statement=[
   db.prepare(`INSERT INTO account_audit(actor,action,target,purpose)
     SELECT ?,'manager.legacy-roster.purged',?,CASE WHEN ${guard} THEN ? ELSE NULL END`)
    .bind(accountId,sha(["manager-legacy-roster",id]),id,row.person_role,row.status,
     row.created_at,row.last_seen_at,row.registration_submitted_at,
+    accountId,sessionHash,
     "Manager archived unused legacy roster record: "+input.reason.trim()),
   db.prepare("DELETE FROM device_challenges WHERE device_id=?").bind(id),
   db.prepare("DELETE FROM device_profiles WHERE device_id=?").bind(id),
