@@ -270,12 +270,13 @@ export class AccountService {
           .bind(accountId, deviceId, publicKeyJson(publicKey));
     const statements: D1PreparedStatement[] = [deviceInsert];
     if (this.v2Enabled && portable) {
-      // A previously pending browser key may be used from a phone/tablet after
+      // Existing previously approved mobile browser keys are reclassified on\n      // their next successful password login, so legacy migration defaults do\n      // not strand phones as desktop slots. A pending browser key may be used from
       // a fresh password login. Revoked keys stay revoked (and banned keys are
       // rejected by assertReentryAllowed before issuing any session).
       statements.push(this.db.prepare(`UPDATE account_devices SET approved=1,client_class=?
-        WHERE account_id=? AND device_id=? AND revoked=0 AND approved=0`)
-        .bind(clientClass, accountId, deviceId));
+        WHERE account_id=? AND device_id=? AND revoked=0
+          AND (approved=0 OR client_class<>?)`)
+        .bind(clientClass, accountId, deviceId, clientClass));
       statements.push(this.audit(accountId, "account.portable-session.verified", deviceId,
         "password-authenticated phone/tablet session; not a physical-device attestation", true));
     }
