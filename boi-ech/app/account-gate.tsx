@@ -489,7 +489,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const managerStorageId=account?.storageDeviceId??"";
   const getManagerProof=useCallback((signal?:AbortSignal)=>{
     signal?.throwIfAborted();
-    return portableManagerProof(managerStorageId);
+    return portableManagerProof(managerStorageId,signal);
   },[managerStorageId]);
   const active = accountServerActive(account, v2, observedNow);
   const roleNeedsBootstrap = Boolean(enabled && !bypass && ready && active && v2 &&
