@@ -1413,20 +1413,47 @@ export default function Home() {
 
   useEffect(() => {
     if (!deviceCredential || deviceAccess?.status !== "pending") return;
+    let cancelled = false;
     let inFlight = false;
-    const timer = window.setInterval(() => {
-      if (document.hidden || !navigator.onLine || inFlight) return;
+    let queued = false;
+    // No periodic device-status polling. React only to incoming events, resume
+    // or reconnection; the manual "Thử lại" button is always available.
+    const sync = () => {
+      if (cancelled || document.hidden || !navigator.onLine) return;
+      if (inFlight) { queued = true; return; }
       inFlight = true;
-      registerDeviceCredential(deviceCredential)
+      void registerDeviceCredential(deviceCredential)
         .then((access) => {
+          if (cancelled) return;
           setDeviceAccess(access);
           setDeviceError("");
           if (access.status === "approved" && access.registrationComplete && !access.accessExpired) setHasEnteredLearning(true);
         })
-        .catch((error) => setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị."))
-        .finally(() => { inFlight = false; });
-    }, 10_000);
-    return () => window.clearInterval(timer);
+        .catch((error) => { if (!cancelled) setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị."); })
+        .finally(() => { inFlight = false; if (queued && !cancelled) { queued = false; sync(); } });
+    };
+    const onVisible = () => { if (!document.hidden) sync(); };
+    const onPush = (event: MessageEvent) => { if (event.data?.type === "boi-ech-device-changed") sync(); };
+    window.addEventListener("focus",sync);
+    window.addEventListener("pageshow",sync);
+    window.addEventListener("online",sync);
+    window.addEventListener("boi:device:changed",sync);
+    document.addEventListener("visibilitychange",onVisible);
+    navigator.serviceWorker?.addEventListener("message",onPush);
+    let channel: BroadcastChannel | null = null;
+    try { if (typeof BroadcastChannel !== "undefined") {
+      channel = new BroadcastChannel("boiech-device-auth"); channel.onmessage = sync;
+    } } catch { /* Focus, online and manual retry remain available. */ }
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus",sync);
+      window.removeEventListener("pageshow",sync);
+      window.removeEventListener("online",sync);
+      window.removeEventListener("boi:device:changed",sync);
+      document.removeEventListener("visibilitychange",onVisible);
+      navigator.serviceWorker?.removeEventListener("message",onPush);
+      channel?.close();
+    };
   }, [deviceAccess?.status, deviceCredential]);
 
   useEffect(() => {
@@ -1450,20 +1477,32 @@ export default function Home() {
         })
         .finally(() => { presenceRunning = false; });
     };
+    let lastPresenceAt = 0;
     const syncVisibleDeviceProfile = () => {
-      if (document.visibilityState === "visible") sendPresence();
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      // Repeated focus/pageshow events are coalesced without a periodic timer.
+      if (Date.now() - lastPresenceAt < 10_000) return;
+      lastPresenceAt = Date.now();
+      sendPresence();
     };
-    sendPresence();
-    const timer = window.setInterval(sendPresence, 60_000);
+    const onPush = (event: MessageEvent) => {
+      if (event.data?.type !== "boi-ech-device-changed") return;
+      lastPresenceAt = 0;
+      syncVisibleDeviceProfile();
+    };
+    syncVisibleDeviceProfile();
     document.addEventListener("visibilitychange", syncVisibleDeviceProfile);
     window.addEventListener("focus", syncVisibleDeviceProfile);
+    window.addEventListener("pageshow", syncVisibleDeviceProfile);
     window.addEventListener("online", syncVisibleDeviceProfile);
+    navigator.serviceWorker?.addEventListener("message", onPush);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
       document.removeEventListener("visibilitychange", syncVisibleDeviceProfile);
       window.removeEventListener("focus", syncVisibleDeviceProfile);
+      window.removeEventListener("pageshow", syncVisibleDeviceProfile);
       window.removeEventListener("online", syncVisibleDeviceProfile);
+      navigator.serviceWorker?.removeEventListener("message", onPush);
     };
   // Presence follows the bound device and refreshes device-managed UX when the app becomes active again.
   // eslint-disable-next-line react-hooks/exhaustive-deps
