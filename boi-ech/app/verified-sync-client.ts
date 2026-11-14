@@ -54,6 +54,16 @@ export async function queueVerifiedSync(accountId:string,scope:Scope,recordKey:s
  const event:QueuedEvent={eventId:crypto.randomUUID(),accountId,scope,recordKey,expectedRevision,
   data,queuedAt:new Date().toISOString(),status:"pending"};
  await writeLocal(accountId,event);
+ // Notify active tabs about REAL queued data, not a synthetic clock tick.
+ // Events are hints only; server consent and session checks remain authoritative.
+ if (typeof window !== "undefined") {
+  window.dispatchEvent(new CustomEvent("boi:sync:queued",{detail:{accountId}}));
+  try {
+   const channel=new BroadcastChannel("boiech-verified-sync");
+   channel.postMessage({type:"queued",accountId});
+   channel.close();
+  } catch { /* Notification is best effort; the durable queue is authoritative. */ }
+ }
  return event.eventId;
 }
 export async function readPendingSync(accountId:string){
@@ -68,7 +78,7 @@ async function sessionMatches(accountId:string){
  if(state.account?.accountId!==accountId||state.account.deviceApproved!==true)throw new Error("ACCOUNT_SWITCHED");
 }
 const activeFlush=new Set<string>();
-export async function flushVerifiedSync(accountId:string,signal?:AbortSignal):Promise<{
+export async function flushVerifiedSync(accountId:string,signal?:AbortSignal,allowedScopes?:ReadonlySet<Scope>):Promise<{
  sent:number;remaining:number;conflicts:number;error?:string}>{
  validate(accountId);
  if(activeFlush.has(accountId))throw new Error("SYNC_ALREADY_RUNNING");
@@ -79,6 +89,7 @@ export async function flushVerifiedSync(accountId:string,signal?:AbortSignal):Pr
   for(const event of await localEvents(accountId)){
    if(signal?.aborted)break;
    if(event.status!=="pending"||event.accountId!==accountId)continue;
+   if(allowedScopes&&!allowedScopes.has(event.scope))continue;
    try{
     const response=await fetch("/api/accounts/sync",{method:"POST",credentials:"same-origin",cache:"no-store",signal,
      headers:{"content-type":"application/json"},
