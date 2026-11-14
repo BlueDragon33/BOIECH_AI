@@ -69,7 +69,7 @@ export async function loadAccountWorkspace(
  // badge nor use a cookie-free, guessed deviceId to enter the workspace.
  onDeviceVerified(device);
  signal.throwIfAborted();
- const proof=await portableManagerProof(storageDeviceId);
+ const proof=await portableManagerProof(storageDeviceId,signal);
  signal.throwIfAborted();
  if(role==="learner"){
   const data=await postJson<{state?:ServerCourseState;content?:LessonContentPayload;outlines?:LessonOutline[]}>(
