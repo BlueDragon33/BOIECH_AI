@@ -1,6 +1,13 @@
 import type {TrainingBoard} from "./training-types";
 export type TrainingProof={deviceId:string;challenge:string;signature:string};
 export type TrainingWindow={from:string;to:string};
+/** Same UTC window is used for the authenticated preload and the manager UI. */
+export function initialTrainingWindow(): TrainingWindow {
+ const start = new Date();
+ start.setMinutes(0,0,0);
+ return {from:start.toISOString(),to:new Date(start.getTime()+3600000).toISOString()};
+}
+
 export function createTrainingClient(getProof:(signal?:AbortSignal)=>Promise<TrainingProof>){
  let lastIntent="",lastCommand="";
  async function request(payload:Record<string,unknown>,external?:AbortSignal):Promise<TrainingBoard>{

@@ -1,0 +1,13 @@
+
+/* Numeric pending-event bubble — no automatic synchronization. */
+.boi-manual-sync-control {position:relative!important;overflow:visible!important;isolation:isolate}
+.boi-manual-sync-badge {
+  position:absolute!important;top:-9px!important;right:-10px!important;z-index:2!important;
+  display:grid!important;place-items:center!important;min-width:23px!important;height:23px!important;
+  padding:1px 5px!important;border:2px solid #fff!important;border-radius:999px!important;
+  background:#b91c43!important;color:#fff!important;box-shadow:0 2px 8px #210b2080!important;
+  font:800 11px/1.1 system-ui,sans-serif!important;font-variant-numeric:tabular-nums!important;
+  pointer-events:none!important;white-space:nowrap!important;
+}
+.boi-manual-sync-control:focus-visible {outline:3px solid #fbbf24!important;outline-offset:4px!important}
+@media(prefers-reduced-motion:reduce){.boi-manual-sync-badge{animation:none!important}}

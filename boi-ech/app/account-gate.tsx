@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import {createPortal} from "react-dom";
 import RegistrantReader from "./registrant-reader";
 import ManagerWorkspace from "./manager-workspace";
+import {createTrainingClient,initialTrainingWindow,type TrainingWindow} from "./training-client";
+import type {TrainingBoard} from "./training-types";
 import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialog";
 import VerifiedSyncSettings from "./verified-sync-settings";
 import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
@@ -190,6 +192,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [enteredAccountId, setEnteredAccountId] = useState("");
+  const [managerPreload,setManagerPreload]=useState<{accountId:string;board:TrainingBoard;range:TrainingWindow}|null>(null);
+  const [managerPreloadError,setManagerPreloadError]=useState("");
+  const [managerPreloadAttempt,setManagerPreloadAttempt]=useState(0);
   const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({});
   const [mode, setMode] = useState<Mode>("login"), [role, setRole] = useState<"learner" | "manager" | "teacher">("learner");
   const [contactType,setContactType]=useState<"email"|"phone">("email");
@@ -475,6 +480,27 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     return portableManagerProof(managerStorageId);
   },[managerStorageId]);
   const active = accountServerActive(account, v2, observedNow);
+  const managerNeedsBootstrap = Boolean(enabled && !bypass && ready && active && v2 &&
+    account?.role==="manager" && account.storageDeviceId && pathname==="/" &&
+    enteredAccountId!==account.accountId);
+  // The manager's very first authorized board read happens INSIDE the
+  // verification screen. GO is withheld until that real D1-backed read passes.
+  useEffect(()=>{
+    if(!managerNeedsBootstrap||!account?.accountId)return;
+    const id=account.accountId;
+    const controller=new AbortController();
+    const range=initialTrainingWindow();
+    queueMicrotask(()=>{
+      if(!controller.signal.aborted){setManagerPreload(null);setManagerPreloadError("");}
+    });
+    void createTrainingClient(getManagerProof).read(range,controller.signal).then(board=>{
+      if(!controller.signal.aborted)setManagerPreload({accountId:id,board,range});
+    }).catch(cause=>{
+      if(!controller.signal.aborted)setManagerPreloadError(cause instanceof Error?
+        cause.message:"Không thể xác minh dữ liệu điều phối. Hãy thử lại.");
+    });
+    return()=>controller.abort();
+  },[managerNeedsBootstrap,account?.accountId,getManagerProof,managerPreloadAttempt]);
   if (!enabled || bypass) return children;
   const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
     && account.storageDeviceId && pathname==="/");
@@ -821,18 +847,24 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     </section>;
   // The legacy loading login card is replaced by the full-screen verification
   // ceremony. An error never advances to READY/GO without server approval.
-  if (!ready) return <AccountVerificationShowcase phase="checking" error={error} busy={busy}
+  if (!ready) return <AccountVerificationShowcase phase="checking" checks={[false,false,false]} error={error} busy={busy}
     onRetry={() => void run(() => reload())} onGo={() => undefined}/>;
-  // Show the ceremony once per validated account in this mounted document.
-  // Once GO has appeared for 1s, enter automatically; still no auth bypass.
+  // Presentation follows REAL server evidence. Managers also need their full
+  // first training-board read before the final step can finish.
   if (active && account && enteredAccountId !== account.accountId) {
-    return <AccountVerificationShowcase phase="verified" accountName={account.name}
+    const boardVerified= !managerNeedsBootstrap ||
+      Boolean(managerPreload?.accountId===account.accountId && managerPreload.board);
+    return <AccountVerificationShowcase phase="verified" checks={[ready,active,boardVerified]}
+      accountName={account.name}
       role={account.role==="manager"?"Cán bộ quản lý":account.role==="teacher"?"Giảng viên":"Học viên"}
-      error={error} busy={busy}
-      onRetry={() => void run(() => reload())}
+      error={managerPreloadError||error} busy={busy}
+      onRetry={() => {
+        if(managerPreloadError){setManagerPreloadError("");setManagerPreloadAttempt(value=>value+1);}
+        else void run(()=>reload());
+      }}
       onGo={() => {
-        if (accountServerActive(account, v2, Date.now())) setEnteredAccountId(account.accountId);
-        else { setError("Quyền truy cập đã thay đổi. Hãy xác thực lại với máy chủ."); void reload().catch(() => undefined); }
+        if (accountServerActive(account, v2, Date.now()) && boardVerified) setEnteredAccountId(account.accountId);
+        else { setError("Quyền truy cập hoặc dữ liệu điều phối đã thay đổi. Hãy xác thực lại."); void reload().catch(() => undefined); }
       }}/>;
   }
   if(ready&&account&&!active&&trial?.state==="active"&&account.role===trial.role){
@@ -856,7 +888,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     </aside> : null}
     {ready&&active&&v2&&account?.expiresAt?<AccountLeaseCountdown expiresAt={account.expiresAt} role={account.role}/>:null}
     {managerDashboard && account?.storageDeviceId ? <div key={account.accountId}>
-      <ManagerWorkspace deviceId={account.storageDeviceId} getProof={getManagerProof}
+      <ManagerWorkspace deviceId={account.storageDeviceId} accountId={account.accountId}
+        initialBoard={managerPreload?.accountId===account.accountId?managerPreload.board:undefined}
+        initialWindow={managerPreload?.accountId===account.accountId?managerPreload.range:undefined}
+        getProof={getManagerProof}
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
         accountName={account.name||"Cán bộ quản lý"}/>
     </div> : null}
