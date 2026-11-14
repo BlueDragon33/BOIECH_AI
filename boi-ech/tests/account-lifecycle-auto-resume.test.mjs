@@ -32,7 +32,9 @@ test("only server-verified status + trusted device + active onboarding + entitle
 
 test("active account mounts from server readback without forced document reload",()=>{
  assert.match(gateSource,/await preparePortableAccount\(data\.account\?\.accountId \?\? null, claim\)/);
- assert.match(gateSource,/ready && active && account \? <div key=\{account\.accountId\}>\{children\}<\/div>/);
+ assert.match(gateSource,/!managerDashboard && ready && active && account \? <div key=\{account.accountId\}>/);
+ assert.match(gateSource,/AccountWorkspaceProvider workspace=\{roleBootstrap\}/);
+ assert.match(gateSource,/roleBootstrap\?\.accountId===account.accountId/);
  assert.match(gateSource,/accountTransitionNeedsReload\(current\.current,data\.account\?\.accountId \?\? ""\)/);
  assert.doesNotMatch(gateSource,/activationNeedsDocumentBootstrap/);
  assert.doesNotMatch(gateSource,/shouldAutoResumeDocument/);
@@ -44,11 +46,15 @@ test("one-time recovery code remains visible without auto-reload on activation",
  assert.equal(recoveryMustRemainVisible(true,"single-use-token"),true);
  assert.equal(recoveryMustRemainVisible(false,"single-use-token"),false);
  assert.equal(recoveryMustRemainVisible(true,""),false);
- assert.match(gateSource,/ready && active && account \? <div key=\{account\.accountId\}>\{children\}<\/div>/);
+ assert.match(gateSource,/!managerDashboard && ready && active && account \? <div key=\{account.accountId\}>/);
+ assert.match(gateSource,/AccountWorkspaceProvider workspace=\{roleBootstrap\}/);
+ assert.match(gateSource,/roleBootstrap\?\.accountId===account.accountId/);
  assert.doesNotMatch(gateSource,/ready && active && !recovery && account \?/);
  assert.match(gateSource,/recoveryMustRemainVisible\(active,recovery\)/);
  assert.doesNotMatch(gateSource,/activationNeedsDocumentBootstrap/);
- assert.match(gateSource,/ready && active && account \? <div key=\{account\.accountId\}>\{children\}<\/div>/);
+ assert.match(gateSource,/!managerDashboard && ready && active && account \? <div key=\{account.accountId\}>/);
+ assert.match(gateSource,/AccountWorkspaceProvider workspace=\{roleBootstrap\}/);
+ assert.match(gateSource,/roleBootstrap\?\.accountId===account.accountId/);
  assert.match(gateSource,/Mã này chỉ hiển thị một lần/);
  assert.match(css,/\.activeRecovery\{/);
  assert.match(css,/@media\(max-width:600px\)/);

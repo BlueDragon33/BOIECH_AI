@@ -14,6 +14,7 @@ import { isUnlimitedAccountExpiry } from "./account-term";
 import { accountServerActive, recoveryMustRemainVisible } from "./account-lifecycle-client";
 import AccountVerificationShowcase from "./account-verification-showcase";
 import ConditionalSyncAgent from "./conditional-sync-agent";
+import {AccountWorkspaceProvider,loadAccountWorkspace,type AccountWorkspaceBootstrap,type AccountWorkspaceDevice} from "./account-workspace-bootstrap";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
@@ -192,6 +193,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [observedNow,setObservedNow] = useState(0);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [enteredAccountId, setEnteredAccountId] = useState("");
+  const [authSubmitting,setAuthSubmitting]=useState(false);
+  const [roleDeviceVerified,setRoleDeviceVerified]=useState<{accountId:string;device:AccountWorkspaceDevice}|null>(null);
+  const [roleBootstrap,setRoleBootstrap]=useState<AccountWorkspaceBootstrap|null>(null);
+  const [roleBootstrapError,setRoleBootstrapError]=useState("");
+  const [roleBootstrapAttempt,setRoleBootstrapAttempt]=useState(0);
   const [managerPreload,setManagerPreload]=useState<{accountId:string;board:TrainingBoard;range:TrainingWindow}|null>(null);
   const [managerPreloadError,setManagerPreloadError]=useState("");
   const [managerPreloadAttempt,setManagerPreloadAttempt]=useState(0);
@@ -419,6 +425,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     if (field) field.value = "";
     const answerInput=form.elements.namedItem("securityAnswer") as HTMLInputElement|null;
     if(answerInput) answerInput.value="";
+    // Present real CHECKING immediately after a valid form submission,
+    // instead of leaving the old card stuck at "Đang xử lý…".
+    const showGate=mode==="login"||mode==="claim"||mode==="register";
+    if(showGate)setAuthSubmitting(true);
+    try {
     await run(async () => {
       if(mode==="recover"&&v2&&recoveryMethod==="question"){
         const login=String(fields.login||"").trim().toLowerCase();
@@ -464,6 +475,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       if (mode === "recover") { setMode("login"); setNotice("Đã đổi mật khẩu và thu hồi các phiên cũ. Hãy lưu mã khôi phục mới."); }
       await reload(mode === "claim"); broadcast();
     });
+    } finally { if(showGate)setAuthSubmitting(false); }
   }
   async function compareContact(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
@@ -477,9 +489,39 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const managerStorageId=account?.storageDeviceId??"";
   const getManagerProof=useCallback((signal?:AbortSignal)=>{
     signal?.throwIfAborted();
-    return portableManagerProof(managerStorageId);
+    return portableManagerProof(managerStorageId,signal);
   },[managerStorageId]);
   const active = accountServerActive(account, v2, observedNow);
+  const roleNeedsBootstrap = Boolean(enabled && !bypass && ready && active && v2 &&
+    (account?.role==="learner" || account?.role==="teacher") &&
+    account.storageDeviceId && pathname==="/" && enteredAccountId!==account.accountId);
+  useEffect(()=>{
+    if(!roleNeedsBootstrap || !account?.storageDeviceId || !account.accountId
+      || (account.role!=="learner"&&account.role!=="teacher")) return;
+    const accountId=account.accountId;
+    const controller=new AbortController();
+    let disposed=false, timedOut=false;
+    // All three milestones are real: GET session -> authorized device ->
+    // course/teacher readback + role bundle loaded. No fake completion timer.
+    queueMicrotask(()=>{
+      if(!controller.signal.aborted){setRoleDeviceVerified(null);setRoleBootstrap(null);setRoleBootstrapError("");}
+    });
+    const timeout=window.setTimeout(()=>{
+      timedOut=true;
+      controller.abort(new Error("Quá thời gian xác thực dữ liệu học tập (20 giây). Chọn Thử lại, không xóa dữ liệu trình duyệt."));
+    },20000);
+    void loadAccountWorkspace(accountId,account.storageDeviceId,account.role,controller.signal,device=>{
+      if(!controller.signal.aborted)setRoleDeviceVerified({accountId,device});
+    }).then(result=>{
+      if(!controller.signal.aborted)setRoleBootstrap(result);
+    }).catch(cause=>{
+      if(!disposed && (!controller.signal.aborted || timedOut))
+        setRoleBootstrapError(timedOut
+          ? "Máy chủ chưa hoàn tất xác thực dữ liệu sau 20 giây. Chọn Thử lại; không xóa khóa hoặc dữ liệu thiết bị."
+          : cause instanceof Error?cause.message:"Không thể xác minh không gian học tập.");
+    }).finally(()=>window.clearTimeout(timeout));
+    return()=>{disposed=true;window.clearTimeout(timeout);controller.abort();};
+  },[roleNeedsBootstrap,account?.accountId,account?.storageDeviceId,account?.role,roleBootstrapAttempt]);
   const managerNeedsBootstrap = Boolean(enabled && !bypass && ready && active && v2 &&
     account?.role==="manager" && account.storageDeviceId && pathname==="/" &&
     enteredAccountId!==account.accountId);
@@ -847,24 +889,32 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     </section>;
   // The legacy loading login card is replaced by the full-screen verification
   // ceremony. An error never advances to READY/GO without server approval.
+  if (authSubmitting && !active) return <AccountVerificationShowcase phase="checking"
+    checks={[false,false,false]} error="" busy={busy}
+    onRetry={() => setAuthSubmitting(false)} onGo={() => undefined}/>;
   if (!ready) return <AccountVerificationShowcase phase="checking" checks={[false,false,false]} error={error} busy={busy}
     onRetry={() => void run(() => reload())} onGo={() => undefined}/>;
   // Presentation follows REAL server evidence. Managers also need their full
   // first training-board read before the final step can finish.
   if (active && account && enteredAccountId !== account.accountId) {
-    const boardVerified= !managerNeedsBootstrap ||
+    const managerVerified=!managerNeedsBootstrap ||
       Boolean(managerPreload?.accountId===account.accountId && managerPreload.board);
-    return <AccountVerificationShowcase phase="verified" checks={[ready,active,boardVerified]}
+    const deviceVerified=!roleNeedsBootstrap || roleDeviceVerified?.accountId===account.accountId;
+    const workspaceVerified=managerVerified&&(!roleNeedsBootstrap||roleBootstrap?.accountId===account.accountId);
+    return <AccountVerificationShowcase phase="verified"
+      checks={[ready,active && deviceVerified,workspaceVerified]}
       accountName={account.name}
       role={account.role==="manager"?"Cán bộ quản lý":account.role==="teacher"?"Giảng viên":"Học viên"}
-      error={managerPreloadError||error} busy={busy}
+      error={roleBootstrapError||managerPreloadError||error} busy={busy}
       onRetry={() => {
-        if(managerPreloadError){setManagerPreloadError("");setManagerPreloadAttempt(value=>value+1);}
+        if(roleBootstrapError){setRoleBootstrapError("");setRoleBootstrapAttempt(value=>value+1);}
+        else if(managerPreloadError){setManagerPreloadError("");setManagerPreloadAttempt(value=>value+1);}
         else void run(()=>reload());
       }}
       onGo={() => {
-        if (accountServerActive(account, v2, Date.now()) && boardVerified) setEnteredAccountId(account.accountId);
-        else { setError("Quyền truy cập hoặc dữ liệu điều phối đã thay đổi. Hãy xác thực lại."); void reload().catch(() => undefined); }
+        if (accountServerActive(account, v2, Date.now()) && workspaceVerified && deviceVerified)
+          setEnteredAccountId(account.accountId);
+        else { setError("Quyền truy cập hoặc dữ liệu khởi tạo đã thay đổi. Hãy xác thực lại."); void reload().catch(()=>undefined); }
       }}/>;
   }
   if(ready&&account&&!active&&trial?.state==="active"&&account.role===trial.role){
@@ -895,7 +945,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         onOpenAccount={()=>setProfileOpen(true)} onLogout={()=>void logoutAccount()}
         accountName={account.name||"Cán bộ quản lý"}/>
     </div> : null}
-    {!managerDashboard && ready && active && account ? <div key={account.accountId}>{children}</div> : null}
+    {!managerDashboard && ready && active && account ? <div key={account.accountId}>
+      {pathname==="/" && v2 && (account.role==="learner"||account.role==="teacher") ?
+        roleBootstrap?.accountId===account.accountId ?
+          <AccountWorkspaceProvider workspace={roleBootstrap}>{children}</AccountWorkspaceProvider> : null
+        : children}
+    </div> : null}
     {!managerDashboard && ready && active && pathname!=="/" && account?
       <button type="button" className={styles.accountCornerButton} onClick={()=>setProfileOpen(true)}
         aria-label="Mở Trang cá nhân và bảo mật">Trang cá nhân</button>:null}

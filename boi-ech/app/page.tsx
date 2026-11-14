@@ -6,6 +6,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { parseLocalQuizBackup } from "./progress-backup";
+import {useAccountWorkspace} from "./account-workspace-bootstrap";
 import ManagerWorkspace from "./manager-workspace";
 import ManagerRenderBoundary from "./manager-render-boundary";
 import { RegistrationRoles } from "./registration-roles";
@@ -1004,12 +1005,19 @@ function FoundationLesson({
 }
 
 export default function Home() {
+  const accountWorkspace=useAccountWorkspace();
   const [section, setSection] = useState<SectionId>("tong-quan");
   const [selectedLesson, setSelectedLesson] = useState("01");
   const [phase, setPhase] = useState(0);
   const [question, setQuestion] = useState(0);
-  const [progress, setProgress] = useState<ProgressState>(initialProgress);
-  const [ready, setReady] = useState(false);
+  const [progress, setProgress] = useState<ProgressState>(()=>accountWorkspace?.course ? {
+    ...initialProgress,
+    completed:accountWorkspace.course.state.completed,
+    submitted:accountWorkspace.course.state.scores["03"]!==undefined,
+    lessonSubmitted:Object.keys(accountWorkspace.course.state.scores).filter(n=>n!=="03"),
+  }:initialProgress);
+  const [ready, setReady] = useState(Boolean(accountWorkspace));
+  const [localProgressReady,setLocalProgressReady]=useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [notice, setNotice] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -1017,25 +1025,28 @@ export default function Home() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [appearanceReady, setAppearanceReady] = useState(false);
   const [appearance, setAppearance] = useState<AppearanceSettings>(defaultAppearance);
-  const [deviceCredential, setDeviceCredential] = useState<StoredDeviceCredential | null>(null);
-  const [deviceAccess, setDeviceAccess] = useState<DeviceAccessState | null>(null);
+  const [deviceCredential, setDeviceCredential] = useState<StoredDeviceCredential | null>(()=>accountWorkspace?.credential??null);
+  const [deviceAccess, setDeviceAccess] = useState<DeviceAccessState | null>(()=>accountWorkspace?.device??null);
   const [deviceError, setDeviceError] = useState("");
-  const [deviceChecking, setDeviceChecking] = useState(true);
-  const [lessonContent, setLessonContent] = useState<LessonContentPayload | null>(null);
-  const [serverScores, setServerScores] = useState<Record<string, number>>({});
-  const [lessons, setLessons] = useState<LessonOutline[]>(defaultLessonOutlines);
+  const [deviceChecking, setDeviceChecking] = useState(!accountWorkspace);
+  const [lessonContent, setLessonContent] = useState<LessonContentPayload | null>(()=>accountWorkspace?.course?.content??null);
+  const [serverScores, setServerScores] = useState<Record<string, number>>(()=>accountWorkspace?.course?.state.scores??{});
+  const [lessons, setLessons] = useState<LessonOutline[]>(()=>accountWorkspace?.course?.outlines??defaultLessonOutlines);
   const [networkOnline, setNetworkOnline] = useState(true);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [usingOfflineLesson, setUsingOfflineLesson] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
-  const [hasEnteredLearning, setHasEnteredLearning] = useState(false);
+  // In Account-first mode GO already requires a real approved device and
+  // verified role payload. Never re-enter the old, redundant DeviceGate.
+  const [hasEnteredLearning, setHasEnteredLearning] = useState(Boolean(accountWorkspace));
   const [localContent, setLocalContent] = useState<LocalContentRecord | null>(null);
   const [localStudioOpen, setLocalStudioOpen] = useState(false);
   const [studyStats, setStudyStats] = useState<OfflineStudyStats>(emptyStudyStats);
   const [certificate, setCertificate] = useState<CourseCertificate | null>(null);
   const [certificateBusy, setCertificateBusy] = useState(false);
   const actionQueue = useRef<Promise<void>>(Promise.resolve());
-  const hasBootstrapped = useRef(false);
+  const hasBootstrapped = useRef(Boolean(accountWorkspace?.course));
+  const skipPreloadedCourseRead=useRef(Boolean(accountWorkspace?.course));
   const syncRunning = useRef(false);
   const lastInteractionAt = useRef(0);
   const certificateAttempted = useRef(false);
@@ -1205,26 +1216,34 @@ export default function Home() {
     let cancelled = false;
     const progressTask = readProgress()
       .then((saved) => {
-        if (cancelled) return;
-        if (!saved) return;
+        if (cancelled || !saved) return;
         const merged: ProgressState = {
           ...initialProgress,
           ...saved,
-          completed: normalizeCompletedProgress(saved.completed),
+          completed:accountWorkspace?.course
+            ? accountWorkspace.course.state.completed
+            : normalizeCompletedProgress(saved.completed),
           answers: saved.answers ?? {},
           lessonAnswers: saved.lessonAnswers ?? {},
           lessonFlags: saved.lessonFlags ?? {},
           lessonChecked: saved.lessonChecked ?? {},
-          lessonSubmitted: Array.isArray(saved.lessonSubmitted) ? saved.lessonSubmitted : [],
+          lessonSubmitted:accountWorkspace?.course
+            ? Object.keys(accountWorkspace.course.state.scores).filter(n=>n!=="03")
+            : Array.isArray(saved.lessonSubmitted) ? saved.lessonSubmitted : [],
           flags: Array.isArray(saved.flags) ? saved.flags : [],
           checked: Array.isArray(saved.checked) ? saved.checked : [],
-          submitted: Boolean(saved.submitted),
+          submitted:accountWorkspace?.course
+            ? accountWorkspace.course.state.scores["03"]!==undefined
+            : Boolean(saved.submitted),
         };
         setProgress(merged);
       })
-      .catch(() => { if (!cancelled) setNotice("Trình duyệt chưa cho phép lưu tiến độ."); });
+      .catch(() => { if (!cancelled) setNotice("Trình duyệt chưa cho phép đọc tiến độ đã lưu."); })
+      .finally(()=>{if(!cancelled)setLocalProgressReady(true);});
 
-    const deviceTask = getOrCreateDeviceCredential()
+    // AccountGate has already read the real device and role workspace before
+    // GO. Do not issue a second registration request or render legacy auth.
+    const deviceTask = accountWorkspace ? Promise.resolve() : getOrCreateDeviceCredential()
       .then(async (credential) => {
         if (cancelled) return;
         setDeviceCredential(credential);
@@ -1241,7 +1260,7 @@ export default function Home() {
 
     Promise.allSettled([progressTask, deviceTask]).then(() => { if (!cancelled) setReady(true); });
     return () => { cancelled = true; };
-  }, []);
+  }, [accountWorkspace]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1353,6 +1372,12 @@ export default function Home() {
 
   useEffect(() => {
     if (deviceAccess?.personRole === "manager" || !ready || !hasEnteredLearning || !deviceCredential || deviceAccess?.status !== "approved") return;
+    // The bootstrap was already fetched and validated while CHECKING was
+    // displayed. Avoid a duplicate first fetch and a second visible loader.
+    if(skipPreloadedCourseRead.current && selectedLesson==="01"){
+      skipPreloadedCourseRead.current=false;
+      return;
+    }
     let cancelled = false;
     postCourse(deviceCredential, deviceAccess, {
       action: "bootstrap",
@@ -1565,12 +1590,14 @@ export default function Home() {
   }, [appearanceOpen]);
 
   useEffect(() => {
-    if (!ready) return;
+    // A preloaded page is visible immediately after GO, but never overwrites
+    // slow IndexedDB state before its first local read has finished.
+    if (!ready || !localProgressReady) return;
     const timer = window.setTimeout(() => {
       writeProgress(progress).catch(() => setNotice("Chưa thể lưu thay đổi mới."));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [progress, ready]);
+  }, [progress, ready, localProgressReady]);
 
   useEffect(() => {
     if (!motionPlaying || animatedPhaseCount === 0) return;

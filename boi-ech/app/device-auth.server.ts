@@ -627,7 +627,11 @@ export async function verifyDeviceRequest(payload: Record<string, unknown>, skip
   const database = await getCourseDatabase();
   const row = await database.prepare("SELECT access_expires_at FROM device_access WHERE device_id = ?")
     .bind(device.deviceId).first<{ access_expires_at: string | null }>();
-  if (row?.access_expires_at && Date.parse(row.access_expires_at) <= Date.now()) {
+  const v2Account = Boolean(device.accountId &&
+    (await (await import("./account-runtime.server")).accountConfiguration()).v2);
+  // authorize(token) above has already asserted current V2 entitlement and
+  // approved account/device. Never apply the retired legacy expiry as a second gate.
+  if (!v2Account && row?.access_expires_at && Date.parse(row.access_expires_at) <= Date.now()) {
     throw new DeviceAccessError("Quyền truy cập của thiết bị đã hết hạn.", 403, "DEVICE_ACCESS_EXPIRED", device);
   }
   return device;

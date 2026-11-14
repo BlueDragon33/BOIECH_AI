@@ -42,3 +42,27 @@
 @media(max-width:930px){.ring[data-mode="ready"] .orbitWord{font-size:18px}.ring[data-mode="go"] .orbitWord{font-size:33px}.ring[data-mode="checking"] .orbitWord{font-size:9px;letter-spacing:0}}
 @media(max-width:550px){.ring[data-mode="ready"] .orbitWord{font-size:13px}.ring[data-mode="go"] .orbitWord{font-size:25px}.ring[data-mode="checking"] .orbitWord{font-size:7px}}
 @media(prefers-reduced-motion:reduce){.ring,.ring::before,.ring::after,.orbitWord{animation:none!important;transition:none!important}}
+
+/* Genuine active-work outer gear and independently moving inner tracking rings. */
+.gear{position:absolute;inset:-12px;z-index:1;border-radius:50%;
+  background:repeating-conic-gradient(from 0deg,#69fff5 0deg 5deg,#0699ad 5deg 8deg,transparent 8deg 12deg);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 15px),#000 calc(100% - 14px));
+  mask:radial-gradient(farthest-side,transparent calc(100% - 15px),#000 calc(100% - 14px));
+  filter:drop-shadow(0 0 8px #35fff7);pointer-events:none;
+}
+.tinyOrbit,.innerOrbit{position:absolute;border-radius:50%;pointer-events:none;z-index:1}
+.tinyOrbit{inset:10%;border:1px dashed #50f9e6c9;box-shadow:0 0 13px #00d9cf2c}
+.innerOrbit{inset:22%;border:2px dotted #68eaffaa;box-shadow:inset 0 0 17px #4af4eb3d}
+.tinyOrbit::after,.innerOrbit::after{content:"";position:absolute;top:-4px;left:50%;width:8px;height:8px;
+  border-radius:50%;background:#b9ffff;box-shadow:0 0 14px 5px #34e8e9a1}
+.innerOrbit::after{width:6px;height:6px;top:-3px;box-shadow:0 0 11px 3px #39e4ff9e}
+.ring[data-mode="checking"] .gear{animation:boiOrbitForward 3.3s linear infinite}
+.ring[data-mode="checking"] .tinyOrbit{animation:boiOrbitReverse 5.1s linear infinite}
+.ring[data-mode="checking"] .innerOrbit{animation:boiOrbitForward 2.8s linear infinite}
+.ring[data-mode="ready"] .gear{animation:boiOrbitForward 5.5s linear infinite}
+.ring[data-mode="ready"] .tinyOrbit{animation:boiOrbitReverse 7s linear infinite}
+.ring[data-mode="ready"] .innerOrbit{animation:boiReadyPulse .7s ease-in-out infinite alternate}
+.ring[data-mode="go"] .gear,.ring[data-mode="go"] .tinyOrbit,.ring[data-mode="go"] .innerOrbit{
+ animation:boiGoFlash 1s ease-out both}
+@media(max-width:930px){.gear{inset:-6px}.tinyOrbit::after{width:5px;height:5px}}
+@media(prefers-reduced-motion:reduce){.gear,.tinyOrbit,.innerOrbit{animation:none!important}}
