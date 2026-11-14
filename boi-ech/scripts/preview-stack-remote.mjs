@@ -50,7 +50,12 @@ export async function checkPreviewStack(env = process.env, fetcher = fetch, depl
     if (!app.some(b => b.name === name && b.type === "secret_text")) throw new Error(`Existing App Preview protection ${name} must be retained.`);
   }
   if (deployed) {
-    if (variable(boi,"BOI_ECH_BUILD_REVISION") !== env.GITHUB_SHA || variable(app,"APPLICATION_MANAGEMENT_BUILD_REVISION") !== env.APPLICATION_MANAGEMENT_BUILD_REVISION) throw new Error("Live Preview build revision mismatch.");
+    if (variable(boi,"BOI_ECH_BUILD_REVISION") !== env.GITHUB_SHA) {
+      throw new Error("Live Preview build revision mismatch (Bơi Ếch Worker).");
+    }
+    if (variable(app,"APPLICATION_MANAGEMENT_BUILD_REVISION") !== env.APPLICATION_MANAGEMENT_BUILD_REVISION) {
+      throw new Error("Live Preview build revision mismatch (Application-Management Worker).");
+    }
     if (variable(boi,"BOI_ECH_DEPLOYMENT_CHANNEL") !== "cloudflare-preview" || variable(app,"APPLICATION_MANAGEMENT_DEPLOYMENT_CHANNEL") !== "cloudflare-preview") throw new Error("Live Preview channel mismatch.");
     if (!env.CONTROL_OWNER_EMAILS || /@example\.(?:com|test|invalid)\b/i.test(env.CONTROL_OWNER_EMAILS) || variable(app,"CONTROL_OWNER_EMAILS") !== env.CONTROL_OWNER_EMAILS) throw new Error("Live App Preview Owner policy mismatch or example identity.");
     if (boi.some(b => b.type === "r2_bucket")) throw new Error("FREE Preview must not introduce R2.");
