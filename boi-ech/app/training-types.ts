@@ -9,7 +9,10 @@ export type TrainingClassLeader = {
  updatedAt:string;
 };
 export type TrainingPeriod = {number:number;startTime:string;endTime:string;timezone:string;version:number};
-export type TrainingBoard = { leaders:TrainingClassLeader[];periods:TrainingPeriod[];resources:TrainingResource[]; people:TrainingPerson[]; sessions:TrainingSession[]; from:string; to:string; observedAt:string; summary:{ freeRooms:number; occupiedRooms:number; missingLearners:number; missingTeachers:number; unassignedLearners:number; unassignedTeachers:number } };
+export type TrainingLeaderHistory = {id:string;classId:string;slot:"cadre"|"student";previousVersion:number;previousSource:string;
+ previousMemberDeviceId:string|null;previousDisplayName:string|null;previousBirthDate:string|null;
+ previousMilitaryRank:string|null;previousBattalion:string|null;replacedAt:string};
+export type TrainingBoard = { leaderHistory:TrainingLeaderHistory[];leaders:TrainingClassLeader[];periods:TrainingPeriod[];resources:TrainingResource[]; people:TrainingPerson[]; sessions:TrainingSession[]; from:string; to:string; observedAt:string; summary:{ freeRooms:number; occupiedRooms:number; missingLearners:number; missingTeachers:number; unassignedLearners:number; unassignedTeachers:number } };
 export function classNames(value:string) { return value.split(/[;,\n]+/).map(s=>s.trim()).filter(Boolean); }
 // Match SQLite's built-in lower() exactly; manager assignments write canonical names.
 export function classKey(value:string) { return value.trim().replace(/[A-Z]/g,c=>c.toLowerCase()); }
