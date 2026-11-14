@@ -55,6 +55,7 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
   if(busy)return;
   setBusy(true);setError("");setNotice("");
   try{const result=await flushVerifiedSync(accountId);await refresh();
+   window.dispatchEvent(new CustomEvent("boi:sync:completed",{detail:{accountId}}));
    setNotice(`Máy chủ đã xác nhận ${result.sent} bản cập nhật; còn ${result.remaining} chờ, ${result.conflicts} xung đột.`);
    if(result.error)setError(result.error);}
   catch(e){setError(e instanceof Error?e.message:"Không gửi được đồng bộ.");}
@@ -70,7 +71,7 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
   finally{setBusy(false);}
  }
  return <details style={{marginBlock:"1rem"}}><summary><strong>Đồng bộ có xác nhận</strong> · Chưa gửi: {pending} · Xung đột: {conflicts}</summary>
-  <p>Đồng bộ có điều kiện: chỉ gửi khi có dữ liệu chờ, nhận thông báo thay đổi, kết nối mạng lại hoặc người dùng chọn đồng bộ. Không hỏi máy chủ theo timer. Video, mật khẩu, hồ sơ cá nhân không được sao chép tự động.</p>
+  <p>Khi có dữ liệu chờ, hệ thống chỉ hiển thị số trên nút Đồng bộ. Chỉ khi bạn bấm nút mới gửi dữ liệu lên máy chủ. Không tự đồng bộ khi có sự kiện, quay lại trang hoặc kết nối lại. Video, mật khẩu và hồ sơ cá nhân không được sao chép tự động.</p>
   {error?<p role="alert">{error}</p>:null}{notice?<p role="status">{notice}</p>:null}
   {(["learning-progress","study-preferences"] as const).map(scope=>{
     const enabled=grants.some(g=>g.scope===scope&&g.enabled===1);
@@ -81,7 +82,10 @@ export default function VerifiedSyncSettings({accountId}:{accountId:string}){
       <button type="submit" disabled={busy}>{enabled?"Tắt đồng bộ":"Xác nhận bật đồng bộ"}</button>
     </form>;
   })}
-  <button type="button" disabled={busy||pending===0} onClick={()=>void flush()}>Đồng bộ ngay dữ liệu đang chờ</button>
+  <button type="button" className="boi-manual-sync-control" disabled={busy||pending===0} onClick={()=>void flush()} aria-label={pending>0?`Đồng bộ thủ công ${pending} sự kiện chờ`:"Không có sự kiện cần đồng bộ"}>
+    ↻ Đồng bộ ngay
+    {pending>0?<span className="boi-manual-sync-badge" aria-hidden="true">{pending>99?"99+":pending}</span>:null}
+  </button>
   <button type="button" disabled={busy||!grants.some(g=>g.scope==="learning-progress"&&g.enabled===1)}
    onClick={()=>void inspectCanonical()}>Đối chiếu tiến độ học gốc trên máy chủ</button>
   {canonical?<section aria-label="Tiến độ học đã xác minh" role="status">
