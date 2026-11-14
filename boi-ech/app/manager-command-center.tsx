@@ -4,6 +4,7 @@ import {classKey,classNames,type ResourceKind,type TrainingBoard,type TrainingPe
 import {AppIcon,Badge,ResourceStatusBars,eligible,roomOccupancy,stateText} from "./manager-status";
 import type {DetailTarget} from "./manager-details";
 import styles from "./manager-command-center.module.css";
+import {CampusBuildingArt} from "./manager-campus-illustration";
 
 type Destination="schedule"|"people"|"class"|"room"|"building"|"settings"|"review";
 type Props={
@@ -208,7 +209,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
         const activeCount=related.filter(room=>room.status==="active").length;
         return <button type="button" className={styles.buildingNode} data-selected={false} data-index={index%6}
           key={building.id} onClick={()=>selectBuilding(building.id)} aria-label={`Mở tòa ${building.name}`}>
-          <span className={styles.buildingIllustration} aria-hidden="true"><AppIcon name="building"/></span>
+          <span className={styles.buildingIllustration} aria-hidden="true"><CampusBuildingArt variant={index}/></span>
           <strong>{building.name}</strong><small>{activeCount}/{related.length} phòng hoạt động</small>
           <span className={styles.nodeState} data-status={building.status}>{building.status==="active"?"● Đang hoạt động":building.status==="unavailable"?"● Tạm ngừng":"● Đã lưu trữ"}</span>
         </button>;
