@@ -5,16 +5,18 @@ import ts from "typescript";
 
 const read=(name)=>readFileSync(new URL("../app/"+name,import.meta.url),"utf8");
 const route=read("api/device/route.ts");
-const identity=read("device-authorized-readback.ts");
 const workspace=read("account-workspace-bootstrap.tsx");
 const runtime=read("account-runtime.server.ts");
 const core=read("device-auth.server.ts");
-const transpiled=ts.transpileModule(identity,{compilerOptions:{
+// Exercise the ACTUAL production route helper rather than a copied test helper.
+const parsed=ts.createSourceFile("api/device/route.ts",route,ts.ScriptTarget.ES2022,true,ts.ScriptKind.TS);
+const declaration=parsed.statements.find(node=>ts.isFunctionDeclaration(node)
+  &&node.name?.text==="preserveAccountDeviceReadback");
+assert.ok(declaration,"registered route must contain the readback identity fix");
+const transpiled=ts.transpileModule(declaration.getText(parsed),{compilerOptions:{
   target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,
 }}).outputText;
-const compiledModule={exports:{}};
-new Function("module","exports",transpiled)(compiledModule,compiledModule.exports);
-const {preserveAccountDeviceReadback}=compiledModule.exports;
+const preserveAccountDeviceReadback=new Function(transpiled+"\nreturn preserveAccountDeviceReadback;")();
 
 const id="a".repeat(64), accountId="acc_"+"b".repeat(64);
 const server={
@@ -64,7 +66,7 @@ test("missing D1 readback returns existing server-validated identity without inv
  assert.strictEqual(preserveAccountDeviceReadback(server,null),server);
 });
 test("both /api/device register and presence preserve authorized data after fresh D1 read",()=>{
- assert.match(route,/import \{ preserveAccountDeviceReadback \}/);
+ assert.match(route,/function preserveAccountDeviceReadback\(/);
  assert.equal((route.match(/device = preserveAccountDeviceReadback\(device, await getPublicDeviceState\(device.deviceId\)/g)||[]).length,2);
  assert.doesNotMatch(route,/device = \(await getPublicDeviceState\(device.deviceId\).catch/);
  assert.match(route,/let device = await registerDevice\(/);
