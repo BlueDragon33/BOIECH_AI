@@ -299,6 +299,7 @@ export default function PhaseCycleAnalyzer() {
       run.check();
       const sampleCount = Math.max(5, Math.min(150, Math.ceil(video.duration * SAMPLE_FPS)));
       const frames: PhaseFrame[] = [];
+      let previousProgressBucket = -1;
       let previousKneeFlexion: number | null = null;
       for (let index = 0; index < sampleCount; index += 1) {
         const time = Math.min(video.duration - 0.01, index / SAMPLE_FPS);
@@ -310,7 +311,13 @@ export default function PhaseCycleAnalyzer() {
           frames.push(metric);
           previousKneeFlexion = metric.kneeFlexion;
         }
-        setProgress(Math.round((index + 1) / sampleCount * 100));
+        // Progress is visual only; batch React updates without skipping any pose frame.
+        const pct = Math.round((index + 1) / sampleCount * 100);
+        const bucket = Math.floor(pct / 5);
+        if (bucket !== previousProgressBucket || index === sampleCount - 1) {
+          previousProgressBucket = bucket;
+          setProgress(pct);
+        }
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
         run.check();
       }

@@ -3,16 +3,20 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const enhancements = fs.readFileSync(new URL("../app/learner-enhancements.tsx", import.meta.url), "utf8");
 const inbox = fs.readFileSync(new URL("../app/student-teacher-inbox.tsx", import.meta.url), "utf8");
 const adaptive = fs.readFileSync(new URL("../app/student-adaptive-coach.tsx", import.meta.url), "utf8");
 const inboxRoute = fs.readFileSync(new URL("../app/api/course/teacher-actions/route.ts", import.meta.url), "utf8");
 const replyRoute = fs.readFileSync(new URL("../app/api/course/teacher-actions/reply/route.ts", import.meta.url), "utf8");
 const statusRoute = fs.readFileSync(new URL("../app/api/course/teacher-actions/status/route.ts", import.meta.url), "utf8");
 
-test("learner experience surfaces remain mounted", () => {
-  assert.ok(layout.includes("<StudentRoleShell />"));
-  assert.ok(layout.includes("<StudentTeacherInbox />"));
-  assert.ok(layout.includes("<StudentAdaptiveCoach />"));
+test("learner experience surfaces mount only in the authenticated learner bundle", () => {
+  assert.ok(page.includes('deviceAccess.personRole === "learner" ? <LearnerEnhancements />'));
+  for (const name of ["StudentRoleShell", "StudentTeacherInbox", "StudentAdaptiveCoach"]) {
+    assert.ok(enhancements.includes("<" + name + " />"), name);
+    assert.ok(!layout.includes("<" + name + " />"), name + " must not run in root");
+  }
 });
 
 test("learner signed clients require real keys and canonical device ids", () => {

@@ -8,7 +8,7 @@ import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialo
 import VerifiedSyncSettings from "./verified-sync-settings";
 import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
-import { accountServerActive, shouldAutoResumeDocument, recoveryMustRemainVisible, type ObservedLifecycle } from "./account-lifecycle-client";
+import { accountServerActive, recoveryMustRemainVisible } from "./account-lifecycle-client";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
@@ -166,8 +166,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const lastUserEngagementAt=useRef(0);
   const lastLeaseRenewalAttemptAt=useRef(0);
   const readbackGeneration=useRef(0);
-  const observedLifecycle=useRef<ObservedLifecycle|null>(null);
-  const activationNeedsDocumentBootstrap=useRef<string|null>(null);
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const readbackId=++readbackGeneration.current;
@@ -194,13 +192,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     await preparePortableAccount(data.account?.accountId ?? null, claim);
     if (!mounted.current || readbackId !== readbackGeneration.current) return;
     current.current = data.account?.accountId ?? "";
-    const nextLifecycle: ObservedLifecycle = {
-      accountId: data.account?.accountId ?? "",
-      active: accountServerActive(data.account, data.accountV2 === true, Date.now()),
-    };
-    if (shouldAutoResumeDocument(observedLifecycle.current, nextLifecycle))
-      activationNeedsDocumentBootstrap.current = nextLifecycle.accountId;
-    observedLifecycle.current = nextLifecycle;
     setObservedNow(Date.now()); setAccount(data.account ?? null);
     setDevices(data.devices ?? []); setReady(true);
   }, []);
@@ -429,14 +420,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     return portableManagerProof(managerStorageId);
   },[managerStorageId]);
   const active = accountServerActive(account, v2, observedNow);
-  useEffect(()=>{
-    if (!enabled || bypass || !ready || !active || !account?.accountId ||
-      activationNeedsDocumentBootstrap.current !== account.accountId || recovery) return;
-    // No one-time recovery secret is discarded by an automatic reload.
-    // The server has already confirmed account, device, onboarding and entitlement.
-    activationNeedsDocumentBootstrap.current = null;
-    window.location.reload();
-  },[enabled,bypass,ready,active,account?.accountId,recovery]);
   if (!enabled || bypass) return children;
   const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
     && account.storageDeviceId && pathname==="/");

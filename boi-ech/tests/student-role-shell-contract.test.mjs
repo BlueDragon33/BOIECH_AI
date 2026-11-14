@@ -4,6 +4,8 @@ import fs from "node:fs";
 
 const shell = fs.readFileSync(new URL("../app/student-role-shell.tsx", import.meta.url), "utf8");
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const page = fs.readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const enhancements = fs.readFileSync(new URL("../app/learner-enhancements.tsx", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../app/student-role-shell.css", import.meta.url), "utf8");
 
 test("learner dashboard activates only for the registered learner role", () => {
@@ -37,10 +39,15 @@ test("student role shell exposes learner capabilities without teacher or admin c
   assert.doesNotMatch(shell, /Xin quyền chỉnh sửa|Sửa bản riêng|Duyệt video|Quản trị|Giảng viên Pro/);
 });
 
-test("root layout mounts the role adapter once and keeps styling isolated", () => {
-  assert.match(layout, /import StudentRoleShell from "\.\/student-role-shell"/);
+test("learner DOM observer bundle lazy-mounts once only for active learner role", () => {
+  assert.match(page, /dynamic\(\(\) => import\("\.\/learner-enhancements"\)/);
+  assert.match(page, /deviceAccess\.personRole === "learner" \? <LearnerEnhancements \/>/);
+  assert.doesNotMatch(layout, /<StudentRoleShell \/>/);
+  assert.match(enhancements, /import StudentRoleShell from "\.\/student-role-shell"/);
+  assert.equal((enhancements.match(/<StudentRoleShell \/>/g) ?? []).length, 1);
+  assert.equal((enhancements.match(/<StudentTeacherInbox \/>/g) ?? []).length, 1);
+  assert.equal((enhancements.match(/<StudentAdaptiveCoach \/>/g) ?? []).length, 1);
   assert.match(layout, /import "\.\/student-role-shell\.css"/);
-  assert.equal((layout.match(/<StudentRoleShell \/>/g) ?? []).length, 1);
   assert.match(css, /data-student-section="overview"/);
   assert.match(css, /\.page-overview \{ display: none !important; \}/);
 });

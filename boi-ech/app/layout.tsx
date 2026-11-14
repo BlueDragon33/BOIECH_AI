@@ -33,14 +33,7 @@ import "./video-analysis-v37.css";
 import "./teacher-premium-v9-layout-clean.css";
 import "./role-readable-v9.css";
 import "./modal-contrast-v9.css";
-import StudentRoleShell from "./student-role-shell";
-import StudentTeacherInbox from "./student-teacher-inbox";
-import StudentAdaptiveCoach from "./student-adaptive-coach";
-import TeacherRoleShell from "./teacher-role-shell";
-import TeacherActionBridge from "./teacher-action-bridge";
 import MultiAccountSwitcher from "./multi-account-switcher";
-import TeacherDashboardBlueprint from "./teacher-dashboard-blueprint";
-import TeacherRosterManager from "./teacher-roster-manager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -88,14 +81,7 @@ export default async function RootLayout({
       >
         <AccountGate enabled={enabled}>
         {children}
-        <StudentRoleShell />
-        <StudentTeacherInbox />
-        <StudentAdaptiveCoach />
-        <TeacherRoleShell />
-        <TeacherActionBridge />
         <MultiAccountSwitcher />
-        <TeacherDashboardBlueprint />
-        <TeacherRosterManager />
         </AccountGate>
       </body>
     </html>

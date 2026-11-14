@@ -1,4 +1,7 @@
 const CACHE_NAME = "boi-ech-webapp-v4";
+// This worker owns only boi-ech-webapp-vN caches. Never delete separate
+// MediaPipe offline AI caches or caches belonging to other applications.
+const LEGACY_APP_SHELL_CACHE = /^boi-ech-webapp-v\d+$/;
 const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", "/icon-512.png", "/thanh-toan-mb.jpeg"];
 
 self.addEventListener("install", (event) => {
@@ -8,7 +11,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => LEGACY_APP_SHELL_CACHE.test(key) && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });

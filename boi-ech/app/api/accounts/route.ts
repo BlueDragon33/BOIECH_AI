@@ -1,4 +1,5 @@
 import { AccountError } from "../../account-core.server";
+import { classifyAccountClient } from "../../account-client-class";
 import { normalizeRegistrationContact } from "../../account-contact.server";
 import { accountRequest, accountErrorResponse, sessionCookie } from "../../account-runtime.server";
 import { createDeviceChallenge, verifyDeviceIdentityRequest, getCourseDatabase } from "../../device-auth.server";
@@ -81,6 +82,8 @@ export async function POST(request: Request) {
     if (!p || Array.isArray(p) || typeof p !== "object") throw new AccountError("ACCOUNT_INPUT", 400);
     // Peer identity is supplied by the trusted edge; never accept an arbitrary payload identity.
     const peer = request.headers.get("cf-connecting-ip") ?? "unavailable-edge-peer";
+    // Never trust the action payload to select device authorization policy.
+    const clientClass = classifyAccountClient(request.headers.get("user-agent"), request.headers.get("sec-ch-ua-mobile"));
     if (p.action === "legacy-challenge") return json(await createDeviceChallenge(p.deviceId, true));
     if(config.v2 && p.action==="security-recovery-challenge")
       return json(await new AccountSecurityQuestionService(await getCourseDatabase(),service).challenge(p.login,peer));
@@ -108,7 +111,7 @@ export async function POST(request: Request) {
       p.contactValue=contact.value;
     }
     if (p.action === "manager-register") {
-      const result=await service.registerManagerWithInvite(p,peer);
+      const result=await service.registerManagerWithInvite(p,peer,clientClass);
       const {token:session,...safe}=result;
       await service.rememberCurrentDeviceLabel(session,friendlyDeviceLabel(request.headers.get("user-agent")));
       return json({ok:true,...safe},sessionCookie(session));
@@ -120,7 +123,7 @@ export async function POST(request: Request) {
         const device = await verifyDeviceIdentityRequest(p, false, true);
         legacyId = device.deviceId;
       }
-      const result = p.action === "register" ? await service.register(p, peer) : p.action === "login" ? await service.login(p, peer) : await service.claim(p, legacyId, peer);
+      const result = p.action === "register" ? await service.register(p, peer, clientClass) : p.action === "login" ? await service.login(p, peer, clientClass) : await service.claim(p, legacyId, peer);
       const { token: session, ...safe } = result;
       await service.rememberCurrentDeviceLabel(session,friendlyDeviceLabel(request.headers.get("user-agent")));
       return json({ ok: true, ...safe }, sessionCookie(session));

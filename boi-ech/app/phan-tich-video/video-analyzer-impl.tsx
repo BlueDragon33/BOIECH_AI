@@ -253,7 +253,7 @@ async function createLandmarker(signal?: AbortSignal) {
     finally { objectUrls.forEach((url) => URL.revokeObjectURL(url)); }
   };
   try {
-    await prepareAssets(undefined, signal);
+    // One asset-read pass per inference; the explicit download button alone reports per-file progress.
     const [bundle, loader, wasm, model] = await Promise.all(AI_ASSETS.map((url) => cachedAsset(url, signal)));
     const bundleUrl = URL.createObjectURL(new Blob([await bundle.text()], { type: "text/javascript" }));
     objectUrls.push(bundleUrl);
@@ -536,6 +536,7 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
       run.check(); setReady(true);
       const sampleCount = Math.max(3, Math.min(150, Math.ceil(video.duration * SAMPLE_FPS)));
       const frames: Metric[] = [];
+      let previousProgressBucket = -1;
       for (let index = 0; index < sampleCount; index += 1) {
         const time = Math.min(video.duration - 0.01, index / SAMPLE_FPS);
         await seek(video, time, run.signal);
@@ -543,7 +544,14 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         const points = pose.landmarker.detectForVideo(video, index * 200 + 1).landmarks?.[0];
         const metric = points ? metricAt(time, points) : null;
         if (metric) frames.push(metric);
-        setProgress(Math.round((index + 1) / sampleCount * 82));
+        // Avoid rerendering every panel for every sampled frame (up to 150).
+        // Keep a final progress update and yield for responsive cancellation.
+        const pct = Math.round((index + 1) / sampleCount * 82);
+        const bucket = Math.floor(pct / 5);
+        if (bucket !== previousProgressBucket || index === sampleCount - 1) {
+          previousProgressBucket = bucket;
+          setProgress(pct);
+        }
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
         run.check();
       }

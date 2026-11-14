@@ -3,6 +3,7 @@
 /* Ảnh đã được tối ưu sẵn thành WebP cục bộ; giữ URL do máy chủ cấp. */
 /* eslint-disable @next/next/no-img-element */
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { parseLocalQuizBackup } from "./progress-backup";
 import ManagerWorkspace from "./manager-workspace";
@@ -28,6 +29,11 @@ import type {
   PublicQuestion,
   ServerCourseState,
 } from "./course-types";
+
+// Each role enhancement bundle is loaded only when its authenticated role is visible.
+// No background DOM observers for unrelated roles or account sign-in screens.
+const LearnerEnhancements = dynamic(() => import("./learner-enhancements"), { ssr: false });
+const TeacherEnhancements = dynamic(() => import("./teacher-enhancements"), { ssr: false });
 
 type SectionId =
   | "tong-quan"
@@ -939,6 +945,7 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [notice, setNotice] = useState("");
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [motionPlaying, setMotionPlaying] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [appearanceReady, setAppearanceReady] = useState(false);
@@ -1091,11 +1098,11 @@ export default function Home() {
     let detachServiceWorkerListener: () => void = () => undefined;
     if ("serviceWorker" in navigator) {
       const hadActiveWorker = Boolean(navigator.serviceWorker.controller);
-      let reloadingForUpdate = false;
       const onControllerChange = () => {
-        if (!hadActiveWorker || reloadingForUpdate) return;
-        reloadingForUpdate = true;
-        window.location.reload();
+        if (!hadActiveWorker) return;
+        // Never interrupt a lesson, unsaved answer or local AI analysis.
+        // The user explicitly chooses when to load the new application shell.
+        setUpdateAvailable(true);
       };
       navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
       detachServiceWorkerListener = () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
@@ -1996,6 +2003,12 @@ export default function Home() {
           hasLocalOverride={hasLocalOverride}
         /> : null}
 
+        {updateAvailable && (
+          <div className="notice" role="status" aria-label="Bản cập nhật Bơi Ếch">
+            <span>Đã có bản cập nhật. Lưu phần đang làm trước khi tải lại để tránh gián đoạn.</span>
+            <button type="button" onClick={() => window.location.reload()}>Tải bản mới</button>
+          </div>
+        )}
         {notice && (
           <div className="notice" role="status">
             <span>{notice}</span><button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button>
@@ -2475,6 +2488,8 @@ export default function Home() {
         onSync={() => void flushOfflineQueue()}
         onReminderChange={changeReminder}
       />
+      {deviceAccess.personRole === "learner" ? <LearnerEnhancements /> : null}
+      {deviceAccess.personRole === "teacher" ? <TeacherEnhancements /> : null}
     </div>
   );
 }
