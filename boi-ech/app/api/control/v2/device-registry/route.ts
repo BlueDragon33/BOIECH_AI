@@ -26,13 +26,14 @@ export async function GET(request: Request) {
     // class. A P-256 browser key must NEVER be advertised as a physical phone.
     const result = await db.prepare(ownerView
       ? `SELECT b.account_id,b.device_id,b.approved,b.revoked,b.device_label,b.client_class,
-           d.learner_name,d.person_role
+           d.learner_name,d.person_role,prog.completed_json
          FROM account_devices b JOIN accounts a ON a.account_id=b.account_id
          JOIN device_access d ON d.device_id=a.storage_device_id
+         LEFT JOIN device_profiles prog ON prog.device_id=a.storage_device_id
          ORDER BY b.account_id,b.device_id`
       : "SELECT account_id, device_id, approved, revoked FROM account_devices ORDER BY account_id, device_id",
     ).all<{ account_id: string; device_id: string; approved: number; revoked: number;
-      device_label?: string | null; client_class?: string | null;
+      device_label?: string | null; client_class?: string | null; completed_json?: string | null;
       learner_name?: string | null; person_role?: string | null }>();
     if (!result.success || !Array.isArray(result.results)) {
       throw new DeviceAccessError("Chưa xác minh được danh sách thiết bị.", 503, "BOI_DEVICE_REGISTRY_UNAVAILABLE");
@@ -46,7 +47,17 @@ export async function GET(request: Request) {
       const role = row.person_role === "manager" || row.person_role === "teacher" || row.person_role === "learner"
         ? row.person_role : null;
       const clientClass = row.client_class === "phone" || row.client_class === "tablet" ? row.client_class : "desktop";
-      return { deviceId, status, account: {
+      let progress: { completed: number; total: number } | null = null;
+      if (row.person_role === "learner" && typeof row.completed_json === "string") {
+        try {
+          const recorded: unknown = JSON.parse(row.completed_json);
+          if (Array.isArray(recorded) && recorded.length <= 1000) {
+            progress = { completed: Math.min(8, new Set(recorded.filter(item =>
+              typeof item === "string" || typeof item === "number")).size), total: 8 };
+          }
+        } catch { /* Fail closed: invalid progress is unavailable, never fake zero. */ }
+      }
+      return { deviceId, status, progress, account: {
           accountId: row.account_id, name: row.learner_name?.trim() || null, role,
         },
         browserLabel: row.device_label?.trim() || null, clientClass,
