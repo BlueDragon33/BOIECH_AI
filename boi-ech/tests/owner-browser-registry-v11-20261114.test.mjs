@@ -11,10 +11,12 @@ test("Owner browser registry maps binding to exactly one account, never emits ra
   const db = new DatabaseSync(":memory:");t.after(()=>db.close());
   db.exec(`CREATE TABLE device_access (device_id TEXT PRIMARY KEY,learner_name TEXT,person_role TEXT);
     CREATE TABLE accounts (account_id TEXT PRIMARY KEY,storage_device_id TEXT);
+    CREATE TABLE device_profiles (device_id TEXT PRIMARY KEY, completed_json TEXT);
     CREATE TABLE account_devices (account_id TEXT,device_id TEXT,approved INTEGER,revoked INTEGER,
       device_label TEXT,client_class TEXT,public_key_jwk TEXT);
     INSERT INTO device_access VALUES ('stored','Sample Learner','learner');
     INSERT INTO accounts VALUES ('acc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','stored');
+    INSERT INTO device_profiles VALUES ('stored','["01","02"]');
     INSERT INTO account_devices VALUES ('acc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'secret-key-id',1,0,'Điện thoại · Safari','phone','PRIVATE-P256-MATERIAL');`);
   let reads=0;
@@ -54,6 +56,7 @@ test("Owner browser registry maps binding to exactly one account, never emits ra
   assert.equal(owner.data.devices[0].account.role,"learner");
   assert.equal(owner.data.devices[0].clientClass,"phone");
   assert.equal(owner.data.devices[0].browserLabel,"Điện thoại · Safari");
+  assert.deepEqual(owner.data.devices[0].progress,{completed:2,total:8});
   assert.match(owner.data.devices[0].deviceId,/^[a-f0-9]{64}$/);
   assert.doesNotMatch(JSON.stringify(owner.data),/secret-key-id|PRIVATE-P256-MATERIAL|public_key_jwk/);
   const v2=await get("https://boi.example.test/api/control/v2/device-registry");
