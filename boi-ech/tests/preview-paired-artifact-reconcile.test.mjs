@@ -83,6 +83,10 @@ test("paired Preview flow runs attestation+safe correction and strict gate befor
  const appBuild=text.indexOf("name: Build App Preview before any remote D1 mutation");
  assert.ok(appBuild>0&&restored>appBuild&&repair>restored&&hardGate>repair&&migration>hardGate&&deploy>migration);
  assert.ok(text.includes('PARENT_GITHUB_SHA: ${{ github.sha }}'));
+ assert.ok(text.includes('REVIEWED_APP_SHA: ${{ env.APPLICATION_MANAGEMENT_BUILD_REVISION }}'));
+ assert.ok(text.includes('APP_CHECKOUT_SHA="$(git -C "$GITHUB_WORKSPACE/application-management-preview-source" rev-parse HEAD)"'));
+ assert.ok(text.includes('env GITHUB_SHA="$REVIEWED_APP_SHA" npm run cloudflare:preview:prepare'));
+ assert.doesNotMatch(text.slice(restored,repair),/^[ \t]*GITHUB_SHA: \$\{\{ env\.APPLICATION_MANAGEMENT_BUILD_REVISION \}\}/m);
  assert.match(text,/App checkout no longer matches pinned source/);
  assert.match(text,/Unexpected or duplicate prepared App revision/);
  assert.match(text,/node boi-ech\/scripts\/reconcile-paired-preview-app-revision\.mjs/);
