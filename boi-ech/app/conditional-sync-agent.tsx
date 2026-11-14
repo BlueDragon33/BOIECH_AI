@@ -5,7 +5,7 @@ import { readPendingSync } from "./verified-sync-client";
 
 /**
  * Event-only observer. It reads the durable IndexedDB queue and updates numeric
- * badges. It NEVER calls /api/accounts/sync, flushVerifiedSync, or any write.
+ * badges. This component makes no network request and performs no server mutation.
  * Network synchronization requires an explicit button click.
  */
 export default function ConditionalSyncAgent({ accountId }: { accountId: string }) {
