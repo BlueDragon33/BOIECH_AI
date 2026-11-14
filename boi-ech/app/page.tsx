@@ -1425,7 +1425,7 @@ export default function Home() {
         })
         .catch((error) => setDeviceError(error instanceof Error ? error.message : "Chưa thể kiểm tra quyền thiết bị."))
         .finally(() => { inFlight = false; });
-    }, 20_000);
+    }, 10_000);
     return () => window.clearInterval(timer);
   }, [deviceAccess?.status, deviceCredential]);
 
