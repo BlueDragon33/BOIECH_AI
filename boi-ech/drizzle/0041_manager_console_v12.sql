@@ -71,12 +71,19 @@ CREATE TRIGGER IF NOT EXISTS training_leader_update_guard BEFORE UPDATE ON train
   OLD.display_name,OLD.birth_date,OLD.military_rank,OLD.battalion);
 END;
 --> statement-breakpoint
-CREATE TRIGGER IF NOT EXISTS training_leader_student_class_guard BEFORE UPDATE OF class_name,person_role,status ON device_access
+-- Revoking or transferring a student account must NEVER be blocked by a class title.
+-- Demote its title to a provisional external contact instead, with retained audit history.
+CREATE TRIGGER IF NOT EXISTS training_leader_student_class_guard AFTER UPDATE OF class_name,person_role,status ON device_access
  WHEN EXISTS(SELECT 1 FROM training_class_leaders l JOIN training_resources c ON c.id=l.class_id
     WHERE l.slot='student' AND l.source='class' AND l.member_device_id=NEW.device_id
      AND (NEW.person_role!='learner' OR NEW.status!='approved'
      OR lower(trim(COALESCE(NEW.class_name,'')))!=lower(c.name)))
- BEGIN SELECT RAISE(ABORT,'TRAINING_LEADER_TRANSFER'); END;
+ BEGIN
+  UPDATE training_class_leaders
+   SET source='outside',member_device_id=CASE WHEN NEW.person_role='learner' THEN NEW.device_id ELSE NULL END,
+       version=version+1,updated_at=CURRENT_TIMESTAMP
+   WHERE slot='student' AND source='class' AND member_device_id=NEW.device_id;
+ END;
 --> statement-breakpoint
 CREATE TRIGGER IF NOT EXISTS training_leader_class_rename_guard BEFORE UPDATE OF name ON training_resources
  WHEN NEW.kind='class' AND OLD.name!=NEW.name
@@ -139,7 +146,7 @@ CREATE TRIGGER IF NOT EXISTS training_session_v12_update BEFORE UPDATE ON traini
   THEN RAISE(ABORT,'TRAINING_CONFLICT') END;
 END;
 --> statement-breakpoint
-CREATE TRIGGER IF NOT EXISTS training_assistant_assignment_guard BEFORE UPDATE OF class_name,person_role,status ON device_access
+-- Never block emergency account revocation or change of role; guard only unsafe class reassignment.\nCREATE TRIGGER IF NOT EXISTS training_assistant_assignment_guard BEFORE UPDATE OF class_name ON device_access
  WHEN EXISTS(SELECT 1 FROM training_sessions s JOIN training_resources c ON c.id=s.class_id
   WHERE s.assistant_teacher_id=NEW.device_id AND s.status='scheduled' AND datetime(s.ends_at)>CURRENT_TIMESTAMP
     AND (NEW.person_role!='teacher' OR NEW.status!='approved'
