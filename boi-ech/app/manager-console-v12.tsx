@@ -49,12 +49,14 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
  const resources=board.resources;
  const classes=resources.filter(r=>r.kind==="class");
  const buildings=resources.filter(r=>r.kind==="building");
- const activeBuilding=buildings.find(b=>b.id===selectedRoomBuilding)??buildings[0]??null;
+ const visibleBuildings=buildings.filter(b=>matchesBuilding(b));
+ const activeBuilding=visibleBuildings.find(b=>b.id===selectedRoomBuilding)??visibleBuildings[0]??null;
  const teachers=board.people.filter(p=>p.role==="teacher");
  const learners=board.people.filter(p=>p.role==="learner");
  const nameOf=(id:string)=>resources.find(x=>x.id===id)?.name??"Không xác định";
  const teacherName=(id:string|null|undefined)=>id?teachers.find(p=>p.id===id)?.name??"Không có hồ sơ": "Chưa phân công";
  const matches=(text:string)=>text.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"));
+ function matchesBuilding(b:TrainingResource){return matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name));}
  const cls=classes.find(x=>x.id===selectedClass);
  const inClass=cls?learners.filter(p=>belongs(p,cls)):[];
  const unassigned=learners.filter(p=>p.registered&&(!p.className.trim()||!classes.some(c=>belongs(p,c))));
@@ -169,7 +171,7 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
    <section className={styles.campusOverview} aria-label="Sơ đồ tòa học dạng trực quan">
     <div className={styles.campusTitle}><strong>Chọn tòa học</strong><small>Tòa → Phòng học → Lịch sử dụng thực tế</small></div>
     <div className={styles.campusNodes}>
-     {buildings.filter(b=>matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name))).map((b,index)=>{
+     {visibleBuildings.map((b,index)=>{
       const related=resources.filter(r=>r.kind==="room"&&r.parentId===b.id);
       const busyRooms=related.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
       return <button type="button" className={styles.campusNode} aria-pressed={activeBuilding?.id===b.id}
@@ -180,8 +182,9 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
      })}
     </div>
     {!buildings.length?<p className={styles.empty}>Chưa có tòa học. Mở tab Tòa học và tạo tòa đầu tiên.</p>:null}
+    {buildings.length>0&&!visibleBuildings.length?<p className={styles.empty}>Không tìm thấy tòa hoặc phòng phù hợp. Thử từ khóa khác.</p>:null}
    </section>
-   {buildings.filter(b=>(matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name)))&&(!activeBuilding||b.id===activeBuilding.id)).map((b,index)=>{
+   {visibleBuildings.filter(b=>b.id===activeBuilding?.id).map((b,index)=>{
     const rooms=resources.filter(r=>r.kind==="room"&&r.parentId===b.id);
     const occupied=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
     const available=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="vacant").length;
