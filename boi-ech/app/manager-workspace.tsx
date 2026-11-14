@@ -10,6 +10,9 @@ import ManagerCommandCenter from "./manager-command-center";
 import ManagerRosterCleanup from "./manager-roster-cleanup";
 import ManagerConsoleV12 from "./manager-console-v12";
 import ManagerBuildingStudio from "./manager-building-studio";
+import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,PRACTICE_POOL_ROOM_ID,
+ PRACTICE_POOL_ROOM_NAME,PRACTICE_POOL_DRAFT_CAPACITY,existingPracticePoolBuilding,
+ existingPracticePoolRoom} from "./manager-practice-pool";
 import {readPendingSync,flushVerifiedSync} from "./verified-sync-client";
 import {useBoiSyncNotices,broadcastBoiChange} from "./manual-sync-notices";
 type Tab="overview"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
@@ -41,6 +44,34 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  function selectTab(next:Tab){setTab(next);setFilter("all");setQuery("");setDetail(null);setShowWindow(next==="schedule");}
  function newResource(kind:ResourceKind,preferredBuildingId=""){setDetail(null);setResource({id:crypto.randomUUID(),kind,name:"",parentId:kind==="room"?preferredBuildingId:"",capacity:kind==="building"?1:30,requiredTeachers:1,status:"active",expectedVersion:0});setFormError("");}
  function editResource(r:TrainingResource){setDetail(null);setResource({...r,parentId:r.parentId||"",expectedVersion:r.version});setFormError("");}
+ async function installPracticePoolTemplate():Promise<boolean>{
+  setFormError("");
+  const knownBuilding=existingPracticePoolBuilding(board.resources);
+  const buildingId=knownBuilding?.id??PRACTICE_POOL_BUILDING_ID;
+  if(knownBuilding&&knownBuilding.status!=="active"){
+   setFormError("Tòa bể bơi đang tạm ngừng hoặc lưu trữ. Hãy mở cấu hình tòa trước khi tạo bể thực hành.");
+   return false;
+  }
+  if(!knownBuilding){
+   if(board.resources.some(r=>r.id===PRACTICE_POOL_BUILDING_ID)){
+    setFormError("Mã tòa mẫu đã có dữ liệu khác. Không ghi đè.");return false;
+   }
+   if(!await onCommand({action:"save-resource",id:buildingId,kind:"building",name:PRACTICE_POOL_BUILDING_NAME,
+    parentId:"",capacity:1,requiredTeachers:1,status:"active",expectedVersion:0}))return false;
+  }
+  if(!existingPracticePoolRoom(board.resources,buildingId)){
+   if(board.resources.some(r=>r.id===PRACTICE_POOL_ROOM_ID||
+     (r.kind==="room"&&r.name.trim().normalize("NFC").toLocaleLowerCase("vi")===PRACTICE_POOL_ROOM_NAME.toLocaleLowerCase("vi")))){
+    setFormError("Đã có bể bơi cùng mã hoặc tên tại nơi khác. Hãy kiểm tra dữ liệu trước khi tạo mới.");return false;
+   }
+   // A template does not know actual pool capacity. Fail closed until manager configures it.
+   return await onCommand({action:"save-resource",id:PRACTICE_POOL_ROOM_ID,kind:"room",name:PRACTICE_POOL_ROOM_NAME,
+    parentId:buildingId,capacity:PRACTICE_POOL_DRAFT_CAPACITY,requiredTeachers:1,
+    status:"unavailable",expectedVersion:0});
+  }
+  return true;
+ }
+
  function assignPerson(p:TrainingPerson,targetClassId?:string){const previous=(p.role==="teacher"?classNames(p.className):[p.className]).map(name=>name.trim()).filter(Boolean);setDetail(null);setAssignment({person:p,ids:targetClassId&&p.role==="learner"?[targetClassId]:classes.filter(c=>previous.some(n=>classKey(n)===classKey(c.name))).map(c=>c.id),omittedNames:previous.filter(name=>!classes.some(c=>classKey(c.name)===classKey(name))),replaceConfirmed:false});setFormError("");}
  function editSession(s?:TrainingSession,preferredRoomId="",preferredClassId=""){setDetail(null);setSession(s?{...s,
  assistantTeacherId:s.assistantTeacherId??"",periodStart:s.periodStart??null,periodEnd:s.periodEnd??null,
@@ -150,7 +181,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
     })}
   </div>:null}
   {(["class","room","building"] as Tab[]).includes(tab)&&tab!=="building"&&!(v12Enabled&&(tab==="class"||tab==="room"))?<section className={styles.grid} aria-label={`Danh sách ${title.toLocaleLowerCase("vi")}`}>{resources.map(r=><article className={styles.card} key={r.id}><div className={styles.cardHeading}><div><small>{r.kind==="class"?"LỚP HỌC":r.kind==="room"?label(r.parentId||""):"TÒA HỌC"}</small><h2><button type="button" className={styles.cardTitle} onClick={()=>setDetail({kind:"resource",id:r.id})}>{r.name}</button></h2></div><Badge tone={r.state}>{r.kind==="class"&&r.state==="full"?"Đủ học viên":r.kind==="building"&&!r.roomCount?"Chưa có phòng":stateText[r.state]}</Badge></div><ResourceStatusBars resource={r} board={board}/>{r.kind==="room"?<p>{r.capacity} chỗ · {r.bookingCount} buổi trong khoảng xem</p>:null}<small>{r.status==="active"?"Đang hoạt động":r.status==="unavailable"?"Tạm ngừng":"Đã lưu trữ"}</small><div className={styles.cardActions}><button type="button" className={styles.textButton} onClick={()=>setDetail({kind:"resource",id:r.id})}>Quản lý chi tiết</button><button type="button" disabled={busy} onClick={()=>editResource(r)}>Chỉnh sửa</button></div></article>)}{!resources.length&&<div className={styles.emptyState}><AppIcon name={tab}/><strong>Chưa có dữ liệu phù hợp</strong><p>Đổi bộ lọc hoặc thêm {tab==="class"?"lớp":tab==="room"?"phòng":"tòa"} bằng nút phía trên.</p></div>}</section>:null}
-  {tab==="building"?<ManagerBuildingStudio board={board} busy={busy}
+  {tab==="building"?<ManagerBuildingStudio board={board} busy={busy} onInstallPoolTemplate={installPracticePoolTemplate}
       onCreateBuilding={()=>newResource("building")} onEditBuilding={editResource}
       onCreateRoom={buildingId=>newResource("room",buildingId)} onEditRoom={editResource}
       onCreateSession={roomId=>editSession(undefined,roomId)}/>:null}
