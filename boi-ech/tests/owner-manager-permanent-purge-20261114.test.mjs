@@ -81,14 +81,12 @@ test("Owner may remove archived/blocked manager only after sessions revoked and 
   assert.equal(f.sqlite.prepare("SELECT count(*) AS n FROM accounts WHERE account_id=?").get(id).n,0);
  }finally{f.close();}
 });
-test("Owner manager cleanup refuses unrevoked active session, stale revision, learning progress and payment proof",async()=>{
+test("Owner may delete pending manager with an active temporary session, but stale revision, learning and payments still block",async()=>{
  const f=accountStack({v2:true,singleReview:true});try{
   const login=await registerManager(f,"session");
   const pending=(await preview(f)).records.find(x=>x.accountId===login.account.accountId);
-  assert.equal(pending.eligible,false);
-  assert.ok(pending.blockers.some(b=>b.includes("Phiên đăng nhập")));
-  noSession(f,login.account.accountId);
-  const eligible=(await preview(f)).records.find(x=>x.accountId===login.account.accountId);
+  assert.equal(pending.eligible,true, "Owner may remove a pending temporary login without archiving first");
+  const eligible=pending;
   assert.equal(eligible.eligible,true);
   f.sqlite.prepare("UPDATE accounts SET revision=revision+1 WHERE account_id=?").run(login.account.accountId);
   await assert.rejects(()=>purge(f,eligible),e=>e.code==="CLEANUP_ELIGIBILITY_CHANGED");
@@ -104,6 +102,22 @@ test("Owner manager cleanup refuses unrevoked active session, stale revision, le
   assert.ok(protectedRow.blockers.some(x=>x.includes("thanh toán")));
  }finally{f.close();}
 });
+test("Owner one-step purge removes pending manager, active login session and linked browser key together",async()=>{
+ const f=accountStack({v2:true,singleReview:true});try{
+  const registered=await registerManager(f,"immediate");
+  const accountId=registered.account.accountId;
+  const row=(await preview(f)).records.find(r=>r.accountId===accountId);
+  assert.equal(row.eligible,true);
+  assert.ok(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_sessions WHERE account_id=?").get(accountId).n>0);
+  const out=await purge(f,row);
+  assert.equal(out.deleted,true);
+  for(const table of ["accounts","account_sessions","account_devices","account_contacts","account_onboarding"]){
+   assert.equal(f.sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE account_id=?`).get(accountId).n,0,table);
+  }
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit WHERE action='owner.account.cleanup-purge'").get().n,1);
+ }finally{f.close();}
+});
+
 test("Manager purge uses Owner HMAC and per-record snapshot; no blanket DELETE in endpoint",()=>{
  const route=readFileSync(new URL("../app/api/control/v2/manager-purge/route.ts",import.meta.url),"utf8");
  const source=readFileSync(new URL("../app/owner-account-cleanup.server.ts",import.meta.url),"utf8");
