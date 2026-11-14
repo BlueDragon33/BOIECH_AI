@@ -49,14 +49,14 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
  const resources=board.resources;
  const classes=resources.filter(r=>r.kind==="class");
  const buildings=resources.filter(r=>r.kind==="building");
- const visibleBuildings=buildings.filter(b=>matchesBuilding(b));
- const activeBuilding=visibleBuildings.find(b=>b.id===selectedRoomBuilding)??visibleBuildings[0]??null;
  const teachers=board.people.filter(p=>p.role==="teacher");
  const learners=board.people.filter(p=>p.role==="learner");
  const nameOf=(id:string)=>resources.find(x=>x.id===id)?.name??"Không xác định";
  const teacherName=(id:string|null|undefined)=>id?teachers.find(p=>p.id===id)?.name??"Không có hồ sơ": "Chưa phân công";
  const matches=(text:string)=>text.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"));
  function matchesBuilding(b:TrainingResource){return matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name));}
+ const visibleBuildings=buildings.filter(b=>matchesBuilding(b));
+ const activeBuilding=visibleBuildings.find(b=>b.id===selectedRoomBuilding)??visibleBuildings[0]??null;
  const cls=classes.find(x=>x.id===selectedClass);
  const inClass=cls?learners.filter(p=>belongs(p,cls)):[];
  const unassigned=learners.filter(p=>p.registered&&(!p.className.trim()||!classes.some(c=>belongs(p,c))));
