@@ -48,7 +48,12 @@ export async function resolveAccountDevice(claimedDeviceId?: unknown) {
   if (claimedDeviceId && claimedDeviceId !== actor.storageDeviceId) throw new AccountError("ACCOUNT_SWITCHED", 409);
   const state = await getPublicDeviceState(actor.storageDeviceId);
   if (!state) throw new AccountError("ACCOUNT_NOT_FOUND", 404);
-  return { ...state, accountId: actor.accountId };
+  // V2 entitlement and trusted-session authorization above replace the retired
+  // device_access.access_expires_at lease. Do not send a stale legacy expiry
+  // to the learner shell, which would otherwise reopen DeviceGate after GO.
+  return { ...state,...(config.v2?{
+    accessExpired:false,accessExpiringSoon:false,accessDaysRemaining:null,accessExpiresAt:null,
+  }:{}), accountId: actor.accountId };
 }
 export async function accountRequest(request: Request) {
   const config = await accountConfiguration();
