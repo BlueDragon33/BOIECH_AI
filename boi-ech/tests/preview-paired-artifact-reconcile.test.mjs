@@ -82,7 +82,7 @@ test("paired Preview flow runs attestation+safe correction and strict gate befor
  const deploy=text.indexOf("name: Deploy preview\n");
  const appBuild=text.indexOf("name: Build App Preview before any remote D1 mutation");
  assert.ok(appBuild>0&&restored>appBuild&&repair>restored&&hardGate>repair&&migration>hardGate&&deploy>migration);
- assert.match(text,/PARENT_GITHUB_SHA: \\$\\{\\{ github\\.sha \\}\\}/);
+ assert.ok(text.includes('PARENT_GITHUB_SHA: ${{ github.sha }}'));
  assert.match(text,/App checkout no longer matches pinned source/);
  assert.match(text,/Unexpected or duplicate prepared App revision/);
  assert.match(text,/node boi-ech\/scripts\/reconcile-paired-preview-app-revision\.mjs/);
