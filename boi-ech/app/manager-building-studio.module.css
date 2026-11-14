@@ -47,3 +47,27 @@
 @media(max-width:540px){.studio{padding:12px;border-radius:15px}.hero{align-items:start}.hero .create{width:100%}.metrics>div{padding:11px}.buildingGallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.studio .buildingCard{padding:8px 5px 11px;min-height:175px}.art{height:88px}.buildingCard strong{font-size:12px}.buildingInfo{font-size:10px}.toolbar{grid-template-columns:1fr}.readback{grid-column:auto}.campus{padding:11px 7px}.detailHeader .actions{width:100%}.detailHeader .actions>button{flex:1}.roomState{order:2}.roomActions{order:3;width:100%}.roomActions button{flex:1}}
 @media(max-width:360px){.buildingGallery{grid-template-columns:1fr 1fr}.art{height:75px}.state{font-size:9px}.summaryGrid span{font-size:10px}}
 @media(prefers-reduced-motion:no-preference){.studio button{transition:border-color .16s,background-color .16s,box-shadow .16s}}
+
+/* A real swimming template is visible before installation without becoming fake inventory. */
+.studio .poolSampleCard{display:grid;justify-items:center;align-content:start;gap:5px;min-height:220px;padding:11px 9px 14px;text-align:center;min-width:0;border:1px dashed #73d7ef;border-radius:18px;background:linear-gradient(145deg,#0e4569dd,#072947e5)}
+.studio .poolSampleCard[aria-pressed=true]{border-style:solid;border-color:#b0fff7;box-shadow:0 0 0 2px #5edbe6}
+.poolSampleCard strong{font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.sampleState{font-size:11px;color:#f6efbb;border:1px solid #e2cf81;background:#604d1c;border-radius:99px;padding:5px 9px}
+.poolPreview{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:17px;background:linear-gradient(120deg,#0d4768,#12355d);border:1px solid #6ccae1;border-radius:16px}
+.poolSampleArt{flex:0 0 128px;width:128px;display:grid;place-items:center}
+.poolSampleArt svg{width:100%;height:auto;filter:drop-shadow(0 9px 9px #0005)}
+.poolPreviewText{min-width:190px;flex:1 1 260px}
+.poolPreviewText h4{font-size:20px;margin:3px 0 4px}
+.poolPreviewText p{font-size:12px;line-height:1.55;margin:4px 0}
+.poolPreviewText strong{font-size:17px}
+.poolPreview .create{flex:0 1 190px;text-align:center}
+.practiceLabel{font-size:11px;color:#c1f9ff;background:#125c75;border:1px solid #49bad4;border-radius:11px;padding:5px 8px;line-height:1.4}
+.roomAvatar:has(svg){width:76px;height:59px;background:#124b69;border-color:#70d5ed}
+.roomAvatar svg{width:75px;height:55px}
+@media(max-width:540px){.studio .poolSampleCard{padding:8px 5px 11px;min-height:175px}
+ .poolSampleCard strong{font-size:12px}.poolPreview{padding:12px;gap:9px}
+ .poolSampleArt{flex-basis:94px;width:94px}
+ .poolPreviewText{flex-basis:150px;min-width:0}
+ .poolPreview .create{flex:1 1 100%}
+ .roomAvatar:has(svg){width:65px;height:51px}
+ .roomAvatar svg{width:64px;height:48px}}
