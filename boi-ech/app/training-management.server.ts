@@ -24,6 +24,7 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  db.prepare('SELECT id,kind,name,parent_id AS parentId,capacity,required_teachers AS requiredTeachers,status,version FROM training_resources ORDER BY name LIMIT 1001').all<TrainingResource>(),
  db.prepare(`SELECT d.device_id AS id,d.learner_name AS name,d.person_code AS code,d.person_role AS role,
  COALESCE(d.class_name,'') AS className,d.status,
+ CASE WHEN a.account_id IS NULL THEN 'legacy' ELSE 'account-first' END AS recordSource,
  CASE WHEN e.account_id IS NOT NULL OR o.first_review_by IS NOT NULL THEN
    CASE WHEN o.stage='active' AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP THEN 0 ELSE 1 END
  ELSE CASE WHEN d.access_expires_at IS NOT NULL AND datetime(d.access_expires_at)<=CURRENT_TIMESTAMP THEN 1 ELSE 0 END END AS expired,
