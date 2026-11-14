@@ -8,6 +8,7 @@ import {
   verifyDeviceIdentityRequest,
 } from "../../device-auth.server";
 import { captureDeviceMetadata } from "../../device-metadata.server";
+import { preserveAccountDeviceReadback } from "../../device-authorized-readback";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
       );
       if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
-      device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
+      device = preserveAccountDeviceReadback(device, await getPublicDeviceState(device.deviceId).catch(() => null));
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     if (action === "challenge") {
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
       let device = await verifyDeviceIdentityRequest(payload, standalone);
       if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
-      device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
+      device = preserveAccountDeviceReadback(device, await getPublicDeviceState(device.deviceId).catch(() => null));
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     return Response.json({ error: "Thao tác không được hỗ trợ." }, { status: 400 });
