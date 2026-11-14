@@ -8,6 +8,7 @@ import AccountProfileDialog, {type ProfileSection} from "./account-profile-dialo
 import VerifiedSyncSettings from "./verified-sync-settings";
 import AccountTrialSandbox, {type TrialLease} from "./account-trial-sandbox";
 import { accountTransitionNeedsReload } from "./account-scope";
+import { isUnlimitedAccountExpiry } from "./account-term";
 import { accountServerActive, recoveryMustRemainVisible } from "./account-lifecycle-client";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
@@ -114,18 +115,24 @@ function AccountLeaseCountdown({expiresAt,role}:{expiresAt:string;role:string}) 
   observer.observe(document.body,{childList:true,subtree:true});
   return()=>observer.disconnect();
  },[role]);
- useEffect(()=>{queueMicrotask(()=>setNow(Date.now()));
-  const tick=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(tick);},[]);
- const ms=Math.max(0,new Date(expiresAt).getTime()-now);
+ const unlimited=isUnlimitedAccountExpiry(expiresAt);
+ useEffect(()=>{
+  if(unlimited)return; // Permanent grants do not need a ticking countdown.
+  queueMicrotask(()=>setNow(Date.now()));
+  const tick=window.setInterval(()=>setNow(Date.now()),1000);
+  return()=>window.clearInterval(tick);
+ },[unlimited]);
+ const ms=unlimited?0:Math.max(0,new Date(expiresAt).getTime()-now);
  const days=Math.floor(ms/86400000),hours=Math.floor(ms%86400000/3600000);
  const minutes=Math.floor(ms%3600000/60000),seconds=Math.floor(ms%60000/1000);
  const left=`${days} ngày ${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
- const expiry=new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(expiresAt));
- return slot?createPortal(<aside className={`${styles.leaseClock} ${styles.leaseClockHeader}`} role="status" aria-label="Thời gian sử dụng còn lại"
-   data-expiring={ms<=86400000}>
-   <strong>{ms>0?"Thời hạn sử dụng":"Đã hết hạn"}</strong>
-   <output aria-live="off">{ms>0?left:"00 ngày 00:00:00"}</output>
-   <small>Đến {expiry} · {role==="manager"?"Owner gia hạn":"Cán bộ quản lý gia hạn"}</small>
+ const expiry=unlimited?null:new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(expiresAt));
+ return slot?createPortal(<aside className={`${styles.leaseClock} ${styles.leaseClockHeader}`} role="status"
+   aria-label={unlimited?"Thời hạn sử dụng: Không giới hạn":"Thời gian sử dụng còn lại"}
+   data-expiring={!unlimited&&ms<=86400000} data-unlimited={unlimited}>
+   <strong>{unlimited||ms>0?"Thời hạn sử dụng":"Đã hết hạn"}</strong>
+   <output aria-live="off">{unlimited?"Không giới hạn":ms>0?left:"00 ngày 00:00:00"}</output>
+   <small>{unlimited?"Quyền sử dụng vĩnh viễn":`Đến ${expiry} · ${role==="manager"?"Owner gia hạn":"Cán bộ quản lý gia hạn"}`}</small>
  </aside>,slot):null;
 }
 export default function AccountGate({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
@@ -513,7 +520,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         <div className={styles.settingDataGrid}>
           <div><small>Trạng thái tài khoản</small><strong>{active?"Đang hoạt động":"Chờ kích hoạt"}</strong></div>
           <div><small>Quyền truy cập</small><strong>{account?.entitlementActive?"Đã xác nhận thời hạn":"Chưa xác nhận"}</strong></div>
-          <div><small>Thời hạn truy cập</small><strong>{account?.expiresAt?
+          <div><small>Thời hạn truy cập</small><strong>{isUnlimitedAccountExpiry(account?.expiresAt)?"Không giới hạn":account?.expiresAt?
             new Intl.DateTimeFormat("vi-VN",{dateStyle:"medium"}).format(new Date(account.expiresAt)):"Chưa có dữ liệu"}</strong></div>
           <div><small>Thiết bị liên kết</small><strong>{devices.filter(d=>!d.revoked).length}/3</strong></div>
         </div>

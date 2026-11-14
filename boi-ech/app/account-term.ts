@@ -1,5 +1,9 @@
 export type AccountTerm="7d"|"30d"|"6m"|"1y"|"4y"|"forever";
 export const FOREVER_EXPIRES_AT="9999-12-31T23:59:59.000Z";
+/** Only the canonical D1 permanent entitlement is unlimited; ordinary long expiries remain finite. */
+export function isUnlimitedAccountExpiry(value:string|null|undefined):boolean{
+ return value===FOREVER_EXPIRES_AT;
+}
 export function replaceExpiryFromNow(term:AccountTerm,now:number):string{
  if(!Number.isFinite(now))throw new Error("TIME_INVALID");
  if(term==="forever")return FOREVER_EXPIRES_AT;
