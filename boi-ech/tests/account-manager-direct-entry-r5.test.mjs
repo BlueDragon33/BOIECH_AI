@@ -105,7 +105,7 @@ test("R5: after server-confirmed active manager, AccountGate opens ManagerWorksp
  assert.doesNotMatch(ui,/ready && active && !recovery && account/);
  assert.match(ui,/recoveryMustRemainVisible\(active,recovery\)/);
  assert.match(ui,/primaryContactKind==="email"\?"Số điện thoại bổ sung":"Email bổ sung"/);
- assert.match(proof,/portableManagerProof\(storageDeviceId: string\)/);
+ assert.match(proof,/portableManagerProof\(storageDeviceId: string, signal\?:AbortSignal\)/);
  assert.match(proof,/action:"legacy-challenge",deviceId:storageDeviceId/);
  assert.match(page,/<DeviceGate/);
  assert.doesNotMatch(ui,/save-registration|setPersonCode|submitDeviceRegistration/);
