@@ -5,6 +5,7 @@ import {ManagerSheet} from "./manager-details";
 import {AppIcon} from "./manager-status";
 import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession,type TrainingClassLeader} from "./training-types";
 import styles from "./manager-console-v12.module.css";
+import {CampusBuildingArt} from "./manager-campus-illustration";
 
 type Tab="class"|"people"|"room";
 type Slot="cadre"|"student";
@@ -40,6 +41,7 @@ function draftLeader(classId:string,slot:Slot,old?:TrainingClassLeader):LeaderDr
 export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,onAssignPerson,onEditResource,
  onCreateRoom,onEditSession,onWindowChange,onSelectPerson}:Props){
  const [query,setQuery]=useState("");
+ const [selectedRoomBuilding,setSelectedRoomBuilding]=useState<string|null>(null);
  const [selectedClass,setSelectedClass]=useState<string|null>(null);
  const [showUnassigned,setShowUnassigned]=useState(false);
  const [leaderEditor,setLeaderEditor]=useState<LeaderDraft|null>(null);
@@ -47,6 +49,7 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
  const resources=board.resources;
  const classes=resources.filter(r=>r.kind==="class");
  const buildings=resources.filter(r=>r.kind==="building");
+ const activeBuilding=buildings.find(b=>b.id===selectedRoomBuilding)??buildings[0]??null;
  const teachers=board.people.filter(p=>p.role==="teacher");
  const learners=board.people.filter(p=>p.role==="learner");
  const nameOf=(id:string)=>resources.find(x=>x.id===id)?.name??"Không xác định";
@@ -163,12 +166,27 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
    {!teachers.some(t=>matches(t.name+" "+t.className))?<p className={styles.empty}>Không tìm thấy giảng viên. Tab này không hiển thị học viên.</p>:null}
   </div>:null}
   {tab==="room"?<div className={styles.buildings}>
-   {buildings.filter(b=>matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name))).map(b=>{
+   <section className={styles.campusOverview} aria-label="Sơ đồ tòa học dạng trực quan">
+    <div className={styles.campusTitle}><strong>Chọn tòa học</strong><small>Tòa → Phòng học → Lịch sử dụng thực tế</small></div>
+    <div className={styles.campusNodes}>
+     {buildings.filter(b=>matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name))).map((b,index)=>{
+      const related=resources.filter(r=>r.kind==="room"&&r.parentId===b.id);
+      const busyRooms=related.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
+      return <button type="button" className={styles.campusNode} aria-pressed={activeBuilding?.id===b.id}
+       key={b.id} onClick={()=>setSelectedRoomBuilding(b.id)}>
+       <span className={styles.campusArtwork}><CampusBuildingArt variant={index}/></span>
+       <strong>{b.name}</strong><small>{related.length} phòng · {busyRooms} đang học</small>
+      </button>;
+     })}
+    </div>
+    {!buildings.length?<p className={styles.empty}>Chưa có tòa học. Mở tab Tòa học và tạo tòa đầu tiên.</p>:null}
+   </section>
+   {buildings.filter(b=>(matches(b.name)||resources.some(r=>r.kind==="room"&&r.parentId===b.id&&matches(r.name)))&&(!activeBuilding||b.id===activeBuilding.id)).map((b,index)=>{
     const rooms=resources.filter(r=>r.kind==="room"&&r.parentId===b.id);
     const occupied=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
     const available=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="vacant").length;
     return <details key={b.id} className={styles.building} open>
-     <summary><span className={styles.buildingIcon}><AppIcon name="building"/></span>
+     <summary><span className={styles.buildingArtwork}><CampusBuildingArt variant={index}/></span>
       <span><strong>{b.name}</strong><small>{rooms.length} phòng · {occupied} đang học · {available} trống</small></span>
       <span className={styles.openChevron}>⌄</span>
      </summary>
