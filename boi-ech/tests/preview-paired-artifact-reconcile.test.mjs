@@ -75,11 +75,16 @@ test("source checkout and prepared revision must both attest exact App HEAD, and
 test("paired Preview flow runs attestation+safe correction and strict gate before ALL remote D1 writes",()=>{
  const file=fileURLToPath(new URL("../../.github/workflows/deploy-boi-ech-preview.yml",import.meta.url));
  const text=fs.readFileSync(file,"utf8");
+ const restored=text.indexOf("name: Restore only attested pinned App Preview config after build");
  const repair=text.indexOf("name: Attest pinned App checkout and reconcile ONLY the verified parent-SHA packaging defect");
  const hardGate=text.indexOf("name: Verify BOTH generated Preview Worker revision identities");
  const migration=text.indexOf("name: Apply isolated Preview migrations");
  const deploy=text.indexOf("name: Deploy preview\n");
- assert.ok(repair>0&&hardGate>repair&&migration>hardGate&&deploy>migration);
+ const appBuild=text.indexOf("name: Build App Preview before any remote D1 mutation");
+ assert.ok(appBuild>0&&restored>appBuild&&repair>restored&&hardGate>repair&&migration>hardGate&&deploy>migration);
+ assert.match(text,/PARENT_GITHUB_SHA: \\$\\{\\{ github\\.sha \\}\\}/);
+ assert.match(text,/App checkout no longer matches pinned source/);
+ assert.match(text,/Unexpected or duplicate prepared App revision/);
  assert.match(text,/node boi-ech\/scripts\/reconcile-paired-preview-app-revision\.mjs/);
  assert.match(text,/node boi-ech\/scripts\/assert-paired-preview-artifact-revisions\.mjs/);
  assert.doesNotMatch(text,/DEPLOY_PRODUCTION/);
