@@ -449,6 +449,15 @@ export async function preparePortableAccount(accountId: string | null, claim = f
   document.documentElement.dataset.accountLocalDatabase = databaseName;
   document.documentElement.dataset.accountVideoDatabase = typeof videoScope === "string" ? videoScope : VIDEO_DB + ":" + (accountId ?? "signed-out");
 }
+/** Read the already trusted P-256 key for account-first workspace bootstrap.
+ * Never creates a second device, rotates keys, or returns them to the server. */
+export async function portableWorkspaceCredential(): Promise<StoredDeviceCredential> {
+  const credential=await readActiveCredential();
+  if(!credential?.privateKey||!credential.publicKey) {
+    throw new Error("Chưa đọc được khóa P-256 của phiên đã xác thực. Hãy dùng thiết bị tin cậy hoặc quy trình khôi phục.");
+  }
+  return credential;
+}
 /**
  * Account-first V2 manager proof. Never registers a second legacy device.
  * The storage anchor and account session are server-bound; challenge is signed
