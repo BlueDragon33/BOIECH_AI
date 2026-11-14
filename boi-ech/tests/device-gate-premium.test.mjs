@@ -57,9 +57,12 @@ test("the retry action reopens device identity initialization after a failure", 
   assert.doesNotMatch(retry, /if \(!deviceCredential\) return/);
 });
 
-test("device polling skips hidden tabs and overlapping requests", () => {
-  assert.match(page, /if \(document\.hidden \|\| !navigator\.onLine \|\| inFlight\) return/);
-  assert.match(page, /10_000/);
+test("device approval sync reacts only to real events and ignores overlapping requests", () => {
+  assert.match(page, /if \(inFlight\) \{ queued = true; return; \}/);
+  assert.match(page, /window\.addEventListener\("boi:device:changed",sync\)/);
+  assert.match(page, /window\.addEventListener\("online",sync\)/);
+  assert.match(page, /navigator\.serviceWorker\?\.addEventListener\("message",onPush\)/);
+  assert.doesNotMatch(page, /window\.setInterval\(sendPresence, 60_000\)/);
   assert.match(page, /access\.status === "approved" && access\.registrationComplete && !access\.accessExpired/);
 });
 
