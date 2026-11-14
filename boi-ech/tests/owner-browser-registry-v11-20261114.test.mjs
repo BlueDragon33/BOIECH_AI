@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import ts from "typescript";
 
@@ -19,6 +20,7 @@ test("Owner browser registry maps binding to exactly one account, never emits ra
   let reads=0;
   class Err extends Error { constructor(message,status,code){super(message);this.status=status;this.code=code;} }
   const modules={
+    "node:crypto":{createHash},
     "../../../../account-runtime.server": {
       accountConfiguration:async()=>({v2:true}),
       accountErrorResponse:e=>Response.json({code:e.code||"ERR"},{status:e.status||500}),
