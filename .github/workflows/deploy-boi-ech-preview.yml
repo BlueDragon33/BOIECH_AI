@@ -140,6 +140,11 @@ jobs:
         run: CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH=wrangler.cloudflare.preview.jsonc npm run build
       - name: Build App Preview before any remote D1 mutation
         working-directory: application-management-preview-source
+        env:
+          # Critical: the Vite/Cloudflare build generates the deployed revision
+          # from GITHUB_SHA. This secondary checkout has its own pinned commit.
+          # Do not publish the BOIECH_AI commit as the App Management revision.
+          GITHUB_SHA: ${{ env.APPLICATION_MANAGEMENT_BUILD_REVISION }}
         run: CLOUDFLARE_VITE_WRANGLER_CONFIG_PATH=wrangler.cloudflare.jsonc npm run build
       - name: Verify generated Preview artifact before any remote D1 mutation
         working-directory: boi-ech
@@ -147,6 +152,9 @@ jobs:
       - name: Verify generated App Preview artifact before any remote D1 mutation
         working-directory: application-management-preview-source
         run: npm run cloudflare:artifact:check
+
+      - name: Verify BOTH generated Preview Worker revision identities before any remote D1 mutation
+        run: node boi-ech/scripts/assert-paired-preview-artifact-revisions.mjs
 
       - name: Apply isolated Preview migrations
         working-directory: boi-ech
