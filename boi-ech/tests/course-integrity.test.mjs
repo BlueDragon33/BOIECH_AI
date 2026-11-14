@@ -223,8 +223,12 @@ test("replaces learner accounts with signed, server-approved device access", asy
   assert.match(page, /autoComplete="family-name"/);
   assert.match(page, /autoComplete="given-name"/);
   assert.match(page, /Sao chép mã/);
-  assert.match(page, /10_000/, "pending devices must automatically recheck approval");
-  assert.match(page, /window\.setInterval\(sendPresence, 60_000\)/);
+  assert.match(page, /window\.addEventListener\("boi:device:changed",sync\)/,
+    "pending devices must recheck only on a real event");
+  assert.match(page, /window\.addEventListener\("online",sync\)/);
+  assert.doesNotMatch(page, /window\.setInterval\(sendPresence, 60_000\)/,
+    "presence must never use periodic sync polling");
+  assert.match(page, /window\.addEventListener\("focus", syncVisibleDeviceProfile\)/);
   assert.match(adminRoute, /requireDeviceAdmin\(\)/);
   assert.match(migration, /CREATE TABLE `device_access`/);
   assert.match(migration, /CREATE TABLE `device_profiles`/);
