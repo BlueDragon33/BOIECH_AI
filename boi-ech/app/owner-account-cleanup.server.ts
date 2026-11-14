@@ -99,20 +99,26 @@ function check(r:Row,options:{days:number;mode:Mode},now:number){
  const pending=r.access_status==="pending"&&
   ["requested","profile_required","profile_review","changes_requested"].includes(r.stage||"");
  const inactive=r.access_status==="approved"&&["active","suspended"].includes(r.stage||"");
- const manager=r.person_role==="manager"&&["pending","blocked"].includes(r.access_status)
-   &&(r.access_status==="blocked"||
-     ["requested","profile_required","profile_review","changes_requested"].includes(r.stage||""));
+ const manager=r.person_role==="manager";
  const category=options.mode==="manager"?(manager?"manager":null)
    :pending?"pending":inactive?"inactive":null;
  const categoryAllowed=category&&(options.mode==="both"||category===options.mode);
  const tooRecent=options.mode==="manager"?false:
    lastActivity===0||(options.days===8 ? now-lastActivity<=7*86400000 : now-lastActivity<options.days*86400000);
  const blockers=dataBlockers(r);
+ if(options.mode==="manager"){
+   if(!["pending","blocked"].includes(r.access_status))
+     blockers.push("Tài khoản đang hoạt động hoặc đã được duyệt");
+   if(r.access_status==="pending"&&
+     !["requested","profile_required","profile_review","changes_requested"].includes(r.stage||""))
+     blockers.push("Trạng thái hoàn thiện hồ sơ không cho phép xóa");
+   if(lastActivity>now)blockers.push("Tín hiệu thời gian bất thường; cần đối chiếu");
+ }
  if(!categoryAllowed||tooRecent)return null;
  return {accountId:r.account_id,name:r.person_name||r.login||"Chưa khai báo",
   role:r.person_role,category,createdAt:r.account_created_at,
   lastSeenAt:r.last_seen_at,latestLoginAt:lastLogin?new Date(lastLogin).toISOString():null,
-  inactiveDays:Math.floor((now-lastActivity)/86400000),stage:r.stage,
+  inactiveDays:Math.max(0,Math.floor((now-lastActivity)/86400000)),stage:r.stage,
   eligible:blockers.length===0,blockers,snapshot:snapshot(r,options)};
 }
 export async function inspectCleanup(db:DB,actor:Actor,input:Record<string,unknown>,
@@ -158,7 +164,9 @@ export async function purgeCleanupAccount(db:DB,actor:Actor,input:Record<string,
  // If anything changes the NOT NULL audit purpose aborts the entire batch.
  const managerGuard=options.mode==="manager"
    ?`AND d.person_role='manager' AND d.status IN ('pending','blocked')
-      AND (d.status='blocked' OR o.stage IN ('requested','profile_required','profile_review','changes_requested'))`
+      AND (d.status='blocked' OR o.stage IN ('requested','profile_required','profile_review','changes_requested'))
+      AND (datetime(a.created_at)<=CURRENT_TIMESTAMP)
+      AND (d.last_seen_at IS NULL OR datetime(d.last_seen_at)<=CURRENT_TIMESTAMP)`
    :"";
  const eligibleGuard=`EXISTS(SELECT 1 FROM accounts a JOIN device_access d
    ON d.device_id=a.storage_device_id JOIN account_onboarding o ON o.account_id=a.account_id
