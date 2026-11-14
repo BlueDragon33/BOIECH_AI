@@ -19,7 +19,7 @@ test("checking screen starts during real session readback; display never grants 
  assert.match(gate,/if \(!ready\) return <AccountVerificationShowcase phase="checking" checks=\{\[false,false,false\]\}/);
  assert.match(gate,/if \(active && account && enteredAccountId !== account.accountId\)/);
  assert.match(gate,/accountServerActive\(account, v2, Date.now\(\)\)/);
- assert.match(gate,/if \(accountServerActive\(account, v2, Date.now\(\)\) && boardVerified\)/);
+ assert.match(gate,/if \(accountServerActive\(account, v2, Date.now\(\)\) && workspaceVerified && deviceVerified\)/);
  assert.match(gate,/setEnteredAccountId\(account.accountId\)/);
 });
 test("three real checks gate visual transitions; GO appears centrally for exactly 1 second",()=>{
@@ -40,7 +40,8 @@ test("manager first D1-backed board is loaded BEFORE READY and passed into the m
  assert.match(gate,/createTrainingClient\(getManagerProof\).read\(range,controller.signal\)/);
  assert.match(gate,/setManagerPreload\(\{accountId:id,board,range\}\)/);
  assert.match(gate,/managerPreload\?\.accountId===account.accountId/);
- assert.match(gate,/checks=\{\[ready,active,boardVerified\]\}/);
+ assert.match(gate,/checks=\{\[ready,active && deviceVerified,workspaceVerified\]\}/);
+ assert.match(gate,/const workspaceVerified=managerVerified&&/);
  assert.match(gate,/initialBoard=\{managerPreload\?\.accountId===account.accountId\?managerPreload.board:undefined\}/);
  assert.match(manager,/useState<TrainingBoard\|null>\(initialBoard\?\?null\)/);
  assert.match(manager,/skipPreloadedRead.current/);
@@ -49,7 +50,7 @@ test("manager first D1-backed board is loaded BEFORE READY and passed into the m
 });
 test("when manager prefetch fails, no READY or GO and retry uses an actual server request",()=>{
  assert.match(gate,/setManagerPreloadError\(cause instanceof Error/);
- assert.match(gate,/error=\{managerPreloadError\|\|error\}/);
+ assert.match(gate,/error=\{roleBootstrapError\|\|managerPreloadError\|\|error\}/);
  assert.match(gate,/setManagerPreloadAttempt\(value=>value\+1\)/);
  assert.match(ceremony,/if \(error \|\| phase !== "verified"\) return/);
  assert.match(ceremony,/role="alert"/);
