@@ -50,13 +50,16 @@ test("V12: student class leader can be chosen inside class or provisionally outs
   const restored=await f.call({...base,source:"class",memberDeviceId:inside.device.deviceId,
     displayName:"Học viên trong lớp",expectedVersion:3});
   assert.equal(restored.status,200);
-  const forbidden=await f.call({action:"assign-person",personId:inside.device.deviceId,
+  const moved=await f.call({action:"assign-person",personId:inside.device.deviceId,
     expectedClassName:"A",classIds:[]});
-  assert.equal(forbidden.status,409,"a class leader cannot be silently transferred out");
-  const cleared=await f.call({...base,source:"none",memberDeviceId:null,displayName:null,expectedVersion:4});
+  assert.equal(moved.status,200,"class transfer must never be held hostage by a leader title");
+  const afterMove=await f.call();
+  const leader=afterMove.board.leaders.find(l=>l.slot==="student");
+  assert.equal(leader.source,"outside","transferred student becomes a provisional outside contact");
+  assert.equal(leader.version,5);
+  assert.ok(afterMove.board.leaderHistory.some(h=>h.previousSource==="class"));
+  const cleared=await f.call({...base,source:"none",memberDeviceId:null,displayName:null,expectedVersion:5});
   assert.equal(cleared.status,200);
-  assert.equal((await f.call({action:"assign-person",personId:inside.device.deviceId,
-    expectedClassName:"A",classIds:[]})).status,200);
  }finally{f.sqlite.close();}
 });
 
