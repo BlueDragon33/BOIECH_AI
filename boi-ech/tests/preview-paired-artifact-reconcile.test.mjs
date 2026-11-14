@@ -87,7 +87,7 @@ test("paired Preview flow runs attestation+safe correction and strict gate befor
  assert.ok(text.includes('APP_CHECKOUT_SHA="$(git -C "$GITHUB_WORKSPACE/application-management-preview-source" rev-parse HEAD)"'));
  assert.ok(text.includes('env GITHUB_SHA="$REVIEWED_APP_SHA" npm run cloudflare:preview:prepare'));
  assert.doesNotMatch(text.slice(restored,repair),/^[ \t]*GITHUB_SHA: \$\{\{ env\.APPLICATION_MANAGEMENT_BUILD_REVISION \}\}/m);
- assert.match(text,/App checkout no longer matches pinned source/);
+ assert.match(text,/App checkout SHA differs from reviewed source/);
  assert.match(text,/Unexpected or duplicate prepared App revision/);
  assert.match(text,/node boi-ech\/scripts\/reconcile-paired-preview-app-revision\.mjs/);
  assert.match(text,/node boi-ech\/scripts\/assert-paired-preview-artifact-revisions\.mjs/);
