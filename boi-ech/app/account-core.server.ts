@@ -256,16 +256,18 @@ export class AccountService {
     // Client classification based on UA is a usability policy, not hardware attestation.
     const portable = clientClass !== "desktop";
     const deviceInsert = this.v2Enabled
-      ? this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved,client_class)
-          SELECT ?,?,?,CASE WHEN ?=1 OR (?=1 AND NOT EXISTS(
-            SELECT 1 FROM account_devices WHERE account_id=?
-          )) THEN 1 ELSE 0 END,?
-          WHERE 1 ON CONFLICT(account_id,device_id) DO NOTHING`)
-          .bind(accountId, deviceId, publicKeyJson(publicKey), portable ? 1 : 0,
-            firstRegistration ? 1 : 0, accountId, clientClass)
-      : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,client_class)
-          VALUES(?,?,?,?) ON CONFLICT(account_id,device_id) DO NOTHING`)
-          .bind(accountId, deviceId, publicKeyJson(publicKey), clientClass);
+      ? portable
+        ? this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved,client_class)
+            SELECT ?,?,?,1,? WHERE 1 ON CONFLICT(account_id,device_id) DO NOTHING`)
+            .bind(accountId, deviceId, publicKeyJson(publicKey), clientClass)
+        : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk,approved)
+            SELECT ?,?,?,CASE WHEN ?=1 AND NOT EXISTS(
+              SELECT 1 FROM account_devices WHERE account_id=?
+            ) THEN 1 ELSE 0 END WHERE 1 ON CONFLICT(account_id,device_id) DO NOTHING`)
+            .bind(accountId, deviceId, publicKeyJson(publicKey), firstRegistration ? 1 : 0, accountId)
+      : this.db.prepare(`INSERT INTO account_devices(account_id,device_id,public_key_jwk)
+          VALUES(?,?,?) ON CONFLICT(account_id,device_id) DO NOTHING`)
+          .bind(accountId, deviceId, publicKeyJson(publicKey));
     const statements: D1PreparedStatement[] = [deviceInsert];
     if (this.v2Enabled && portable) {
       // A previously pending browser key may be used from a phone/tablet after
