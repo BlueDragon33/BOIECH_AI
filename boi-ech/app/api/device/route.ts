@@ -9,10 +9,35 @@ import {
 } from "../../device-auth.server";
 import { captureDeviceMetadata } from "../../device-metadata.server";
 
+
 export const dynamic = "force-dynamic";
 
 export const ADDITIONAL_ACCOUNT_REVIEW_TOKEN = "boi-ech-additional-account-manual-review-v1";
 export const ADDITIONAL_ACCOUNT_REVIEW_LABEL = "Tài khoản bổ sung · chờ quản trị duyệt";
+
+/** A fresh device_access read intentionally lacks account_id, but the
+ * authorized session lookup above already proved ownership and V2 lease.
+ * Keep that server-only identity when refreshing D1 metadata after a
+ * successful authenticated register/presence call. Never trust request fields. */
+function preserveAccountDeviceReadback(
+  verified: Awaited<ReturnType<typeof registerDevice>>,
+  fresh: Awaited<ReturnType<typeof getPublicDeviceState>>,
+) {
+  if (!fresh) return verified;
+  if (fresh.deviceId !== verified.deviceId) throw new Error("DEVICE_READBACK_IDENTITY_MISMATCH");
+  if (!verified.accountId) return fresh; // unchanged anonymous/legacy contract
+  // Fresh D1 status, role and registration details are authoritative, including
+  // BLOCKED/INCOMPLETE; only the account ID and previously verified V2 lease
+  // are preserved from the cookie-authorized Account-first session.
+  return {
+    ...fresh,
+    accountId: verified.accountId,
+    accessExpiresAt: verified.accessExpiresAt,
+    accessExpired: verified.accessExpired,
+    accessExpiringSoon: verified.accessExpiringSoon,
+    accessDaysRemaining: verified.accessDaysRemaining,
+  };
+}
 
 function standaloneDevelopmentMode(request: Request) {
   const hostname = new URL(request.url).hostname;
@@ -64,7 +89,7 @@ export async function POST(request: Request) {
       );
       if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
-      device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
+      device = preserveAccountDeviceReadback(device, await getPublicDeviceState(device.deviceId).catch(() => null));
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     if (action === "challenge") {
@@ -84,7 +109,7 @@ export async function POST(request: Request) {
       let device = await verifyDeviceIdentityRequest(payload, standalone);
       if (standalone) device = await ensureStandaloneDevice(device.deviceId);
       await captureDeviceMetadata(request, device.deviceId).catch(() => undefined);
-      device = (await getPublicDeviceState(device.deviceId).catch(() => null)) ?? device;
+      device = preserveAccountDeviceReadback(device, await getPublicDeviceState(device.deviceId).catch(() => null));
       return Response.json({ device }, { headers: { "cache-control": "no-store, private" } });
     }
     return Response.json({ error: "Thao tác không được hỗ trợ." }, { status: 400 });
