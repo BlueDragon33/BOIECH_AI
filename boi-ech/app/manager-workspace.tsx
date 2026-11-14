@@ -8,6 +8,8 @@ import styles from "./manager-workspace.module.css";
 import ManagerRenewalPanel from "./manager-renewal-panel";
 import ManagerCommandCenter from "./manager-command-center";
 import ManagerRosterCleanup from "./manager-roster-cleanup";
+import {readPendingSync,flushVerifiedSync} from "./verified-sync-client";
+import {useBoiSyncNotices,broadcastBoiChange} from "./manual-sync-notices";
 type Tab="overview"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
 type Write=(payload:Record<string,unknown>)=>Promise<boolean>;
 const apps:{id:Tab;label:string;description:string}[]=[{id:"approval",label:"Gia hạn tài khoản",description:"Học viên và giảng viên"},{id:"schedule",label:"Xếp lịch",description:"Buổi học & thời gian"},{id:"class",label:"Lớp học",description:"Sĩ số & giảng viên"},{id:"people",label:"Nhân sự",description:"Học viên & giảng viên"},{id:"room",label:"Phòng học",description:"Sức chứa & lịch trống"},{id:"building",label:"Tòa học",description:"Tòa & các phòng"},{id:"settings",label:"Cài đặt",description:"Giao diện & thiết lập"}];
@@ -20,7 +22,7 @@ function currentWindow(){const start=new Date();start.setMinutes(0,0,0);return {
 type ResourceDraft={id:string;kind:ResourceKind;name:string;parentId:string;capacity:number;requiredTeachers:number;status:ResourceStatus;expectedVersion:number};
 type SessionDraft={id:string;title:string;classId:string;roomId:string;teacherId:string;startsAt:string;endsAt:string;status:TrainingSession["status"];expectedVersion:number};
 
-export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=false,onCommand,onWindowChange,appearance=defaultDisplay,onAppearanceChange=()=>{},accountControls,onOpenAccount=()=>{},onLogout=()=>{},accountName="Cán bộ quản lý",getProof,onAfterCleanup=()=>{}}:{board:TrainingBoard;tab:Tab;setTab:(tab:Tab)=>void;busy:boolean;notice:string;noticeError?:boolean;onCommand:Write;onWindowChange:(window:TrainingWindow)=>void;appearance?:DisplayPreferences;onAppearanceChange?:(next:DisplayPreferences)=>void;accountControls?:ReactNode;onOpenAccount?:()=>void;onLogout?:()=>void;accountName?:string;getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;onAfterCleanup?:()=>void}){
+export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=false,onCommand,onWindowChange,onManualSync=()=>{},syncPending=0,appearance=defaultDisplay,onAppearanceChange=()=>{},accountControls,onOpenAccount=()=>{},onLogout=()=>{},accountName="Cán bộ quản lý",getProof,onAfterCleanup=()=>{}}:{board:TrainingBoard;tab:Tab;setTab:(tab:Tab)=>void;busy:boolean;notice:string;noticeError?:boolean;onCommand:Write;onWindowChange:(window:TrainingWindow)=>void;onManualSync?:()=>void;syncPending?:number;appearance?:DisplayPreferences;onAppearanceChange?:(next:DisplayPreferences)=>void;accountControls?:ReactNode;onOpenAccount?:()=>void;onLogout?:()=>void;accountName?:string;getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;onAfterCleanup?:()=>void}){
  const [query,setQuery]=useState("");const [filter,setFilter]=useState("all");
  const [accountMenuOpen,setAccountMenuOpen]=useState(false);
  const [resource,setResource]=useState<ResourceDraft|null>(null);const [session,setSession]=useState<SessionDraft|null>(null);
@@ -82,7 +84,11 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
       </div>
     </div>
    </header>
-  <div className={styles.syncLine}><span className={styles.syncDot} data-busy={busy}/><small>{busy?"Đang đồng bộ…":`Cập nhật gần nhất ${dateLabel(board.observedAt)}`}</small><button type="button" className={styles.textButton} disabled={busy} onClick={()=>onWindowChange({from:board.from,to:board.to})}>Đồng bộ</button></div>
+  <div className={styles.syncLine}><span className={styles.syncDot} data-busy={busy}/><small>{busy?"Đang đồng bộ…":`Cập nhật gần nhất ${dateLabel(board.observedAt)}`}</small><button type="button" className={`${styles.textButton} boi-manual-sync-control`} disabled={busy} onClick={onManualSync}
+      aria-label={syncPending>0?`Đồng bộ thủ công ${syncPending} sự kiện chờ`:"Đồng bộ dữ liệu thủ công"}>
+      ↻ Đồng bộ
+      {syncPending>0?<span className="boi-manual-sync-badge" aria-hidden="true">{syncPending>99?"99+":syncPending}</span>:null}
+    </button></div>
   {tab==="approval"?<section className={styles.accountTools} aria-label="Gia hạn học viên và giảng viên">{accountControls??<p role="alert">Chưa xác minh được quyền gia hạn tài khoản.</p>}</section>:null}
   {tab!=="approval"&&tab!=="settings"?<section className={styles.window} aria-label="Khoảng thời gian điều phối"><button type="button" className={styles.windowToggle} aria-expanded={showWindow} onClick={()=>setShowWindow(!showWindow)}><span><small>Khoảng đang xem</small><strong>{dateLabel(board.from)} → {dateLabel(board.to)}</strong></span><span aria-hidden="true">⌄</span></button><form hidden={!showWindow} onSubmit={event=>{event.preventDefault();const data=new FormData(event.currentTarget);try{setFormError("");onWindowChange({from:utc(String(data.get("from"))),to:utc(String(data.get("to")))});}catch(error){setFormError(error instanceof Error?error.message:"");}}}><label>Từ<input key={board.from} name="from" type="datetime-local" defaultValue={localDate(board.from)} required disabled={busy}/></label><label>Đến<input key={board.to} name="to" type="datetime-local" defaultValue={localDate(board.to)} required disabled={busy}/></label><button disabled={busy}>Kiểm tra / đồng bộ</button></form><small className={styles.timezone}>{timezone} · Trạng thái phòng và nhân sự tính trong khoảng này.</small></section>:null}
   {notice?<p className={noticeError?styles.error:styles.notice} role={noticeError?"alert":"status"}>{notice}</p>:null}{formError?<p className={styles.error} role="alert">{formError}</p>:null}
@@ -148,19 +154,59 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  </div></main>;
 }
 
-export default function ManagerWorkspace({deviceId,getProof,onOpenAccount,onLogout,accountName}:{deviceId:string;getProof:(signal?:AbortSignal)=>Promise<TrainingProof>;onOpenAccount?:()=>void;onLogout?:()=>void;accountName?:string}){
+export default function ManagerWorkspace({deviceId,accountId,getProof,onOpenAccount,onLogout,accountName}:{deviceId:string;accountId?:string;getProof:(signal?:AbortSignal)=>Promise<TrainingProof>;onOpenAccount?:()=>void;onLogout?:()=>void;accountName?:string}){
  const client=useMemo(()=>createTrainingClient(getProof),[getProof]);
  const [board,setBoard]=useState<TrainingBoard|null>(null);const [windowRange,setWindowRange]=useState<TrainingWindow>(currentWindow);const [tab,setTab]=useState<Tab>("overview");
  const [appearance,setAppearance]=useState<DisplayPreferences>(defaultDisplay);
  useEffect(()=>{try{const raw=window.localStorage.getItem("boi-manager-display-v1");queueMicrotask(()=>setAppearance(parseDisplayPreferences(raw)));}catch{}},[]);
  function changeAppearance(next:DisplayPreferences){setAppearance(next);try{window.localStorage.setItem("boi-manager-display-v1",JSON.stringify(next));}catch{}}
  const [busy,setBusy]=useState(false);const [notice,setNotice]=useState("");const [noticeError,setNoticeError]=useState(false);const lock=useRef(false);
+ const {count:unreadCount,ids:unreadIds,acknowledge}=useBoiSyncNotices(accountId?`manager:${accountId}`:"");
+ const [localPending,setLocalPending]=useState<number|null>(null);
+ useEffect(()=>{
+   if(!accountId)return;
+   let live=true;
+   const recount=()=>{
+     void readPendingSync(accountId).then(value=>{if(live)setLocalPending(value.pending);})
+       .catch(()=>{if(live)setLocalPending(null);});
+   };
+   const onQueue=(event:Event)=>{
+     if((event as CustomEvent<{accountId?:string}>).detail?.accountId===accountId)recount();
+   };
+   recount();
+   window.addEventListener("boi:sync:queued",onQueue);
+   window.addEventListener("boi:sync:completed",onQueue);
+   return ()=>{live=false;window.removeEventListener("boi:sync:queued",onQueue);
+     window.removeEventListener("boi:sync:completed",onQueue);};
+ },[accountId]);
 
- const refresh=useCallback(async(signal?:AbortSignal)=>{setBusy(true);setNotice("");setNoticeError(false);try{setBoard(await client.read(windowRange,signal));}catch(error){if(!signal?.aborted){setNoticeError(true);setNotice(error instanceof Error?error.message:"Không thể tải dữ liệu.");}}finally{if(!signal?.aborted)setBusy(false);}},[client,windowRange]);
+ const refresh=useCallback(async(signal?:AbortSignal):Promise<boolean>=>{setBusy(true);setNotice("");setNoticeError(false);
+   try{setBoard(await client.read(windowRange,signal));return true;}
+   catch(error){if(!signal?.aborted){setNoticeError(true);setNotice(error instanceof Error?error.message:"Không thể tải dữ liệu.");}return false;}
+   finally{if(!signal?.aborted)setBusy(false);}},[client,windowRange]);
+ async function manualSync(){
+   if(lock.current||busy)return;
+   const observed=[...unreadIds];
+   const success=await refresh();
+   if(!success)return;
+   if(accountId && (localPending===null||localPending>0)){
+     try{
+       const queue=await readPendingSync(accountId);
+       if(queue.pending>0){
+         const result=await flushVerifiedSync(accountId);
+         window.dispatchEvent(new CustomEvent("boi:sync:completed",{detail:{accountId}}));
+         if(result.error){setNoticeError(true);setNotice("Dữ liệu chờ chưa được gửi hết: "+result.error);return;}
+       }
+     }catch(error){setNoticeError(true);setNotice(error instanceof Error?error.message:"Chưa thể đồng bộ hàng đợi.");return;}
+   }
+   acknowledge(observed);
+ }
  useEffect(()=>{const controller=new AbortController();queueMicrotask(()=>{if(!controller.signal.aborted)void refresh(controller.signal);});return()=>controller.abort();},[refresh]);
- async function command(payload:Record<string,unknown>){if(lock.current)return false;lock.current=true;setBusy(true);setNotice("");setNoticeError(false);try{const range=payload.action==="save-session"?{from:String(payload.startsAt),to:String(payload.endsAt)}:windowRange;const next=await client.mutate(payload,range);setBoard(next);if(range.from!==windowRange.from||range.to!==windowRange.to)setWindowRange(range);setNotice("Đã lưu và đọc lại dữ liệu điều phối.");return true;}catch(error){setNoticeError(true);setNotice(error instanceof Error?error.message:"Chưa xác minh được thay đổi. Bản nháp được giữ nguyên.");return false;}finally{lock.current=false;setBusy(false);}}
+ async function command(payload:Record<string,unknown>){if(lock.current)return false;lock.current=true;setBusy(true);setNotice("");setNoticeError(false);try{const range=payload.action==="save-session"?{from:String(payload.startsAt),to:String(payload.endsAt)}:windowRange;const next=await client.mutate(payload,range);setBoard(next);if(range.from!==windowRange.from||range.to!==windowRange.to)setWindowRange(range);setNotice("Đã lưu và đọc lại dữ liệu điều phối.");
+   if(accountId)broadcastBoiChange(`manager:${accountId}`);
+   return true;}catch(error){setNoticeError(true);setNotice(error instanceof Error?error.message:"Chưa xác minh được thay đổi. Bản nháp được giữ nguyên.");return false;}finally{lock.current=false;setBusy(false);}}
  if(!board)return <main className={styles.workspace} data-device-id={deviceId}><h1>Cán bộ quản lý</h1><p role="status">{busy?"Đang xác minh quyền và tải dữ liệu điều phối…":notice||"Chưa có dữ liệu được xác minh."}</p><button disabled={busy} onClick={()=>void refresh()}>Kiểm tra lại quyền / kết nối</button><button type="button" onClick={onOpenAccount}>Trang cá nhân và bảo mật</button><button type="button" onClick={onLogout}>Đăng xuất</button></main>;
  return <div data-device-id={deviceId} data-person-role="manager">
    <TrainingDashboard accountControls={<ManagerRenewalPanel/>} getProof={getProof}
-     onAfterCleanup={()=>void refresh()} onOpenAccount={onOpenAccount} onLogout={onLogout} accountName={accountName} appearance={appearance} onAppearanceChange={changeAppearance} board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindowRange(next);}}/></div>;
+     onAfterCleanup={()=>void refresh()} onManualSync={()=>void manualSync()} syncPending={unreadCount+(localPending??0)} onOpenAccount={onOpenAccount} onLogout={onLogout} accountName={accountName} appearance={appearance} onAppearanceChange={changeAppearance} board={board} tab={tab} setTab={setTab} busy={busy} notice={notice} noticeError={noticeError} onCommand={command} onWindowChange={next=>{if(lock.current)return;setWindowRange(next);}}/></div>;
 }
