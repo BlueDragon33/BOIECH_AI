@@ -6,6 +6,9 @@ import {AppIcon} from "./manager-status";
 import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession,type TrainingClassLeader} from "./training-types";
 import styles from "./manager-console-v12.module.css";
 import {CampusBuildingArt} from "./manager-campus-illustration";
+import {PracticePoolBuildingArt,PracticePoolBasinArt} from "./manager-practice-pool-art";
+import {existingPracticePoolBuilding,isPracticePoolBuilding,isPracticePoolRoom,
+ PRACTICE_POOL_BUILDING_NAME} from "./manager-practice-pool";
 
 type Tab="class"|"people"|"room";
 type Slot="cadre"|"student";
@@ -18,6 +21,7 @@ type Props={board:TrainingBoard;tab:Tab;busy:boolean;managerName:string;
  onEditSession:(s?:TrainingSession,roomId?:string,classId?:string)=>void;
  onWindowChange:(value:{from:string;to:string})=>void;
  onSelectPerson:(p:TrainingPerson)=>void;
+ onOpenBuildings:()=>void;
 };
 function localDay(iso:string){const d=new Date(iso);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");}
 function dayWindow(day:string){const d=new Date(day+"T00:00:00");if(!Number.isFinite(d.getTime()))throw new Error("Ngày chọn không hợp lệ.");const t=new Date(d);t.setDate(t.getDate()+1);return {from:d.toISOString(),to:t.toISOString()};}
@@ -39,7 +43,7 @@ function draftLeader(classId:string,slot:Slot,old?:TrainingClassLeader):LeaderDr
   militaryRank:old?.militaryRank??"",battalion:old?.battalion??"",expectedVersion:old?.version??0};
 }
 export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,onAssignPerson,onEditResource,
- onCreateRoom,onEditSession,onWindowChange,onSelectPerson}:Props){
+ onCreateRoom,onEditSession,onWindowChange,onSelectPerson,onOpenBuildings}:Props){
  const [query,setQuery]=useState("");
  const [selectedRoomBuilding,setSelectedRoomBuilding]=useState<string|null>(null);
  const [selectedClass,setSelectedClass]=useState<string|null>(null);
@@ -176,11 +180,16 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
       const busyRooms=related.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
       return <button type="button" className={styles.campusNode} aria-pressed={activeBuilding?.id===b.id}
        key={b.id} onClick={()=>setSelectedRoomBuilding(b.id)}>
-       <span className={styles.campusArtwork}><CampusBuildingArt variant={index}/></span>
+       <span className={styles.campusArtwork}>{isPracticePoolBuilding(b)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
        <strong>{b.name}</strong><small>{related.length} phòng · {busyRooms} đang học</small>
       </button>;
      })}
     </div>
+    {!existingPracticePoolBuilding(buildings)?<button type="button" className={styles.campusNode}
+     aria-label="Mở mẫu tòa bể bơi tại phân hệ Tòa học" onClick={onOpenBuildings}>
+      <span className={styles.campusArtwork}><PracticePoolBuildingArt/></span>
+      <strong>{PRACTICE_POOL_BUILDING_NAME}</strong><small>Mẫu sẵn · Mở Tòa học để tạo bể</small>
+     </button>:null}
     {!buildings.length?<p className={styles.empty}>Chưa có tòa học. Mở tab Tòa học và tạo tòa đầu tiên.</p>:null}
     {buildings.length>0&&!visibleBuildings.length?<p className={styles.empty}>Không tìm thấy tòa hoặc phòng phù hợp. Thử từ khóa khác.</p>:null}
    </section>
@@ -189,7 +198,7 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
     const occupied=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
     const available=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="vacant").length;
     return <details key={b.id} className={styles.building} open>
-     <summary><span className={styles.buildingArtwork}><CampusBuildingArt variant={index}/></span>
+     <summary><span className={styles.buildingArtwork}>{isPracticePoolBuilding(b)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
       <span><strong>{b.name}</strong><small>{rooms.length} phòng · {occupied} đang học · {available} trống</small></span>
       <span className={styles.openChevron}>⌄</span>
      </summary>
@@ -200,8 +209,8 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
        const next=running??schedules.find(s=>Date.parse(s.startsAt)>observed)??schedules[0];
        const state=sessionState(board,schedules,r);
        return <article key={r.id} className={styles.roomCard}>
-        <div className={styles.roomHeading}><span className={styles.roomIcon}><AppIcon name="room"/></span>
-         <span><strong>{r.name}</strong><small>{r.capacity} chỗ</small></span><span className={styles.roomState} data-state={state}>{stateLabel[state]}</span></div>
+        <div className={styles.roomHeading}><span className={styles.roomIcon}>{isPracticePoolRoom(r)?<PracticePoolBasinArt/>:<AppIcon name="room"/>}</span>
+         <span><strong>{r.name}</strong><small>{isPracticePoolRoom(r)?"Thực hành · ":""}{isPracticePoolRoom(r)&&r.status!=="active"?"Chờ cấu hình sức chứa":`${r.capacity} chỗ`}</small></span><span className={styles.roomState} data-state={state}>{stateLabel[state]}</span></div>
         {next?<div className={styles.roomDetails}>
          <p><strong>Lớp:</strong> {nameOf(next.classId)}</p>
          <p><strong>Thời gian:</strong> {fmt(next.startsAt)}–{fmt(next.endsAt)}</p>
@@ -211,8 +220,8 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
         </div>:<p className={styles.roomFree}>Không có lịch trong khoảng đã chọn</p>}
         <div className={styles.roomActions}>
          <button type="button" onClick={()=>onEditResource(r)}>Thiết lập</button>
-         <button type="button" onClick={()=>onEditSession(next,r.id,next?.classId)} disabled={busy}>Đổi lịch</button>
-         <button type="button" onClick={()=>onEditSession(undefined,r.id)} disabled={busy}>+ Phân phòng</button>
+         <button type="button" onClick={()=>onEditSession(next,r.id,next?.classId)} disabled={busy||!next}>Đổi lịch</button>
+         <button type="button" onClick={()=>onEditSession(undefined,r.id)} disabled={busy||r.status!=="active"||b.status!=="active"}>+ Phân phòng</button>
         </div>
        </article>;
       })}
