@@ -25,8 +25,8 @@ function guardOwner(actor:Actor){
 function criteria(input:Record<string,unknown>){
  const days=Number(input.days);
  const mode=input.mode;
- if(!([3,5,7,8].includes(days)&&["pending","inactive","both"].includes(String(mode))
-   &&!(days===0&&mode==="manager"))
+ if(!(([3,5,7,8].includes(days)&&["pending","inactive","both"].includes(String(mode)))
+   ||(days===0&&mode==="manager")))
   throw new AccountError("CLEANUP_INPUT",400);
  return {days,mode:mode as Mode};
 }
