@@ -50,7 +50,7 @@ test("main video evaluator calls gate before score, sync or grade persistence",(
  const source=readFileSync(new URL("../app/phan-tich-video/video-analyzer-impl.tsx",import.meta.url),"utf8");
  const gate=source.indexOf("const contentGate=inspectSwimmingEvidence");
  const save=source.indexOf("await putLocalAnalysis(analysis)");
- const scoring=source.indexOf("const categories = scoreCategories(errors)");
+ const scoring=source.indexOf("const technique = scoreSwimmingTechnique(scoreCategories(errors), contentGate, view)");
  assert.ok(gate>0&&gate<scoring&&scoring<save);
  assert.match(source,/if\(contentGate\.status!=="plausible"\)/);
  assert.match(source,/scoreSwimmingTechnique\(scoreCategories\(errors\), contentGate, view\)/);
