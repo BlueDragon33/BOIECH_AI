@@ -50,7 +50,38 @@ test("preview role smoke refuses HTTP 404 and HTML fallbacks",async()=>{
  ]){
   const tmp=tempBundle();
   try{
-    await assert.rejects(verifyPreviewRoleAssetsLive(async()=>response, tmp.root),/Preview role smoke:/);
+    await assert.rejects(verifyPreviewRoleAssetsLive(async()=>response,tmp.root,{retryDelays:[0,0],pause:async()=>{}}),/Preview role smoke:/);
+  }finally{tmp.cleanup();}
+ }
+});
+test("transient post-deploy 404 converges only after verified JavaScript 200",async()=>{
+ const tmp=tempBundle();
+ const attempts=new Map();
+ const seen=[];
+ try{
+  const proof=await verifyPreviewRoleAssetsLive(async (url)=>{
+    const count=(attempts.get(url)||0)+1;
+    attempts.set(url,count);seen.push({url,count});
+    return count===1
+      ?new Response("Not Found",{status:404,headers:{"content-type":"text/html"}})
+      :new Response("export const role='ready'",{status:200,headers:{"content-type":"application/javascript"}});
+  },tmp.root,{retryDelays:[0,0],pause:async()=>{}});
+  assert.equal(proof.checked,2);
+  assert.equal(seen.length,4);
+  assert.ok([...attempts.values()].every(count=>count===2));
+ }finally{tmp.cleanup();}
+});
+test("HTTP 403 and HTML 200 must fail immediately with no bridge writes",async()=>{
+ for(const response of [
+  new Response("Forbidden",{status:403,headers:{"content-type":"text/javascript"}}),
+  new Response("<html>SPA</html>",{status:200,headers:{"content-type":"text/html"}})
+ ]){
+  const tmp=tempBundle();
+  let calls=0;
+  try{
+   await assert.rejects(verifyPreviewRoleAssetsLive(async()=>{calls++;return response;},
+     tmp.root,{retryDelays:[0,0,0],pause:async()=>{}}),/Preview role smoke:/);
+   assert.equal(calls,1,"non-404 failures must never be retried or acknowledged");
   }finally{tmp.cleanup();}
  }
 });
