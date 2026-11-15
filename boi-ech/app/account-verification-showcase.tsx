@@ -13,6 +13,7 @@ type Props = {
   busy?: boolean;
   onRetry: () => void;
   onGo: () => void;
+  retryLabel?: string;
 };
 
 const steps = [
@@ -23,7 +24,7 @@ const steps = [
 
 /** Visual pacing cannot grant permissions. Each step waits for actual server evidence. */
 export default function AccountVerificationShowcase({
-  phase, checks, accountName, role, error = "", busy = false, onRetry, onGo,
+  phase, checks, accountName, role, error = "", busy = false, onRetry, onGo, retryLabel="Thử xác thực lại",
 }: Props) {
   const [stage, setStage] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -117,7 +118,7 @@ export default function AccountVerificationShowcase({
                 {stage === 0 ? "Đang xác minh phiên..." : stage === 1 ? "Đang kiểm tra quyền từ máy chủ..." : "Đang tải dữ liệu thật..."}
               </span> : null}
               {error ? <button type="button" disabled={busy} onClick={onRetry} className={styles.retry}>
-                {busy ? "Đang kết nối..." : "Thử xác thực lại"}
+                {busy ? "Đang kết nối..." : retryLabel}
               </button> : null}
             </div>
             <p className={styles.foot}>READY chỉ xuất hiện khi đủ quyền và dữ liệu thực đã sẵn sàng; GO tự chuyển sau 1 giây.</p>
