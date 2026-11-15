@@ -69,8 +69,8 @@ test("V39 suggestions remain scoped and require human action, no auto-send",()=>
 test("V39 actionable priority strip jumps to filtered list and safely opens reports/create",()=>{
  assert.match(shortcuts,/const focusList=\(next:TaskFilter\)=>\{onFilterChange\(next\);document\.getElementById\("teacher-task-list-v39"\)/);
  assert.match(schedule,/id="teacher-task-list-v39"/);
- assert.match(shortcuts,/action:()=>focusList\("overdue"\)/);
- assert.match(shortcuts,/action:()=>focusList\("needs-help"\)/);
+ assert.match(shortcuts,/action:\(\)=>focusList\("overdue"\)/);
+ assert.match(shortcuts,/action:\(\)=>focusList\("needs-help"\)/);
  assert.match(shortcuts,/action:onCreate/);
  assert.match(shortcuts,/action:onReports/);
  assert.match(shell,/onReports=\{\(\)=>setTab\("reports"\)\}/);
