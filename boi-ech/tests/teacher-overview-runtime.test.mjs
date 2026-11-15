@@ -48,7 +48,17 @@ function clientLoader(f, api, key) {
     assert.equal(url, "/api/teacher/overview");
     return api.POST(new Request(`https://boi-ech.boiech-ai.workers.dev${url}`, { method: "POST", body: options.body }));
   };
-  return new Function("fetch", "readStoredDeviceCredential", `${outputText}; return loadTeacherOverview;`)(fetch, async () => ({ version: 2, publicKey: key.publicKey, privateKey: key.privateKey }));
+  // Exercise the real shared signing/nonce queue rather than replacing the
+  // new teacher import with an undefined global in the isolated TS function fixture.
+  const {outputText: clientText}=ts.transpileModule(
+    fs.readFileSync(path.join(app, "teacher-learner-conversation-client.ts"), "utf8"),
+    {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}
+  );
+  const sharedExports={};
+  new Function("exports", "fetch", clientText)(sharedExports, fetch);
+  const readCredential=async()=>({version:2,publicKey:key.publicKey,privateKey:key.privateKey});
+  return new Function("fetch", "readStoredDeviceCredential", "signedConversationProof",
+    `${outputText}; return loadTeacherOverview;`)(fetch, readCredential, sharedExports.signedConversationProof);
 }
 
 test("registered approved teacher loads the real signed overview and sees only assigned learners", async () => {
