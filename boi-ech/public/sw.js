@@ -33,7 +33,8 @@ self.addEventListener("fetch", (event) => {
         const valid = url.pathname.endsWith(".js")
           ? /javascript|ecmascript/i.test(type) : /text\/css/i.test(type);
         if (response.ok && valid) {
-          event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone())));
+          const assetCopy = response.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, assetCopy)));
         }
         // Never substitute cached JS for an online 404 or an HTML fallback.
         return response;
