@@ -58,7 +58,19 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+    // HTML may reference release-specific hashed JS. Never keep an old SSR
+    // shell across deployments; immutable /assets/* is handled separately.
+    if (request.method === "GET" &&
+        request.headers.get("accept")?.includes("text/html") &&
+        response.headers.get("content-type")?.includes("text/html")) {
+      const headers = new Headers(response.headers);
+      headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+      return new Response(response.body, {
+        status: response.status, statusText: response.statusText, headers,
+      });
+    }
+    return response;
   },
 };
 
