@@ -97,3 +97,10 @@ test("teacher inbox auto channel only sees inbound messages for authorized class
   assert.equal(b.recent.length,1);assert.equal(b.recent[0].learnerPersonCode,"HV02");
  }finally{f.dispose();}
 });
+
+test("teacher inbox UI respects the currently selected work-scope and does not select a different student",()=>{
+ const code=fs.readFileSync(new URL("../app/teacher-learner-conversations.tsx",import.meta.url),"utf8");
+ assert.match(code,/const scopedInbox=inbox\.filter\(item=>available\.some\(l=>l\.personCode===item\.learnerPersonCode\)\)/);
+ assert.match(code,/scopedInbox\.slice\(0,5\)/);
+ assert.match(code,/const messages=records\.target===target\?records\.items:\[\]/);
+});
