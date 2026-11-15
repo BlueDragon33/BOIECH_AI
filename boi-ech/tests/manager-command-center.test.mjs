@@ -229,7 +229,7 @@ test("changing building or room keeps nonselected siblings as compact icons insi
  const render=hookHarness({board:b,busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},
   onCreateResource:()=>{},onCreateSession:()=>{}});
  let tree=render();
- tree.find(node=>node.props?.["aria-label"]==="Mở tòa Tòa B").props.onClick();tree=render();
+ openBuildingFromMap(tree,"Tòa B");tree=render();
  assert.ok(tree.find(node=>node.props?.["aria-label"]==="Chuyển sang tòa Tòa A"),"other building remains available");
  tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m").props.onClick();tree=render();
  assert.ok(tree.find(node=>node.props?.["aria-label"]==="Chuyển sang phòng Hồ 50m"),"other room collapses, not disappears");
