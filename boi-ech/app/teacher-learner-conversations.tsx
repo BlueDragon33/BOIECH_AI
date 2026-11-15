@@ -9,7 +9,7 @@ type Props={role:"learner"|"teacher";deviceId:string;learners?:LearnerOption[]};
 function when(value:string){const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(date):"—";}
 const label={chat:"Chat trực tiếp",request:"Thư yêu cầu & phản hồi"} as const;
 
-/** No page reload: scoped authenticated D1 polling every 5–7s while visible. Not a WebSocket. */
+/** Event-driven chat over authenticated WebSocket. Signed REST remains the source of truth and reconnect fallback. */
 export default function TeacherLearnerConversations({role,deviceId,learners=[]}:Props){
  const [channel,setChannel]=useState<ConversationChannel>("chat");
  const [selected,setSelected]=useState("");
@@ -19,6 +19,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  const [subject,setSubject]=useState("");
  const [requestId,setRequestId]=useState<number|null>(null);
  const [busy,setBusy]=useState(false);
+ const [realtime,setRealtime]=useState(false);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
@@ -38,6 +39,63 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   if(!signal?.aborted){setRecords({target,items:data.messages??[]});setLoading(false);setError("");}
  },[role,deviceId,target,validDevice]);
  useEffect(()=>{
+  if(!validDevice)return;
+  let disposed=false;
+  let socket:WebSocket|null=null;
+  let timer:number|undefined;
+  let tries=0;
+  const schedule=()=>{
+   if(disposed||timer!==undefined)return;
+   const delay=Math.min(30000,750*Math.pow(2,Math.min(tries++,6)));
+   timer=window.setTimeout(()=>{timer=undefined;void connect();},delay);
+  };
+  async function connect(){
+   if(disposed||!navigator.onLine||document.visibilityState==="hidden")return;
+   try{
+    const session=await conversationRequest(deviceId,{action:"connect"});
+    if(disposed)return;
+    if(session.realtime!==true||!session.ticket){setRealtime(false);return;}
+    const url=new URL("/api/course/conversations/socket",window.location.origin);
+    url.protocol=url.protocol==="https:"?"wss:":"ws:";
+    const ws=new WebSocket(url.toString(),["boi-ech.v16","ticket."+session.ticket]);
+    socket=ws;
+    ws.onopen=()=>{
+     if(disposed){ws.close();return;}
+     tries=0;setRealtime(true);
+     window.dispatchEvent(new Event("boi:conversation:new"));
+    };
+    ws.onmessage=(event)=>{
+     if(disposed||typeof event.data!=="string")return;
+     try{
+      const message=JSON.parse(event.data) as {type?:string};
+      if(message.type==="conversation_changed")
+       window.dispatchEvent(new Event("boi:conversation:new"));
+     }catch{}
+    };
+    ws.onerror=()=>{ /* onclose starts a bounded reconnect */ };
+    ws.onclose=()=>{if(disposed)return;setRealtime(false);schedule();};
+   }catch{if(!disposed){setRealtime(false);schedule();}}
+  }
+  const wake=()=>{
+   if(document.visibilityState==="visible"&&navigator.onLine&&
+      (!socket||socket.readyState===WebSocket.CLOSED)){
+    if(timer!==undefined){window.clearTimeout(timer);timer=undefined;}
+    void connect();
+   }
+  };
+  void connect();
+  document.addEventListener("visibilitychange",wake);
+  window.addEventListener("online",wake);
+  return ()=>{
+   disposed=true;setRealtime(false);
+   if(timer!==undefined)window.clearTimeout(timer);
+   document.removeEventListener("visibilitychange",wake);
+   window.removeEventListener("online",wake);
+   socket?.close(1000,"Component unmounted");
+  };
+ },[deviceId,validDevice]);
+ useEffect(()=>{
+  if(realtime)return;
   if(!validDevice||(role==="teacher"&&!target))return;
   let dead=false,pending=false;
   const controller=new AbortController();
@@ -51,9 +109,11 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   const timer=window.setInterval(poll,5200);
   document.addEventListener("visibilitychange",handle);
   window.addEventListener("online",handle);
-  return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);};
- },[refresh,validDevice,role,target]);
+  window.addEventListener("boi:conversation:new",handle);
+  return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
+ },[refresh,validDevice,role,target,realtime]);
  useEffect(()=>{
+  if(realtime)return;
   if(role!=="teacher"||!validDevice)return;
   let dead=false,pending=false;
   const controller=new AbortController();
@@ -75,8 +135,9 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   const handle=()=>poll();
   const timer=window.setInterval(poll,6800);
   document.addEventListener("visibilitychange",handle);window.addEventListener("online",handle);
-  return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);};
- },[deviceId,role,validDevice]);
+  window.addEventListener("boi:conversation:new",handle);
+  return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
+ },[deviceId,role,validDevice,realtime]);
  function resetDraft(){pendingId.current=null;setText("");setSubject("");setRequestId(null);}
  function selectChannel(type:ConversationChannel){setChannel(type);resetDraft();}
  async function send(event:React.FormEvent){
@@ -92,14 +153,14 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
     ...(target?{learnerPersonCode:target}:{}),...(channel==="request"&&role==="teacher"?{requestId:selectedRequest!.id}:{}),
     clientEventId:pendingId.current});
    pendingId.current=null;setText("");if(role==="learner"&&channel==="request")setSubject("");
-   await refresh();setNotice("Đã gửi. Người nhận sẽ thấy tin khi tự đồng bộ.");
+   await refresh();setNotice("Đã gửi và lưu thành công.");
   }catch(err){setError(err instanceof Error?err.message:"Chưa gửi được. Có thể thử lại mà không tạo tin trùng.");}
   finally{setBusy(false);}
  }
  const editing=(value:string)=>{setText(value);pendingId.current=null;};
  if(!validDevice)return <section className={styles.shell}><p>Đang xác minh thiết bị để mở kênh Giảng viên – Học viên…</p></section>;
  return <section className={styles.shell} aria-label="Liên lạc trực tiếp giữa giảng viên và học viên">
-  <header className={styles.header}><div><small>LIÊN LẠC HAI CHIỀU</small><h2>Giảng viên ↔ Học viên</h2><p>Hai kênh độc lập, lưu theo đúng lớp và tài khoản. Tự nhận tin mới khi trang đang mở.</p></div><span className={styles.online}>● Tự đồng bộ 5–7 giây</span></header>
+  <header className={styles.header}><div><small>LIÊN LẠC HAI CHIỀU</small><h2>Giảng viên ↔ Học viên</h2><p>Hai kênh độc lập, lưu theo đúng lớp và tài khoản. Tự nhận tin mới khi trang đang mở.</p></div><span className={styles.online}>{realtime?"● Realtime · Sự kiện trực tiếp":"● Đang dùng kết nối dự phòng"}</span></header>
   {role==="teacher"?<div className={styles.teacherScope}>
     <label>Học viên trong lớp<select value={target} onChange={e=>{setSelected(e.target.value);resetDraft();setNotice("");}}>
       {available.length?available.map(l=><option key={l.personCode} value={l.personCode}>{l.name} · {l.className}</option>):<option value="">Chưa có học viên phù hợp</option>}
