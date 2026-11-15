@@ -116,6 +116,10 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
   const categories = source.categories && typeof source.categories === "object"
     ? source.categories as Record<string, unknown>
     : {};
+  // Time offsets preserve tenths of seconds so teachers can locate an error.
+  const measuredSeconds = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 30
+      ? Math.round(value * 10) / 10 : null;
   const detailErrors = errors.slice(0, 6).flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const row = item as Record<string, unknown>;
@@ -124,7 +128,7 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     return [{
       title: label,
       severity: row.severity === "critical" ? "critical" as const : "warning" as const,
-      timeSec: measured(row.timeSec, 30),
+      timeSec: measuredSeconds(row.timeSec),
       observed: typeof row.observed === "string" ? row.observed.slice(0, 100) : "",
       expected: typeof row.expected === "string" ? row.expected.slice(0, 120) : "",
       recommendation: typeof row.recommendation === "string" ? row.recommendation.slice(0, 240) : "",
@@ -139,7 +143,7 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     averageVisibility: measured(quality.averageVisibility),
     sampledFrames: measured(source.sampledFrames, 240),
     detectedFrames: measured(source.detectedFrames, 240),
-    durationSec: measured(source.durationSec, 30),
+    durationSec: measuredSeconds(source.durationSec),
     cameraView: source.cameraView === "side" ? "side" : "rear",
     categories: {
       legs: measured(categories.legs),
