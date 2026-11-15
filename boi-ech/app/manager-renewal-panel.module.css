@@ -1,68 +1,185 @@
-.panel{display:grid;gap:17px;background:#fff;color:#163956;border:2px solid #c5d9ed;border-radius:16px;padding:20px}
-.panel header{display:flex;justify-content:space-between;align-items:start;gap:15px;flex-wrap:wrap}.panel header small{color:#24679a;font-size:11px;font-weight:900}
-.panel h2{font-size:22px;margin:5px 0;color:#153d6a}.panel p{font-size:13px;color:#3c5a77;line-height:1.6;margin:0}
-.panel button{min-height:42px;border:1px solid #2a659e;background:#18578c;color:#fff;border-radius:9px;padding:9px 13px;font:inherit;font-weight:800;cursor:pointer}
-.panel button:disabled{opacity:.55;cursor:not-allowed}.panel :is(button,input,select,textarea):focus-visible{outline:3px solid #1e78bd;outline-offset:3px}
-.panel label{display:grid;gap:6px;font-size:12px;font-weight:800;color:#395b7a}.panel :is(input,select,textarea){min-height:42px;padding:10px;border:1px solid #b1c9e2;border-radius:9px;background:white;color:#183d60;font:inherit}
-.tools{display:grid;grid-template-columns:2fr 1fr;gap:11px}.reason textarea{resize:vertical}
-.list{display:grid;gap:10px;max-height:550px;overflow:auto}
-.list article{border:1px solid #d4e3f0;background:#f8fbff;border-radius:11px;padding:13px;display:grid;grid-template-columns:2fr minmax(100px,1fr) auto;gap:12px;align-items:center}
-.list article>div{display:grid;gap:5px;min-width:0}
-.list strong{font-size:14px;color:#143e65}.list small{font-size:12px;color:#3f6081}.list code{font-size:11px;color:#32658c;overflow-wrap:anywhere}
-.notice{padding:10px;color:#145a3d;border:1px solid #8bbca0;background:#ecf8f0;border-radius:9px}
-.error{padding:10px;color:#882936;border:1px solid #d8a1a9;background:#fff0f2;border-radius:9px}
-.panel footer{font-size:11px;color:#466480}
-@media(max-width:680px){.panel{padding:12px}.tools{grid-template-columns:1fr}.list article{grid-template-columns:1fr}.panel h2{font-size:19px}}
+/* Account renewal — Owner-approved premium manager UI, 2026-11-15.
+ * UI-only. D1 verified values, source authorization and write/readback unchanged. */
+.panel{color-scheme:light;isolation:isolate;display:grid;gap:19px;width:100%;min-width:0;
+ padding:clamp(16px,2.1vw,28px);border:1px solid #c5d4fa;border-radius:23px;
+ color:#102b55;background:radial-gradient(ellipse at 88% 0%,#e2dffd 0%,transparent 37%),
+ radial-gradient(ellipse at 4% 100%,#dbeafe 0%,transparent 49%),
+ linear-gradient(135deg,#f6f9ff,#edf3ff 72%,#e7e7ff);
+ box-shadow:inset 0 1px #fff,0 17px 45px #041c3a20;overflow:hidden}
+.panel *{box-sizing:border-box}
+.panel h2,.panel h3,.panel p{margin:0;color:#132e59}
+.panel p{line-height:1.55}
+.panel small{font-size:12px;color:#466180}
+.heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.headingCopy{min-width:0;max-width:850px;display:grid;gap:6px}
+.headingCopy>small{color:#1456b4;font-weight:900;letter-spacing:.035em;font-size:12px}
+.panel .heading h2{color:#0d2655;font-size:clamp(24px,2.9vw,36px);font-weight:850;line-height:1.13;letter-spacing:-.04em}
+.panel .heading p{max-width:940px;color:#364e72;font-size:clamp(12px,1.16vw,15px)}
+.panel button{font:inherit;cursor:pointer;touch-action:manipulation;min-height:43px}
+.panel button:disabled{opacity:.55;cursor:not-allowed}
+.panel :is(button,input,select,textarea):focus-visible{outline:3px solid #175ddb;outline-offset:3px}
+.panel .refresh{display:inline-flex;align-items:center;gap:8px;justify-content:center;white-space:nowrap;
+ border:1px solid #164eb9;border-radius:12px;min-height:46px;padding:9px 17px;
+ background:linear-gradient(160deg,#327cf8,#0755cd);box-shadow:0 5px 14px #205fd73d;
+ color:white;font-weight:800;font-size:13px}
+.refresh svg{width:19px;height:19px}
+.panel .refresh:hover:not(:disabled){background:linear-gradient(160deg,#2173ed,#0545b6)}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.metricCard{min-height:108px;min-width:0;display:flex;align-items:center;gap:13px;
+ border:1px solid #fff;border-radius:17px;padding:clamp(11px,1.3vw,17px);
+ box-shadow:0 7px 16px #173f7e17,inset 0 1px #fff}
+.metricCard[data-tone=green]{background:linear-gradient(140deg,#ecfff5,#d7f5e8);border-color:#b7e5d0}
+.metricCard[data-tone=orange]{background:linear-gradient(140deg,#fff9f0,#ffe6d2);border-color:#f1d5bb}
+.metricCard[data-tone=purple]{background:linear-gradient(140deg,#f8f5ff,#e6e0fc);border-color:#cec2f8}
+.metricCard[data-tone=blue]{background:linear-gradient(140deg,#f5faff,#d3eaff);border-color:#b9d5f8}
+.metricIcon{flex:0 0 48px;width:48px;height:48px;display:grid;place-items:center;border-radius:16px;
+ background:#d0f7e1;color:#117a48}
+.metricCard[data-tone=orange] .metricIcon{background:#ffecd5;color:#b56505}
+.metricCard[data-tone=purple] .metricIcon{background:#ebe3ff;color:#703ed4}
+.metricCard[data-tone=blue] .metricIcon{background:#d9eefe;color:#1269cc}
+.metricIcon svg{height:26px;width:26px}
+.metricCard>div{display:grid;gap:2px;min-width:0}
+.panel .metricCard h3{font-size:13px;font-weight:850;color:#102753;line-height:1.3}
+.metricCard strong{font-size:clamp(24px,2.6vw,34px);font-weight:850;color:#102753;line-height:1.04;font-variant-numeric:tabular-nums}
+.panel .metricCard small{font-size:11px;color:#3e5774;line-height:1.25}
+.tools{display:grid;grid-template-columns:minmax(220px,1.6fr) minmax(145px,.57fr) minmax(0,1.65fr);
+ align-items:end;gap:13px;min-width:0}
+.panel .tools label{display:grid;gap:7px;min-width:0;font-size:13px;font-weight:800;color:#15305b}
+.panel :is(input,select,textarea){color:#17365d;background:#fff;border:1px solid #b9ccef;border-radius:11px;
+ font:inherit;min-height:45px;padding:10px 12px;max-width:100%;width:100%;min-width:0}
+.panel input::placeholder,.panel textarea::placeholder{color:#6680a0;opacity:1}
+.searchField{position:relative;display:flex;align-items:center;min-width:0}
+.searchField svg{position:absolute;left:13px;width:20px;height:20px;color:#31649b;pointer-events:none}
+.panel .searchField input{padding-left:43px}
+.panel .tools select{appearance:auto;font-weight:700}
+.filterGroup{display:flex;justify-content:flex-end;align-items:center;gap:6px;min-width:0;overflow-x:auto;padding:0 0 1px;scrollbar-width:thin}
+.panel .filterChip{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:0 0 auto;
+ padding:8px 11px;min-height:44px;border:1px solid #c4d2ef;border-radius:999px;
+ background:#f3f6fe;color:#17345e;font-size:12px;font-weight:750;white-space:nowrap}
+.filterChip svg{width:17px;height:17px}
+.panel .filterChip[aria-pressed=true]{background:linear-gradient(140deg,#3482fe,#0756d5);border-color:#1558cf;
+ color:#fff;box-shadow:0 3px 11px #155ed75c}
+.panel .filterChip:hover:not(:disabled):not([aria-pressed=true]){background:#e3edfc;border-color:#8eaee9}
+.panel .summary{font-size:12px;color:#486484;line-height:1.5}
+.roleSections{display:grid;gap:18px;min-width:0}
+.roleSection{display:grid;gap:13px;padding:15px;min-width:0;border-radius:20px;
+ border:1px solid #bfd8fc;background:linear-gradient(135deg,#e8f2ff,#daeafe 75%,#eaf2ff);
+ box-shadow:inset 0 1px #fff,0 7px 19px #22477915;container-type:inline-size}
+.roleSection[data-role=teacher]{border-color:#cdc0f6;background:linear-gradient(135deg,#f0edff,#e7e2fb 75%,#f3efff)}
+.groupHeader{display:flex;align-items:center;gap:13px 18px;flex-wrap:wrap;min-width:0}
+.groupIdentity{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+.groupIcon{display:grid;place-items:center;flex:0 0 37px;width:37px;height:37px;color:#1167d5}
+.groupIcon svg{width:29px;height:29px}
+.roleSection[data-role=teacher] .groupIcon{color:#6b37bf}
+.panel .groupHeader h3{margin:0;font-size:21px;line-height:1.2;color:#0d2853;font-weight:850}
+.groupCount{padding:5px 12px;border-radius:999px;background:#cbe0fe;color:#104fae;
+ font-size:12px;font-weight:850;white-space:nowrap}
+.roleSection[data-role=teacher] .groupCount{color:#6033ba;background:#dbd1fc}
+.panel .groupHeader p{border-left:1px solid #a7bddf;padding-left:17px;font-size:12px;color:#364e74;min-width:0;flex:1 1 200px}
+.roleSection[data-role=teacher] .groupHeader p{border-left-color:#bca9ea}
+.list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0;align-items:stretch}
+.accountTile{min-width:0;display:grid;align-content:start;gap:13px;padding:clamp(12px,1.35vw,17px);
+ border:1px solid #ccdcf6;border-radius:17px;background:linear-gradient(150deg,#fff,#f9fbff);
+ box-shadow:0 5px 14px #224b8512,inset 0 1px #fff}
+.roleSection[data-role=teacher] .accountTile{border-color:#d9cffa;background:linear-gradient(145deg,#fff,#fbfaff)}
+.identity{min-width:0;display:flex;align-items:flex-start;gap:11px}
+.avatar{width:47px;height:47px;flex:0 0 47px;display:grid;place-items:center;
+ border-radius:14px;background:#e1edff;color:#1765d8}
+.avatar[data-role=teacher]{background:#ece6ff;color:#6134c4}
+.avatar svg{width:27px;height:27px}
+.personName{flex:1 1 auto;min-width:0;display:grid;gap:4px;padding-top:4px}
+.personName strong{display:block;font-size:15px;font-weight:850;color:#132c57;line-height:1.25;overflow-wrap:anywhere}
+.panel .personName small{display:block;color:#456180;font-size:12px;line-height:1.3}
+.statusBadge{display:inline-flex;align-items:center;justify-content:center;gap:5px;max-width:47%;
+ padding:5px 9px;border-radius:999px;background:#e4f7ec;color:#116036;
+ font-size:11px;font-weight:850;line-height:1.3;text-align:center}
+.statusBadge[data-state=soon]{background:#fff0dd;color:#9b4d00}
+.statusBadge[data-state=expired]{background:#fff0f2;color:#9c2639}
+.statusBadge[data-state=permanent]{background:#efe8ff;color:#5930b1}
+.statusBadge[data-state=unknown]{background:#e6edf7;color:#405675}
+.statusBadge svg{flex:0 0 16px;width:16px;height:16px}
+.tileDetails{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) auto;align-items:end;gap:10px;min-width:0}
+.expiryInfo,.permanentInfo,.learningInfo{min-width:0;display:grid;gap:6px}
+.detailTitle{display:flex;align-items:center;gap:6px;color:#416180;font-size:11px;line-height:1.3}
+.detailTitle svg{width:16px;height:16px;flex-shrink:0;color:#23578c}
+.expiryInfo strong,.permanentInfo strong{color:#122c57;font-size:13px;font-weight:850;line-height:1.3;font-variant-numeric:tabular-nums}
+.permanentInfo strong{color:#5c32b5}
+.unlimitedValue{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#5530ab;font-weight:750}
+.unlimitedValue svg{width:17px;height:17px}
+.progressLine{display:flex;align-items:center;gap:7px}
+.progressLine progress{appearance:none;width:100%;height:9px;border:0;border-radius:999px;overflow:hidden;min-width:10px;background:#dee6f4;accent-color:#1cbd77}
+.progressLine progress::-webkit-progress-bar{background:#dce4f2;border-radius:999px}
+.progressLine progress::-webkit-progress-value{background:#16b96f;border-radius:999px}
+.progressLine progress::-moz-progress-bar{background:#16b96f;border-radius:999px}
+.progressLine strong{color:#19335f;font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.progressEmpty{color:#526c8b;font-size:11px;line-height:1.4;max-width:160px}
+.panel .editIcon{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+ min-height:43px;padding:8px 12px;border:1px solid #195dcc;border-radius:10px;
+ background:linear-gradient(155deg,#3382ff,#0758d6);box-shadow:0 3px 10px #1461dc31;
+ color:white;white-space:nowrap;font-size:12px;font-weight:850}
+.panel .editIcon svg{width:17px;height:17px}
+.panel .editIcon:hover:not(:disabled){background:linear-gradient(155deg,#2173ee,#094bc6)}
+.panel .empty,.panel .loading{padding:23px 15px;border:1px dashed #a9bfdd;background:#ffffff9c;
+ border-radius:13px;text-align:center;font-size:13px;color:#405d80}
+.panel .empty{grid-column:1/-1}
+.panel .notice,.panel .error{padding:12px 14px;border-radius:11px;font-size:13px}
+.panel .notice{color:#125c3d;background:#e6f8ef;border:1px solid #82c7a5}
+.panel .error{color:#8c2436;background:#fff0f2;border:1px solid #e6a8b1}
+.panel footer{font-size:11px;color:#456280;line-height:1.45}
 
-
-/* Professional renewal cards: visible time and genuine learner progress. */
-.list article{grid-template-columns:minmax(180px,1.3fr) minmax(160px,1fr) auto;
- gap:16px;padding:18px;border:1px solid #bdd7ed;border-radius:16px;
- background:#f6faff;box-shadow:0 5px 16px #102b4a0b}
-.list article>div>strong{font-size:16px;color:#0e355f}
-.list article>label{align-self:center}
-.list article>label select{width:100%;font-weight:750;color:#153e6b}
-.list article>button{min-height:48px;background:#195b9b;font-size:13px}
-.lessonProgress{display:grid;gap:5px;margin-top:5px}
-.lessonProgress strong{font-size:11px;color:#2c587c}
-.lessonProgress span{font-size:12px;color:#244a6f}
-.lessonProgress progress{height:11px;width:100%;border-radius:8px;accent-color:#197ac1}
-@media(max-width:860px){.list article{grid-template-columns:1fr}.list article>button{width:100%}}
-
-
-/* V10: compact renewal roster + deliberate modal editing. No wasted 3-column form. */
-.heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
-.heading>div{max-width:620px}
-.summary{font-size:12px!important;color:#426382!important}
-.list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px;max-height:min(62dvh,700px);overflow-y:auto;align-content:start}
-.list .accountTile{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;gap:12px;padding:16px;
- min-width:0;background:#fff;border:1px solid #d0e0f1;border-radius:17px;box-shadow:0 4px 18px #102b4a0a;align-items:center}
-.identity{grid-column:1/-1;display:flex!important;align-items:center;gap:12px;min-width:0}
-.avatar{flex:0 0 46px;width:46px;height:46px;display:grid;place-items:center;border-radius:14px;
- background:#edf4ff;color:#144a87;font-size:25px;font-weight:900}
-.identity>div{display:grid;gap:4px;min-width:0}.identity strong{font-size:15px;overflow-wrap:anywhere}
-.identity small{font-size:12px;color:#506b87}.termSummary{display:grid;gap:3px;min-width:0}
-.termSummary>span,.termSummary small{font-size:11px;color:#526c86}.termSummary strong{font-size:13px;color:#133b63}
-.panel .editIcon{display:flex;align-items:center;justify-content:center;gap:7px;min-height:43px;
- padding:8px 12px;border-radius:11px;background:#eaf3ff;color:#154d8b;border-color:#bdd3ee;
- font-size:19px;white-space:nowrap}.editIcon span{font-size:12px;font-weight:800}
+/* Existing verified D1 confirmation dialog: restyled, business logic and audit unchanged. */
 .backdrop{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;overflow-y:auto;
- padding:clamp(12px,3vw,32px);background:#061832bd;backdrop-filter:blur(5px)}
-.dialog{width:min(100%,570px);max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;
- display:grid;gap:18px;padding:clamp(18px,3vw,30px);background:#fff;color:#133557;
- border:1px solid #c9daf0;border-radius:23px;box-shadow:0 32px 100px #071c396e}
-.dialog header{border-bottom:1px solid #e0e9f3;padding-bottom:16px}.dialog header h2{font-size:clamp(21px,3vw,27px);margin:5px 0}
-.dialog header p{margin:0}.panel .dialog .close{width:44px;height:44px;padding:0;border-radius:13px;
- background:#f5f8fc;color:#224b70;border-color:#cfdeec;font-size:20px}
+ padding:clamp(12px,3vw,30px);background:#071a36bd;backdrop-filter:blur(7px)}
+.dialog{display:grid;gap:17px;width:min(100%,575px);max-height:calc(100dvh - 24px);overflow:auto;
+ overscroll-behavior:contain;padding:clamp(17px,3vw,29px);
+ border:1px solid #c8d9f5;border-radius:21px;background:linear-gradient(150deg,#fff,#f5f8ff);
+ color:#12325b;box-shadow:0 26px 90px #07142f75}
+.dialog header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:13px;border-bottom:1px solid #dce5f4}
+.dialog header>div{display:grid;gap:4px}
+.dialog header small{font-size:11px;color:#235db6;font-weight:850}
+.panel .dialog h2{font-size:clamp(21px,2.5vw,27px);color:#12315f;font-weight:850}
+.panel .dialog header p{font-size:13px;color:#4c6787}
+.panel .dialog .close{width:43px;height:43px;padding:0;border:1px solid #cddcf2;border-radius:12px;background:#edf3fc;color:#173d69;font-size:20px;flex:0 0 43px}
 .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.details>div{display:grid;gap:7px;padding:14px;background:#f2f7fe;border:1px solid #d6e4f3;border-radius:13px}
-.details small{color:#58728d;font-size:11px}.details strong{font-size:13px;line-height:1.45;overflow-wrap:anywhere}
-.warning{padding:12px 14px;background:#fff8e9;border-left:3px solid #b67c1c;border-radius:8px;color:#664616!important}
-.actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.panel .actions button:first-child{background:#f2f6fb;color:#254c74;border-color:#cfdeec}
-.panel .actions button:last-child{background:#145891;color:white;border-color:#145891}
-.dialog textarea{resize:vertical;min-height:88px}
+.details>div{display:grid;gap:6px;padding:13px;border-radius:13px;border:1px solid #d8e5f6;background:#edf4ff}
+.details small{color:#4e6b89;font-size:11px}
+.details strong{font-size:14px;color:#193a65;line-height:1.4;overflow-wrap:anywhere}
+.panel .dialog label{display:grid;gap:7px;min-width:0;font-size:13px;font-weight:800;color:#284869}
+.panel .dialog textarea{min-height:96px;resize:vertical}
+.panel .warning{padding:11px 13px;border-left:3px solid #c28420;border-radius:8px;
+ background:#fff3dd;color:#69480d;font-size:12px;line-height:1.55}
+.actions{display:flex;justify-content:flex-end;gap:11px;align-items:center;flex-wrap:wrap}
+.panel .actions button{border:1px solid #c5d7eb;background:#eef3fb;color:#1b456c;
+ padding:10px 15px;min-height:45px;border-radius:10px;font-weight:850}
+.panel .actions button:last-child{border-color:#175bc2;background:#175fca;color:white}
 .dialog:focus{outline:none}
-@media(max-width:620px){.list{grid-template-columns:1fr;max-height:none}.details{grid-template-columns:1fr}
- .dialog{max-height:calc(100dvh - 16px);border-radius:17px;padding:16px}.actions button{width:100%}}
-@media(prefers-reduced-motion:reduce){.dialog,.backdrop{transition:none}}
+
+/* Adapt the approved concept to real manager workspace width and phone-sized viewports. */
+@media(max-width:1320px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .tools{grid-template-columns:minmax(190px,1.5fr) minmax(135px,.75fr)}
+ .filterGroup{grid-column:1/-1;justify-content:flex-start}
+}
+@container (max-width:890px){
+ .list{grid-template-columns:1fr}
+ .tileDetails{grid-template-columns:minmax(0,.9fr) minmax(0,1.05fr) auto}
+}
+@media(max-width:740px){.panel{padding:14px;gap:15px;border-radius:18px}
+ .metrics{gap:9px}.metricCard{min-height:92px;padding:12px 9px;gap:9px}.metricIcon{width:38px;height:38px;flex-basis:38px;border-radius:13px}
+ .metricIcon svg{height:23px;width:23px}.metricCard strong{font-size:25px}.metricCard h3{font-size:12px}
+ .heading{align-items:flex-start}.panel .heading h2{font-size:27px}
+ .tools{grid-template-columns:1fr}.filterGroup{grid-column:auto;justify-content:flex-start}
+ .groupHeader{align-items:flex-start}.panel .groupHeader p{border-left:0;padding-left:0;flex-basis:100%}
+ .roleSection{padding:11px;gap:10px}.list{grid-template-columns:1fr}
+ .dialog{padding:16px}.details{grid-template-columns:1fr}
+}
+@media(max-width:490px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .metricCard{display:grid;justify-items:start;align-content:center;min-height:112px}
+ .panel .heading h2{font-size:24px}.panel .refresh{min-height:43px}
+ .tileDetails{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .panel .editIcon{grid-column:1/-1;width:100%}
+ .identity{gap:8px}.avatar{width:40px;height:40px;flex-basis:40px}
+ .avatar svg{width:24px;height:24px}.statusBadge{padding:5px 6px}
+ .filterGroup{overflow-x:auto}.panel .filterChip{font-size:11px}
+ .actions button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.panel *{transition:none!important;animation:none!important}}
