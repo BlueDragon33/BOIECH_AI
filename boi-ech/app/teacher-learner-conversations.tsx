@@ -22,6 +22,8 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  const [realtime,setRealtime]=useState(false);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [historySyncError,setHistorySyncError]=useState("");
+ const [inboxSyncError,setInboxSyncError]=useState("");
  const [notice,setNotice]=useState("");
  const lastIncoming=useRef<number|null>(null);
  const pendingId=useRef<string|null>(null);
@@ -57,7 +59,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  const refresh=useCallback(async(signal?:AbortSignal)=>{
   if(!validDevice||(role==="teacher"&&!target))return;
   const data=await conversationRequest(deviceId,{action:"list",...(target?{learnerPersonCode:target}:{})},signal);
-  if(!signal?.aborted){setRecords({target,items:data.messages??[]});setLoading(false);setError("");}
+  if(!signal?.aborted){setRecords({target,items:data.messages??[]});setLoading(false);setHistorySyncError("");}
  },[role,deviceId,target,validDevice]);
  useEffect(()=>{
   if(!validDevice)return;
@@ -123,7 +125,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
    if(dead||document.visibilityState==="hidden"||!navigator.onLine)return;
    if(pending){rerun=true;return;}
    pending=true;
-   void refresh(controller.signal).catch(err=>{if(!dead&&!controller.signal.aborted){setError(err instanceof Error?err.message:"Không tải được tin nhắn.");setLoading(false);}}).finally(()=>{pending=false;if(rerun&&!dead){rerun=false;queueMicrotask(poll);}});
+   void refresh(controller.signal).catch(err=>{if(!dead&&!controller.signal.aborted){setHistorySyncError(err instanceof Error?err.message:"Không tải được tin nhắn.");setLoading(false);}}).finally(()=>{pending=false;if(rerun&&!dead){rerun=false;queueMicrotask(poll);}});
   };
   poll();
   const handle=()=>poll();
@@ -147,10 +149,11 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
      if(dead||controller.signal.aborted)return;
      const list=data.recent??[];
      setInbox(list);
+     setInboxSyncError("");
      const newest=list[0]?.id??0;
      if(lastIncoming.current!==null&&newest>lastIncoming.current&&list[0])setNotice(`Có tin mới từ ${list[0].learnerName}.`);
      lastIncoming.current=newest;
-    }).catch(err=>{if(!dead&&!controller.signal.aborted)setError(err instanceof Error?err.message:"Lỗi đồng bộ thư đến.");})
+    }).catch(err=>{if(!dead&&!controller.signal.aborted)setInboxSyncError(err instanceof Error?err.message:"Lỗi đồng bộ thư đến.");})
     .finally(()=>{pending=false;if(rerun&&!dead){rerun=false;queueMicrotask(poll);}});
   };
   poll();
@@ -176,8 +179,16 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
     ...(target?{learnerPersonCode:target}:{}),...(channel==="request"&&role==="teacher"?{requestId:selectedRequest!.id}:{}),
     clientEventId:pendingId.current});
    pendingId.current=null;setText("");if(role==="learner"&&channel==="request")setSubject("");
-   await refresh();setNotice("Đã gửi và lưu thành công.");
-  }catch(err){setError(err instanceof Error?err.message:"Chưa gửi được. Có thể thử lại mà không tạo tin trùng.");}
+   // D1 acknowledged the write. A later history refresh cannot undo it.
+   setNotice("Đã gửi và lưu thành công.");
+   try{
+    await refresh();
+   }catch(err){
+    setHistorySyncError(err instanceof Error?err.message:"Chưa tải được lịch sử mới.");
+    setNotice("Đã lưu tin nhắn thành công. Hiển thị đang đồng bộ lại, không cần gửi lần nữa.");
+    window.dispatchEvent(new Event("boi:conversation:new"));
+   }
+  }catch(err){setError((err instanceof Error?err.message:"Chưa xác nhận được kết quả gửi.")+" · Nếu cần thử lại, hãy giữ nguyên nội dung để hệ thống đối chiếu mã chống gửi trùng.");}
   finally{setBusy(false);}
  }
  const editing=(value:string)=>{setText(value);pendingId.current=null;};
@@ -205,6 +216,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   </nav>
   {notice?<p className={styles.notice} role="status">{notice}</p>:null}
   {error?<p className={styles.error} role="alert">{error}</p>:null}
+  {historySyncError||inboxSyncError?<p className={styles.error} role="status">Đồng bộ tạm gián đoạn; các tin đã tải vẫn được giữ lại. {historySyncError||inboxSyncError}</p>:null}
   <div className={styles.history} aria-live="polite" aria-relevant="additions">
     {forRequest.map(item=><article key={item.id} className={styles.message} data-mine={item.role===role}>
       <div><strong>{item.senderName}</strong><time>{when(item.createdAt)}</time></div>
