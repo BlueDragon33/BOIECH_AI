@@ -307,3 +307,9 @@ body[data-teacher-role-ui="active"] .teacher-video-disclaimer{
   animation:none!important;transition:none!important;
  }
 }
+
+body[data-teacher-role-ui="active"] .teacher-video-score-discrepancy {
+  margin:0;padding:13px 15px;background:#fff1da;border:1px solid #d2974d;
+  color:#6c3a06;font-size:12px;line-height:1.65;border-radius:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-score-discrepancy strong { color:#6c3a06 }
