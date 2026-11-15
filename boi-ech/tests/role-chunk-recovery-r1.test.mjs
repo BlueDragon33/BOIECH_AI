@@ -71,7 +71,8 @@ test("auth readback keeps device proof unchanged and offers a labeled safe retry
   assert.match(gate,/refreshRoleAssetsManually\(\)/);
   assert.match(gate,/setRoleBootstrapError\(timedOut/);
   const errorPage=read("../app/error.tsx");
-  assert.match(errorPage,/recoverRoleChunkOnce\(error\)/);
+  assert.doesNotMatch(errorPage,/recoverRoleChunkOnce\(error\)/);
+  assert.match(errorPage,/refreshRoleAssetsManually\(\)/);
   assert.match(errorPage,/Tải bản ứng dụng mới/);
 });
 function fetchEvent(code){
