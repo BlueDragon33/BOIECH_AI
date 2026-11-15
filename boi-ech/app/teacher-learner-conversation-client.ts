@@ -2,7 +2,9 @@
 
 type StoredCredential={version:2;privateKey:CryptoKey|null;publicKey:JsonWebKey};
 export type ConversationItem={id:number;role:"teacher"|"learner";channel:"chat"|"request";message:string;subject:string;requestId:number|null;createdAt:string;senderName:string};
-export type IncomingItem=ConversationItem&{learnerPersonCode:string;learnerName:string;className:string};
+export type IncomingItem=ConversationItem&{learnerPersonCode:string;learnerName:string;className:string;unread?:boolean};
+export type ConversationUnread={chat:number;request:number};
+export const compactUnread=(value:number)=>value>9?"9+":String(Math.max(0,value));
 export type ConversationChannel="chat"|"request";
 
 function base64Url(bytes:Uint8Array){
@@ -38,7 +40,7 @@ export async function conversationRequest(deviceId:string,payload:Record<string,
  const response=await fetch("/api/course/conversations",{method:"POST",credentials:"same-origin",cache:"no-store",signal,
   headers:{"content-type":"application/json"},
   body:JSON.stringify({...payload,deviceId,challenge:challengeData.challenge,signature:base64Url(new Uint8Array(signature))})});
- const data=await response.json() as {error?:string;messages?:ConversationItem[];recent?:IncomingItem[];ok?:boolean;cursor?:number;realtime?:boolean;ticket?:string;mode?:string};
+ const data=await response.json() as {error?:string;messages?:ConversationItem[];recent?:IncomingItem[];unread?:ConversationUnread;ok?:boolean;cursor?:number;realtime?:boolean;ticket?:string;mode?:string};
  if(!response.ok)throw new Error(data.error||"Không thể đồng bộ tin nhắn.");
  return data;
 }
