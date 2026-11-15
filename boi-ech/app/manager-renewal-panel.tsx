@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
-import {accountTerms,FOREVER_EXPIRES_AT,isUnlimitedAccountExpiry,replaceExpiryFromNow,type AccountTerm} from "./account-term";
+import {accountTerms,isUnlimitedAccountExpiry,replaceExpiryFromNow,type AccountTerm} from "./account-term";
 import {accountTermState,accountTimeLabel,expiryDateLabel,renewalCounts,renewalMatchesStatus,renewalStatusText,verifiedProgress,type RenewalRow,type RenewalStatus} from "./manager-renewal-view";
 import styles from "./manager-renewal-panel.module.css";
 type Row=RenewalRow;
