@@ -6,9 +6,11 @@ import {AppIcon} from "./manager-status";
 import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession,type TrainingClassLeader} from "./training-types";
 import styles from "./manager-console-v12.module.css";
 import {CampusBuildingArt} from "./manager-campus-illustration";
+import ManagerCampusMap from "./manager-campus-map";
+import {MainLectureHallArt} from "./manager-lecture-hall-art";
+import {isMainLectureHall} from "./manager-lecture-hall";
 import {PracticePoolBuildingArt,PracticePoolBasinArt} from "./manager-practice-pool-art";
-import {existingPracticePoolBuilding,isPracticePoolBuilding,isPracticePoolRoom,
- PRACTICE_POOL_BUILDING_NAME} from "./manager-practice-pool";
+import {isPracticePoolBuilding,isPracticePoolRoom} from "./manager-practice-pool";
 
 type Tab="class"|"people"|"room";
 type Slot="cadre"|"student";
@@ -172,33 +174,17 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
    {!teachers.some(t=>matches(t.name+" "+t.className))?<p className={styles.empty}>Không tìm thấy giảng viên. Tab này không hiển thị học viên.</p>:null}
   </div>:null}
   {tab==="room"?<div className={styles.buildings}>
-   <section className={styles.campusOverview} aria-label="Sơ đồ tòa học dạng trực quan">
-    <div className={styles.campusTitle}><strong>Chọn tòa học</strong><small>Tòa → Phòng học → Lịch sử dụng thực tế</small></div>
-    <div className={styles.campusNodes}>
-     {visibleBuildings.map((b,index)=>{
-      const related=resources.filter(r=>r.kind==="room"&&r.parentId===b.id);
-      const busyRooms=related.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
-      return <button type="button" className={styles.campusNode} aria-pressed={activeBuilding?.id===b.id}
-       key={b.id} onClick={()=>setSelectedRoomBuilding(b.id)}>
-       <span className={styles.campusArtwork}>{isPracticePoolBuilding(b)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
-       <strong>{b.name}</strong><small>{related.length} phòng · {busyRooms} đang học</small>
-      </button>;
-     })}
-    </div>
-    {!existingPracticePoolBuilding(buildings)?<button type="button" className={styles.campusNode}
-     aria-label="Mở mẫu tòa bể bơi tại phân hệ Tòa học" onClick={onOpenBuildings}>
-      <span className={styles.campusArtwork}><PracticePoolBuildingArt/></span>
-      <strong>{PRACTICE_POOL_BUILDING_NAME}</strong><small>Mẫu sẵn · Mở Tòa học để tạo bể</small>
-     </button>:null}
-    {!buildings.length?<p className={styles.empty}>Chưa có tòa học. Mở tab Tòa học và tạo tòa đầu tiên.</p>:null}
-    {buildings.length>0&&!visibleBuildings.length?<p className={styles.empty}>Không tìm thấy tòa hoặc phòng phù hợp. Thử từ khóa khác.</p>:null}
-   </section>
+   <ManagerCampusMap board={board} mode="room" busy={busy} selectedId={activeBuilding?.id}
+    onSelectBuilding={b=>{setQuery("");setSelectedRoomBuilding(b.id);}}
+    onOpenMainTemplate={onOpenBuildings}
+    onOpenPoolTemplate={onOpenBuildings}
+    onCreateBuilding={onOpenBuildings}/>
    {visibleBuildings.filter(b=>b.id===activeBuilding?.id).map((b,index)=>{
     const rooms=resources.filter(r=>r.kind==="room"&&r.parentId===b.id);
     const occupied=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="occupied").length;
     const available=rooms.filter(r=>sessionState(board,sessionForRoom(board,r.id),r)==="vacant").length;
     return <details key={b.id} className={styles.building} open>
-     <summary><span className={styles.buildingArtwork}>{isPracticePoolBuilding(b)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
+     <summary><span className={styles.buildingArtwork}>{isMainLectureHall(b)?<MainLectureHallArt/>:isPracticePoolBuilding(b)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
       <span><strong>{b.name}</strong><small>{rooms.length} phòng · {occupied} đang học · {available} trống</small></span>
       <span className={styles.openChevron}>⌄</span>
      </summary>
