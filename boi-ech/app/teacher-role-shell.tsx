@@ -243,10 +243,10 @@ export default function TeacherRoleShell() {
   const preloadedTeacher=workspace?.role==="teacher" ? workspace : null;
   const [active, setActive] = useState(false); const [tab, setTab] = useState<TeacherTab>("overview"); const [selectedClass, setSelectedClass] = useState(() => typeof window === "undefined" ? "" : window.sessionStorage.getItem("boi-ech-teacher-selected-class-v31") ?? ""); const [overview, setOverview] = useState<TeacherOverview | null>(
     ()=>preloadedTeacher?.teacherOverview as TeacherOverview|null ?? null); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [query, setQuery] = useState(""); const [dashboardMount, setDashboardMount] = useState<HTMLElement | null>(null); const [navMount, setNavMount] = useState<HTMLElement | null>(null); const [searchMount, setSearchMount] = useState<HTMLElement | null>(null); const deviceIdRef = useRef(""); const loadedDeviceRef = useRef(preloadedTeacher?.device.deviceId??"");
-  const unread=useTeacherConversationIndicators(workspaceDeviceId,active);
   // First overview was already loaded and validated by AccountGate before GO.
   const attemptedDeviceRef = useRef(preloadedTeacher?.device.deviceId??"");
   const [workspaceDeviceId, setWorkspaceDeviceId] = useState("");
+  const unread=useTeacherConversationIndicators(workspaceDeviceId,active);
   const requestRef = useRef<{ deviceId: string; controller: AbortController; timer: number } | null>(null);
   const mountedRef = useRef(false);
   useEffect(() => {
