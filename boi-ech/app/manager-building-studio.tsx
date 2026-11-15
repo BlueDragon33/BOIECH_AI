@@ -4,10 +4,10 @@ import {useState} from "react";
 import ManagerCampusMap from "./manager-campus-map";
 import {MainLectureHallArt} from "./manager-lecture-hall-art";
 import {MAIN_LECTURE_HALL_ID,MAIN_LECTURE_HALL_NAME,existingMainLectureHall,isMainLectureHall} from "./manager-lecture-hall";
-import {PracticePoolBuildingArt,PracticePoolBasinArt} from "./manager-practice-pool-art";
+import {PracticePoolBasinArt} from "./manager-practice-pool-art";
 import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,
  PRACTICE_POOL_ROOM_NAME,existingPracticePoolBuilding,existingPracticePoolRoom,
- isPracticePoolBuilding,isPracticePoolRoom} from "./manager-practice-pool";
+ isPracticePoolRoom} from "./manager-practice-pool";
 import type {TrainingBoard,TrainingResource,TrainingSession} from "./training-types";
 import styles from "./manager-building-studio.module.css";
 
