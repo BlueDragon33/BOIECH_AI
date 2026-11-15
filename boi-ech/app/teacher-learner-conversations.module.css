@@ -22,3 +22,133 @@
 }
 .chatUnread{color:#172338;background:#ffad42}
 .requestUnread{color:#fff;background:#e94656}
+
+
+/* V38 premium teacher / learner messaging. Source and authorization unchanged.
+   Real conversations only; no fabricated presence, analytics, attachments or receipts. */
+.shell[data-role="teacher"],.shell[data-role="learner"]{
+ --premium-ink:#102c50;--premium-muted:#496580;--premium-border:#c9daed;
+ --premium-blue:#075fca;--premium-surface:#ffffff;
+ padding:0;overflow:hidden;gap:0;color:var(--premium-ink);
+ border:1px solid #c4d9ed;border-radius:22px;
+ background:#f5f9ff;
+ box-shadow:0 20px 48px rgba(5,37,84,.12);
+ font-family:var(--site-font,system-ui,sans-serif);
+}
+.shell[data-role] .header{
+ padding:24px clamp(17px,2vw,28px);min-height:104px;
+ color:white;background:
+ radial-gradient(ellipse at 88% -40%,rgba(25,193,255,.5),transparent 48%),
+ linear-gradient(115deg,#052e68,#075fc7 72%,#069cde);
+}
+.shell[data-role] .header small{color:#b3eeff;font-size:11px;letter-spacing:.13em}
+.shell[data-role] .header h2{font-size:clamp(20px,2vw,28px);color:#fff}
+.shell[data-role] .header p{color:#e0efff;font-size:13px}
+.shell[data-role] .online{color:#d9ffeb;background:rgba(2,57,67,.66);border-color:#52b9b1}
+.shell[data-role] .online[data-realtime="false"]{color:#fff0cd;background:#6a471d;border-color:#e6af5a}
+.workspace{display:grid;grid-template-columns:minmax(235px,26%) minmax(0,1fr) minmax(210px,23%);min-width:0;min-height:550px}
+.sidebar{min-width:0;display:flex;flex-direction:column;gap:14px;background:#fff;border-right:1px solid #d9e5f2;padding:18px 13px}
+.sidebar .tabs{order:0;display:flex;gap:6px;grid-template-columns:none}
+.sidebar .tabs button{flex:1;min-height:43px;min-width:0;white-space:normal;border:1px solid #d7e5f5;background:#f3f8ff;color:#24415f;font-size:clamp(11px,.8vw,13px);padding:8px}
+.sidebar .tabs button[aria-pressed="true"]{background:#086ed2;color:#fff;border-color:#0760ba;box-shadow:0 6px 14px rgba(7,94,190,.18)}
+.sidebar .teacherScope{order:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.shell[data-role] .teacherScope label{color:#24476a;font-size:12px;font-weight:800}
+.shell[data-role] :is(select,input,textarea){
+ color:#15375b;background:#fff;border-color:#b9cfe7;border-radius:11px;
+ font-size:13px;
+}
+.shell[data-role] :is(select,input,textarea)::placeholder{color:#58748e}
+.shell[data-role] :is(select,input,textarea):focus-visible,
+.shell[data-role] button:focus-visible{outline:3px solid #f6af27;outline-offset:2px}
+.searchLabel{order:2}
+.contactList{order:3;display:grid;gap:5px;max-height:260px;overflow:auto;min-width:0}
+.shell[data-role] .contactList button{
+ display:flex;align-items:center;gap:9px;min-width:0;min-height:62px;padding:10px;
+ border:1px solid transparent;background:#fff;color:#15385c;
+ border-radius:12px;text-align:left;font-size:12px;box-shadow:none
+}
+.shell[data-role] .contactList button:hover{background:#f2f8ff}
+.shell[data-role] .contactList .selectedContact{background:#e7f2ff;border-color:#8abef8}
+.contactInfo{display:grid;gap:4px;min-width:0;flex:1}
+.contactInfo strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.contactInfo small{font-size:11px;color:#55718e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:50%;
+ background:linear-gradient(135deg,#35a3fd,#0662cf);color:#fff;font-weight:850;font-size:15px}
+.contactUnread{width:9px;height:9px;flex:none;border-radius:50%;background:#ee673a}
+.sidebar .incoming{order:4;background:#f5f9ff;border-color:#dce7f3;padding:13px}
+.sidebar .incoming>strong{color:#214d78}
+.sidebar .incoming>div{display:grid;max-height:185px;overflow:auto}
+.shell[data-role] .incoming button{border-color:#d3e3f4;background:#fff;color:#1b4364;max-width:none;min-height:48px;padding:8px 10px}
+.shell[data-role] .incoming button small{color:#516d85}
+.sidebar .incoming>div>span{color:#516b80}
+.learnerTips{order:1;color:#496781!important;background:#f0f7ff;border-radius:12px;border:1px solid #d8e7f7;padding:15px;line-height:1.55;font-size:12px}
+.conversation{display:flex;flex-direction:column;min-width:0;background:#f4f8ff}
+.conversationHeader{display:flex;align-items:center;gap:12px;padding:17px 20px;background:#fff;border-bottom:1px solid #d9e6f4}
+.conversationHeader>div{flex:1;min-width:0;display:grid;gap:5px}
+.conversationHeader strong{color:#0d315d;font-size:15px}
+.conversationHeader small{color:#58748e;font-size:12px}
+.channelState{padding:7px 10px;border-radius:999px;background:#e8f3ff;color:#075aaa;font-size:11px;font-weight:800}
+.shell[data-role] .notice{border-color:#9ddbc6;background:#e7f8f2;color:#0e5c43}
+.shell[data-role] .error{border-color:#e9aab0;background:#fff0f0;color:#8d2635}
+.conversation > .notice,.conversation > .error{margin:10px 16px 0}
+.shell[data-role] .history{
+ flex:1;display:flex;min-height:310px;max-height:540px;gap:13px;overflow:auto;
+ padding:22px clamp(13px,2.3vw,25px);border:0;border-radius:0;background:#f3f7ff;
+}
+.shell[data-role] .message{max-width:min(83%,620px);border-radius:17px;border:1px solid #d3e0f0;
+ box-shadow:0 5px 16px rgba(11,51,99,.06);background:#fff;color:#19395e;padding:13px 15px}
+.shell[data-role] .message[data-mine="true"]{background:linear-gradient(125deg,#076dd9,#03499c);color:#fff;border-color:#0854ac}
+.shell[data-role] .message strong{font-size:12px;color:inherit}
+.shell[data-role] .message time{color:#526f89}
+.shell[data-role] .message[data-mine="true"] time{color:#ddedff}
+.shell[data-role] .message p{font-size:13.5px;line-height:1.65;color:inherit}
+.shell[data-role] .message small{color:#54718a}
+.shell[data-role] .message[data-mine="true"] :is(small,.subject){color:#e0f1ff}
+.shell[data-role] .message .subject{color:#145d9d}
+.shell[data-role] .message .reply{background:#e8f3ff;color:#084f93;border-color:#a7cdf4}
+.shell[data-role] .empty{color:#4f6d87;font-size:13px}
+.shell[data-role] .form{margin-top:auto;padding:16px 20px 19px;border-top:1px solid #d8e6f5;background:#fff}
+.shell[data-role] .form label{color:#264666;font-size:12px}
+.shell[data-role] .form textarea{min-height:86px}
+.shell[data-role] .actions small{color:#55718a}
+.shell[data-role] .actions button{color:#fff;border-color:#0566c6;background:linear-gradient(145deg,#0789f6,#034db6);box-shadow:0 6px 14px #0358a32a}
+.shell[data-role] .actions button:hover:not(:disabled){background:#065ab5}
+.context{display:flex;flex-direction:column;gap:15px;min-width:0;padding:19px 14px;border-left:1px solid #d9e6f4;background:#fff}
+.contextHeading{display:grid;justify-items:center;gap:8px;text-align:center;padding:12px 6px 16px;border-bottom:1px solid #dbe7f4}
+.contextHeading .avatar{width:55px;height:55px;font-size:21px}
+.contextHeading strong{color:#10375f;font-size:14px;overflow-wrap:anywhere}
+.contextHeading small{color:#54728a;font-size:12px}
+.contextCard{padding:15px;border-radius:15px;background:#f2f8ff;border:1px solid #d7e7f7;color:#133a5e}
+.contextCard>strong{font-size:13px}
+.contextCard p{margin:9px 0;color:#4c6983;font-size:12px;line-height:1.55}
+.contextCard dl{margin:12px 0 0;display:grid;gap:10px}
+.contextCard dl>div{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #d9e7f4;padding-top:8px}
+.contextCard dt{font-size:11px;color:#486883}
+.contextCard dd{margin:0;font-size:13px;font-weight:800;color:#0d4a8e}
+.contextActions{display:grid;gap:8px}
+.shell[data-role] .contextActions button{min-height:43px;background:#fff;color:#075bb5;border-color:#b1cfea;padding:8px}
+.shell[data-role] .contextActions button:last-child{background:linear-gradient(135deg,#0786ed,#0953bf);color:white;border-color:#145dc3}
+.shell[data-role="learner"] .workspace{grid-template-columns:minmax(190px,220px) minmax(0,1fr);min-height:390px}
+.shell[data-role="learner"] .history{min-height:230px;max-height:350px}
+.shell[data-role="learner"] .sidebar{padding:14px}
+.shell[data-role="learner"] .sidebar .tabs{flex-direction:column}
+.shell[data-role="learner"] .sidebar .tabs button{font-size:12px}
+@media(max-width:1220px){
+ .shell[data-role="teacher"] .workspace{grid-template-columns:minmax(220px,31%) minmax(0,1fr)}
+ .context{display:none}
+}
+@media(max-width:760px){
+ .shell[data-role] .workspace,.shell[data-role="learner"] .workspace{display:flex;flex-direction:column;min-height:0}
+ .shell[data-role] .sidebar{gap:7px;border-right:0;border-bottom:1px solid #d6e5f4;padding:12px}
+ .shell[data-role] .sidebar .tabs,.shell[data-role="learner"] .sidebar .tabs{flex-direction:row}
+ .shell[data-role] .teacherScope .contactList{display:flex;gap:8px;overflow:auto;max-height:none}
+ .shell[data-role] .contactList button{min-width:152px}
+ .shell[data-role] .teacherScope .incoming{display:none}
+ .shell[data-role] .history{max-height:320px;min-height:220px}
+ .shell[data-role] .message{max-width:94%}
+ .shell[data-role] .form{padding:13px}
+ .shell[data-role] .actions button{width:100%}
+ .conversationHeader{padding:13px}
+ .channelState{display:none}
+}
+@media(prefers-reduced-motion:reduce){.shell[data-role] *{transition:none;animation:none}}
