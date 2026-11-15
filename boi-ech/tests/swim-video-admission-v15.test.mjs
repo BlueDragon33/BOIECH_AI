@@ -74,6 +74,13 @@ test("poor technique can actually score below 5/10 and explicitly asks for learn
  const strong=scoreSwimmingTechnique(baseline,{kneeExcursion:70,armExcursion:80,movingRatio:80,horizontalRatio:95},"side");
  assert.equal(strong.score,100);
  assert.equal(strong.needsLearningCheck,false);
+ // Strictly *below* five: 49/100 alerts; exactly 50/100 does not.
+ const exactFive=scoreSwimmingTechnique(baseline,{kneeExcursion:55,armExcursion:0,movingRatio:8,horizontalRatio:0},"rear");
+ const belowFive=scoreSwimmingTechnique(baseline,{kneeExcursion:54,armExcursion:0,movingRatio:8,horizontalRatio:0},"rear");
+ assert.equal(exactFive.score,50);
+ assert.equal(exactFive.needsLearningCheck,false);
+ assert.equal(belowFive.score,49);
+ assert.equal(belowFive.needsLearningCheck,true);
  const component=readFileSync(new URL("../app/phan-tich-video/video-analyzer-impl.tsx",import.meta.url),"utf8");
  assert.match(component,/result\.score < LOW_SWIM_SCORE_BELOW/);
  assert.match(component,/Bạn có đang thực sự học bơi không vậy\?/);
