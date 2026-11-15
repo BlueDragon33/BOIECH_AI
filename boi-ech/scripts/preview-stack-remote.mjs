@@ -171,10 +171,10 @@ export async function verifyPreviewRoleAssetsLive(fetcher=fetch, root=process.cw
   return {checked:roleFiles.length,files:roleFiles};
 }
 
-export async function installPreviewBridge(env = process.env, fetcher = fetch) {
+export async function installPreviewBridge(env = process.env, fetcher = fetch, roleVerifier = verifyPreviewRoleAssetsLive) {
   if (env.PREVIEW_BRIDGE_CONFIRMATION !== "INSTALL_PREVIEW_BRIDGE") throw new Error("INSTALL_PREVIEW_BRIDGE confirmation is required to create or rotate the shared credential on the two named Preview Workers.");
   const result = await checkPreviewStack(env, fetcher, true);
-  const roleSmoke=await verifyPreviewRoleAssetsLive(fetcher);
+  const roleSmoke=await roleVerifier(fetcher);
   const api = provider(env, fetcher);
   const secret = randomBytes(48).toString("base64url");
   for (const worker of [BOI, APP]) await api(worker, "secrets", { name:"CONTROL_SERVICE_SECRET", type:"secret_text", text:secret });
