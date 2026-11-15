@@ -38,7 +38,7 @@ test("teacher chat supports immediate learner selection and context action witho
  assert.match(chat,/onLearnerAction\?\.\(target,"assignment"\)/);
  assert.match(chat,/onLearnerAction\?\.\(target,"feedback"\)/);
  assert.match(role,/onLearnerAction=\{\(personCode,mode\)=>/);
- assert.match(chat,/role="teacher"/);
+ assert.match(chat,/data-role=\{role\}/);
  assert.match(chatStyles,/\.workspace\{display:grid;grid-template-columns:/);
  assert.match(chatStyles,/\.shell\[data-role="learner"\] \.workspace/);
 });
