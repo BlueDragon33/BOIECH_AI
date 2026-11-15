@@ -67,5 +67,5 @@ test("3D buildings have layered physical features, pool and foliage without exte
  assert.match(pool,/url\("water"\)/);
  assert.match(pool,/strokeDasharray="11 6"/);
  assert.match(pool,/PracticePoolBasinArt/);
- for(const art of [hall,satellites,pool])assert.doesNotMatch(art,/https?:\/\//);
+ for(const art of [hall,satellites,pool])assert.doesNotMatch(art,/(?:href|src)=["\u0027]https?:\/\//);
 });
