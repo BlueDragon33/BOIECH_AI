@@ -31,7 +31,7 @@ const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   vars: localVars,
-  durable_objects: {bindings: [{binding: "CHAT_HUB", class_name: "ChatRealtimeHub"}]},
+  durable_objects: {bindings: [{name: "CHAT_HUB", class_name: "ChatRealtimeHub"}]},
   migrations: [{tag: "chat-realtime-v16", new_sqlite_classes: ["ChatRealtimeHub"]}],
   d1_databases: d1
     ? [
