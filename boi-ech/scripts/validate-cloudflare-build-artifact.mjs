@@ -53,7 +53,8 @@ if (generated.assets?.binding !== "ASSETS") fail("Generated config missing ASSET
 
 if (typeof generated.assets?.directory !== "string") fail("Generated Preview asset directory is missing.");
 const assetRoot = path.resolve(path.dirname(generatedPath),generated.assets.directory);
-if (!insideRoot(assetRoot, "Preview static asset directory").startsWith("dist/")) fail("Preview assets must remain under dist/.");
+const assetRelative=insideRoot(assetRoot, "Preview static asset directory");
+if (assetRelative!=="dist" && !assetRelative.startsWith("dist/")) fail("Preview assets must remain under dist/.");
 const roleFolder = path.join(assetRoot,"assets");
 if (!fs.existsSync(roleFolder) || !fs.statSync(roleFolder).isDirectory()) fail("Preview role JS assets directory is missing.");
 const roleFiles = roleAssetProbes(fs.readdirSync(roleFolder));
