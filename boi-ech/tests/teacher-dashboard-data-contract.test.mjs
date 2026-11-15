@@ -31,7 +31,7 @@ test("teacher overview exposes six honest KPI tiles and richer supervision state
     "Phân tích AI",
     "Cần hỗ trợ",
     "Tiến độ trung bình",
-    "Tin cậy AI trung bình",
+    "Tin cậy nhận diện TB (không phải độ đúng)",
   ]) assert.ok(shell.includes(label), label);
   assert.ok(shell.includes("Dữ liệu hiện có · không nội suy số liệu giả"));
   assert.ok(shell.includes("Lỗi phổ biến gần nhất"));
