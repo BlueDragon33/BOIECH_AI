@@ -38,7 +38,7 @@ export async function conversationRequest(deviceId:string,payload:Record<string,
  const response=await fetch("/api/course/conversations",{method:"POST",credentials:"same-origin",cache:"no-store",signal,
   headers:{"content-type":"application/json"},
   body:JSON.stringify({...payload,deviceId,challenge:challengeData.challenge,signature:base64Url(new Uint8Array(signature))})});
- const data=await response.json() as {error?:string;messages?:ConversationItem[];recent?:IncomingItem[];ok?:boolean;cursor?:number};
+ const data=await response.json() as {error?:string;messages?:ConversationItem[];recent?:IncomingItem[];ok?:boolean;cursor?:number;realtime?:boolean;ticket?:string;mode?:string};
  if(!response.ok)throw new Error(data.error||"Không thể đồng bộ tin nhắn.");
  return data;
 }

@@ -2,6 +2,16 @@ import {DeviceAccessError,getCourseDatabase,verifyDeviceRequest} from "../../../
 
 export const dynamic="force-dynamic";
 type Role="learner"|"teacher";
+type HubStub={fetch(request:Request):Promise<Response>};
+type HubNamespace={idFromName(name:string):unknown;get(id:unknown):HubStub};
+async function realtimeHub():Promise<HubStub|null>{
+ try{
+  const workers=await import("cloudflare:workers");
+  const ns=(workers.env as unknown as {CHAT_HUB?:HubNamespace}).CHAT_HUB;
+  return ns?.get(ns.idFromName("conversations-v16"))??null;
+ }catch{return null;}
+}
+
 type Channel="chat"|"request";
 type MessageRow={id:number;device_id:string;event_type:string;detail_json:string;created_at:string};
 const EVENTS={
@@ -28,11 +38,23 @@ export async function POST(request:Request){
   if(actor.personRole!=="teacher"&&actor.personRole!=="learner")return json({error:"Chỉ Giảng viên hoặc Học viên được sử dụng hộp thư."},403);
   const role=actor.personRole as Role;
   const operation=clean(payload.action,16);
-  if(!["list","send","inbox"].includes(operation))return json({error:"Thao tác không hợp lệ."},400);
+  if(!["list","send","inbox","connect"].includes(operation))return json({error:"Thao tác không hợp lệ."},400);
   const teacherClasses=classes(actor.className);
   if(!teacherClasses.length||!actor.registrationComplete||actor.accessExpired)return json({error:"Tài khoản chưa đủ điều kiện liên lạc."},403);
   const db=await getCourseDatabase();
   const bindClass=teacherClasses.map(()=> "lower(trim(?))").join(",");
+  if(operation==="connect"){
+   const stub=await realtimeHub();
+   if(!stub)return json({realtime:false,mode:"polling"});
+   const ticket=crypto.randomUUID().replaceAll("-","");
+   const payload={ticket,deviceId:actor.deviceId,role,
+    personCode:actor.personCode||"",classes:teacherClasses,
+    ticketExpires:Date.now()+30000,expiresAt:Date.now()+120000};
+   const admitted=await stub.fetch(new Request("https://realtime.internal/ticket",{
+    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}));
+   if(!admitted.ok)return json({realtime:false,mode:"polling"});
+   return json({realtime:true,mode:"websocket",ticket,expiresIn:30});
+  }
   if(operation==="inbox"){
    if(role!=="teacher")return json({error:"Chỉ Giảng viên xem được danh sách tin đến."},403);
    const result=await db.prepare(`SELECT e.id,e.device_id,e.event_type,e.detail_json,e.created_at,
@@ -48,15 +70,18 @@ export async function POST(request:Request){
    return json({recent});
   }
   let learnerId=actor.deviceId;
+  let learnerCode=actor.personCode||"";
+  let learnerClass=actor.className||"";
   if(role==="teacher"){
-   const learnerCode=clean(payload.learnerPersonCode,80);
+   learnerCode=clean(payload.learnerPersonCode,80);
    if(!learnerCode)return json({error:"Hãy chọn học viên thuộc lớp phụ trách."},400);
-   const target=await db.prepare(`SELECT device_id FROM device_access
+   const target=await db.prepare(`SELECT device_id, class_name FROM device_access
       WHERE person_role='learner' AND status='approved' AND person_code=?
        AND lower(trim(class_name)) IN (${bindClass}) LIMIT 1`)
-      .bind(learnerCode,...teacherClasses).first<{device_id:string}>();
+      .bind(learnerCode,...teacherClasses).first<{device_id:string;class_name:string|null}>();
    if(!target)return json({error:"Không tìm thấy học viên trong lớp được phân công."},404);
    learnerId=target.device_id;
+   learnerClass=target.class_name||"";
   }
   if(operation==="list"){
    const data=await db.prepare(`SELECT id,device_id,event_type,detail_json,created_at
@@ -101,7 +126,19 @@ export async function POST(request:Request){
     VALUES (?,?,NULL,'teacher-conversations',?,?)`).bind(learnerId,eventType,JSON.stringify(detail),eventId).run();
   await db.prepare(`INSERT INTO course_audit_log(actor,action,target,detail_json) VALUES(?,?,?,?)`)
    .bind(actor.personCode||actor.deviceCode,eventType,learnerId,JSON.stringify({channel,requestId,messageLength:message.length})).run();
-  return json({ok:true,id:Number(write.meta?.last_row_id)||null},201);
+  const savedId=Number(write.meta?.last_row_id)||null;
+  // D1 is canonical. Realtime failure must not roll back a committed message.
+  // A reconnect fetches missed records through the authenticated REST endpoint.
+  if(savedId){
+   try{
+    const stub=await realtimeHub();
+    if(stub)await stub.fetch(new Request("https://realtime.internal/publish",{
+     method:"POST",headers:{"content-type":"application/json"},
+     body:JSON.stringify({type:"conversation_changed",id:savedId,
+      learnerDeviceId:learnerId,learnerPersonCode:learnerCode,learnerClass})}));
+   }catch{ /* durable D1 record remains available on reconnect */ }
+  }
+  return json({ok:true,id:savedId},201);
  }catch(error){
   if(error instanceof DeviceAccessError)return json({error:error.message,code:error.code,device:error.device},error.status);
   return json({error:"Không thể xử lý kênh liên lạc. Vui lòng thử lại."},500);

@@ -24,6 +24,8 @@ export function productionPackage(settings,revision,activate=false,activateSingl
  return {name:'boi-ech',main:'./worker/index.ts',compatibility_date:'2026-09-11',compatibility_flags:['nodejs_compat'],workers_dev:true,
   assets:{binding:'ASSETS',run_worker_first:false},images:{binding:'IMAGES'},
   d1_databases:[{binding:'DB',database_name:'boi-ech-db',database_id:id,migrations_dir:'drizzle'}],
+  durable_objects:{bindings:[{name:'CHAT_HUB',class_name:'ChatRealtimeHub'}]},
+  migrations:[{tag:'chat-realtime-v16',new_sqlite_classes:['ChatRealtimeHub']}],
   vars:{...vars,BOI_ECH_BUILD_REVISION:revision,BOI_ECH_DEPLOYMENT_CHANNEL:'cloudflare-production',BOI_ECH_BUILD_SOURCE:'BlueDragon33/BOIECH_AI/boi-ech',APPLICATION_MANAGEMENT_ORIGIN:'https://application-management.boiech-ai.workers.dev'}};
 }
 export function verifyProductionArtifact(c,revision,activate=false,requireSingleReview=false){

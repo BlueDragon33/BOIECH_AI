@@ -3,7 +3,9 @@
   "name": "boi-ech-preview",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-09-11",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": true,
   "assets": {
     "binding": "ASSETS",
@@ -29,5 +31,21 @@
     "BOI_ECH_DEPLOYMENT_CHANNEL": "cloudflare-preview",
     "BOI_ECH_BUILD_REVISION": "__BOI_ECH_BUILD_REVISION__",
     "BOI_ECH_BUILD_SOURCE": "BlueDragon33/BOIECH_AI/boi-ech"
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_HUB",
+        "class_name": "ChatRealtimeHub"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "chat-realtime-v16",
+      "new_sqlite_classes": [
+        "ChatRealtimeHub"
+      ]
+    }
+  ]
 }
