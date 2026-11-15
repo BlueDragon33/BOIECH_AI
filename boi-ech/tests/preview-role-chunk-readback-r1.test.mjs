@@ -69,9 +69,9 @@ test("preview generated artifact and post-deploy smoke are enforced by real scri
  const remote=read("../scripts/preview-stack-remote.mjs");
  const workflow=read("../../.github/workflows/deploy-boi-ech-preview.yml");
  assert.match(artifact,/roleAssetProbes\(fs\.readdirSync\(roleFolder\)\)/);
- const after=remote.indexOf("const roleSmoke=await verifyPreviewRoleAssetsLive(fetcher);");
+ const after=remote.indexOf("const roleSmoke=await roleVerifier(fetcher);");
  const secret=remote.indexOf("const secret = randomBytes(48)");
- assert.ok(after>0&&secret>after,"live role asset smoke must precede bridge secret rotation");
+ assert.ok(after>0&&secret>after&&remote.includes("roleVerifier = verifyPreviewRoleAssetsLive"),"live role asset smoke must precede bridge secret rotation");
  assert.ok(workflow.indexOf("name: Verify generated Preview artifact") <
    workflow.indexOf("name: Deploy preview"));
  assert.ok(workflow.includes("node scripts/preview-stack-remote.mjs install-bridge"));
