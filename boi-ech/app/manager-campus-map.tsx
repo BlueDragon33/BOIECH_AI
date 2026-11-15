@@ -108,6 +108,8 @@ export default function ManagerCampusMap({board,mode,busy=false,selectedId,onSel
        <span aria-hidden="true">{isMainLectureHall(b)?<MainLectureHallArt/>:isPracticePoolBuilding(b)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={i}/>}</span>
        <strong>{b.name}</strong><small>{rooms.filter(r=>r.parentId===b.id).length} phòng / hồ · {statusText[b.status]}</small></button>)}</div>
     </div>:null}
+   {!buildings.length?<div className={styles.setup}><strong>Chưa có tòa học thực tế</strong>
+     <button type="button" disabled={busy} onClick={onCreateBuilding}>＋ Tạo tòa</button></div>:null}
    <p className={styles.mapNote}>Chọn tòa để xem phòng và lịch. Nhãn “Mẫu có sẵn · Chưa tạo” chỉ là minh họa, không phải tòa đã được lưu.</p>
   </div>
  </section>;
