@@ -3,8 +3,9 @@
  * Pose landmarks are not a scene classifier: "pass" means motion is plausible,
  * NEVER that the model has proved water/swimming. Human declaration is separate.
  */
+// Admission establishes evaluability, not correct stroke technique.
 const LIMITS=Object.freeze({minimumSamples:14,minimumCoverage:.63,minimumVisibility:.58,
- minimumKneeExcursion:11,minimumArmExcursion:13,minimumMovingRatio:.19,minimumSideHorizontal:.56});
+ minimumMovingRatio:.08});
 const clamp=(x,min=0,max=1)=>Math.max(min,Math.min(max,Number.isFinite(x)?x:0));
 const avg=x=>x.length?x.reduce((a,b)=>a+b,0)/x.length:0;
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
@@ -41,18 +42,16 @@ export function inspectSwimmingEvidence(frames,sampleCount,view="side"){
  const issues=[];
  if(sorted.length<LIMITS.minimumSamples||coverage<LIMITS.minimumCoverage)issues.push("Không thấy rõ người bơi liên tục; hãy quay toàn thân trong ít nhất vài giây.");
  if(good.length<10||signals.length<10)issues.push("Không đủ điểm khớp tay/chân rõ để đối chiếu động tác.");
- if(kneeExcursion<LIMITS.minimumKneeExcursion&&armExcursion<LIMITS.minimumArmExcursion)issues.push("Không nhận thấy nhịp cử động tay và chân đủ rõ; có thể là video đứng yên hoặc không tập bơi.");
- if(view==="side"&&horizontalRatio<LIMITS.minimumSideHorizontal)issues.push("Góc ngang không thể hiện tư thế thân duỗi khi bơi; hãy quay ngang người đang bơi trong nước.");
- if(movingRatio<LIMITS.minimumMovingRatio)issues.push("Không có chuyển động tương đối tay/chân đủ rõ qua các khung hình.");
- const obviouslyWrong=good.length>=10&&signals.length>=10&&
-  (kneeExcursion<6&&armExcursion<7&&movingRatio<.12||
-    view==="side"&&horizontalRatio<.28&&movingRatio>=.19);
- const status=issues.length===0?"plausible":obviouslyWrong?"reject":"uncertain";
+ // Incorrect angles and poor timing are graded, not rejected.
+ if(movingRatio<LIMITS.minimumMovingRatio)issues.push("Không có chuyển động tay/chân đủ rõ để chấm; hãy quay lại đoạn có thao tác tập bơi.");
+ const obviouslyStatic=good.length>=10&&signals.length>=10
+   &&movingRatio<.04&&kneeExcursion<6&&armExcursion<7;
+ const status=obviouslyStatic?"reject":issues.length?"uncertain":"plausible";
  return {status,issues,coverage:Math.round(coverage*100),observedSamples:signals.length,
   kneeExcursion:Math.round(kneeExcursion),armExcursion:Math.round(armExcursion),
   movingRatio:Math.round(movingRatio*100),horizontalRatio:Math.round(horizontalRatio*100),
   note:status==="plausible"
-   ?"Có tín hiệu tư thế và chuyển động phù hợp để tiếp tục sàng lọc; chưa thể xác thực môi trường nước chỉ bằng pose."
-   :status==="reject"?"Video có dấu hiệu không phải đoạn thực hành bơi ếch phù hợp. Hãy gửi video quay đúng bài tập."
-    :"Không đủ căn cứ xác nhận đây là video tập bơi. Hãy quay lại với toàn thân và nhịp bơi rõ ràng."};
+   ?"Đã thấy người và chuyển động để chấm, kể cả động tác bơi sai; pose chưa xác thực được môi trường nước."
+   :status==="reject"?"Video gần như đứng yên, chưa đủ dấu hiệu thực hiện động tác bơi; hãy gửi đoạn có cử động tay hoặc chân."
+    :"Chưa đủ dữ liệu tư thế và chuyển động để chấm công bằng. Hãy quay rõ toàn thân và thử lại."};
 }
