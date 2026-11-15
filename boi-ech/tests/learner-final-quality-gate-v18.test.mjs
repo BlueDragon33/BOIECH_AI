@@ -59,7 +59,7 @@ test("assignment status updates remain bounded, idempotent and device-bound", ()
 });
 
 test("learner inbox stays visible-tab synchronized without duplicate signed loads", () => {
-  assert.ok(inbox.includes("window.setInterval(refreshVisibleInbox, 60_000)"));
+  assert.ok(inbox.includes("window.setInterval(refreshVisibleInbox, 8_000)"));
   assert.ok(inbox.includes('document.visibilityState === "visible"'));
   assert.ok(inbox.includes("if (inFlightDeviceRef.current === deviceId) return;"));
   assert.ok(inbox.includes("requestRef.current === requestId && deviceRef.current === deviceId"));
