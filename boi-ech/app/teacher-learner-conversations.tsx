@@ -13,7 +13,7 @@ const label={chat:"Chat trực tiếp",request:"Thư yêu cầu & phản hồi"}
 export default function TeacherLearnerConversations({role,deviceId,learners=[]}:Props){
  const [channel,setChannel]=useState<ConversationChannel>("chat");
  const [selected,setSelected]=useState("");
- const [messages,setMessages]=useState<ConversationItem[]>([]);
+ const [records,setRecords]=useState<{target:string;items:ConversationItem[]}>({target:"",items:[]});
  const [inbox,setInbox]=useState<IncomingItem[]>([]);
  const [text,setText]=useState("");
  const [subject,setSubject]=useState("");
@@ -25,23 +25,18 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  const lastIncoming=useRef<number|null>(null);
  const pendingId=useRef<string|null>(null);
  const validDevice=/^[a-f0-9]{64}$/i.test(deviceId);
- const target=role==="teacher"?selected:"";
  const available=useMemo(()=>learners.filter(l=>l.personCode),[learners]);
- const selectedName=available.find(l=>l.personCode===selected)?.name||"Học viên";
+ const target=role==="teacher"?(available.some(l=>l.personCode===selected)?selected:available[0]?.personCode||""):"";
+ const messages=records.target===target?records.items:[];
  const forRequest=useMemo(()=>messages.filter(m=>m.channel===channel),[channel,messages]);
  const openRequests=useMemo(()=>messages.filter(m=>m.channel==="request"&&m.role==="learner"&&!m.requestId),[messages]);
  const selectedRequest=openRequests.find(m=>m.id===requestId)||null;
- useEffect(()=>{
-  if(role!=="teacher")return;
-  if(!available.some(l=>l.personCode===selected))setSelected(available[0]?.personCode||"");
- },[role,available,selected]);
  const refresh=useCallback(async(signal?:AbortSignal)=>{
   if(!validDevice||(role==="teacher"&&!target))return;
   const data=await conversationRequest(deviceId,{action:"list",...(target?{learnerPersonCode:target}:{})},signal);
-  if(!signal?.aborted){setMessages(data.messages??[]);setLoading(false);setError("");}
+  if(!signal?.aborted){setRecords({target,items:data.messages??[]});setLoading(false);setError("");}
  },[role,deviceId,target,validDevice]);
  useEffect(()=>{
-  setMessages([]);setLoading(true);
   if(!validDevice||(role==="teacher"&&!target))return;
   let dead=false,pending=false;
   const controller=new AbortController();
@@ -81,7 +76,8 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   document.addEventListener("visibilitychange",handle);window.addEventListener("online",handle);
   return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);};
  },[deviceId,role,validDevice]);
- useEffect(()=>{pendingId.current=null;setText("");setSubject("");setRequestId(null);},[channel,target]);
+ function resetDraft(){pendingId.current=null;setText("");setSubject("");setRequestId(null);}
+ function selectChannel(type:ConversationChannel){setChannel(type);resetDraft();}
  async function send(event:React.FormEvent){
   event.preventDefault();if(busy||!validDevice)return;
   const message=text.trim();if(!message||message.length>1200)return;
@@ -104,12 +100,12 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  return <section className={styles.shell} aria-label="Liên lạc trực tiếp giữa giảng viên và học viên">
   <header className={styles.header}><div><small>LIÊN LẠC HAI CHIỀU</small><h2>Giảng viên ↔ Học viên</h2><p>Hai kênh độc lập, lưu theo đúng lớp và tài khoản. Tự nhận tin mới khi trang đang mở.</p></div><span className={styles.online}>● Tự đồng bộ 5–7 giây</span></header>
   {role==="teacher"?<div className={styles.teacherScope}>
-    <label>Học viên trong lớp<select value={selected} onChange={e=>{setSelected(e.target.value);setNotice("");}}>
+    <label>Học viên trong lớp<select value={target} onChange={e=>{setSelected(e.target.value);resetDraft();setNotice("");}}>
       {available.length?available.map(l=><option key={l.personCode} value={l.personCode}>{l.name} · {l.className}</option>):<option value="">Chưa có học viên phù hợp</option>}
     </select></label>
     <div className={styles.incoming}><strong>Thư và tin mới nhất trong lớp</strong><div>
      {inbox.slice(0,5).map(item=><button type="button" key={item.id} onClick={()=>{
-       setSelected(item.learnerPersonCode);setChannel(item.channel);setNotice("");
+       setSelected(item.learnerPersonCode);selectChannel(item.channel);setNotice("");
        if(item.channel==="request")setRequestId(item.id);
       }}><span>{item.channel==="request"?"✉":"●"} {item.learnerName}</span><small>{item.subject||item.message.slice(0,80)}</small></button>)}
      {!inbox.length?<span>Chưa có tin mới từ học viên.</span>:null}
@@ -117,7 +113,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   </div>:null}
   <nav className={styles.tabs} aria-label="Chọn kênh liên lạc">
     {(["chat","request"] as const).map(type=><button type="button" key={type} aria-pressed={channel===type}
-      className={channel===type?styles.active:""} onClick={()=>setChannel(type)}>{type==="chat"?"💬":"✉️"} {label[type]}</button>)}
+      className={channel===type?styles.active:""} onClick={()=>selectChannel(type)}>{type==="chat"?"💬":"✉️"} {label[type]}</button>)}
   </nav>
   {notice?<p className={styles.notice} role="status">{notice}</p>:null}
   {error?<p className={styles.error} role="alert">{error}</p>:null}
@@ -130,7 +126,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
       {channel==="request"&&role==="teacher"&&item.role==="learner"&&!item.requestId?
        <button type="button" className={styles.reply} onClick={()=>setRequestId(item.id)}>Trả lời thư này</button>:null}
     </article>)}
-    {!forRequest.length?<p className={styles.empty}>{loading?"Đang đồng bộ hội thoại…":channel==="chat"?"Chưa có tin chat. Bạn có thể bắt đầu cuộc trò chuyện.":"Chưa có thư yêu cầu. Học viên có thể gửi thư mới mà không cần Giảng viên nhắn trước."}</p>:null}
+    {!forRequest.length?<p className={styles.empty}>{loading||records.target!==target?"Đang đồng bộ hội thoại…":channel==="chat"?"Chưa có tin chat. Bạn có thể bắt đầu cuộc trò chuyện.":"Chưa có thư yêu cầu. Học viên có thể gửi thư mới mà không cần Giảng viên nhắn trước."}</p>:null}
   </div>
   <form className={styles.form} onSubmit={event=>void send(event)}>
     {channel==="request"&&role==="learner"?<label>Tiêu đề yêu cầu<input value={subject} maxLength={100} onChange={e=>{setSubject(e.target.value);pendingId.current=null;}} placeholder="Ví dụ: Cần hướng dẫn kỹ thuật đạp chân" required/></label>:null}
