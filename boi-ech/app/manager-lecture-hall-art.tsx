@@ -29,14 +29,14 @@ export function MainLectureHallArt(){
   <path d="M94 170 170 128 201 147 201 261 94 299Z" fill={url("facade")} stroke="#a4bff1" strokeWidth="2"/>
   <path d="M319 145 357 128 432 169 432 299 319 258Z" fill={url("facade")} stroke="#acc9ed" strokeWidth="2"/>
   {/* Illuminated side windows, warm like the reference rendering */}
-  {#each [0,1,2] as n}
+  {[0,1,2].map(n=>(
    <g key={n}>
     <path d={`M${102+n*27} ${184+n*2} l14 -6 v32 l-14 6 Z`} fill={url("glass")} stroke="#315d92" strokeWidth="3"/>
     <path d={`M${102+n*27} ${228+n*2} l14 -6 v32 l-14 6 Z`} fill={url("glass")} stroke="#315d92" strokeWidth="3"/>
     <path d={`M${332+n*29} ${184+n*2} l14 6 v31 l-14 -6 Z`} fill={url("glass")} stroke="#315d92" strokeWidth="3"/>
     <path d={`M${332+n*29} ${228+n*2} l14 6 v31 l-14 -6 Z`} fill={url("glass")} stroke="#315d92" strokeWidth="3"/>
    </g>
-  {/each}
+  ))}
   {/* Central pediment, iconic clock-like university entrance */}
   <path d="M168 152 258 85 349 154 333 165 259 117 183 168Z" fill={url("roof")} stroke="#dbf5ff" strokeWidth="4"/>
   <path d="M185 165 260 119 332 163 332 283 185 282Z" fill={url("facade")} stroke="#e4efff" strokeWidth="3"/>
@@ -50,12 +50,12 @@ export function MainLectureHallArt(){
   <path d="M230 200q29-37 57 0v82h-57Z" fill={url("glass")} stroke="#385d91" strokeWidth="4"/>
   <path d="M239 199q19-24 39 0v76h-39Z" fill="#ffd779" stroke="#fff2bc" strokeWidth="1"/>
   <path d="M258 182v95M230 216h57" stroke="#8d663f" strokeWidth="2" opacity=".8"/>
-  {#each [193,214,306,327] as x}
+  {[193,214,306,327].map(x=>(
     <g key={x}>
      <path d={`M${x-7} 193 h14 l-2 89 h-10Z`} fill={url("facade")} stroke="#738eb4" strokeWidth="1.8"/>
      <path d={`M${x-9} 187 h18 v8 h-18Z M${x-10} 280h20v7h-20Z`} fill="#f0f5ff" stroke="#7b95c2" strokeWidth="1.5"/>
     </g>
-  {/each}
+  ))}
   <path d="M181 187 335 187v7H181Z M174 285h172v8H174Z" fill="#dbe7f8" stroke="#6b89b6" strokeWidth="2"/>
   {/* Broad illuminated stairs, directly facing the viewer */}
   <path d="M227 291 289 291 332 336 184 336Z" fill="#a3bde0" stroke="#e3f5ff" strokeWidth="3"/>
@@ -65,15 +65,15 @@ export function MainLectureHallArt(){
   <path d="M174 220h14v65h-14Z M333 220h14v65h-14Z" fill="#1c5da2" stroke="#8bc4ff" strokeWidth="1"/>
   <path d="M258 65v23" stroke="#f2fbff" strokeWidth="2.5"/>
   <path d="m260 65 21 6-21 9Z" fill="#82d6ff"/>
-  {#each [{x:75,y:282},{x:127,y:312},{x:379,y:311},{x:442,y:281},{x:62,y:258},{x:453,y:258}] as tree,i}
+  {[{x:75,y:282},{x:127,y:312},{x:379,y:311},{x:442,y:281},{x:62,y:258},{x:453,y:258}].map((tree,i)=>(
    <g key={i}>
     <path d={`M${tree.x} ${tree.y-30}v34`} stroke="#28583a" strokeWidth="5"/>
     <ellipse cx={tree.x} cy={tree.y-24} rx="12" ry="18" fill="#3e9b5e" stroke="#78d16e" strokeWidth="2"/>
     <ellipse cx={tree.x+7} cy={tree.y-15} rx="10" ry="13" fill="#2c744a" stroke="#86cb6b" strokeWidth="1"/>
    </g>
-  {/each}
-  {#each [66,448] as x}
+  ))}
+  {[66,448].map(x=>(
    <g key={x}><path d={`M${x} 295v-39`} stroke="#c7e8fa" strokeWidth="3"/><circle cx={x} cy="253" r="5" fill="#ffe8a5" stroke="#fff5d3" strokeWidth="2"/></g>
-  {/each}
+  ))}
  </svg>;
 }
