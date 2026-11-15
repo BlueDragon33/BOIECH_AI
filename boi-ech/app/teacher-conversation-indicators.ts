@@ -13,9 +13,9 @@ export const showUnread=(count:number)=>Math.max(0,Math.floor(Number(count)||0))
  * refetch. Polling is enabled only when the socket is unavailable.
  */
 export function useTeacherConversationIndicators(deviceId:string,active:boolean):ConversationUnread{
- const [counts,setCounts]=useState<ConversationUnread>(empty);
+ const [snapshot,setSnapshot]=useState<{deviceId:string;counts:ConversationUnread}>({deviceId:"",counts:empty});
  useEffect(()=>{
-  if(!active||!/^[a-f0-9]{64}$/i.test(deviceId)){setCounts(empty);return;}
+  if(!active||!/^[a-f0-9]{64}$/i.test(deviceId))return;
   let closed=false,pending=false,again=false,retries=0;
   let socket:WebSocket|null=null;
   let fallback:number|undefined,reconnect:number|undefined;
@@ -24,9 +24,9 @@ export function useTeacherConversationIndicators(deviceId:string,active:boolean)
    if(pending){again=true;return;}
    pending=true;
    void conversationRequest(deviceId,{action:"inbox"}).then(data=>{
-    if(!closed&&data.unread)setCounts({
+    if(!closed&&data.unread)setSnapshot({deviceId,counts:{
      chat:showUnread(data.unread.chat),request:showUnread(data.unread.request)
-    });
+    }});
    }).catch(()=>{ /* Do not present an invented zero count if sync fails. */ })
     .finally(()=>{pending=false;if(again&&!closed){again=false;queueMicrotask(refresh);}});
   };
@@ -94,5 +94,5 @@ export function useTeacherConversationIndicators(deviceId:string,active:boolean)
    socket?.close(1000,"Navigation unmounted");
   };
  },[deviceId,active]);
- return counts;
+ return active&&snapshot.deviceId===deviceId?snapshot.counts:empty;
 }
