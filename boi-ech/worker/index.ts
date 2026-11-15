@@ -8,7 +8,7 @@ interface Env {
   // Match vinext's standard web Request/Response bridge at the asset boundary.
   ASSETS: { fetch(request: Request): Promise<Response> };
   DB: D1Database;
-  CHAT_HUB?: DurableObjectNamespace;
+  CHAT_HUB?: {idFromName(name:string):unknown; get(id:unknown):{fetch(request:Request):Promise<Response>}};
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
