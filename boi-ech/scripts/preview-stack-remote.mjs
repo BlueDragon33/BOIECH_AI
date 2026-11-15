@@ -1,4 +1,7 @@
 import { randomBytes } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import {roleAssetProbes} from "./production-package.mjs";
 import { pathToFileURL } from "node:url";
 import { previewD1Policy } from "./preview-d1-policy.mjs";
 
@@ -138,9 +141,40 @@ export async function readBoiPreviewRuntime(secret, fetcher = fetch, pause = ms 
   throw new Error("Deployed Boi Preview runtime readback exhausted retry policy.");
 }
 
+/**
+ * Validate real Cloudflare Preview URLs for both role-specific lazy chunks.
+ * Use the exact generated deployment asset manifest so a successful shell/
+ * status readback cannot hide a failed teacher or learner GO.
+ * This read-only check is required BEFORE rotating the shared Preview bridge.
+ */
+export async function verifyPreviewRoleAssetsLive(fetcher=fetch, root=process.cwd()) {
+  const dist=path.resolve(root,"dist")+path.sep;
+  const redirect=path.resolve(root,".wrangler/deploy/config.json");
+  const configIndex=JSON.parse(fs.readFileSync(redirect,"utf8"));
+  if(typeof configIndex?.configPath!=="string")throw new Error("Preview role smoke: generated config redirect missing.");
+  const configPath=path.resolve(path.dirname(redirect),configIndex.configPath);
+  if(!configPath.startsWith(dist))throw new Error("Preview role smoke: generated config path must stay under dist.");
+  const config=JSON.parse(fs.readFileSync(configPath,"utf8"));
+  if(config.name!==BOI||typeof config.assets?.directory!=="string")
+    throw new Error("Preview role smoke: unexpected Worker or asset directory.");
+  const assetsRoot=path.resolve(path.dirname(configPath),config.assets.directory);
+  if(!assetsRoot.startsWith(dist))
+    throw new Error("Preview role smoke: asset directory must remain under dist.");
+  const roleFiles=roleAssetProbes(fs.readdirSync(path.join(assetsRoot,"assets")));
+  for(const file of roleFiles){
+    const response=await fetcher(`https://${BOI}.boiech-ai.workers.dev/${file}`,{
+      method:"GET",cache:"no-store",redirect:"error",signal:AbortSignal.timeout(15000),
+    });
+    if(response.status!==200||!/javascript|ecmascript/i.test(response.headers.get("content-type")??""))
+      throw new Error(`Preview role smoke: ${file} returned HTTP ${response.status} or non-JavaScript content.`);
+  }
+  return {checked:roleFiles.length,files:roleFiles};
+}
+
 export async function installPreviewBridge(env = process.env, fetcher = fetch) {
   if (env.PREVIEW_BRIDGE_CONFIRMATION !== "INSTALL_PREVIEW_BRIDGE") throw new Error("INSTALL_PREVIEW_BRIDGE confirmation is required to create or rotate the shared credential on the two named Preview Workers.");
   const result = await checkPreviewStack(env, fetcher, true);
+  const roleSmoke=await verifyPreviewRoleAssetsLive(fetcher);
   const api = provider(env, fetcher);
   const secret = randomBytes(48).toString("base64url");
   for (const worker of [BOI, APP]) await api(worker, "secrets", { name:"CONTROL_SERVICE_SECRET", type:"secret_text", text:secret });
@@ -153,7 +187,7 @@ export async function installPreviewBridge(env = process.env, fetcher = fetch) {
   if (appResponse.status !== 401 || (await appResponse.json()).error !== "preview_access_required") throw new Error("App Preview anonymous access protection check failed.");
   const v2Summary = await verifyV2SummaryLive(secret, fetcher);
   await checkPreviewStack(env, fetcher, true);
-  return {...result, boiRevision:status.deployment.revision, appRevision:env.APPLICATION_MANAGEMENT_BUILD_REVISION, appAnonymousStatus:appResponse.status, v2Summary, bridgeInstalled:true, acceptance:"Owner/MFA/account/device business acceptance remains separate"};
+  return {...result, boiRevision:status.deployment.revision, appRevision:env.APPLICATION_MANAGEMENT_BUILD_REVISION, appAnonymousStatus:appResponse.status, v2Summary, roleSmoke, bridgeInstalled:true, acceptance:"Owner/MFA/account/device business acceptance remains separate"};
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
