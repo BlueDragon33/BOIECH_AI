@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import TeacherLearnerConversations from "./teacher-learner-conversations";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type TeacherInboxAction = {
@@ -359,5 +360,5 @@ export default function StudentTeacherInbox() {
     };
   }, [refreshToken]);
 
-  return mount ? createPortal(<Inbox actions={actions} deviceId={deviceId} onRefresh={() => setRefreshToken((value) => value + 1)} />, mount) : null;
+  return mount ? createPortal(<div style={{display:"grid",gap:16,marginBottom:16}}><TeacherLearnerConversations role="learner" deviceId={deviceId}/><Inbox actions={actions} deviceId={deviceId} onRefresh={() => setRefreshToken((value) => value + 1)} /></div>, mount) : null;
 }
