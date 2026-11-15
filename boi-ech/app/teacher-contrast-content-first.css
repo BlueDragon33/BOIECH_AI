@@ -1,0 +1,291 @@
+/*
+ * CONTENT-FIRST-001 · teacher interface contrast reconciliation.
+ * Loaded AFTER v36 reference styling and v9 readability so presentation layers
+ * never combine dark surfaces with legacy light-surface inks.
+ * Readability is pairwise (foreground AND background), not a text-only patch.
+ * Does not change teacher permissions, roster data, actions or video grading.
+ */
+body[data-teacher-role-ui="active"] {
+  --tc-panel: #ffffff;
+  --tc-panel-alt: #f4f8fd;
+  --tc-heading: #dceaf8;
+  --tc-ink: #123251;
+  --tc-strong: #0b2949;
+  --tc-muted: #405b75;
+  --tc-border: #a8c8df;
+  --tc-action-bg: #dcecff;
+  --tc-action-ink: #084d82;
+  --tc-action-border: #2878ae;
+  --tc-track: #d2e4ee;
+  --tc-track-ink: #14547c;
+  --tc-warning-bg: #fff0ea;
+  --tc-warning-ink: #a83c2a;
+  --tc-ok-bg: #e0f5ed;
+  --tc-ok-ink: #07694b;
+}
+/* Never let reference-v36's dark card background conflict with
+   roster-sync-v9's dark blue text. */
+body[data-teacher-role-ui="active"] .teacher-roster-manager {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+  border: 1px solid var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager > header {
+  background: var(--tc-panel-alt) !important;
+  color: var(--tc-ink) !important;
+  border-bottom: 1px solid var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager > header :is(h2,strong) {
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-manager > header :is(p,small) {
+  color: var(--tc-muted) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary,
+body[data-teacher-role-ui="active"] .teacher-roster-toolbar,
+body[data-teacher-role-ui="active"] .teacher-roster-table-wrap {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+  border-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary > div {
+  background: var(--tc-panel-alt) !important;
+  border-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary strong {
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-summary span,
+body[data-teacher-role-ui="active"] .teacher-roster-sync-compact :is(span,small) {
+  color: var(--tc-muted) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table,
+body[data-teacher-role-ui="active"] .teacher-roster-table tbody {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table :is(thead,th) {
+  background: var(--tc-heading) !important;
+  color: var(--tc-strong) !important;
+  border-bottom-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table tbody tr td {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+  border-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table tbody tr:nth-child(even) td {
+  background: var(--tc-panel-alt) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table tbody tr:hover td {
+  background: var(--tc-heading) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table td strong {
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table td small,
+body[data-teacher-role-ui="active"] .teacher-roster-empty {
+  color: var(--tc-muted) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-table th,
+body[data-teacher-role-ui="active"] .teacher-roster-table td {
+  font-size: calc(14px + var(--font-adjust,0px)) !important;
+  line-height: 1.45 !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-status.approved {
+  background: var(--tc-ok-bg) !important;
+  color: var(--tc-ok-ink) !important;
+  border: 1px solid var(--tc-ok-ink);
+}
+body[data-teacher-role-ui="active"] .teacher-roster-status.pending {
+  background: var(--tc-warning-bg) !important;
+  color: var(--tc-warning-ink) !important;
+  border: 1px solid var(--tc-warning-ink);
+}
+body[data-teacher-role-ui="active"] .teacher-roster-toolbar input,
+body[data-teacher-role-ui="active"] .teacher-roster-filters button,
+body[data-teacher-role-ui="active"] .teacher-roster-sync-compact > button {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+  border-color: var(--tc-action-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-roster-toolbar input::placeholder {
+  color: var(--tc-muted) !important;
+  opacity: 1 !important;
+}
+/* Student watchlist / learner detail table. Includes the "Xem hồ sơ" action
+   which previously looked disabled due to white text over pale blue. */
+body[data-teacher-role-ui="active"] .teacher-watchlist,
+body[data-teacher-role-ui="active"] .teacher-watchlist .teacher-table-wrap,
+body[data-teacher-role-ui="active"] .teacher-page .teacher-table-wrap {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+  border-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table :is(thead,th) {
+  background: var(--tc-heading) !important;
+  color: var(--tc-strong) !important;
+  border-bottom-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table tbody tr td {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+  border-bottom: 1px solid var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table tbody tr:nth-child(even) td {
+  background: var(--tc-panel-alt) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table tbody tr:hover td {
+  background: var(--tc-heading) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-student strong,
+body[data-teacher-role-ui="active"] .teacher-table .teacher-number-cell {
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table :is(.teacher-student small,.teacher-cell-note) {
+  color: var(--tc-muted) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table :is(.teacher-progress b,.teacher-progress-bar b) {
+  color: var(--tc-track-ink) !important;
+  font-weight: 850;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-progress > span {
+  background: var(--tc-track) !important;
+  border: 1px solid var(--tc-border) !important;
+  min-height: 9px;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-progress > span i {
+  background: #097c9f !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-status.warn {
+  color: var(--tc-warning-ink) !important;
+  background: var(--tc-warning-bg) !important;
+  border: 1px solid var(--tc-warning-ink) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-status.ok {
+  color: var(--tc-ok-ink) !important;
+  background: var(--tc-ok-bg) !important;
+  border: 1px solid var(--tc-ok-ink) !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-row-action {
+  background: var(--tc-action-bg) !important;
+  color: var(--tc-action-ink) !important;
+  border: 1px solid var(--tc-action-border) !important;
+  border-radius: 9px;
+  text-decoration: none;
+  min-height: 42px;
+  padding: 8px 12px;
+  font-size: calc(14px + var(--font-adjust,0px)) !important;
+  line-height: 1.35;
+  font-weight: 850 !important;
+  opacity: 1 !important;
+  cursor: pointer;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-row-action:hover:not(:disabled) {
+  color: #ffffff !important;
+  background: #145b8e !important;
+  border-color: #145b8e !important;
+}
+body[data-teacher-role-ui="active"] .teacher-table .teacher-row-action:disabled {
+  color: #40556b !important;
+  background: #d4deea !important;
+  border-color: #63788d !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+body[data-teacher-role-ui="active"] :is(.teacher-roster-table,.teacher-table) :is(th,td) {
+  overflow-wrap: anywhere;
+}
+body[data-teacher-role-ui="active"] :is(.teacher-roster-manager,.teacher-watchlist)
+  :is(button,input,select):focus-visible,
+body[data-teacher-role-ui="active"] .teacher-table button:focus-visible {
+  outline: 3px solid #d08800 !important;
+  outline-offset: 3px !important;
+}
+
+/* Dark appearance: surfaces and foregrounds always move AS A PAIR.
+   Avoid legacy --card-ink and --card-background drifting independently. */
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] {
+  --tc-panel: #10324b;
+  --tc-panel-alt: #193e59;
+  --tc-heading: #284f6c;
+  --tc-ink: #e5f2fb;
+  --tc-strong: #ffffff;
+  --tc-muted: #bdd2e4;
+  --tc-border: #658ba6;
+  --tc-action-bg: #1a4e78;
+  --tc-action-ink: #ffffff;
+  --tc-action-border: #88c1eb;
+  --tc-track: #2f5776;
+  --tc-track-ink: #e2f4fc;
+  --tc-warning-bg: #63312d;
+  --tc-warning-ink: #ffe0d5;
+  --tc-ok-bg: #174c40;
+  --tc-ok-ink: #aff8db;
+}
+/* Stronger than v9's hardcoded dark table selectors, which used the same
+   background for header and body and could override surface tokens. */
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table th {
+  background: var(--tc-heading) !important;
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table tbody tr td {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table tbody tr:nth-child(even) td {
+  background: var(--tc-panel-alt) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table tbody tr:hover td {
+  background: var(--tc-heading) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table th {
+  background: var(--tc-heading) !important;
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table tbody tr td {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table tbody tr:nth-child(even) td {
+  background: var(--tc-panel-alt) !important;
+}
+
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table :is(th,td,strong,small),
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table :is(th,td,strong,small) {
+  /* Keep legacy v9 dark overrides from reintroducing low-contrast text. */
+  border-color: var(--tc-border) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"]
+  :is(.teacher-roster-status.approved,.teacher-table .teacher-status.ok) {
+  color: var(--tc-ok-ink) !important;
+  background: var(--tc-ok-bg) !important;
+  border-color: var(--tc-ok-ink) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"]
+  :is(.teacher-roster-status.pending,.teacher-table .teacher-status.warn) {
+  color: var(--tc-warning-ink) !important;
+  background: var(--tc-warning-bg) !important;
+  border-color: var(--tc-warning-ink) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table .teacher-row-action:hover:not(:disabled) {
+  color: #ffffff !important;
+  background: #23688f !important;
+  border-color: #88c1eb !important;
+}
+@media (max-width: 640px) {
+  body[data-teacher-role-ui="active"] .teacher-roster-table,
+  body[data-teacher-role-ui="active"] .teacher-table {
+    min-width: 650px; /* preserves columns, horizontal scrolling remains explicit */
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body[data-teacher-role-ui="active"] .teacher-roster-manager *,
+  body[data-teacher-role-ui="active"] .teacher-table * {
+    transition: none !important;
+  }
+}

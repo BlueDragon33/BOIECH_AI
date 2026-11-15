@@ -35,6 +35,8 @@ import "./role-readable-v9.css";
 import "./modal-contrast-v9.css";
 import "./device-gate-premium.css";
 import "./manual-sync-badge.css";
+// Final teacher foreground/background pairing: loaded last to prevent legacy overrides.
+import "./teacher-contrast-content-first.css";
 import MultiAccountSwitcher from "./multi-account-switcher";
 
 const geistSans = Geist({
