@@ -4,11 +4,13 @@ import fs from "node:fs";
 
 const inbox = fs.readFileSync(new URL("../app/student-teacher-inbox.tsx", import.meta.url), "utf8");
 
-test("learner inbox refreshes every 60 seconds only while visible", () => {
-  assert.ok(inbox.includes("window.setInterval(refreshVisibleInbox, 60_000)"));
+test("learner inbox refreshes every 8 seconds while visible", () => {
+  assert.ok(inbox.includes("window.setInterval(refreshVisibleInbox, 8_000)"));
   assert.ok(inbox.includes('document.visibilityState === "visible"'));
   assert.ok(inbox.includes('document.addEventListener("visibilitychange", refreshVisibleInbox)'));
   assert.ok(inbox.includes('document.removeEventListener("visibilitychange", refreshVisibleInbox)'));
+  assert.ok(inbox.includes('window.addEventListener("online", refreshVisibleInbox)'));
+  assert.ok(inbox.includes('window.removeEventListener("online", refreshVisibleInbox)'));
 });
 
 test("learner inbox prevents duplicate signed fetches for the same device", () => {
