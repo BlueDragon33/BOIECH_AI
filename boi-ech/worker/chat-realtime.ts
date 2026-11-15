@@ -3,8 +3,26 @@
  * Chat text stays in D1; sockets send only change hints. Clients must re-read
  * through the signed, scoped REST API. No browser polling while connected.
  */
-import { DurableObject } from "cloudflare:workers";
 import type { D1Database } from "@cloudflare/workers-types";
+
+type BrokerSocket=WebSocket&{
+ serializeAttachment(value:unknown):void;
+ deserializeAttachment():unknown;
+};
+type BrokerState={
+ storage:{
+  put(key:string,value:unknown):Promise<unknown>;
+  get<T>(key:string):Promise<T|undefined>;
+  delete(key:string):Promise<unknown>;
+  list<T>(opts:{prefix:string}):Promise<Map<string,T>>;
+  setAlarm(at:number):Promise<unknown>;
+ };
+ blockConcurrencyWhile<T>(fn:()=>Promise<T>):Promise<T>;
+ acceptWebSocket(ws:BrokerSocket):void;
+ getWebSockets():BrokerSocket[];
+};
+declare const WebSocketPair: {new():{0:BrokerSocket;1:BrokerSocket}};
+
 
 type HubEnv={DB:D1Database;BOI_ECH_ACCOUNT_V2?:string};
 type Session={
@@ -21,7 +39,8 @@ const validDevice=(value:unknown)=>typeof value==="string"&&/^[a-f0-9]{64}$/i.te
 const normalize=(value:unknown)=>String(value??"").trim().toLocaleLowerCase("vi");
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{"cache-control":"private, no-store"}});
 
-export class ChatRealtimeHub extends DurableObject<HubEnv>{
+export class ChatRealtimeHub{
+  constructor(private ctx:BrokerState,private env:HubEnv){}
   async fetch(req:Request):Promise<Response>{
     const path=new URL(req.url).pathname;
     if(path==="/ticket"&&req.method==="POST"){
