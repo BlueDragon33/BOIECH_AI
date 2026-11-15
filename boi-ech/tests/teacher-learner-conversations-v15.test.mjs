@@ -104,3 +104,70 @@ test("teacher inbox UI respects the currently selected work-scope and does not s
  assert.match(code,/scopedInbox\.slice\(0,5\)/);
  assert.match(code,/const messages=records\.target===target\?records\.items:\[\]/);
 });
+
+test("teacher chat opens on the selected learner immediately, not only after clicking recent item",()=>{
+ const ui=fs.readFileSync(new URL("../app/teacher-learner-conversations.tsx",import.meta.url),"utf8");
+ assert.match(ui,/const target=role==="teacher"\?\(available\.some/);
+ assert.match(ui,/disabled=\{busy\|\|!text\.trim\(\)\|\|\(role==="teacher"&&!target\)/);
+ assert.doesNotMatch(ui,/role==="teacher"&&!selected\)/);
+ assert.match(ui,/const messages=records\.target===target\?records\.items:\[\]/);
+ assert.match(ui,/setSelected\(e\.target\.value\);resetDraft\(\)/);
+});
+test("teacher unread counters distinguish chats and request letters and survive a signed inbox refresh",async()=>{
+ const f=harness();try{
+  const chat=await f.post({actor:"learnerA",action:"send",channel:"chat",message:"Hỏi nhịp bơi"});
+  const letter=await f.post({actor:"learnerA",action:"send",channel:"request",subject:"Xin hỗ trợ",message:"Hướng dẫn đạp chân"});
+  const first=await f.post({actor:"teacherA",action:"inbox"});
+  assert.equal(first.unread.chat,1);
+  assert.equal(first.unread.request,1);
+  assert.equal(first.recent.filter(item=>item.unread).length,2);
+  const seen=await f.post({actor:"teacherA",action:"seen",learnerPersonCode:"HV01",channel:"chat",lastSeenEventId:chat.id});
+  assert.equal(seen.status,200,seen.error);
+  assert.equal(seen.lastSeenEventId,chat.id);
+  assert.equal((await f.post({actor:"teacherA",action:"seen",learnerPersonCode:"HV01",channel:"chat",lastSeenEventId:chat.id})).status,200);
+  const stored=f.sqlite.prepare("SELECT COUNT(*) AS n FROM course_activity_events WHERE event_type='teacher_conversation_seen'").get();
+  assert.equal(stored.n,1,"read receipt must be idempotent without additional migration");
+  const updated=await f.post({actor:"teacherA",action:"inbox"});
+  assert.deepEqual(updated.unread,{chat:0,request:1});
+  assert.equal(updated.recent.find(item=>item.id===chat.id)?.unread,false);
+  assert.equal(updated.recent.find(item=>item.id===letter.id)?.unread,true);
+  assert.equal((await f.post({actor:"teacherB",action:"inbox"})).unread.chat,0);
+  const letterSeen=await f.post({actor:"teacherA",action:"seen",learnerPersonCode:"HV01",channel:"request",lastSeenEventId:letter.id});
+  assert.equal(letterSeen.status,200);
+  assert.deepEqual((await f.post({actor:"teacherA",action:"inbox"})).unread,{chat:0,request:0});
+ }finally{f.dispose();}
+});
+test("seen receipts cannot mark somebody else's class, wrong channel, or a forged future ID",async()=>{
+ const f=harness();try{
+  const chat=await f.post({actor:"learnerA",action:"send",channel:"chat",message:"Em cần hỏi bài"});
+  assert.equal((await f.post({actor:"teacherB",action:"seen",learnerPersonCode:"HV01",channel:"chat",lastSeenEventId:chat.id})).status,404);
+  assert.equal((await f.post({actor:"manager",action:"seen",learnerPersonCode:"HV01",channel:"chat",lastSeenEventId:chat.id})).status,403);
+  assert.equal((await f.post({actor:"learnerA",action:"seen",channel:"chat",lastSeenEventId:chat.id})).status,403);
+  assert.equal((await f.post({actor:"teacherA",action:"seen",learnerPersonCode:"HV01",channel:"request",lastSeenEventId:chat.id})).status,404);
+  assert.equal((await f.post({actor:"teacherA",action:"seen",learnerPersonCode:"HV01",channel:"chat",lastSeenEventId:chat.id+1000})).status,404);
+  assert.equal((await f.post({actor:"teacherA",action:"seen",learnerPersonCode:"HV01",channel:"chat",lastSeenEventId:0})).status,400);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM course_activity_events WHERE event_type='teacher_conversation_seen'").get().n,0);
+ }finally{f.dispose();}
+});
+test("9+ caps both unread badge colors without confusing read receipts with all recent messages",()=>{
+ const ui=fs.readFileSync(new URL("../app/teacher-learner-conversations.tsx",import.meta.url),"utf8");
+ const nav=fs.readFileSync(new URL("../app/teacher-role-shell.tsx",import.meta.url),"utf8");
+ const css=fs.readFileSync(new URL("../app/teacher-conversation-indicators.module.css",import.meta.url),"utf8");
+ const channelCss=fs.readFileSync(new URL("../app/teacher-learner-conversations.module.css",import.meta.url),"utf8");
+ const indicator=fs.readFileSync(new URL("../app/teacher-conversation-indicators.ts",import.meta.url),"utf8");
+ const helper=fs.readFileSync(new URL("../app/teacher-learner-conversation-client.ts",import.meta.url),"utf8");
+ assert.match(helper,/value>9\?"9\+"/);
+ assert.match(ui,/item\.channel==="chat"&&item\.unread/);
+ assert.match(ui,/item\.channel==="request"&&item\.unread/);
+ assert.match(ui,/action:"seen"/);
+ assert.match(nav,/useTeacherConversationIndicators\(workspaceDeviceId,active\)/);
+ assert.match(nav,/indicatorStyles\.chatCount/);
+ assert.match(nav,/indicatorStyles\.requestCount/);
+ assert.match(css,/chatCount\{background:#ffad42/);
+ assert.match(css,/requestCount\{background:#e94656/);
+ assert.match(channelCss,/\.chatUnread\{/);
+ assert.match(channelCss,/\.requestUnread\{/);
+ assert.match(indicator,/action:"inbox"/);
+ assert.match(indicator,/conversation_changed/);
+ assert.match(indicator,/startFallback\(\)/);
+});

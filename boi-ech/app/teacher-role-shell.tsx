@@ -8,6 +8,8 @@ import TeacherLearningAnalyticsPanel, { type InterventionLearningAnalyticsClient
 import TeacherSmartInterventions, { type SmartSuggestionClient } from "./teacher-smart-interventions";
 import TeacherTwoWayMessages, { type TeacherLearnerReply } from "./teacher-two-way-messages";
 import TeacherLearnerConversations from "./teacher-learner-conversations";
+import {useTeacherConversationIndicators,compactUnread} from "./teacher-conversation-indicators";
+import indicatorStyles from "./teacher-conversation-indicators.module.css";
 import TeacherAssignmentSchedule, { type TeacherAssignmentScheduleItem } from "./teacher-assignment-schedule";
 import TeacherClassWorkspace from "./teacher-class-workspace";
 import TeacherVideoResultDetails, {type TeacherVideoAnalysis} from "./teacher-video-result-details";
@@ -134,9 +136,13 @@ function TeacherIcon({ name }: { name: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.overview}</svg>;
 }
 
-function TeacherNavigation({ tab, setTab, teacherName, className }: { tab: TeacherTab; setTab: TabSetter; teacherName: string; className: string }) {
+function TeacherNavigation({ tab, setTab, teacherName, className, unread }: { tab: TeacherTab; setTab: TabSetter; teacherName: string; className: string; unread: {chat:number;request:number} }) {
   const rows: Array<{ id: TeacherTab; label: string; icon: string }> = [{ id: "overview", label: "Tổng quan", icon: "overview" }, { id: "class", label: "Lớp học", icon: "class" }, { id: "learners", label: "Học viên", icon: "learners" }, { id: "tasks", label: "Bài tập", icon: "task" }, { id: "reports", label: "Báo cáo", icon: "report" }, { id: "messages", label: "Tin nhắn", icon: "message" }, { id: "schedule", label: "Lịch dạy", icon: "schedule" }, { id: "profile", label: "Hồ sơ chuyên môn", icon: "profile" }, { id: "analysis", label: "Phân tích video", icon: "analysis" }];
-  return <div className="teacher-role-nav" data-teacher-role-ui><div className="teacher-nav-brand-note"><span>GIẢNG DẠY ĐÚNG KỸ THUẬT</span><small>Theo dõi tiến bộ học viên</small></div><div className="teacher-role-nav-list">{rows.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><TeacherIcon name={item.icon}/><span>{item.label}</span></button>)}</div><button className="teacher-appearance-shortcut" type="button"
+  return <div className="teacher-role-nav" data-teacher-role-ui><div className="teacher-nav-brand-note"><span>GIẢNG DẠY ĐÚNG KỸ THUẬT</span><small>Theo dõi tiến bộ học viên</small></div><div className="teacher-role-nav-list">{rows.map((item) => <button key={item.id} className={`${tab === item.id ? "active" : ""} ${item.id==="messages" ? indicatorStyles.navWithBadge : ""}`} onClick={() => setTab(item.id)}><TeacherIcon name={item.icon}/><span>{item.label}</span>{item.id==="messages"&&(unread.chat>0||unread.request>0)?
+  <span className={indicatorStyles.indicators} aria-label={`${unread.chat} tin chat và ${unread.request} thư yêu cầu chưa đọc`}>
+   {unread.chat>0?<b className={indicatorStyles.chatCount} title={`${unread.chat} tin chat chưa đọc`}>{compactUnread(unread.chat)}</b>:null}
+   {unread.request>0?<b className={indicatorStyles.requestCount} title={`${unread.request} thư yêu cầu chưa đọc`}>{compactUnread(unread.request)}</b>:null}
+  </span>:null}</button>)}</div><button className="teacher-appearance-shortcut" type="button"
     aria-label="Mở cài đặt giao diện Giảng viên" aria-controls="appearance-panel"
     onClick={() => window.dispatchEvent(new Event("boi:appearance:open"))}>
     <TeacherIcon name="settings"/><span><strong>Cài đặt giao diện</strong>
@@ -240,6 +246,7 @@ export default function TeacherRoleShell() {
   // First overview was already loaded and validated by AccountGate before GO.
   const attemptedDeviceRef = useRef(preloadedTeacher?.device.deviceId??"");
   const [workspaceDeviceId, setWorkspaceDeviceId] = useState("");
+  const unread=useTeacherConversationIndicators(workspaceDeviceId,active);
   const requestRef = useRef<{ deviceId: string; controller: AbortController; timer: number } | null>(null);
   const mountedRef = useRef(false);
   useEffect(() => {
@@ -409,5 +416,5 @@ export default function TeacherRoleShell() {
       delete document.body.dataset.teacherRoleUi;
     };
   }, [refresh]);
-  if (!active) return null; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null; const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null; const dashboard = dashboardMount ? createPortal(<TeacherDashboard key={workspaceDeviceId} deviceId={workspaceDeviceId} overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} selectedClass={selectedClass} setSelectedClass={setSelectedClass} refresh={refresh} query={query} submitAction={submitAction}/>, dashboardMount) : null; return <>{nav}{search}{dashboard}</>;
+  if (!active) return null; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className} unread={unread}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null; const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null; const dashboard = dashboardMount ? createPortal(<TeacherDashboard key={workspaceDeviceId} deviceId={workspaceDeviceId} overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} selectedClass={selectedClass} setSelectedClass={setSelectedClass} refresh={refresh} query={query} submitAction={submitAction}/>, dashboardMount) : null; return <>{nav}{search}{dashboard}</>;
 }

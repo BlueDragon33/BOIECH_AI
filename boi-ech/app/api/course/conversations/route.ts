@@ -38,7 +38,7 @@ export async function POST(request:Request){
   if(actor.personRole!=="teacher"&&actor.personRole!=="learner")return json({error:"Chỉ Giảng viên hoặc Học viên được sử dụng hộp thư."},403);
   const role=actor.personRole as Role;
   const operation=clean(payload.action,16);
-  if(!["list","send","inbox","connect"].includes(operation))return json({error:"Thao tác không hợp lệ."},400);
+  if(!["list","send","inbox","connect","seen"].includes(operation))return json({error:"Thao tác không hợp lệ."},400);
   const teacherClasses=classes(actor.className);
   if(!teacherClasses.length||!actor.registrationComplete||actor.accessExpired)return json({error:"Tài khoản chưa đủ điều kiện liên lạc."},403);
   const db=await getCourseDatabase();
@@ -64,10 +64,29 @@ export async function POST(request:Request){
         AND lower(trim(d.class_name)) IN (${bindClass})
         AND e.event_type IN ('learner_chat','learner_support_request')
       ORDER BY e.id DESC LIMIT 100`).bind(...teacherClasses).all<MessageRow&{learner_name:string|null;person_code:string|null;class_name:string|null}>();
-   const recent=(result.results??[]).map(row=>({
-    ...parse(row),learnerPersonCode:row.person_code||"",learnerName:row.learner_name||"Học viên",className:row.class_name||""
-   }));
-   return json({recent});
+   // Read receipts are durable, scoped to the signed teacher device and
+   // the learner's canonical conversation id. Never infer "read" from polling.
+   const seenEvents=await db.prepare(`SELECT detail_json FROM course_activity_events
+     WHERE device_id=? AND event_type='teacher_conversation_seen'
+     ORDER BY id DESC LIMIT 2000`).bind(actor.deviceId).all<{detail_json:string}>();
+   const lastSeen=new Map<string,number>();
+   for(const row of seenEvents.results??[]){
+    try{
+     const value=JSON.parse(row.detail_json) as {learnerDeviceId?:string;channel?:string;lastSeenEventId?:number};
+     if(!value.learnerDeviceId||!["chat","request"].includes(value.channel||""))continue;
+     const key=value.learnerDeviceId+":"+value.channel;
+     lastSeen.set(key,Math.max(lastSeen.get(key)||0,Number(value.lastSeenEventId)||0));
+    }catch{ /* malformed legacy audit data cannot grant read receipts */ }
+   }
+   const unread={chat:0,request:0};
+   const recent=(result.results??[]).map(row=>{
+    const message=parse(row);
+    const isUnread=row.id>(lastSeen.get(row.device_id+":"+message.channel)||0);
+    if(isUnread)unread[message.channel]++;
+    return {...message,unread:isUnread,learnerPersonCode:row.person_code||"",
+     learnerName:row.learner_name||"Học viên",className:row.class_name||""};
+   });
+   return json({recent,unread});
   }
   let learnerId=actor.deviceId;
   let learnerCode=actor.personCode||"";
@@ -82,6 +101,26 @@ export async function POST(request:Request){
    if(!target)return json({error:"Không tìm thấy học viên trong lớp được phân công."},404);
    learnerId=target.device_id;
    learnerClass=target.class_name||"";
+  }
+  if(operation==="seen"){
+   if(role!=="teacher")return json({error:"Chỉ Giảng viên xác nhận đã đọc tin đến."},403);
+   const seenChannel=payload.channel==="chat"?"chat":payload.channel==="request"?"request":null;
+   const seenId=Number(payload.lastSeenEventId);
+   if(!seenChannel||!Number.isSafeInteger(seenId)||seenId<=0)return json({error:"Mốc đã đọc không hợp lệ."},400);
+   const allowedType=seenChannel==="chat"?EVENTS.learner_chat:EVENTS.learner_request;
+   const incoming=await db.prepare(`SELECT id FROM course_activity_events
+     WHERE id=? AND device_id=? AND event_type=? LIMIT 1`)
+     .bind(seenId,learnerId,allowedType).first<{id:number}>();
+   if(!incoming)return json({error:"Tin đã đọc không thuộc học viên hoặc kênh này."},404);
+   // A deterministic event ID makes retries idempotent; append-only receipt
+   // avoids migration and preserves D1 audit history.
+   const clientEventId=`conversation:seen:${seenChannel}:${seenId}`;
+   await db.prepare(`INSERT OR IGNORE INTO course_activity_events
+     (device_id,event_type,lesson_number,part,detail_json,client_event_id)
+     VALUES (?,'teacher_conversation_seen',NULL,'teacher-conversations',?,?)`)
+     .bind(actor.deviceId,JSON.stringify({learnerDeviceId:learnerId,
+      learnerPersonCode:learnerCode,channel:seenChannel,lastSeenEventId:seenId}),clientEventId).run();
+   return json({ok:true,lastSeenEventId:seenId});
   }
   if(operation==="list"){
    const data=await db.prepare(`SELECT id,device_id,event_type,detail_json,created_at

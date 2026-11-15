@@ -1,7 +1,7 @@
 "use client";
 
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {conversationRequest,newClientEventId,type ConversationItem,type IncomingItem,type ConversationChannel} from "./teacher-learner-conversation-client";
+import {conversationRequest,newClientEventId,type ConversationItem,type IncomingItem,type ConversationChannel,compactUnread} from "./teacher-learner-conversation-client";
 import styles from "./teacher-learner-conversations.module.css";
 
 type LearnerOption={name:string;personCode:string;className:string};
@@ -28,11 +28,32 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  const validDevice=/^[a-f0-9]{64}$/i.test(deviceId);
  const available=useMemo(()=>learners.filter(l=>l.personCode),[learners]);
  const scopedInbox=inbox.filter(item=>available.some(l=>l.personCode===item.learnerPersonCode));
+ const unreadCounts=useMemo(()=>({
+  chat:scopedInbox.filter(item=>item.channel==="chat"&&item.unread).length,
+  request:scopedInbox.filter(item=>item.channel==="request"&&item.unread).length,
+ }),[scopedInbox]);
  const target=role==="teacher"?(available.some(l=>l.personCode===selected)?selected:available[0]?.personCode||""):"";
  const messages=records.target===target?records.items:[];
  const forRequest=useMemo(()=>messages.filter(m=>m.channel===channel),[channel,messages]);
  const openRequests=useMemo(()=>messages.filter(m=>m.channel==="request"&&m.role==="learner"&&!m.requestId),[messages]);
  const selectedRequest=openRequests.find(m=>m.id===requestId)||null;
+ const latestIncomingId=forRequest.filter(item=>item.role==="learner").at(-1)?.id||0;
+ const markedSeen=useRef(new Map<string,number>());
+ useEffect(()=>{
+  if(role!=="teacher"||!validDevice||!target||records.target!==target||!latestIncomingId||
+    document.visibilityState!=="visible")return;
+  const key=target+":"+channel;
+  if((markedSeen.current.get(key)||0)>=latestIncomingId)return;
+  let cancelled=false;
+  void conversationRequest(deviceId,{action:"seen",learnerPersonCode:target,
+   channel,lastSeenEventId:latestIncomingId})
+   .then(()=>{if(!cancelled){
+    markedSeen.current.set(key,latestIncomingId);
+    window.dispatchEvent(new Event("boi:conversation:read"));
+   }})
+   .catch(()=>{ /* Never pretend a failed read receipt was stored. */ });
+  return ()=>{cancelled=true;};
+ },[role,validDevice,target,records.target,latestIncomingId,channel,deviceId]);
  const refresh=useCallback(async(signal?:AbortSignal)=>{
   if(!validDevice||(role==="teacher"&&!target))return;
   const data=await conversationRequest(deviceId,{action:"list",...(target?{learnerPersonCode:target}:{})},signal);
@@ -110,7 +131,8 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   document.addEventListener("visibilitychange",handle);
   window.addEventListener("online",handle);
   window.addEventListener("boi:conversation:new",handle);
-  return ()=>{dead=true;controller.abort();if(timer!==undefined)window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
+  window.addEventListener("boi:conversation:read",handle);
+  return ()=>{dead=true;controller.abort();if(timer!==undefined)window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);window.removeEventListener("boi:conversation:read",handle);};
  },[refresh,validDevice,role,target,realtime]);
  useEffect(()=>{
   if(role!=="teacher"||!validDevice)return;
@@ -136,7 +158,8 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   const timer=realtime?undefined:window.setInterval(poll,6800);
   document.addEventListener("visibilitychange",handle);window.addEventListener("online",handle);
   window.addEventListener("boi:conversation:new",handle);
-  return ()=>{dead=true;controller.abort();if(timer!==undefined)window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
+  window.addEventListener("boi:conversation:read",handle);
+  return ()=>{dead=true;controller.abort();if(timer!==undefined)window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);window.removeEventListener("boi:conversation:read",handle);};
  },[deviceId,role,validDevice,realtime]);
  function resetDraft(){pendingId.current=null;setText("");setSubject("");setRequestId(null);}
  function selectChannel(type:ConversationChannel){setChannel(type);resetDraft();}
@@ -162,7 +185,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  return <section className={styles.shell} aria-label="Liên lạc trực tiếp giữa giảng viên và học viên">
   <header className={styles.header}><div><small>LIÊN LẠC HAI CHIỀU</small><h2>Giảng viên ↔ Học viên</h2><p>Hai kênh độc lập, lưu theo đúng lớp và tài khoản. Tự nhận tin mới khi trang đang mở.</p></div><span className={styles.online}>{realtime?"● Realtime · Sự kiện trực tiếp":"● Đang dùng kết nối dự phòng"}</span></header>
   {role==="teacher"?<div className={styles.teacherScope}>
-    <label>Học viên trong lớp<select value={target} onChange={e=>{setSelected(e.target.value);resetDraft();setNotice("");}}>
+    <label>Học viên trong lớp<select value={target} disabled={busy} onChange={e=>{setSelected(e.target.value);resetDraft();setNotice("");setError("");setLoading(true);}}>
       {available.length?available.map(l=><option key={l.personCode} value={l.personCode}>{l.name} · {l.className}</option>):<option value="">Chưa có học viên phù hợp</option>}
     </select></label>
     <div className={styles.incoming}><strong>Thư và tin mới nhất trong lớp</strong><div>
@@ -175,7 +198,10 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   </div>:null}
   <nav className={styles.tabs} aria-label="Chọn kênh liên lạc">
     {(["chat","request"] as const).map(type=><button type="button" key={type} aria-pressed={channel===type}
-      className={channel===type?styles.active:""} onClick={()=>selectChannel(type)}>{type==="chat"?"💬":"✉️"} {label[type]}</button>)}
+      className={channel===type?styles.active:""} onClick={()=>selectChannel(type)}>{type==="chat"?"💬":"✉️"} {label[type]}
+       {role==="teacher"&&unreadCounts[type]>0?<span className={type==="chat"?styles.chatUnread:styles.requestUnread}
+        aria-label={`${unreadCounts[type]} ${type==="chat"?"tin nhắn":"thư yêu cầu"} chưa đọc`}>{compactUnread(unreadCounts[type])}</span>:null}
+      </button>)}
   </nav>
   {notice?<p className={styles.notice} role="status">{notice}</p>:null}
   {error?<p className={styles.error} role="alert">{error}</p>:null}
@@ -198,7 +224,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
     <label>Nội dung {channel==="request"?"thư":"tin nhắn"}<textarea rows={3} maxLength={1200} value={text} onChange={e=>editing(e.target.value)}
       placeholder={channel==="chat"?"Nhập tin nhắn gửi trực tiếp…":"Mô tả vấn đề, yêu cầu hướng dẫn hoặc phản hồi cụ thể…"} required/></label>
     <div className={styles.actions}><small>{text.length}/1200 · Không đính kèm video gốc hoặc dữ liệu nhạy cảm</small>
-      <button disabled={busy||!text.trim()||(role==="teacher"&&!selected)||(channel==="request"&&role==="teacher"&&!selectedRequest)} type="submit">{busy?"Đang gửi…":channel==="chat"?"Gửi tin nhắn":"Gửi thư / phản hồi"}</button></div>
+      <button disabled={busy||!text.trim()||(role==="teacher"&&!target)||(channel==="request"&&role==="teacher"&&!selectedRequest)} type="submit">{busy?"Đang gửi…":channel==="chat"?"Gửi tin nhắn":"Gửi thư / phản hồi"}</button></div>
   </form>
  </section>;
 }
