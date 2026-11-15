@@ -51,8 +51,8 @@ export function TeacherTaskQuickActions({assignments,learners,filter,onFilterCha
  const tiles=[
   {id:"create",name:"Tạo bài tập",help:"Giao bài luyện mới",icon:"plus" as const,tone:"create",action:()=>onCreatorChange(!showCreator),count:undefined},
   {id:"active",name:"Đang theo dõi",help:"Bài đã giao, chưa hoàn tất",icon:"play" as const,tone:"active",action:()=>onFilterChange("active"),count:active},
-  {id:"overdue",name:"Quá hạn",help:"Kiểm tra việc cần xử lý",icon:"clock" as const,tone:"overdue",action:()=>onFilterChange("overdue"),count:overdue},
-  {id:"needs-help",name:"Cần hỗ trợ",help:"Học viên đã yêu cầu giúp đỡ",icon:"help" as const,tone:"help",action:()=>onFilterChange("needs-help"),count:needsHelp},
+  {id:"overdue",name:"Quá hạn",help:"Kiểm tra việc cần xử lý",icon:"clock" as const,tone:"overdue",action:()=>focusList("overdue"),count:overdue},
+  {id:"needs-help",name:"Cần hỗ trợ",help:"Học viên đã yêu cầu giúp đỡ",icon:"help" as const,tone:"help",action:()=>focusList("needs-help"),count:needsHelp},
   {id:"ai",name:"Gợi ý AI",help:"Giảng viên xem và quyết định",icon:"sparkles" as const,tone:"ai",action:jumpToSuggestions,count:undefined}
  ];
  return <section className="icon-task-quick-area" id="teacher-task-quick-v39" aria-label="Lối tắt quản lý bài luyện">
@@ -79,6 +79,7 @@ export function TeacherTaskToday({assignments,helpCount,onFilterChange,onCreate,
 }){
  const overdue=assignments.filter(a=>a.scheduleState==="overdue").length;
  const helpAssignments=assignments.filter(a=>a.scheduleState==="needs-help").length;
+ const focusList=(next:TaskFilter)=>{onFilterChange(next);document.getElementById("teacher-task-list-v39")?.scrollIntoView({block:"start",behavior:"auto"});};
  const actions=[
   {label:"Xem quá hạn",sub:overdue+" nhiệm vụ",icon:"clock" as const,tone:"overdue",action:()=>onFilterChange("overdue")},
   {label:"Cần hỗ trợ",sub:helpAssignments+" bài · "+helpCount+" học viên",icon:"help" as const,tone:"help",action:()=>onFilterChange("needs-help")},
