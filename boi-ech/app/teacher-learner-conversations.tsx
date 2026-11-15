@@ -95,7 +95,6 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   };
  },[deviceId,validDevice]);
  useEffect(()=>{
-  if(realtime)return;
   if(!validDevice||(role==="teacher"&&!target))return;
   let dead=false,pending=false;
   const controller=new AbortController();
@@ -106,14 +105,13 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   };
   poll();
   const handle=()=>poll();
-  const timer=window.setInterval(poll,5200);
+  const timer=realtime?undefined:window.setInterval(poll,5200);
   document.addEventListener("visibilitychange",handle);
   window.addEventListener("online",handle);
   window.addEventListener("boi:conversation:new",handle);
-  return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
+  return ()=>{dead=true;controller.abort();if(timer!==undefined)window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
  },[refresh,validDevice,role,target,realtime]);
  useEffect(()=>{
-  if(realtime)return;
   if(role!=="teacher"||!validDevice)return;
   let dead=false,pending=false;
   const controller=new AbortController();
@@ -133,10 +131,10 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   };
   poll();
   const handle=()=>poll();
-  const timer=window.setInterval(poll,6800);
+  const timer=realtime?undefined:window.setInterval(poll,6800);
   document.addEventListener("visibilitychange",handle);window.addEventListener("online",handle);
   window.addEventListener("boi:conversation:new",handle);
-  return ()=>{dead=true;controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
+  return ()=>{dead=true;controller.abort();if(timer!==undefined)window.clearInterval(timer);document.removeEventListener("visibilitychange",handle);window.removeEventListener("online",handle);window.removeEventListener("boi:conversation:new",handle);};
  },[deviceId,role,validDevice,realtime]);
  function resetDraft(){pendingId.current=null;setText("");setSubject("");setRequestId(null);}
  function selectChannel(type:ConversationChannel){setChannel(type);resetDraft();}
