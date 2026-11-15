@@ -15,6 +15,7 @@ import { accountServerActive, recoveryMustRemainVisible } from "./account-lifecy
 import AccountVerificationShowcase from "./account-verification-showcase";
 import ConditionalSyncAgent from "./conditional-sync-agent";
 import {AccountWorkspaceProvider,loadAccountWorkspace,type AccountWorkspaceBootstrap,type AccountWorkspaceDevice} from "./account-workspace-bootstrap";
+import {isRoleChunkLoadFailure,recoverRoleChunkOnce,refreshRoleAssetsManually,roleChunkFailureMessage} from "./role-asset-recovery";
 import { RegistrationRoles } from "./registration-roles";
 import { portableCredential, portableManagerProof, portableChildhoodRecoveryProof, preparePortableAccount } from "./multi-account-switcher";
 import styles from "./account-gate.module.css";
@@ -197,6 +198,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const [roleDeviceVerified,setRoleDeviceVerified]=useState<{accountId:string;device:AccountWorkspaceDevice}|null>(null);
   const [roleBootstrap,setRoleBootstrap]=useState<AccountWorkspaceBootstrap|null>(null);
   const [roleBootstrapError,setRoleBootstrapError]=useState("");
+  const [roleAssetFailure,setRoleAssetFailure]=useState(false);
   const [roleBootstrapAttempt,setRoleBootstrapAttempt]=useState(0);
   const [managerPreload,setManagerPreload]=useState<{accountId:string;board:TrainingBoard;range:TrainingWindow}|null>(null);
   const [managerPreloadError,setManagerPreloadError]=useState("");
@@ -504,7 +506,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // All three milestones are real: GET session -> authorized device ->
     // course/teacher readback + role bundle loaded. No fake completion timer.
     queueMicrotask(()=>{
-      if(!controller.signal.aborted){setRoleDeviceVerified(null);setRoleBootstrap(null);setRoleBootstrapError("");}
+      if(!controller.signal.aborted){setRoleDeviceVerified(null);setRoleBootstrap(null);setRoleBootstrapError("");setRoleAssetFailure(false);}
     });
     const timeout=window.setTimeout(()=>{
       timedOut=true;
@@ -515,10 +517,15 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     }).then(result=>{
       if(!controller.signal.aborted)setRoleBootstrap(result);
     }).catch(cause=>{
-      if(!disposed && (!controller.signal.aborted || timedOut))
-        setRoleBootstrapError(timedOut
-          ? "Máy chủ chưa hoàn tất xác thực dữ liệu sau 20 giây. Chọn Thử lại; không xóa khóa hoặc dữ liệu thiết bị."
-          : cause instanceof Error?cause.message:"Không thể xác minh không gian học tập.");
+      if(disposed || (controller.signal.aborted && !timedOut)) return;
+      const assetFailure=!timedOut&&isRoleChunkLoadFailure(cause);
+      // A stale Vite chunk is a deployment/version mismatch, not bad credentials.
+      // One bounded refresh is safe here because GO has not entered workspace.
+      if(assetFailure&&recoverRoleChunkOnce(cause)) return;
+      setRoleAssetFailure(assetFailure);
+      setRoleBootstrapError(timedOut
+        ? "Máy chủ chưa hoàn tất xác thực dữ liệu sau 20 giây. Chọn Thử lại; không xóa khóa hoặc dữ liệu thiết bị."
+        : roleChunkFailureMessage(cause));
     }).finally(()=>window.clearTimeout(timeout));
     return()=>{disposed=true;window.clearTimeout(timeout);controller.abort();};
   },[roleNeedsBootstrap,account?.accountId,account?.storageDeviceId,account?.role,roleBootstrapAttempt]);
@@ -907,7 +914,10 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       role={account.role==="manager"?"Cán bộ quản lý":account.role==="teacher"?"Giảng viên":"Học viên"}
       error={roleBootstrapError||managerPreloadError||error} busy={busy}
       onRetry={() => {
-        if(roleBootstrapError){setRoleBootstrapError("");setRoleBootstrapAttempt(value=>value+1);}
+        if(roleBootstrapError){
+          if(roleAssetFailure&&refreshRoleAssetsManually())return;
+          setRoleBootstrapError("");setRoleAssetFailure(false);setRoleBootstrapAttempt(value=>value+1);
+        }
         else if(managerPreloadError){setManagerPreloadError("");setManagerPreloadAttempt(value=>value+1);}
         else void run(()=>reload());
       }}
