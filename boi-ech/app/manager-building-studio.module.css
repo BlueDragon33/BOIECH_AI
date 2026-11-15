@@ -71,3 +71,14 @@
  .poolPreview .create{flex:1 1 100%}
  .roomAvatar:has(svg){width:65px;height:51px}
  .roomAvatar svg{width:64px;height:48px}}
+
+/* V13 central main-hall installer: premium illustration, never fake inventory. */
+.lecturePreview{display:flex;align-items:center;flex-wrap:wrap;gap:15px;padding:15px 18px;border:1px solid #72cdec;border-radius:18px;background:linear-gradient(125deg,#114775,#09294f);box-shadow:inset 0 0 22px #2e9fd629}
+.lectureArt{width:clamp(150px,25%,235px);flex:0 0 clamp(150px,25%,235px);height:167px;display:grid;place-items:center;filter:drop-shadow(0 11px 16px #010e27)}
+.lectureArt svg{width:100%;height:100%;display:block}
+.lectureIntro{flex:1 1 200px;min-width:0;display:grid;gap:6px}
+.lectureIntro h4{font-size:clamp(19px,2.3vw,26px);margin:0}
+.lectureIntro p{font-size:12px;line-height:1.55;margin:0}
+.lecturePreview .create{flex:0 1 200px}
+@media(max-width:550px){.lecturePreview{padding:12px;gap:8px}.lectureArt{flex:0 0 112px;width:112px;height:114px}
+ .lectureIntro{flex:1 1 170px}.lecturePreview .create{flex:1 1 100%}}

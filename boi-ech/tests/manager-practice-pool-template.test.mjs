@@ -78,7 +78,8 @@ test("pool UI: never fake persisted inventory or silently schedule an unconfigur
  assert.match(studio,/Chờ xác nhận sức chứa/);
  assert.match(studio,/onInstallPoolTemplate\(\)/);
  assert.match(studio,/PracticePoolBasinArt/);
- assert.match(overview,/PracticePoolBuildingArt/);
+ assert.match(overview,/ManagerCampusMap/);
+ assert.match(read("manager-campus-map.tsx"),/PracticePoolBuildingArt/);
  assert.match(rooms,/PracticePoolBuildingArt/);
  assert.match(rooms,/PracticePoolBasinArt/);
  assert.match(rooms,/disabled=\{busy\|\|r.status!=="active"\|\|b.status!=="active"\}/);

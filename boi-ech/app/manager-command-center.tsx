@@ -4,10 +4,9 @@ import {classKey,classNames,type ResourceKind,type TrainingBoard,type TrainingPe
 import {AppIcon,Badge,ResourceStatusBars,eligible,roomOccupancy,stateText} from "./manager-status";
 import type {DetailTarget} from "./manager-details";
 import styles from "./manager-command-center.module.css";
-import {CampusBuildingArt} from "./manager-campus-illustration";
-import {PracticePoolBuildingArt,PracticePoolBasinArt} from "./manager-practice-pool-art";
-import {existingPracticePoolBuilding,isPracticePoolBuilding,isPracticePoolRoom,
- PRACTICE_POOL_BUILDING_NAME} from "./manager-practice-pool";
+import ManagerCampusMap from "./manager-campus-map";
+import {PracticePoolBasinArt} from "./manager-practice-pool-art";
+import {isPracticePoolRoom} from "./manager-practice-pool";
 
 type Destination="schedule"|"people"|"class"|"room"|"building"|"settings"|"review";
 type Props={
@@ -206,27 +205,11 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
     <div className={styles.campus} data-stage={!selectedBuilding?"buildings":selectedRoom?"classes":"rooms"}
       role="group" aria-label="Sơ đồ tương tác chọn tòa, phòng, lớp">
       <div className={styles.campusGlow} aria-hidden="true"/><div className={styles.campusPath} aria-hidden="true"/>
-      {!selectedBuilding?<div className={styles.campusBuildingGrid}>
-       {buildings.map((building,index)=>{
-        const related=rooms.filter(room=>room.parentId===building.id);
-        const activeCount=related.filter(room=>room.status==="active").length;
-        return <button type="button" className={styles.buildingNode} data-selected={false} data-index={index%6}
-          key={building.id} onClick={()=>selectBuilding(building.id)} aria-label={`Mở tòa ${building.name}`}>
-          <span className={styles.buildingIllustration} aria-hidden="true">{isPracticePoolBuilding(building)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
-          <strong>{building.name}</strong><small>{activeCount}/{related.length} phòng hoạt động</small>
-          <span className={styles.nodeState} data-status={building.status}>{building.status==="active"?"● Đang hoạt động":building.status==="unavailable"?"● Tạm ngừng":"● Đã lưu trữ"}</span>
-        </button>;
-       })}
-       {!existingPracticePoolBuilding(buildings)?<button type="button" className={styles.buildingNode}
-        data-index="0" onClick={()=>onNavigate("building")} aria-label="Mở mẫu tòa bể bơi để tạo khu thực hành">
-         <span className={styles.buildingIllustration} aria-hidden="true"><PracticePoolBuildingArt/></span>
-         <strong>{PRACTICE_POOL_BUILDING_NAME}</strong><small>Mẫu có sẵn · 01 bể thực hành</small>
-         <span className={styles.nodeState} data-status="unavailable">Chưa tạo · Mở Tòa học</span>
-        </button>:null}
-       {!buildings.length?<div className={styles.diagramEmpty}><strong>Chưa có tòa học</strong>
-         <p>Hãy thêm cơ sở và phòng từ nguồn điều phối thực tế.</p>
-         <button type="button" disabled={busy} onClick={()=>onCreateResource("building")}>＋ Tạo tòa</button></div>:null}
-      </div>:<div className={styles.hierarchyWorkspace}>
+      {!selectedBuilding?<ManagerCampusMap board={board} mode="overview" busy={busy}
+        onSelectBuilding={building=>selectBuilding(building.id)}
+        onOpenMainTemplate={()=>onNavigate("building")}
+        onOpenPoolTemplate={()=>onNavigate("building")}
+        onCreateBuilding={()=>onCreateResource("building")}/>:<div className={styles.hierarchyWorkspace}>
        <aside className={styles.compactRail} aria-label="Chuyển tòa nhanh">
         <strong>Tòa khác</strong>
         {buildings.filter(building=>building.id!==selectedBuilding.id).map(building=>
