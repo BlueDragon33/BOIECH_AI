@@ -12,3 +12,13 @@
 .form{display:grid;gap:12px}.form label{display:grid;gap:6px}.actions{display:flex;justify-content:space-between;align-items:center;gap:11px;flex-wrap:wrap}.actions small{font-size:11px;color:#c5d9ed}.actions button{background:#076ccc;border-color:#9ed8ff;min-width:155px}.notice,.error{padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.5}.notice{border:1px solid #3bbfad;background:#104d46;color:#bfffec}.error{border:1px solid #e7a7a7;background:#5b303a;color:#ffe5e8}
 @media(max-width:670px){.teacherScope{grid-template-columns:1fr}.history{max-height:340px}.header{align-items:flex-start}.message{max-width:98%}.actions button{width:100%}}
 @media(prefers-reduced-motion:reduce){.shell *{scroll-behavior:auto}}
+
+/* Unread indications are attached to the channel, not to arbitrary recent cards. */
+.tabs button{display:flex;align-items:center;justify-content:center;gap:8px}
+.chatUnread,.requestUnread{
+ display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 5px;
+ border-radius:999px;font-weight:850;font-size:11px;line-height:1;
+ font-variant-numeric:tabular-nums;box-shadow:0 0 0 1px #091d36;
+}
+.chatUnread{color:#172338;background:#ffad42}
+.requestUnread{color:#fff;background:#e94656}
