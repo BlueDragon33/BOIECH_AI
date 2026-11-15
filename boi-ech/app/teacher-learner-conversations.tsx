@@ -26,6 +26,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  const pendingId=useRef<string|null>(null);
  const validDevice=/^[a-f0-9]{64}$/i.test(deviceId);
  const available=useMemo(()=>learners.filter(l=>l.personCode),[learners]);
+ const scopedInbox=inbox.filter(item=>available.some(l=>l.personCode===item.learnerPersonCode));
  const target=role==="teacher"?(available.some(l=>l.personCode===selected)?selected:available[0]?.personCode||""):"";
  const messages=records.target===target?records.items:[];
  const forRequest=useMemo(()=>messages.filter(m=>m.channel===channel),[channel,messages]);
@@ -104,11 +105,11 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
       {available.length?available.map(l=><option key={l.personCode} value={l.personCode}>{l.name} · {l.className}</option>):<option value="">Chưa có học viên phù hợp</option>}
     </select></label>
     <div className={styles.incoming}><strong>Thư và tin mới nhất trong lớp</strong><div>
-     {inbox.slice(0,5).map(item=><button type="button" key={item.id} onClick={()=>{
+     {scopedInbox.slice(0,5).map(item=><button type="button" key={item.id} onClick={()=>{
        setSelected(item.learnerPersonCode);selectChannel(item.channel);setNotice("");
        if(item.channel==="request")setRequestId(item.id);
       }}><span>{item.channel==="request"?"✉":"●"} {item.learnerName}</span><small>{item.subject||item.message.slice(0,80)}</small></button>)}
-     {!inbox.length?<span>Chưa có tin mới từ học viên.</span>:null}
+     {!scopedInbox.length?<span>Chưa có tin mới trong phạm vi lớp đang chọn.</span>:null}
     </div></div>
   </div>:null}
   <nav className={styles.tabs} aria-label="Chọn kênh liên lạc">
