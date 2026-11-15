@@ -96,12 +96,13 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  },[deviceId,validDevice]);
  useEffect(()=>{
   if(!validDevice||(role==="teacher"&&!target))return;
-  let dead=false,pending=false;
+  let dead=false,pending=false,rerun=false;
   const controller=new AbortController();
   const poll=()=>{
-   if(dead||pending||document.visibilityState==="hidden"||!navigator.onLine)return;
+   if(dead||document.visibilityState==="hidden"||!navigator.onLine)return;
+   if(pending){rerun=true;return;}
    pending=true;
-   void refresh(controller.signal).catch(err=>{if(!dead&&!controller.signal.aborted){setError(err instanceof Error?err.message:"Không tải được tin nhắn.");setLoading(false);}}).finally(()=>{pending=false;});
+   void refresh(controller.signal).catch(err=>{if(!dead&&!controller.signal.aborted){setError(err instanceof Error?err.message:"Không tải được tin nhắn.");setLoading(false);}}).finally(()=>{pending=false;if(rerun&&!dead){rerun=false;queueMicrotask(poll);}});
   };
   poll();
   const handle=()=>poll();
@@ -113,10 +114,11 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  },[refresh,validDevice,role,target,realtime]);
  useEffect(()=>{
   if(role!=="teacher"||!validDevice)return;
-  let dead=false,pending=false;
+  let dead=false,pending=false,rerun=false;
   const controller=new AbortController();
   const poll=()=>{
-   if(dead||pending||document.visibilityState==="hidden"||!navigator.onLine)return;
+   if(dead||document.visibilityState==="hidden"||!navigator.onLine)return;
+   if(pending){rerun=true;return;}
    pending=true;
    void conversationRequest(deviceId,{action:"inbox"},controller.signal)
     .then(data=>{
@@ -127,7 +129,7 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
      if(lastIncoming.current!==null&&newest>lastIncoming.current&&list[0])setNotice(`Có tin mới từ ${list[0].learnerName}.`);
      lastIncoming.current=newest;
     }).catch(err=>{if(!dead&&!controller.signal.aborted)setError(err instanceof Error?err.message:"Lỗi đồng bộ thư đến.");})
-    .finally(()=>{pending=false;});
+    .finally(()=>{pending=false;if(rerun&&!dead){rerun=false;queueMicrotask(poll);}});
   };
   poll();
   const handle=()=>poll();
