@@ -147,7 +147,14 @@ export async function readBoiPreviewRuntime(secret, fetcher = fetch, pause = ms 
  * status readback cannot hide a failed teacher or learner GO.
  * This read-only check is required BEFORE rotating the shared Preview bridge.
  */
-export async function verifyPreviewRoleAssetsLive(fetcher=fetch, root=process.cwd()) {
+export async function verifyPreviewRoleAssetsLive(
+  fetcher=fetch,root=process.cwd(),{
+    // Only a just-deployed asset's 404 can be transient while Cloudflare
+    // propagates the new immutable asset manifest across its edge.
+    retryDelays=[0,1000,2000,4000,7000,12000],
+    pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+  }={}
+) {
   const dist=path.resolve(root,"dist")+path.sep;
   const redirect=path.resolve(root,".wrangler/deploy/config.json");
   const configIndex=JSON.parse(fs.readFileSync(redirect,"utf8"));
@@ -161,12 +168,26 @@ export async function verifyPreviewRoleAssetsLive(fetcher=fetch, root=process.cw
   if(assetsRoot!==path.resolve(root,"dist") && !assetsRoot.startsWith(dist))
     throw new Error("Preview role smoke: asset directory must remain under dist.");
   const roleFiles=roleAssetProbes(fs.readdirSync(path.join(assetsRoot,"assets")));
+  if(!Array.isArray(retryDelays)||retryDelays.length<1||retryDelays.length>10||
+     retryDelays.some(v=>!Number.isInteger(v)||v<0||v>15000))
+    throw new Error("Preview role smoke: invalid bounded retry policy.");
   for(const file of roleFiles){
-    const response=await fetcher(`https://${BOI}.boiech-ai.workers.dev/${file}`,{
-      method:"GET",cache:"no-store",redirect:"error",signal:AbortSignal.timeout(15000),
-    });
-    if(response.status!==200||!/javascript|ecmascript/i.test(response.headers.get("content-type")??""))
-      throw new Error(`Preview role smoke: ${file} returned HTTP ${response.status} or non-JavaScript content.`);
+    let lastStatus=0;
+    let verified=false;
+    for(let attempt=0;attempt<retryDelays.length;attempt++){
+      if(retryDelays[attempt])await pause(retryDelays[attempt]);
+      const response=await fetcher(`https://${BOI}.boiech-ai.workers.dev/${file}`,{
+        method:"GET",cache:"no-store",redirect:"error",signal:AbortSignal.timeout(15000),
+      });
+      lastStatus=response.status;
+      const mime=response.headers.get("content-type")??"";
+      if(response.status===200&&/javascript|ecmascript/i.test(mime)){verified=true;break;}
+      // Only freshly deployed 404s may converge. Never mask HTML fallback,
+      // 401/403, redirects, invalid MIME or unrelated Worker/origin failures.
+      if(response.status!==404||attempt===retryDelays.length-1)
+        throw new Error(`Preview role smoke: ${file} returned HTTP ${lastStatus} or non-JavaScript content.`);
+    }
+    if(!verified)throw new Error(`Preview role smoke: ${file} did not become available after bounded retries (HTTP ${lastStatus}).`);
   }
   return {checked:roleFiles.length,files:roleFiles};
 }
