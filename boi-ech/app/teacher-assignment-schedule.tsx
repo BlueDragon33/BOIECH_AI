@@ -57,7 +57,7 @@ export default function TeacherAssignmentSchedule({assignments,onOpen,filter:con
    <span className="icon-task-heading-glyph"><TaskGlyph name="layers" size={24}/></span>
    <div><h2>Danh sách bài tập</h2><p>{assignments.length} nhiệm vụ được giao trong lớp hiện tại</p></div>
   </div></header>
-  <div className="icon-task-list-toolbar">
+  <div className="icon-task-list-toolbar teacher-schedule-toolbar-v37">
    <div className="icon-task-filter-tabs" role="group" aria-label="Lọc bài tập theo trạng thái">
     {filters.map(([id,label,count])=><button key={id} type="button" aria-pressed={filter===id} onClick={()=>chooseFilter(id)}>
      {id==="all"?<TaskGlyph name="layers" size={16}/>:id==="active"?<TaskGlyph name="play" size={16}/>:id==="overdue"?<TaskGlyph name="clock" size={16}/>:id==="needs-help"?<TaskGlyph name="help" size={16}/>:<TaskGlyph name="check" size={16}/>}
