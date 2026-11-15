@@ -343,14 +343,16 @@ export default function StudentTeacherInbox() {
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "title", "data-device-id"] });
 
-    interval = window.setInterval(refreshVisibleInbox, 60_000);
+    interval = window.setInterval(refreshVisibleInbox, 8_000);
     document.addEventListener("visibilitychange", refreshVisibleInbox);
+    window.addEventListener("online", refreshVisibleInbox);
 
     return () => {
       if (timer) window.clearTimeout(timer);
       if (interval) window.clearInterval(interval);
       observer.disconnect();
       document.removeEventListener("visibilitychange", refreshVisibleInbox);
+      window.removeEventListener("online", refreshVisibleInbox);
       requestRef.current += 1;
       inFlightDeviceRef.current = "";
       deviceRef.current = "";
