@@ -67,6 +67,21 @@ test("Account-first Preview packaging does not require an R2 subscription", () =
   assert.equal(config.d1_databases[0].database_id, previewId);
 }));
 
+test("Preview static role chunks bypass Worker first (Production routing parity)",()=>temporary(dir=>{
+  assert.equal(template.assets.run_worker_first,false,
+    "static assets must be served directly, never through Vinext Worker routes");
+  const prep=prepare(dir);
+  assert.equal(prep.status,0,prep.stderr);
+  const generated=JSON.parse(fs.readFileSync(path.join(dir,"wrangler.cloudflare.preview.jsonc"),"utf8"));
+  assert.equal(generated.assets.run_worker_first,false);
+  const artifactResult=artifact(dir);
+  assert.equal(artifactResult.status,0,artifactResult.stderr);
+}));
+test("Preview artifact rejects accidental Worker-first routing even with valid role bundles",()=>temporary(dir=>{
+  const r=artifact(dir,config=>{config.assets.run_worker_first=true;});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/run_worker_first must be false/);
+}));
 test("Preview preparation rejects an injected R2 dependency before writing configuration", () => {
   for (const binding of ["BUCKET", "OTHER_STORAGE"]) temporary(dir => {
     const config = structuredClone(template);
