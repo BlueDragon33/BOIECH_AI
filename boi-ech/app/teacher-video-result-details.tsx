@@ -87,6 +87,11 @@ export default function TeacherVideoResultDetails({analysis,review}:{
    {weak?<p className="teacher-video-priority"><strong>Ưu tiên luyện tập:</strong> {weak.name} ({weak.score}/100) là nhóm có điểm thấp nhất trong những nhóm đã được ghi nhận.</p>
     :<p className="teacher-video-priority">Chưa đủ dữ liệu điểm nhóm để xác định động tác cần ưu tiên.</p>}
   </section>
+  {analysis.score>=85&&analysis.errorCount>0?<p className="teacher-video-score-discrepancy" role="note">
+   <strong>Điểm cao vẫn có lỗi:</strong> AI ghi nhận {analysis.errorCount} lỗi kỹ thuật dù điểm tổng là {analysis.score}/100.
+   Điểm tổng, điểm theo nhóm và các lỗi quy tắc không phải một phép cộng trừ trực tiếp.
+   Cần kiểm tra lỗi cụ thể trước khi kết luận.
+  </p>:null}
   <section className="teacher-video-errors" aria-label="Lỗi kỹ thuật và hướng cải thiện">
    <h4>{analysis.errorCount>0?`Lỗi kỹ thuật phát hiện: ${analysis.errorCount}`:"Không ghi nhận lỗi theo bộ quy tắc hiện tại"}</h4>
    {analysis.errors.length?<ol>{analysis.errors.map((error,i)=><li key={i} data-severity={error.severity}>
