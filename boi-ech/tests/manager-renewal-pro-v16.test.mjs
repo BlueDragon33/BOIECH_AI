@@ -7,9 +7,9 @@ const ts=require("typescript");
 const file=name=>readFileSync(new URL("../app/"+name,import.meta.url),"utf8");
 function load(source,requireFn=()=>{throw new Error("Unexpected dependency");}){
  const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const module={exports:{}};
- new Function("module","exports","require",js)(module,module.exports,requireFn);
- return module.exports;
+ const moduleInstance={exports:{}};
+ new Function("module","exports","require",js)(moduleInstance,moduleInstance.exports,requireFn);
+ return moduleInstance.exports;
 }
 const accountTerm=load(file("account-term.ts"));
 const view=load(file("manager-renewal-view.ts"),name=>{
