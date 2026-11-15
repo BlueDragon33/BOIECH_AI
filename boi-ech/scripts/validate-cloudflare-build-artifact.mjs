@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { previewD1Policy, PREVIEW_MIGRATIONS_TABLE } from "./preview-d1-policy.mjs";
+import {roleAssetProbes} from "./production-package.mjs";
 
 const ROOT = process.cwd();
 const REDIRECT = path.join(ROOT, ".wrangler", "deploy", "config.json");
@@ -49,6 +50,22 @@ if (generated.r2_buckets !== undefined && (!Array.isArray(generated.r2_buckets) 
   fail("Account-first FREE Preview must not configure R2. Payment-proof storage remains unavailable.");
 }
 if (generated.assets?.binding !== "ASSETS") fail("Generated config missing ASSETS binding.");
+if (generated.assets?.run_worker_first !== false) fail("Preview must serve matching static assets before Worker: run_worker_first must be false.");
+
+if (typeof generated.assets?.directory !== "string") fail("Generated Preview asset directory is missing.");
+const assetRoot = path.resolve(path.dirname(generatedPath),generated.assets.directory);
+const assetRelative=insideRoot(assetRoot, "Preview static asset directory");
+if (assetRelative!=="dist" && !assetRelative.startsWith("dist/")) fail("Preview assets must remain under dist/.");
+const roleFolder = path.join(assetRoot,"assets");
+if (!fs.existsSync(roleFolder) || !fs.statSync(roleFolder).isDirectory()) fail("Preview role JS assets directory is missing.");
+const roleFiles = roleAssetProbes(fs.readdirSync(roleFolder));
+for(const roleFile of roleFiles){
+  const file=path.join(assetRoot,roleFile);
+  if(!fs.existsSync(file)||!fs.statSync(file).isFile()||fs.statSync(file).size<1)
+    fail("Preview role JS bundle missing or empty: "+roleFile);
+}
+console.log("Preview learner/teacher role bundles verified: "+roleFiles.join(", "));
+
 if (generated.images?.binding !== "IMAGES") fail("Generated config missing IMAGES binding.");
 
 const vars = generated.vars ?? {};

@@ -46,7 +46,12 @@ function artifact(dir, change = () => {}) {
   config.vars.BOI_ECH_ACCOUNT_ORIGIN = env.BOI_ECH_PREVIEW_ORIGIN;
   config.vars.APPLICATION_MANAGEMENT_ORIGIN = env.APPLICATION_MANAGEMENT_PREVIEW_ORIGIN;
   delete config.r2_buckets;
+  // A real Vinext build emits the ASSETS directory and two lazy role chunks.
+  config.assets = {...config.assets, directory:"../public"};
   change(config);
+  fs.mkdirSync(path.join(dir,"dist","public","assets"),{recursive:true});
+  for(const name of ["learner-enhancements-fixture1.js","teacher-enhancements-fixture2.js"])
+    fs.writeFileSync(path.join(dir,"dist","public","assets",name),"export const ok = true;");
   fs.mkdirSync(path.join(dir, "dist", "server"), { recursive: true });
   fs.mkdirSync(path.join(dir, ".wrangler", "deploy"), { recursive: true });
   fs.writeFileSync(path.join(dir, "dist", "server", "wrangler.json"), JSON.stringify(config));
@@ -62,6 +67,21 @@ test("Account-first Preview packaging does not require an R2 subscription", () =
   assert.equal(config.d1_databases[0].database_id, previewId);
 }));
 
+test("Preview static role chunks bypass Worker first (Production routing parity)",()=>temporary(dir=>{
+  assert.equal(template.assets.run_worker_first,false,
+    "static assets must be served directly, never through Vinext Worker routes");
+  const prep=prepare(dir);
+  assert.equal(prep.status,0,prep.stderr);
+  const generated=JSON.parse(fs.readFileSync(path.join(dir,"wrangler.cloudflare.preview.jsonc"),"utf8"));
+  assert.equal(generated.assets.run_worker_first,false);
+  const artifactResult=artifact(dir);
+  assert.equal(artifactResult.status,0,artifactResult.stderr);
+}));
+test("Preview artifact rejects accidental Worker-first routing even with valid role bundles",()=>temporary(dir=>{
+  const r=artifact(dir,config=>{config.assets.run_worker_first=true;});
+  assert.notEqual(r.status,0);
+  assert.match(r.stderr,/run_worker_first must be false/);
+}));
 test("Preview preparation rejects an injected R2 dependency before writing configuration", () => {
   for (const binding of ["BUCKET", "OTHER_STORAGE"]) temporary(dir => {
     const config = structuredClone(template);

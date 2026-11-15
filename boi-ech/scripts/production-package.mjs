@@ -42,6 +42,19 @@ export function rollbackPoint(bookmark,deployments){
  if(!uuid.test(latest.id??'')||!Array.isArray(latest.versions)||!latest.versions.length||latest.versions.some(v=>!uuid.test(v.version_id??'')||!Number.isFinite(v.percentage)||v.percentage<=0||v.percentage>100)||Math.abs(latest.versions.reduce((n,v)=>n+v.percentage,0)-100)>0.00001)throw new Error('Production rollback version missing');
  return {databaseBookmark:bookmark.bookmark,previousDeployment:latest.id,previousVersions:latest.versions};
 }
+/**
+ * Fail closed when an authenticated role has no bundled lazy JS in the
+ * deploy artifact. Healthy top-level CSS/index responses are insufficient.
+ */
+export function roleAssetProbes(filenames){
+ const required=['learner-enhancements','teacher-enhancements'];
+ return required.map(name=>{
+  const matches=filenames.filter(file=>file.startsWith(name+'-') &&
+   /^[A-Za-z0-9_-]+-[A-Za-z0-9_-]+\.js$/.test(file));
+  if(matches.length!==1)throw new Error('Missing or ambiguous production role chunk: '+name);
+  return 'assets/'+matches[0];
+ });
+}
 export async function verifyPublicAssets(files,http=fetch){
  if(!files.some(f=>f.endsWith('.js'))||!files.some(f=>f.endsWith('.css')))throw new Error('Production JS/CSS probes missing');
  for(const file of files){
@@ -111,13 +124,19 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
   const redirect=JSON.parse(fs.readFileSync('.wrangler/deploy/config.json','utf8'));
   const file=path.resolve('.wrangler/deploy',redirect.configPath),root=path.resolve('dist')+path.sep;
   if(!file.startsWith(root))throw new Error('Generated config must be under dist');
-  verifyProductionArtifact(JSON.parse(fs.readFileSync(file,'utf8')),revision,activate,singleReview);console.log('Exact production Worker / D1 / revision / access artifact PASS.');
+  const artifact=JSON.parse(fs.readFileSync(file,'utf8'));
+  verifyProductionArtifact(artifact,revision,activate,singleReview);
+  const directory=path.resolve(path.dirname(file),artifact.assets.directory,'assets');
+  const roleFiles=roleAssetProbes(fs.readdirSync(directory));
+  console.log('Exact production Worker / D1 / revision / role bundle artifact PASS: '+roleFiles.join(', '));
  }else if(mode==='assets'){
   const redirect=JSON.parse(fs.readFileSync('.wrangler/deploy/config.json','utf8'));
   const file=path.resolve('.wrangler/deploy',redirect.configPath),c=JSON.parse(fs.readFileSync(file,'utf8'));
   const directory=path.resolve(path.dirname(file),c.assets.directory,'assets');
-  const probes=fs.readdirSync(directory).filter(n=>/^index-.*\.js$/.test(n)||n.endsWith('.css')).map(n=>'assets/'+n);
-  await verifyPublicAssets(probes);console.log('Live production JavaScript/CSS asset read-back PASS.');
+  const files=fs.readdirSync(directory);
+  const probes=[...files.filter(n=>/^index-.*\.js$/.test(n)||n.endsWith('.css')).map(n=>'assets/'+n),...roleAssetProbes(files)];
+  await verifyPublicAssets(probes);
+  console.log('Live production JavaScript/CSS plus learner/teacher role assets read-back PASS.');
  }else if(mode==='readback'){
   const verified=await waitForLiveProductionRevision(settings,revision,{
    activate,singleReview,
