@@ -39,7 +39,7 @@ test("moving horizontal swimmer pose is plausible but not certified as water",()
  const result=inspectSwimmingEvidence(samples(26,"swim"),26,"side");
  assert.equal(result.status,"plausible",JSON.stringify(result));
  assert.ok(result.movingRatio>19);
- assert.match(result.note,/chưa thể xác thực môi trường nước/i);
+ assert.match(result.note,/chưa xác thực được môi trường nước/i);
 });
 test("low visibility cannot yield a high-confidence swim admission",()=>{
  const video=samples(20,"swim").map((f,i)=>({...f,visibility:i<16?.35:.88}));
@@ -53,7 +53,34 @@ test("main video evaluator calls gate before score, sync or grade persistence",(
  const scoring=source.indexOf("const categories = scoreCategories(errors)");
  assert.ok(gate>0&&gate<scoring&&scoring<save);
  assert.match(source,/if\(contentGate\.status!=="plausible"\)/);
+ assert.match(source,/scoreSwimmingTechnique\(scoreCategories\(errors\), contentGate, view\)/);
  assert.match(source,/swimConfirmed/);
  assert.match(source,/setContentEvidence\(contentGate\)/);
  assert.match(source,/Video gốc không rời thiết bị/);
+});
+
+test("incorrect breaststroke actions are graded, not falsely rejected as an irrelevant video",()=>{
+ const clip=inspectSwimmingEvidence(samples(26,"standing"),26,"side");
+ assert.equal(clip.status,"plausible",JSON.stringify(clip));
+ assert.ok(clip.horizontalRatio<56,"upright form is a grading signal, not an admission blocker");
+});
+test("poor technique can actually score below 5/10 and explicitly asks for learning check",async()=>{
+ const {scoreSwimmingTechnique,LOW_SWIM_SCORE_BELOW}=await import("../app/phan-tich-video/swim-technique-score.mjs");
+ const baseline={legs:100,arms:100,coordination:100,bodyLine:100};
+ const weak=scoreSwimmingTechnique(baseline,{kneeExcursion:9,armExcursion:13,movingRatio:19,horizontalRatio:38},"side");
+ assert.ok(weak.score<50,JSON.stringify(weak));
+ assert.equal(weak.needsLearningCheck,true);
+ assert.equal(LOW_SWIM_SCORE_BELOW,50);
+ const strong=scoreSwimmingTechnique(baseline,{kneeExcursion:70,armExcursion:80,movingRatio:80,horizontalRatio:95},"side");
+ assert.equal(strong.score,100);
+ assert.equal(strong.needsLearningCheck,false);
+ const component=readFileSync(new URL("../app/phan-tich-video/video-analyzer-impl.tsx",import.meta.url),"utf8");
+ assert.match(component,/result\.score < LOW_SWIM_SCORE_BELOW/);
+ assert.match(component,/Bạn có đang thực sự học bơi không vậy\?/);
+ assert.match(component,/\(result\.score \/ 10\)\.toFixed\(1\)/);
+});
+test("wrong swimming body position never disqualifies a clip with visible movement",()=>{
+ const data=readFileSync(new URL("../app/phan-tich-video/swim-content-gate.mjs",import.meta.url),"utf8");
+ assert.doesNotMatch(data,/horizontalRatio<LIMITS\.minimumSideHorizontal/);
+ assert.doesNotMatch(data,/kneeExcursion<LIMITS\.minimumKneeExcursion/);
 });
