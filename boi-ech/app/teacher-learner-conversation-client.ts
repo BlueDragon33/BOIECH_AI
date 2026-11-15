@@ -31,10 +31,12 @@ async function storedCredential():Promise<StoredCredential>{
 // concurrent D1 nonce writes must not turn a transient outage into a request storm.
 let proofQueue:Promise<unknown>=Promise.resolve();
 const transientStatus=(status:number)=>[429,500,502,503,504].includes(status);
-async function signedConversationProof(deviceId:string,signal?:AbortSignal){
+export async function signedConversationProof(deviceId:string,signal?:AbortSignal,suppliedCredential?:StoredCredential){
+ if(!/^[a-f0-9]{64}$/i.test(deviceId))throw new Error("Chưa nhận diện được thiết bị.");
  const run=async()=>{
   signal?.throwIfAborted();
-  const credential=await storedCredential();
+  const credential=suppliedCredential??await storedCredential();
+  if(!credential.privateKey||!crypto.subtle)throw new Error("Không có khóa xác thực thiết bị.");
   for(let attempt=0;attempt<3;attempt++){
    signal?.throwIfAborted();
    let response:Response;
