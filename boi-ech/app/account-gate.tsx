@@ -913,6 +913,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       accountName={account.name}
       role={account.role==="manager"?"Cán bộ quản lý":account.role==="teacher"?"Giảng viên":"Học viên"}
       error={roleBootstrapError||managerPreloadError||error} busy={busy}
+      retryLabel={roleAssetFailure?"Tải bản ứng dụng mới":"Thử xác thực lại"}
       onRetry={() => {
         if(roleBootstrapError){
           if(roleAssetFailure&&refreshRoleAssetsManually())return;
