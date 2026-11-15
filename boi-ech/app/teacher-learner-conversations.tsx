@@ -5,14 +5,15 @@ import {conversationRequest,newClientEventId,type ConversationItem,type Incoming
 import styles from "./teacher-learner-conversations.module.css";
 
 type LearnerOption={name:string;personCode:string;className:string};
-type Props={role:"learner"|"teacher";deviceId:string;learners?:LearnerOption[]};
+type Props={role:"learner"|"teacher";deviceId:string;learners?:LearnerOption[];onLearnerAction?:(personCode:string,mode:"assignment"|"feedback")=>void};
 function when(value:string){const date=new Date(value);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(date):"—";}
 const label={chat:"Chat trực tiếp",request:"Thư yêu cầu & phản hồi"} as const;
 
 /** Event-driven chat over authenticated WebSocket. Signed REST remains the source of truth and reconnect fallback. */
-export default function TeacherLearnerConversations({role,deviceId,learners=[]}:Props){
+export default function TeacherLearnerConversations({role,deviceId,learners=[],onLearnerAction}:Props){
  const [channel,setChannel]=useState<ConversationChannel>("chat");
  const [selected,setSelected]=useState("");
+ const [search,setSearch]=useState("");
  const [records,setRecords]=useState<{target:string;items:ConversationItem[]}>({target:"",items:[]});
  const [inbox,setInbox]=useState<IncomingItem[]>([]);
  const [text,setText]=useState("");
@@ -35,6 +36,8 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
   request:scopedInbox.filter(item=>item.channel==="request"&&item.unread).length,
  }),[scopedInbox]);
  const target=role==="teacher"?(available.some(l=>l.personCode===selected)?selected:available[0]?.personCode||""):"";
+ const activeLearner=available.find(l=>l.personCode===target);
+ const visibleLearners=available.filter(l=>[l.name,l.personCode,l.className].join(" ").toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")));
  const messages=records.target===target?records.items:[];
  const forRequest=useMemo(()=>messages.filter(m=>m.channel===channel),[channel,messages]);
  const openRequests=useMemo(()=>messages.filter(m=>m.channel==="request"&&m.role==="learner"&&!m.requestId),[messages]);
@@ -193,8 +196,9 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
  }
  const editing=(value:string)=>{setText(value);pendingId.current=null;};
  if(!validDevice)return <section className={styles.shell}><p>Đang xác minh thiết bị để mở kênh Giảng viên – Học viên…</p></section>;
- return <section className={styles.shell} aria-label="Liên lạc trực tiếp giữa giảng viên và học viên">
-  <header className={styles.header}><div><small>LIÊN LẠC HAI CHIỀU</small><h2>Giảng viên ↔ Học viên</h2><p>Hai kênh độc lập, lưu theo đúng lớp và tài khoản. Tự nhận tin mới khi trang đang mở.</p></div><span className={styles.online}>{realtime?"● Realtime · Sự kiện trực tiếp":"● Đang dùng kết nối dự phòng"}</span></header>
+ return <section className={styles.shell} data-role={role} aria-label="Liên lạc trực tiếp giữa giảng viên và học viên">
+  <header className={styles.header}><div><small>TRUNG TÂM LIÊN LẠC</small><h2>{role==="teacher"?"Tin nhắn & phản hồi học viên":"Liên hệ Giảng viên"}</h2><p>{role==="teacher"?"Chọn học viên để trao đổi ngay, không cần mở tin cũ.":"Chat trực tiếp hoặc gửi thư yêu cầu hỗ trợ."}</p></div><span className={styles.online}>{realtime?"● Realtime · Sự kiện trực tiếp":"● Đang dùng kết nối dự phòng"}</span></header>
+  <div className={styles.workspace}><div className={styles.sidebar}>
   {role==="teacher"?<div className={styles.teacherScope}>
     <label>Học viên trong lớp<select value={target} disabled={busy} onChange={e=>{setSelected(e.target.value);resetDraft();setNotice("");setError("");setLoading(true);}}>
       {available.length?available.map(l=><option key={l.personCode} value={l.personCode}>{l.name} · {l.className}</option>):<option value="">Chưa có học viên phù hợp</option>}
@@ -206,14 +210,24 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
       }}><span>{item.channel==="request"?"✉":"●"} {item.learnerName}</span><small>{item.subject||item.message.slice(0,80)}</small></button>)}
      {!scopedInbox.length?<span>Chưa có tin mới trong phạm vi lớp đang chọn.</span>:null}
     </div></div>
-  </div>:null}
+   <label className={styles.searchLabel}>Tìm học viên<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tên, mã hoặc lớp…" /></label>
+   <div className={styles.contactList} aria-label="Danh sách học viên">
+    {visibleLearners.map(l=><button type="button" key={l.personCode} className={l.personCode===target?styles.selectedContact:""} aria-pressed={l.personCode===target}
+       onClick={()=>{setSelected(l.personCode);resetDraft();setNotice("");setError("");setLoading(true);}}>
+       <span className={styles.avatar} aria-hidden="true">{l.name.slice(0,1).toUpperCase()}</span>
+       <span className={styles.contactInfo}><strong>{l.name}</strong><small>{l.className||"Chưa có lớp"}</small></span>
+       {scopedInbox.some(m=>m.learnerPersonCode===l.personCode&&m.channel===channel&&m.unread)?<i className={styles.contactUnread} aria-label="Có tin chưa đọc"/>:null}
+    </button>)}
+    {!visibleLearners.length?<small>Không tìm thấy học viên phù hợp.</small>:null}
+   </div></div>:<p className={styles.learnerTips}>Chat để trao đổi nhanh; dùng Thư yêu cầu nếu cần phản hồi có tiêu đề.</p>}
   <nav className={styles.tabs} aria-label="Chọn kênh liên lạc">
     {(["chat","request"] as const).map(type=><button type="button" key={type} aria-pressed={channel===type}
       className={channel===type?styles.active:""} onClick={()=>selectChannel(type)}>{type==="chat"?"💬":"✉️"} {label[type]}
        {role==="teacher"&&unreadCounts[type]>0?<span className={type==="chat"?styles.chatUnread:styles.requestUnread}
         aria-label={`${unreadCounts[type]} ${type==="chat"?"tin nhắn":"thư yêu cầu"} chưa đọc`}>{compactUnread(unreadCounts[type])}</span>:null}
       </button>)}
-  </nav>
+  </nav></div><div className={styles.conversation}>
+  <div className={styles.conversationHeader}><span className={styles.avatar} aria-hidden="true">{role==="teacher"?(activeLearner?.name.slice(0,1).toUpperCase()||"HV"):"GV"}</span><div><strong>{role==="teacher"?(activeLearner?.name||"Chọn học viên"):"Giảng viên phụ trách"}</strong><small>{role==="teacher"?(activeLearner?.className||"Phạm vi lớp hiện tại"):"Kênh bảo mật đã xác thực"}</small></div><span className={styles.channelState}>{channel==="chat"?"Chat trực tiếp":"Thư yêu cầu"}</span></div>
   {notice?<p className={styles.notice} role="status">{notice}</p>:null}
   {error?<p className={styles.error} role="alert">{error}</p>:null}
   {historySyncError||inboxSyncError?<p className={styles.error} role="status">Đồng bộ tạm gián đoạn; các tin đã tải vẫn được giữ lại. {historySyncError||inboxSyncError}</p>:null}
@@ -237,6 +251,14 @@ export default function TeacherLearnerConversations({role,deviceId,learners=[]}:
       placeholder={channel==="chat"?"Nhập tin nhắn gửi trực tiếp…":"Mô tả vấn đề, yêu cầu hướng dẫn hoặc phản hồi cụ thể…"} required/></label>
     <div className={styles.actions}><small>{text.length}/1200 · Không đính kèm video gốc hoặc dữ liệu nhạy cảm</small>
       <button disabled={busy||!text.trim()||(role==="teacher"&&!target)||(channel==="request"&&role==="teacher"&&!selectedRequest)} type="submit">{busy?"Đang gửi…":channel==="chat"?"Gửi tin nhắn":"Gửi thư / phản hồi"}</button></div>
-  </form>
- </section>;
+  </form></div>
+  {role==="teacher"?<aside className={styles.context} aria-label="Ngữ cảnh học viên đang trao đổi">
+   <div className={styles.contextHeading}><span className={styles.avatar}>{activeLearner?.name.slice(0,1).toUpperCase()||"HV"}</span><strong>{activeLearner?.name||"Chưa chọn học viên"}</strong><small>{activeLearner?.className||"Chọn học viên trong lớp"}</small></div>
+   <div className={styles.contextCard}><strong>Thông tin hội thoại</strong><p>Chỉ dữ liệu trong phạm vi lớp được cấp quyền mới hiển thị.</p><dl><div><dt>Chat chưa đọc</dt><dd>{unreadCounts.chat}</dd></div><div><dt>Thư chưa đọc</dt><dd>{unreadCounts.request}</dd></div></dl></div>
+   <div className={styles.contextCard}><strong>Thao tác chuyên môn</strong><p>Ghi nhận phản hồi và giao bài qua máy chủ; không gửi tự động.</p><div className={styles.contextActions}>
+    <button type="button" disabled={!target||!onLearnerAction} onClick={()=>target&&onLearnerAction?.(target,"feedback")}>Nhận xét</button>
+    <button type="button" disabled={!target||!onLearnerAction} onClick={()=>target&&onLearnerAction?.(target,"assignment")}>Giao bài luyện</button>
+   </div></div>
+  </aside>:null}
+ </div></section>;
 }

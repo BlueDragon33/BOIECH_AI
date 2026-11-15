@@ -217,7 +217,7 @@ test("switching teachers removes the actual dashboard learner drawer and action 
     let slots = [], cursor = 0, activeKey;
     const useState = initial => { const index = cursor++; if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial; return [slots[index], value => { slots[index] = value; }]; };
     const React = { createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }) };
-    const args = { useState, useEffect() {}, React, window: { sessionStorage: { getItem() { return null; } }, setTimeout() {} }, document: { querySelector() { return null; } }, matchesQuery: () => true, text: () => "", OverviewDashboard: "overview", LearnerDrawer: "drawer", TeacherActionDialog: "action" };
+    const args = { useState, useEffect() {}, React, createPortal: node => node, window: { sessionStorage: { getItem() { return null; } }, setTimeout() {} }, document: { body: {}, querySelector() { return null; } }, matchesQuery: () => true, text: () => "", OverviewDashboard: "overview", LearnerDrawer: "drawer", TeacherActionDialog: "action" };
     const dashboard = new Function(...Object.keys(args), `${outputText}; return TeacherDashboard;`)(...Object.values(args));
     const render = ({ key, ...props }) => {
       // React consumes key before props and remounts component state on a new key.
@@ -232,7 +232,7 @@ test("switching teachers removes the actual dashboard learner drawer and action 
     controls.onSelect(learnerA);
     controls.onAction({ mode: "feedback", learner: learnerA });
     const open = render(f.dashboard);
-    assert.equal(open.children.find(node => node?.type === "drawer").props.learner.name, "Học viên A");
+    assert.equal(open.children.some(node => node?.type === "drawer"), false, "opening an action closes the learner drawer to avoid an obscured modal");
     assert.equal(open.children.find(node => node?.type === "action").props.draft.learner.name, "Học viên A");
     f.shell.dataset.deviceId = "b".repeat(64); f.mutate(); await f.settle();
     f.requests[1].resolve(overview("Giảng viên B")); await f.settle();

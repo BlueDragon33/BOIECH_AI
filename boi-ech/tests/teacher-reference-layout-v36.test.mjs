@@ -38,7 +38,8 @@ test("V36 shell carries selected class scope into learners, tasks, reports and a
   assert.match(shell, /onOpenTasks=\{\(scopeClass\) => \{ setWorkScopeClass\(scopeClass\); setTab\("tasks"\); \}\}/);
   assert.match(shell, /onOpenReports=\{\(scopeClass\) => \{ setWorkScopeClass\(scopeClass\); setTab\("reports"\); \}\}/);
   assert.match(shell, /onOpenAnalysis=\{\(scopeClass\) => \{ setWorkScopeClass\(scopeClass\); setTab\("analysis"\); \}\}/);
-  assert.match(shell, /<LearnerTable learners=\{workScopedLearners\}/);
+  assert.match(shell, /const filteredLearners = learnerFilter==="support"\?workScopedSupport:learnerFilter==="completed"\?workScopedLearners\.filter/);
+  assert.match(shell, /<LearnerTable learners=\{filteredLearners\}/);
 });
 
 test("V36 uses a two-column class area plus a bounded right rail on desktop", () => {
