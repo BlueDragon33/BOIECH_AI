@@ -21,10 +21,11 @@ export function TeacherPremiumMetrics({tab,learners,assignments}:Props){
   ["Cần hỗ trợ",String(needs),"Theo tín hiệu giám sát"],
   ["Hoàn thành",String(completed),"Đã đạt 100% tiến độ"]
  ]:tab==="tasks"?[
-  ["Đang thực hiện",String(open),"Nhiệm vụ đã gửi"],
-  ["Quá hạn",String(overdue),"Cần theo dõi"],
-  ["Hoàn thành",String(done),"Đã ghi nhận"],
-  ["Cần hỗ trợ",String(help),"Học viên yêu cầu giúp đỡ"]
+  ["Tổng bài tập",String(assignments.length),"Nhiệm vụ đã gửi"],
+  ["Đang thực hiện",String(open),"Đã giao, chưa hoàn thành"],
+  ["Quá hạn",String(overdue),"Cần giảng viên xem"],
+  ["Cần hỗ trợ",String(help),"Học viên yêu cầu giúp đỡ"],
+  ["Đã hoàn thành",String(done),"Học viên đã xác nhận"]
  ]:[
   ["Tiến độ trung bình",avg+"%","Dựa trên hồ sơ hiện có"],
   ["Hoàn thành",String(completed),"Đạt 100% tiến độ"],

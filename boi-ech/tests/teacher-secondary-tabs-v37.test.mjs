@@ -24,11 +24,19 @@ test("V37 secondary teacher tabs use the modern reference design layer", () => {
 test("V37 messages and schedule expose filters without changing server contracts", () => {
   const messages = read("app/teacher-two-way-messages.tsx");
   const schedule = read("app/teacher-assignment-schedule.tsx");
+  const shell = read("app/teacher-role-shell.tsx");
+  const metrics = read("app/teacher-premium-workspaces-v38.tsx");
 
   assert.match(messages, /teacher-message-toolbar-v37/);
   assert.match(messages, /useMemo/);
   assert.match(schedule, /teacher-schedule-toolbar-v37/);
-  assert.match(schedule, /teacher-schedule-summary-v37/);
+  // V39 puts the actual task summary in the scoped icon KPI strip instead
+  // of duplicating historical V37 counters inside the schedule list.
+  assert.match(shell, /<TeacherPremiumMetrics tab="tasks" learners=\{workScopedLearners\} assignments=\{workScopedAssignments\}/);
+  assert.match(metrics, /Tổng bài tập/);
+  assert.match(metrics, /Quá hạn/);
+  assert.match(metrics, /Cần hỗ trợ/);
+  assert.match(metrics, /Đã hoàn thành/);
   assert.doesNotMatch(messages, /fetch\(/);
   assert.doesNotMatch(schedule, /fetch\(/);
 });
