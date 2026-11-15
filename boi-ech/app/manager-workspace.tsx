@@ -10,6 +10,7 @@ import ManagerCommandCenter from "./manager-command-center";
 import ManagerRosterCleanup from "./manager-roster-cleanup";
 import ManagerConsoleV12 from "./manager-console-v12";
 import ManagerBuildingStudio from "./manager-building-studio";
+import {MAIN_LECTURE_HALL_ID,MAIN_LECTURE_HALL_NAME,existingMainLectureHall} from "./manager-lecture-hall";
 import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,PRACTICE_POOL_ROOM_ID,
  PRACTICE_POOL_ROOM_NAME,PRACTICE_POOL_DRAFT_CAPACITY,existingPracticePoolBuilding,
  existingPracticePoolRoom,isPracticePoolRoom} from "./manager-practice-pool";
@@ -44,6 +45,18 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  function selectTab(next:Tab){setTab(next);setFilter("all");setQuery("");setDetail(null);setShowWindow(next==="schedule");}
  function newResource(kind:ResourceKind,preferredBuildingId=""){setDetail(null);setResource({id:crypto.randomUUID(),kind,name:"",parentId:kind==="room"?preferredBuildingId:"",capacity:kind==="building"?1:30,requiredTeachers:1,status:"active",expectedVersion:0});setFormError("");}
  function editResource(r:TrainingResource){setDetail(null);setResource({...r,parentId:r.parentId||"",expectedVersion:r.version});setFormError("");}
+ async function installLectureHallTemplate():Promise<boolean>{
+  setFormError("");
+  // Existing main hall is authoritative even if renamed after template installation.
+  const existing=existingMainLectureHall(board.resources);
+  if(existing)return true;
+  if(board.resources.some(r=>r.id===MAIN_LECTURE_HALL_ID||
+    r.name.trim().normalize("NFC").toLocaleLowerCase("vi")===MAIN_LECTURE_HALL_NAME.toLocaleLowerCase("vi"))){
+    setFormError("Tên hoặc mã Tòa giảng đường đã tồn tại ở tài nguyên khác. Không ghi đè.");return false;
+  }
+  return await onCommand({action:"save-resource",id:MAIN_LECTURE_HALL_ID,kind:"building",
+    name:MAIN_LECTURE_HALL_NAME,parentId:"",capacity:1,requiredTeachers:1,status:"active",expectedVersion:0});
+ }
  async function installPracticePoolTemplate():Promise<boolean>{
   setFormError("");
   const knownBuilding=existingPracticePoolBuilding(board.resources);
@@ -181,7 +194,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
     })}
   </div>:null}
   {(["class","room","building"] as Tab[]).includes(tab)&&tab!=="building"&&!(v12Enabled&&(tab==="class"||tab==="room"))?<section className={styles.grid} aria-label={`Danh sách ${title.toLocaleLowerCase("vi")}`}>{resources.map(r=><article className={styles.card} key={r.id}><div className={styles.cardHeading}><div><small>{r.kind==="class"?"LỚP HỌC":r.kind==="room"?label(r.parentId||""):"TÒA HỌC"}</small><h2><button type="button" className={styles.cardTitle} onClick={()=>setDetail({kind:"resource",id:r.id})}>{r.name}</button></h2></div><Badge tone={r.state}>{r.kind==="class"&&r.state==="full"?"Đủ học viên":r.kind==="building"&&!r.roomCount?"Chưa có phòng":stateText[r.state]}</Badge></div><ResourceStatusBars resource={r} board={board}/>{r.kind==="room"?<p>{r.capacity} chỗ · {r.bookingCount} buổi trong khoảng xem</p>:null}<small>{r.status==="active"?"Đang hoạt động":r.status==="unavailable"?"Tạm ngừng":"Đã lưu trữ"}</small><div className={styles.cardActions}><button type="button" className={styles.textButton} onClick={()=>setDetail({kind:"resource",id:r.id})}>Quản lý chi tiết</button><button type="button" disabled={busy} onClick={()=>editResource(r)}>Chỉnh sửa</button></div></article>)}{!resources.length&&<div className={styles.emptyState}><AppIcon name={tab}/><strong>Chưa có dữ liệu phù hợp</strong><p>Đổi bộ lọc hoặc thêm {tab==="class"?"lớp":tab==="room"?"phòng":"tòa"} bằng nút phía trên.</p></div>}</section>:null}
-  {tab==="building"?<ManagerBuildingStudio board={board} busy={busy} onInstallPoolTemplate={installPracticePoolTemplate}
+  {tab==="building"?<ManagerBuildingStudio board={board} busy={busy} onInstallMainHallTemplate={installLectureHallTemplate} onInstallPoolTemplate={installPracticePoolTemplate}
       onCreateBuilding={()=>newResource("building")} onEditBuilding={editResource}
       onCreateRoom={buildingId=>newResource("room",buildingId)} onEditRoom={editResource}
       onCreateSession={roomId=>editSession(undefined,roomId)}/>:null}
