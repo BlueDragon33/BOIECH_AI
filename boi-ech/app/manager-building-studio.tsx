@@ -1,7 +1,9 @@
 "use client";
 
 import {useState} from "react";
-import {CampusBuildingArt} from "./manager-campus-illustration";
+import ManagerCampusMap from "./manager-campus-map";
+import {MainLectureHallArt} from "./manager-lecture-hall-art";
+import {MAIN_LECTURE_HALL_ID,MAIN_LECTURE_HALL_NAME,existingMainLectureHall,isMainLectureHall} from "./manager-lecture-hall";
 import {PracticePoolBuildingArt,PracticePoolBasinArt} from "./manager-practice-pool-art";
 import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,
  PRACTICE_POOL_ROOM_NAME,existingPracticePoolBuilding,existingPracticePoolRoom,
@@ -15,6 +17,7 @@ type Props={
  onCreateRoom:(buildingId:string)=>void; onEditRoom:(resource:TrainingResource)=>void;
  onCreateSession:(roomId:string)=>void;
  onInstallPoolTemplate:()=>Promise<boolean>;
+ onInstallMainHallTemplate:()=>Promise<boolean>;
 };
 function stateOf(board:TrainingBoard,room:TrainingResource){
  if(room.status!=="active")return "unavailable" as const;
@@ -32,28 +35,39 @@ function nextSession(board:TrainingBoard,roomId:string):TrainingSession|null{
 function clock(iso:string){const date=new Date(iso);return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("vi-VN",{hour:"2-digit",minute:"2-digit"}).format(date):"—";}
 
 /** Building-first editor; all numbers and writes come from the verified TrainingBoard APIs. */
-export default function ManagerBuildingStudio({board,busy,onCreateBuilding,onEditBuilding,onCreateRoom,onEditRoom,onCreateSession,onInstallPoolTemplate}:Props){
+export default function ManagerBuildingStudio({board,busy,onCreateBuilding,onEditBuilding,onCreateRoom,onEditRoom,onCreateSession,onInstallPoolTemplate,onInstallMainHallTemplate}:Props){
  const [search,setSearch]=useState("");
  const [selectedId,setSelectedId]=useState<string|null>(null);
  const [showPoolPreview,setShowPoolPreview]=useState(false);
+ const [showMainPreview,setShowMainPreview]=useState(false);
+ const [installingMain,setInstallingMain]=useState(false);
  const [installingPool,setInstallingPool]=useState(false);
  const [statusFilter,setStatusFilter]=useState<"all"|"active"|"unavailable"|"archived">("all");
  const buildings=board.resources.filter(r=>r.kind==="building");
  const rooms=board.resources.filter(r=>r.kind==="room");
  const poolBuilding=existingPracticePoolBuilding(buildings);
+ const mainHall=existingMainLectureHall(buildings);
+ async function installMainHall(){
+  if(busy||installingMain)return;
+  setInstallingMain(true);
+  try{
+   const created=await onInstallMainHallTemplate();
+   if(created){setSelectedId(mainHall?.id??MAIN_LECTURE_HALL_ID);setShowMainPreview(false);setShowPoolPreview(false);setSearch("");setStatusFilter("all");}
+  }finally{setInstallingMain(false);}
+ }
  const poolRoom=poolBuilding?existingPracticePoolRoom(rooms,poolBuilding.id):undefined;
  async function installPool(){
   if(installingPool||busy)return;
   setInstallingPool(true);
   try{
    const created=await onInstallPoolTemplate();
-   if(created){setSelectedId(poolBuilding?.id??PRACTICE_POOL_BUILDING_ID);setShowPoolPreview(false);}
+   if(created){setSelectedId(poolBuilding?.id??PRACTICE_POOL_BUILDING_ID);setShowPoolPreview(false);setShowMainPreview(false);setSearch("");setStatusFilter("all");}
   }finally{setInstallingPool(false);}
  }
  const visible=buildings.filter(b=>(statusFilter==="all"||b.status===statusFilter)&&
   (b.name.toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi"))||
     rooms.some(r=>r.parentId===b.id&&r.name.toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")))));
- const current=showPoolPreview&&!poolBuilding?null:(visible.find(b=>b.id===selectedId)??visible[0]??null);
+ const current=(showPoolPreview&&!poolBuilding)||(showMainPreview&&!mainHall)?null:(visible.find(b=>b.id===selectedId)??visible[0]??null);
  const currentRooms=current?rooms.filter(r=>r.parentId===current.id):[];
  const activeRooms=rooms.filter(r=>r.status==="active").length;
  const occupiedRooms=rooms.filter(r=>stateOf(board,r)==="occupied").length;
@@ -82,37 +96,23 @@ export default function ManagerBuildingStudio({board,busy,onCreateBuilding,onEdi
    <span className={styles.readback}>Dữ liệu: {new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(board.observedAt))}</span>
   </div>
   <div className={styles.mapHead}><div><h4>Bản đồ tòa nhà</h4><p>Chọn một tòa để quản lý chi tiết hoặc thêm phòng.</p></div><strong>{visible.length} / {buildings.length} tòa</strong></div>
-  <div className={styles.campus} aria-label="Danh sách tòa học trực quan">
-   <div className={styles.sky} aria-hidden="true"/>
-   <div className={styles.buildingGallery}>
-    {visible.map((building,index)=>{
-     const linked=rooms.filter(r=>r.parentId===building.id);
-     const occupied=linked.filter(r=>stateOf(board,r)==="occupied").length;
-     return <button type="button" key={building.id} className={styles.buildingCard}
-      aria-pressed={current?.id===building.id} onClick={()=>{setSelectedId(building.id);setShowPoolPreview(false);}}>
-      <span className={styles.art}>{isPracticePoolBuilding(building)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
-      <strong>{building.name}</strong>
-      <span className={styles.buildingInfo}>{linked.length} phòng <span aria-hidden="true">·</span> {occupied} đang học</span>
-      <span className={styles.state} data-status={building.status} data-tone={building.state}>{buildingStatus[building.status]}</span>
-     </button>;
-    })}
-    {!poolBuilding?<button type="button" className={styles.poolSampleCard} aria-pressed={showPoolPreview}
-      onClick={()=>{setShowPoolPreview(true);setSelectedId(null);}}>
-       <span className={styles.art}><PracticePoolBuildingArt/></span>
-       <strong>{PRACTICE_POOL_BUILDING_NAME}</strong>
-       <span className={styles.buildingInfo}>Mẫu sẵn · {PRACTICE_POOL_ROOM_NAME}</span>
-       <span className={styles.sampleState}>Chưa thêm vào dữ liệu</span>
-      </button>:null}
-    {!visible.length?<div className={styles.noBuilding}><strong>{buildings.length?"Không có tòa phù hợp":"Chưa có tòa nhà"}</strong>
-     <p>{buildings.length?"Đổi bộ lọc hoặc từ khóa để xem các tòa khác.":"Tạo tòa học đầu tiên để bắt đầu xây dựng hệ thống phòng."}</p>
-     {!buildings.length?<button type="button" disabled={busy} onClick={onCreateBuilding}>＋ Tạo tòa đầu tiên</button>:null}
-    </div>:null}
-   </div>
-  </div>
+  <ManagerCampusMap board={board} mode="studio" busy={busy} selectedId={current?.id}
+    onSelectBuilding={building=>{setSelectedId(building.id);setSearch("");setStatusFilter("all");setShowPoolPreview(false);setShowMainPreview(false);}}
+    onOpenMainTemplate={()=>{setShowMainPreview(true);setShowPoolPreview(false);setSelectedId(null);}}
+    onOpenPoolTemplate={()=>{setShowPoolPreview(true);setShowMainPreview(false);setSelectedId(null);}}
+    onCreateBuilding={onCreateBuilding}/>
+  {!mainHall&&(showMainPreview||!buildings.length)?<div className={styles.lecturePreview} aria-label="Tạo Tòa giảng đường trung tâm">
+    <div className={styles.lectureArt}><MainLectureHallArt/></div>
+    <div className={styles.lectureIntro}><span className={styles.eyebrow}>TÒA CHÍNH · CHƯA THÊM VÀO DỮ LIỆU</span>
+      <h4>{MAIN_LECTURE_HALL_NAME}</h4>
+      <p>Tòa giảng đường chính lớn nhất ở trung tâm sơ đồ. Chọn tạo để lưu tòa thật, sau đó thêm các phòng học và lịch sử dụng vào tòa.</p></div>
+    <button className={styles.create} type="button" disabled={busy||installingMain}
+      onClick={()=>void installMainHall()}>{installingMain?"Đang tạo và đồng bộ…":"＋ Tạo Tòa giảng đường trung tâm"}</button>
+   </div>:null}
   {(!poolBuilding&&(showPoolPreview||!buildings.length))?<div className={styles.poolPreview} aria-label="Mẫu tòa bể bơi thực hành">
     <div className={styles.poolSampleArt}><PracticePoolBasinArt/></div>
     <div className={styles.poolPreviewText}>
-     <span className={styles.eyebrow}>MẪU DỰNG SẴN · CHƯA TÍNH VÀO SỐ LIỆU</span>
+     <span className={styles.eyebrow}>MẪU DỰNG SẴN · Chưa thêm vào dữ liệu · CHƯA TÍNH VÀO SỐ LIỆU</span>
      <h4>{PRACTICE_POOL_BUILDING_NAME}</h4>
      <p>Bên trong có 01 {PRACTICE_POOL_ROOM_NAME.toLocaleLowerCase("vi")} để bố trí các buổi học dưới nước.
       Bể mới mặc định chưa mở lịch cho đến khi cán bộ xác nhận sức chứa thật.</p>
@@ -124,7 +124,8 @@ export default function ManagerBuildingStudio({board,busy,onCreateBuilding,onEdi
     <div className={styles.detailHeader}>
      <div><span className={styles.eyebrow}>CHI TIẾT TÒA ĐANG CHỌN</span><h4>{current.name}</h4>
       <span className={styles.state} data-status={current.status} data-tone={current.state}>{buildingStatus[current.status]}</span>
-      {isPracticePoolBuilding(current)?<small className={styles.practiceLabel}>Khu học thực hành bơi ếch</small>:null}</div>
+      {isPracticePoolBuilding(current)?<small className={styles.practiceLabel}>Khu học thực hành bơi ếch</small>:null}
+      {isMainLectureHall(current)?<small className={styles.practiceLabel}>Tòa giảng đường trung tâm · Tòa chính</small>:null}</div>
      <div className={styles.actions}>
       <button type="button" onClick={()=>onEditBuilding(current)} disabled={busy}>Cấu hình tòa</button>
       <button type="button" className={styles.create} onClick={()=>onCreateRoom(current.id)} disabled={busy||current.status!=="active"}>＋ Thêm phòng</button>
