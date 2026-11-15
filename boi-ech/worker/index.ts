@@ -41,7 +41,7 @@ const worker = {
         return new Response("Cross-origin WebSocket forbidden", { status: 403 });
       if (!env.CHAT_HUB) return new Response("Realtime not configured", { status: 503 });
       const protocols = (request.headers.get("sec-websocket-protocol") ?? "").split(",").map(x => x.trim());
-      if (protocols.length !== 2 || protocols[0] !== "boi-ech.v16" || !/^ticket\\.[a-f0-9]{32}$/.test(protocols[1]))
+      if (protocols.length !== 2 || protocols[0] !== "boi-ech.v16" || !protocols[1].startsWith("ticket.") || !/^[a-f0-9]{32}$/.test(protocols[1].slice(7)))
         return new Response("Invalid WebSocket protocol", { status: 401 });
       const stub = env.CHAT_HUB.get(env.CHAT_HUB.idFromName("conversations-v16"));
       return stub.fetch(new Request("https://realtime.internal/socket", request));
