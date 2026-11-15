@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cancelVideoAnalysisRuns, seekVideoFrame } from "./video-analysis-run.mjs";
 import { useVideoAnalysisRun } from "./use-video-analysis-run";
 import { inspectSwimmingEvidence } from "./swim-content-gate.mjs";
+import { scoreSwimmingTechnique, LOW_SWIM_SCORE_BELOW } from "./swim-technique-score.mjs";
 import styles from "./video-analyzer.module.css";
 
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
@@ -15,7 +16,7 @@ const MAX_LOCAL_ANALYSES = 10;
 const MAX_ERROR_FRAMES = 4;
 const AI_CACHE = "boi-ech-pose-ai-v1";
 const VIDEO_DB = "boi-ech-video-ai-v1";
-const ENGINE_VERSION = "breaststroke-local-v1.1";
+const ENGINE_VERSION = "breaststroke-local-v1.2";
 const VISION_VERSION = "1.0.1";
 const BUNDLE_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/vision_bundle.mjs`;
 const WASM_LOADER_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/wasm/vision_wasm_internal.js`;
@@ -580,8 +581,10 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
         (avg(frames.map((frame) => frame.visibility)) * .45 + frames.length / sampleCount * .35
           + Math.min(1,contentGate.movingRatio/45)*.2) * 100)));
       const errors = detectErrors(frames, view, confidence);
-      const categories = scoreCategories(errors);
-      let score = Math.round(categories.legs * .35 + categories.arms * .2 + categories.coordination * .3 + categories.bodyLine * .15);
+      // A clip with enough observable movement remains gradable even if form is weak.
+      const technique = scoreSwimmingTechnique(scoreCategories(errors), contentGate, view);
+      const categories = technique.categories;
+      let score = technique.score;
       if (captureQuality.level === "review") score = Math.min(score, 80);
       const localFrames: LocalFrame[] = [];
       for (const error of errors.slice(0, MAX_ERROR_FRAMES)) {
@@ -675,7 +678,12 @@ export default function VideoAnalyzer({ lessonNumber = "03" }: { lessonNumber?: 
     </section> : null}
 
     {result ? <section className={styles.report}>
-      <header><div><span>03 · Kết quả AI</span><h2>{result.errors.length ? `Phát hiện ${result.errors.length} điểm cần xem lại` : "Chưa thấy lỗi nổi bật trong các tiêu chí v1"}</h2><p>Độ tin cậy {result.confidence}% · {result.detectedFrames}/{result.sampledFrames} khung hình hợp lệ · {result.syncState === "synced" ? "đã đồng bộ" : "đang giữ local/chờ đồng bộ"}.</p></div><strong>{result.score}<small>/100</small></strong></header>
+      <header><div><span>03 · Kết quả AI</span><h2>{result.errors.length ? `Phát hiện ${result.errors.length} điểm cần xem lại` : "Chưa thấy lỗi nổi bật trong các tiêu chí v1"}</h2><p>Độ tin cậy {result.confidence}% · {result.detectedFrames}/{result.sampledFrames} khung hình hợp lệ · {result.syncState === "synced" ? "đã đồng bộ" : "đang giữ local/chờ đồng bộ"}.</p></div><strong>{result.score}<small>/100 · {(result.score / 10).toFixed(1)}/10</small></strong></header>
+      {result.score < LOW_SWIM_SCORE_BELOW ? <section className={styles.lowScoreCallout} role="status" aria-label="Cảnh báo điểm bơi dưới 5 trên 10">
+        <strong>Bạn có đang thực sự học bơi không vậy?</strong>
+        <p>Điểm kỹ thuật AI là {(result.score / 10).toFixed(1)}/10, dưới mức 5/10. Nếu bạn đang luyện bơi, không sao: hãy xem các tiêu chí chân, tay, phối hợp và đường thân bên dưới, tập lại đúng hướng dẫn rồi quay video rõ hơn để đánh giá lần nữa.</p>
+        <small>Đây là nhận xét hỗ trợ học tập theo tư thế ghi nhận được, không phải kết luận bạn không biết bơi hoặc không thực sự luyện tập.</small>
+      </section> : null}
       <div className={styles.scores}><div><span>Chân</span><b>{result.categories.legs}</b></div><div><span>Tay</span><b>{result.categories.arms}</b></div><div><span>Phối hợp</span><b>{result.categories.coordination}</b></div><div><span>Đường thân</span><b>{result.categories.bodyLine}</b></div></div>
       {result.errors.length ? <div className={styles.errorList}>{result.errors.map((error, index) => <article key={error.code} className={error.severity === "critical" ? styles.critical : ""}><header><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{error.title}</strong><small>{timeLabel(error.timeSec)} · {error.observed}</small></div><b>{error.severity === "critical" ? "Ưu tiên" : "Cần sửa"}</b></header><p>{error.recommendation}</p><footer><div><span>Mốc tham chiếu</span> <strong>{error.expected}</strong></div><button type="button" onClick={() => void jumpToError(error)} style={{ border: "1px solid #c9dedf", borderRadius: 10, padding: "8px 10px", background: "#f4fbfb", color: "#075a64", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Xem đúng khung hình</button></footer></article>)}</div> : null}
       {result.localFrames.length ? <div className={styles.frames}><header><span>Ảnh lỗi lấy từ video local</span><small>Chỉ giữ trong phiên đang mở · không lưu lên máy chủ</small></header><div>{result.localFrames.map((frame) => <figure key={`${frame.timeSec}-${frame.title}`}><img src={frame.dataUrl} alt={`Khung hình lỗi ${frame.title}`} /><figcaption><strong>{frame.title}</strong><span>{timeLabel(frame.timeSec)}</span></figcaption></figure>)}</div></div> : null}
