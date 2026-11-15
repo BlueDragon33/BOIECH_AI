@@ -240,3 +240,11 @@
 .commandCenter .buildingNode:has(svg[aria-label*="bể bơi"]){border-color:#62c7ec;background:linear-gradient(140deg,#114c80,#071e4b)}
 @media(max-width:720px){.commandCenter .poolRoomArt{width:39px;height:34px}
  .commandCenter .poolRoomArt svg{width:37px;height:30px}}
+
+/* Approved 3D campus composition: dominant main hall in center, connected satellites. */
+.commandCenter .diagramLayout{grid-template-columns:minmax(0,1fr)}
+.commandCenter .campus[data-stage="buildings"]{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;
+ padding:0!important;border:0;background:transparent;display:block!important}
+.commandCenter .campus[data-stage="buildings"]:before,.commandCenter .campus[data-stage="buildings"]>.campusGlow,
+.commandCenter .campus[data-stage="buildings"]>.campusPath{display:none}
+@media(max-width:720px){.commandCenter .campus[data-stage="buildings"]{height:auto!important;max-height:none!important}}
