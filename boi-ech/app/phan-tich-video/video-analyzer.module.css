@@ -189,3 +189,13 @@
 }
 .qualityRetry>header span{color:#ff8d86}
 .qualityRetry>header>b{background:rgba(208,79,72,.18);color:#ff8d86}
+
+/* V15 learning feedback: meaningful text contrast and no score-only color signal. */
+.lowScoreCallout{
+  display:grid;gap:8px;margin:15px 0;padding:clamp(13px,2.5vw,20px);
+  border:1px solid #e7a954;border-radius:15px;
+  background:linear-gradient(135deg,#53340b,#3b2614);color:#fff7e8;
+}
+.lowScoreCallout strong{font-size:clamp(16px,2vw,21px);font-weight:800;line-height:1.45;color:#fff2c5}
+.lowScoreCallout p{margin:0;line-height:1.6;font-size:14px;color:#fff5e7}
+.lowScoreCallout small{font-size:12px;line-height:1.5;color:#ffe0ae}

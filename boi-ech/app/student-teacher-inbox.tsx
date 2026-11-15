@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import TeacherLearnerConversations from "./teacher-learner-conversations";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type TeacherInboxAction = {
@@ -342,14 +343,16 @@ export default function StudentTeacherInbox() {
     const observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "title", "data-device-id"] });
 
-    interval = window.setInterval(refreshVisibleInbox, 60_000);
+    interval = window.setInterval(refreshVisibleInbox, 8_000);
     document.addEventListener("visibilitychange", refreshVisibleInbox);
+    window.addEventListener("online", refreshVisibleInbox);
 
     return () => {
       if (timer) window.clearTimeout(timer);
       if (interval) window.clearInterval(interval);
       observer.disconnect();
       document.removeEventListener("visibilitychange", refreshVisibleInbox);
+      window.removeEventListener("online", refreshVisibleInbox);
       requestRef.current += 1;
       inFlightDeviceRef.current = "";
       deviceRef.current = "";
@@ -359,5 +362,5 @@ export default function StudentTeacherInbox() {
     };
   }, [refreshToken]);
 
-  return mount ? createPortal(<Inbox actions={actions} deviceId={deviceId} onRefresh={() => setRefreshToken((value) => value + 1)} />, mount) : null;
+  return mount ? createPortal(<div style={{display:"grid",gap:16,marginBottom:16}}><TeacherLearnerConversations role="learner" deviceId={deviceId}/><Inbox actions={actions} deviceId={deviceId} onRefresh={() => setRefreshToken((value) => value + 1)} /></div>, mount) : null;
 }
