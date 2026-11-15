@@ -46,7 +46,12 @@ function artifact(dir, change = () => {}) {
   config.vars.BOI_ECH_ACCOUNT_ORIGIN = env.BOI_ECH_PREVIEW_ORIGIN;
   config.vars.APPLICATION_MANAGEMENT_ORIGIN = env.APPLICATION_MANAGEMENT_PREVIEW_ORIGIN;
   delete config.r2_buckets;
+  // A real Vinext build emits the ASSETS directory and two lazy role chunks.
+  config.assets = {...config.assets, directory:"../public"};
   change(config);
+  fs.mkdirSync(path.join(dir,"dist","public","assets"),{recursive:true});
+  for(const name of ["learner-enhancements-fixture1.js","teacher-enhancements-fixture2.js"])
+    fs.writeFileSync(path.join(dir,"dist","public","assets",name),"export const ok = true;");
   fs.mkdirSync(path.join(dir, "dist", "server"), { recursive: true });
   fs.mkdirSync(path.join(dir, ".wrangler", "deploy"), { recursive: true });
   fs.writeFileSync(path.join(dir, "dist", "server", "wrangler.json"), JSON.stringify(config));
