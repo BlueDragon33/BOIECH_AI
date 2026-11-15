@@ -114,9 +114,10 @@ test("PWA never masks a live 404 or HTML chunk response with stale cache",async(
   for(const response of [new Response("Missing",{status:404}),new Response("<html>",{headers:{"content-type":"text/html"}})]){
     const code=worker(async()=>response);
     const event=fetchEvent(code.handlers.fetch);
+    const expected=await response.clone().text();
     const actual=await event.response();
     assert.equal(actual.status,response.status);
-    assert.equal(await actual.text(),await response.clone().text());
+    assert.equal(await actual.text(),expected);
     await Promise.all(event.waits);
     assert.equal(code.writes.length,0);
   }
