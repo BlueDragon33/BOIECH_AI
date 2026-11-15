@@ -7,6 +7,7 @@ import {webcrypto} from "node:crypto";
 const read=path=>fs.readFileSync(new URL(path,import.meta.url),"utf8");
 const clientSource=read("../app/teacher-learner-conversation-client.ts");
 const viewSource=read("../app/teacher-learner-conversations.tsx");
+const shellSource=read("../app/teacher-role-shell.tsx");
 
 async function fixture(fetchHandler){
  const pair=await webcrypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},false,["sign","verify"]);
@@ -80,4 +81,11 @@ test("teacher sends retain idempotency and never turn an acknowledged D1 write i
  assert.match(viewSource,/Hiển thị đang đồng bộ lại, không cần gửi lần nữa/);
  assert.match(viewSource,/setHistorySyncError/);
  assert.match(viewSource,/setInboxSyncError/);
+});
+
+test("teacher dashboard and chat share one signed nonce queue and close their IndexedDB readers",()=>{
+ assert.match(shellSource,/import \{signedConversationProof\} from "\.\/teacher-learner-conversation-client"/);
+ assert.match(shellSource,/return signedConversationProof\(deviceId, signal, credential\)/);
+ assert.match(shellSource,/request\.onsuccess = \(\) => \{ const value=request\.result as StoredDeviceCredential\|undefined; db\.close\(\); resolve\(value\)/);
+ assert.match(clientSource,/export async function signedConversationProof/);
 });
