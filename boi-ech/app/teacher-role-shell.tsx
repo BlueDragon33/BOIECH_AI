@@ -203,7 +203,7 @@ function AnalysisQueue({ learners, setTab, onAction }: {
   })}
   {items.length===0?<TeacherEmptyState icon="video"
    title="Chưa có bản phân tích AI để Giảng viên xem"
-   note="Hàng đợi tự xuất hiện khi có tóm tắt media-free được đồng bộ. Video gốc vẫn ở thiết bị của học viên."
+   note="Hàng đợi tự xuất hiện khi có tóm tắt media-free được đồng bộ. Video gốc vẫn ở thiết bị của người dùng."
    action={<a href={teacherVideoHref("analysis")}>Mở workspace phân tích local →</a>}/>:null}
  </div>;
 }
