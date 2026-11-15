@@ -6,7 +6,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { D1Database } from "@cloudflare/workers-types";
 
-type HubEnv={DB:D1Database};
+type HubEnv={DB:D1Database;BOI_ECH_ACCOUNT_V2?:string};
 type Session={
   deviceId:string; role:"teacher"|"learner"; personCode:string;
   classes:string[]; expiresAt:number;
@@ -82,7 +82,7 @@ export class ChatRealtimeHub extends DurableObject<HubEnv>{
           "SELECT person_role,status,class_name,access_expires_at FROM device_access WHERE device_id=?"
         ).bind(session.deviceId).first<{person_role:string;status:string;class_name:string;access_expires_at:string|null}>();
         const granted=state?.status==="approved"&&state.person_role===session.role&&
-          !(state.access_expires_at&&Date.parse(state.access_expires_at)<=Date.now())&&
+          !(this.env.BOI_ECH_ACCOUNT_V2!=="true"&&state.access_expires_at&&Date.parse(state.access_expires_at)<=Date.now())&&
           (session.role==="learner"||String(state.class_name??"").split(/[;,\n]+/).some(c=>normalize(c)===learnerClass));
         if(!granted){try{ws.close(1008,"Access revoked");}catch{}continue;}
         try{ws.send(JSON.stringify({type:"conversation_changed",id:notice.id,
