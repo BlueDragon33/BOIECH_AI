@@ -158,7 +158,7 @@ export async function verifyPreviewRoleAssetsLive(fetcher=fetch, root=process.cw
   if(config.name!==BOI||typeof config.assets?.directory!=="string")
     throw new Error("Preview role smoke: unexpected Worker or asset directory.");
   const assetsRoot=path.resolve(path.dirname(configPath),config.assets.directory);
-  if(!assetsRoot.startsWith(dist))
+  if(assetsRoot!==path.resolve(root,"dist") && !assetsRoot.startsWith(dist))
     throw new Error("Preview role smoke: asset directory must remain under dist.");
   const roleFiles=roleAssetProbes(fs.readdirSync(path.join(assetsRoot,"assets")));
   for(const file of roleFiles){
