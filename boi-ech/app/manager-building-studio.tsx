@@ -7,7 +7,7 @@ import {MAIN_LECTURE_HALL_ID,MAIN_LECTURE_HALL_NAME,existingMainLectureHall,isMa
 import {PracticePoolBasinArt} from "./manager-practice-pool-art";
 import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,
  PRACTICE_POOL_ROOM_NAME,existingPracticePoolBuilding,existingPracticePoolRoom,
- isPracticePoolRoom} from "./manager-practice-pool";
+ isPracticePoolBuilding,isPracticePoolRoom} from "./manager-practice-pool";
 import type {TrainingBoard,TrainingResource,TrainingSession} from "./training-types";
 import styles from "./manager-building-studio.module.css";
 
