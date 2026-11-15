@@ -76,7 +76,7 @@ test("actual Manager renewal UI has separate role sections, selected status filt
  assert.match(jsx,/unlimited\?<div className=\{styles\.permanentInfo\} data-permanent="true"/);
  assert.match(jsx,/Loại thời hạn/);
  assert.match(jsx,/Không giới hạn/);
- assert.match(jsx,/\}:<div className=\{styles\.expiryInfo\}/);
+ assert.match(jsx,/<\/div>:<div className=\{styles\.expiryInfo\}/);
  assert.match(jsx,/verifiedProgress\(x.progress\)/);
  assert.doesNotMatch(jsx,/(?:ngô tuyết quỳnh|caovan dung|42,300|181 ngày|100%)/i,"must not hardcode concept data");
  assert.match(css,/\.roleSection\[data-role=teacher\]/);
@@ -91,7 +91,7 @@ test("server-side revision, explicit user confirmation and D1 readback remain un
  assert.match(jsx,/action:"manager-renew-list"/);
  assert.match(jsx,/action:"manager-renew",accountId:record.accountId/);
  assert.match(jsx,/expectedRevision:record.revision/);
- assert.match(jsx,/window.confirm\("ĐẶT LẠI"/);
+ assert.match(jsx,/window.confirm\("ĐẶT LẠI thời hạn /);
  assert.match(jsx,/result.entitlement.revision!==record.revision\+1/);
  assert.match(jsx,/reason.trim\(\).length<10/);
  assert.match(jsx,/Lưu và đọc lại D1/);
