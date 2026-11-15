@@ -204,7 +204,7 @@ body[data-teacher-role-ui="active"] .icon-task-ai-heading-title>span{
  color:#048a83;background:#ddf8f0;
 }
 body[data-teacher-role-ui="active"] .icon-task-ai-heading-title small{display:block;color:#087d8a;font-size:10px;font-weight:850;letter-spacing:.07em}
-body[data-teacher-role-ui="active"] .icon-task-ai-heading-title h2{margin:4px 0 0;color:#123c57;font:850 20px/1.25 inherit}
+body[data-teacher-role-ui="active"] .icon-task-ai-heading-title h2{margin:4px 0 0;color:#123c57;font-family:inherit;font-size:20px;font-weight:850;line-height:1.25}
 body[data-teacher-role-ui="active"] .icon-task-ai-heading p{margin:0;color:#496d7c;font-size:12px;line-height:1.55}
 body[data-teacher-role-ui="active"] .icon-task-ai .icon-task-ai-count{
  display:inline-flex;align-items:center;min-height:32px;justify-self:start;
