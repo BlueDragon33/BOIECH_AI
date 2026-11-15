@@ -9,6 +9,7 @@ import TeacherSmartInterventions, { type SmartSuggestionClient } from "./teacher
 import TeacherTwoWayMessages, { type TeacherLearnerReply } from "./teacher-two-way-messages";
 import TeacherLearnerConversations from "./teacher-learner-conversations";
 import {useTeacherConversationIndicators,compactUnread} from "./teacher-conversation-indicators";
+import indicatorStyles from "./teacher-conversation-indicators.module.css";
 import TeacherAssignmentSchedule, { type TeacherAssignmentScheduleItem } from "./teacher-assignment-schedule";
 import TeacherClassWorkspace from "./teacher-class-workspace";
 import TeacherVideoResultDetails, {type TeacherVideoAnalysis} from "./teacher-video-result-details";
@@ -137,10 +138,10 @@ function TeacherIcon({ name }: { name: string }) {
 
 function TeacherNavigation({ tab, setTab, teacherName, className, unread }: { tab: TeacherTab; setTab: TabSetter; teacherName: string; className: string; unread: {chat:number;request:number} }) {
   const rows: Array<{ id: TeacherTab; label: string; icon: string }> = [{ id: "overview", label: "Tổng quan", icon: "overview" }, { id: "class", label: "Lớp học", icon: "class" }, { id: "learners", label: "Học viên", icon: "learners" }, { id: "tasks", label: "Bài tập", icon: "task" }, { id: "reports", label: "Báo cáo", icon: "report" }, { id: "messages", label: "Tin nhắn", icon: "message" }, { id: "schedule", label: "Lịch dạy", icon: "schedule" }, { id: "profile", label: "Hồ sơ chuyên môn", icon: "profile" }, { id: "analysis", label: "Phân tích video", icon: "analysis" }];
-  return <div className="teacher-role-nav" data-teacher-role-ui><div className="teacher-nav-brand-note"><span>GIẢNG DẠY ĐÚNG KỸ THUẬT</span><small>Theo dõi tiến bộ học viên</small></div><div className="teacher-role-nav-list">{rows.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><TeacherIcon name={item.icon}/><span>{item.label}</span>{item.id==="messages"&&(unread.chat>0||unread.request>0)?
-  <span className="teacher-message-unread" aria-label={`${unread.chat} tin chat và ${unread.request} thư yêu cầu chưa đọc`}>
-   {unread.chat>0?<b className="teacher-message-unread-chat" title={`${unread.chat} tin chat chưa đọc`}>{compactUnread(unread.chat)}</b>:null}
-   {unread.request>0?<b className="teacher-message-unread-request" title={`${unread.request} thư yêu cầu chưa đọc`}>{compactUnread(unread.request)}</b>:null}
+  return <div className="teacher-role-nav" data-teacher-role-ui><div className="teacher-nav-brand-note"><span>GIẢNG DẠY ĐÚNG KỸ THUẬT</span><small>Theo dõi tiến bộ học viên</small></div><div className="teacher-role-nav-list">{rows.map((item) => <button key={item.id} className={`${tab === item.id ? "active" : ""} ${item.id==="messages" ? indicatorStyles.navWithBadge : ""}`} onClick={() => setTab(item.id)}><TeacherIcon name={item.icon}/><span>{item.label}</span>{item.id==="messages"&&(unread.chat>0||unread.request>0)?
+  <span className={indicatorStyles.indicators} aria-label={`${unread.chat} tin chat và ${unread.request} thư yêu cầu chưa đọc`}>
+   {unread.chat>0?<b className={indicatorStyles.chatCount} title={`${unread.chat} tin chat chưa đọc`}>{compactUnread(unread.chat)}</b>:null}
+   {unread.request>0?<b className={indicatorStyles.requestCount} title={`${unread.request} thư yêu cầu chưa đọc`}>{compactUnread(unread.request)}</b>:null}
   </span>:null}</button>)}</div><button className="teacher-appearance-shortcut" type="button"
     aria-label="Mở cài đặt giao diện Giảng viên" aria-controls="appearance-panel"
     onClick={() => window.dispatchEvent(new Event("boi:appearance:open"))}>
