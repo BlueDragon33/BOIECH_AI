@@ -50,6 +50,7 @@ if (generated.r2_buckets !== undefined && (!Array.isArray(generated.r2_buckets) 
   fail("Account-first FREE Preview must not configure R2. Payment-proof storage remains unavailable.");
 }
 if (generated.assets?.binding !== "ASSETS") fail("Generated config missing ASSETS binding.");
+if (generated.assets?.run_worker_first !== false) fail("Preview must serve matching static assets before Worker: run_worker_first must be false.");
 
 if (typeof generated.assets?.directory !== "string") fail("Generated Preview asset directory is missing.");
 const assetRoot = path.resolve(path.dirname(generatedPath),generated.assets.directory);
