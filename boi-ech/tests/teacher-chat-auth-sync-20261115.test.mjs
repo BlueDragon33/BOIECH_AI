@@ -74,7 +74,7 @@ test("an invalid or blocked device response is never retried as a transient fail
 test("teacher sends retain idempotency and never turn an acknowledged D1 write into a send failure on refresh",()=>{
  assert.match(viewSource,/pendingId\.current\?\?=newClientEventId\(\)/);
  assert.match(viewSource,/clientEventId:pendingId\.current/);
- assert.match(viewSource,/pendingId\.current=null;setText\(" "\)/.source.replace('" "','""')); // payload ACK resets draft only once
+ assert.match(viewSource,/pendingId\.current=null;setText\(""\)/); // payload ACK resets draft only once
  assert.match(viewSource,/setNotice\("Đã gửi và lưu thành công\."\)/);
  assert.match(viewSource,/try\{\s*await refresh\(\);\s*\}catch\(err\)\{/);
  assert.match(viewSource,/Hiển thị đang đồng bộ lại, không cần gửi lần nữa/);
