@@ -12,9 +12,9 @@ test("campus UI: both overview and room tab use the same illustrative building a
  const overview=source("manager-command-center.tsx");
  const rooms=source("manager-console-v12.tsx");
  assert.match(art,/viewBox="0 0 280 210"/);
- assert.match(overview,/ManagerCampusMap board=\\{board\\} mode="overview"/);
+ assert.ok(overview.includes('ManagerCampusMap board={board} mode="overview"'));
  const map=source("manager-campus-map.tsx");
- assert.match(map,/CampusBuildingArt variant=\\{index\\}/);
+ assert.ok(map.includes("CampusBuildingArt variant={index}"));
  assert.match(map,/MainLectureHallArt/);
  assert.match(rooms,/CampusBuildingArt variant=\{index\}/);
  assert.match(rooms,/selectedId=\{activeBuilding\?\.id\}/);
