@@ -1,26 +1,25 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
+import {accountTerms,FOREVER_EXPIRES_AT,isUnlimitedAccountExpiry,replaceExpiryFromNow,type AccountTerm} from "./account-term";
+import {accountTermState,accountTimeLabel,expiryDateLabel,renewalCounts,renewalMatchesStatus,renewalStatusText,verifiedProgress,type RenewalRow,type RenewalStatus} from "./manager-renewal-view";
 import styles from "./manager-renewal-panel.module.css";
-
-type AccountTerm="7d"|"30d"|"6m"|"1y"|"4y"|"forever";
-const FOREVER_EXPIRES_AT="9999-12-31T23:59:59.000Z";
-function replaceExpiryFromNow(term:AccountTerm,now:number):string{
- if(!Number.isFinite(now))throw new Error("TIME_INVALID");
- if(term==="forever")return FOREVER_EXPIRES_AT;
- const date=new Date(now);
- if(term==="7d"||term==="30d")date.setTime(now+(term==="7d"?7:30)*86400000);
- else if(term==="6m"||term==="1y"||term==="4y"){
-  const months=term==="6m"?6:term==="1y"?12:48,day=date.getUTCDate();
-  date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()+months);
-  date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));
- }else throw new Error("TERM_INVALID");
- return date.toISOString();
+type Row=RenewalRow;
+type RenewalIconName="shield"|"clock"|"teacher"|"learner"|"search"|"calendar"|"book"|"edit"|"refresh"|"infinity";
+function RenewalIcon({name}:{name:RenewalIconName}){
+ return <svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24"
+   fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+  {name==="shield"?<><path d="m12 2 8 3v6c0 5-3.1 8.5-8 11-4.9-2.5-8-6-8-11V5z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></>:null}
+  {name==="clock"?<><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></>:null}
+  {name==="teacher"?<><path d="m2 9 10-5 10 5-10 5zM6 11v6c2.8 2.6 9.2 2.6 12 0v-6M22 9v7"/></>:null}
+  {name==="learner"?<><circle cx="9" cy="8" r="3"/><path d="M3.5 20v-2a5.5 5.5 0 0 1 11 0v2M17 5a3 3 0 0 1 0 6M17 14a4.5 4.5 0 0 1 3.5 4.4V20"/></>:null}
+  {name==="search"?<><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></>:null}
+  {name==="calendar"?<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 10h18"/></>:null}
+  {name==="book"?<><path d="M12 6c-2.7-1.6-6-2-10-1v14c4-1 7.3-.6 10 1 2.7-1.6 6-2 10-1V5c-4-1-7.3-.6-10 1zM12 6v14"/></>:null}
+  {name==="edit"?<><path d="m4 16-1 5 5-1L20 8a2.2 2.2 0 0 0-3-3zM14.5 7.5l3 3"/></>:null}
+  {name==="refresh"?<><path d="M20 7V3h-4M4 17v4h4"/><path d="M20 7a8 8 0 0 0-14-2M4 17a8 8 0 0 0 14 2"/></>:null}
+  {name==="infinity"?<><path d="M12 12C8.8 7 6.8 7 4.7 7a5 5 0 0 0 0 10c2.1 0 4.1 0 7.3-5z"/><path d="M12 12c3.2 5 5.2 5 7.3 5a5 5 0 0 0 0-10c-2.1 0-4.1 0-7.3 5z"/></>:null}
+ </svg>;
 }
-
-const accountTerms=[{value:"7d",label:"7 ngày"},{value:"30d",label:"30 ngày"},
- {value:"6m",label:"6 tháng"},{value:"1y",label:"1 năm"},
- {value:"4y",label:"4 năm"},{value:"forever",label:"Vĩnh viễn"}] as const;
-type Row={accountId:string;name:string;role:"learner"|"teacher";expiresAt:string;revision:number;progress?:{completed:number;total:number}|null};
 const getError=(value:unknown)=>value instanceof Error?value.message:"Máy chủ chưa xác nhận.";
 async function post(payload:Record<string,unknown>){
  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
@@ -40,6 +39,7 @@ async function post(payload:Record<string,unknown>){
 export default function ManagerRenewalPanel(){
  const [rows,setRows]=useState<Row[]|null>(null);
  const [search,setSearch]=useState(""),[role,setRole]=useState<"all"|"teacher"|"learner">("all");
+ const [statusFilter,setStatusFilter]=useState<RenewalStatus>("all");
  const [terms,setTerms]=useState<Record<string,AccountTerm>>({});
  const [editing,setEditing]=useState<string|null>(null);
  const dialogRef=useRef<HTMLElement|null>(null);
@@ -81,8 +81,13 @@ export default function ManagerRenewalPanel(){
   }catch(e){setError(getError(e));}finally{lock.current=false;setBusy(false);}
  }
  useEffect(()=>{queueMicrotask(()=>{void refresh();});},[]);
+
  const filtered=(rows??[]).filter(x=>(role==="all"||x.role===role)
-  &&(x.name+" "+x.accountId).toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")));
+  && renewalMatchesStatus(x,statusFilter,now)
+  && (x.name+" "+x.accountId).toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")));
+ const counts=renewalCounts(rows??[],now);
+ const learners=filtered.filter(x=>x.role==="learner");
+ const teachers=filtered.filter(x=>x.role==="teacher");
  useEffect(()=>{
   if(!editing)return;
   const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
@@ -93,48 +98,110 @@ export default function ManagerRenewalPanel(){
   return()=>{window.clearTimeout(timer);document.body.style.overflow=overflow;document.removeEventListener("keydown",onKey);
     if(previous?.isConnected)previous.focus({preventScroll:true});};
  },[editing,busy]);
- const activeRecord=filtered.find(item=>item.accountId===editing)??null;
- // Editing is an opt-in modal: keep the roster compact on large and small screens.
+ const activeRecord=rows?.find(item=>item.accountId===editing)??null;
+
+ const accountTile=(x:Row)=>{
+  const state=accountTermState(x.expiresAt,now);
+  const progress=verifiedProgress(x.progress);
+  const unlimited=state==="permanent";
+  return <article className={styles.accountTile} key={x.accountId} data-role={x.role} data-term={state}>
+    <div className={styles.identity}>
+      <span className={styles.avatar} data-role={x.role}><RenewalIcon name={x.role==="teacher"?"teacher":"learner"}/></span>
+      <div className={styles.personName}><strong>{x.name||"Chưa khai báo"}</strong>
+        <small>{x.role==="teacher"?"Giảng viên":"Học viên"} · {accountTimeLabel(x.expiresAt,now)}</small>
+      </div>
+      <span className={styles.statusBadge} data-state={state}>{unlimited?<RenewalIcon name="infinity"/>:<RenewalIcon name="clock"/>}{renewalStatusText(state)}</span>
+    </div>
+    <div className={styles.tileDetails}>
+      {unlimited?<div className={styles.permanentInfo} data-permanent="true">
+        <span className={styles.detailTitle}>Loại thời hạn</span>
+        <strong>Vĩnh viễn</strong><span className={styles.unlimitedValue}><RenewalIcon name="infinity"/> Không giới hạn</span>
+      </div>:<div className={styles.expiryInfo}>
+        <span className={styles.detailTitle}><RenewalIcon name="calendar"/>{state==="expired"?"Đã hết hạn từ":"Hết hạn vào"}</span>
+        <strong>{expiryDateLabel(x.expiresAt)}</strong>
+      </div>}
+      <div className={styles.learningInfo}>
+        {progress?<><span className={styles.detailTitle}><RenewalIcon name="book"/>{progress.completed}/{progress.total} bài đã hoàn thành</span>
+           <div className={styles.progressLine}><progress value={progress.completed} max={progress.total} aria-label={"Tiến độ học tập "+(x.name||"tài khoản")}/><strong>{progress.percent}%</strong></div></>
+          :<span className={styles.progressEmpty}>{x.role==="learner"?"Chưa có tiến độ được xác minh":"Quyền sử dụng tài khoản giảng viên"}</span>}
+      </div>
+      <button type="button" className={styles.editIcon} disabled={busy}
+        aria-label={"Mở gia hạn cho "+(x.name||"tài khoản")}
+        onClick={()=>{setEditing(x.accountId);setError("");}}
+        title="Chi tiết và điều chỉnh thời hạn"><RenewalIcon name="edit"/><span>Điều chỉnh</span></button>
+    </div>
+  </article>;
+ };
+
+ // Existing D1 authority and confirmation gates above remain unchanged. Only presentation changes.
  return <section className={styles.panel} aria-label="Gia hạn tài khoản giảng viên và học viên">
   <header className={styles.heading}>
-   <div><small>MANAGER · QUYỀN SỬ DỤNG</small><h2>Thời hạn tài khoản</h2>
-    <p>Học viên và giảng viên · Chạm vào biểu tượng lịch để xem và điều chỉnh thời hạn. Mỗi thay đổi có nhật ký và xác minh D1.</p></div>
-   <button type="button" disabled={busy} onClick={()=>void refresh()}>↻ Làm mới</button>
+   <div className={styles.headingCopy}><small>MANAGER · QUYỀN SỬ DỤNG</small><h2>Thời hạn tài khoản</h2>
+     <p>Quản lý và gia hạn thời hạn tài khoản của học viên và giảng viên. Theo dõi trạng thái, thời gian còn lại và điều chỉnh quyền sử dụng theo đúng phạm vi được cấp.</p>
+   </div>
+   <button type="button" className={styles.refresh} disabled={busy} onClick={()=>void refresh()}>
+     <RenewalIcon name="refresh"/> Làm mới
+   </button>
   </header>
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
   {notice?<p role="status" className={styles.notice}>{notice}</p>:null}
+  <section className={styles.metrics} aria-label="Thống kê tài khoản đã xác minh">
+   {([
+    {key:"verified",name:"Đã xác minh",subtitle:"Tài khoản hợp lệ",icon:"shield",tone:"green"},
+    {key:"soon",name:"Sắp hết hạn",subtitle:"Trong vòng 30 ngày",icon:"clock",tone:"orange"},
+    {key:"teacher",name:"Giảng viên",subtitle:"Đang quản lý",icon:"teacher",tone:"purple"},
+    {key:"learner",name:"Học viên",subtitle:"Đang theo dõi",icon:"learner",tone:"blue"}
+   ] as const).map(card=><article className={styles.metricCard} data-tone={card.tone} key={card.key}>
+     <span className={styles.metricIcon}><RenewalIcon name={card.icon}/></span>
+     <div><h3>{card.name}</h3><strong>{rows?counts[card.key]:"—"}</strong><small>{rows?card.subtitle:"Đang xác minh dữ liệu"}</small></div>
+   </article>)}
+  </section>
   <div className={styles.tools}>
-    <label>Tìm tài khoản<input type="search" value={search} onChange={e=>setSearch(e.target.value)}
-      placeholder="Tên học viên / giảng viên…"/></label>
-    <label>Vai trò<select value={role} onChange={e=>setRole(e.target.value as typeof role)}>
-      <option value="all">Tất cả</option><option value="learner">Học viên</option><option value="teacher">Giảng viên</option>
-    </select></label>
+    <label className={styles.searchControl}>Tìm tài khoản
+      <span className={styles.searchField}><RenewalIcon name="search"/><input type="search" value={search}
+        onChange={event=>setSearch(event.target.value)} placeholder="Tên học viên / giảng viên…"/></span>
+    </label>
+    <label className={styles.roleControl}>Vai trò
+      <select value={role} onChange={event=>setRole(event.target.value as typeof role)}>
+       <option value="all">Tất cả</option><option value="learner">Học viên</option><option value="teacher">Giảng viên</option>
+      </select>
+    </label>
+    <div className={styles.filterGroup} role="group" aria-label="Lọc theo thời hạn">
+      {([
+       {id:"all",label:"Tất cả"},
+       {id:"soon",label:"Sắp hết hạn"},
+       {id:"permanent",label:"Không giới hạn"},
+       {id:"expired",label:"Hết hạn"}
+      ] as const).map(item=><button type="button" key={item.id} className={styles.filterChip}
+         data-filter={item.id} aria-pressed={statusFilter===item.id}
+         onClick={()=>setStatusFilter(item.id)}>{item.id==="permanent"?<RenewalIcon name="infinity"/>:item.id==="soon"||item.id==="expired"?<RenewalIcon name="clock"/>:null}{item.label}</button>)}
+    </div>
   </div>
-  {rows?<p className={styles.summary} role="status">Đã xác minh {rows.length} tài khoản · Đang hiển thị {filtered.length} · Quyền gia hạn theo phạm vi cán bộ được cấp</p>:null}
-  <div className={styles.list}>
-    {filtered.map(x=>{
-      const left=x.expiresAt===FOREVER_EXPIRES_AT?null:Math.max(0,Math.ceil((Date.parse(x.expiresAt)-now)/86400000));
-      return <article className={styles.accountTile} key={x.accountId}>
-        <div className={styles.identity}>
-          <span className={styles.avatar} aria-hidden="true">{x.role==="teacher"?"♧":"♙"}</span>
-          <div><strong>{x.name||"Chưa khai báo"}</strong>
-            <small>{x.role==="teacher"?"Giảng viên":"Học viên"} · {x.expiresAt===FOREVER_EXPIRES_AT?"Không giới hạn":
-              left===0?"Hết hạn":`Còn ${left} ngày`}</small></div>
-        </div>
-        <div className={styles.termSummary}>
-          <span>Hết hạn</span><strong>{x.expiresAt===FOREVER_EXPIRES_AT?"Vĩnh viễn":
-            new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(new Date(x.expiresAt))}</strong>
-          {x.role==="learner"&&x.progress?<small>{x.progress.completed}/{x.progress.total} bài đã hoàn thành</small>:null}
-        </div>
-        <button type="button" className={styles.editIcon} disabled={busy}
-          aria-label={`Mở gia hạn cho ${x.name||"tài khoản"}`}
-          onClick={()=>{setEditing(x.accountId);setError("");}}
-          title="Chi tiết và gia hạn">◷ <span>Điều chỉnh</span></button>
-      </article>;
-    })}
-    {!rows?<p role="status">{busy?"Đang xác minh D1…":"Chưa có dữ liệu được xác minh."}</p>:
-      !filtered.length?<p>Không có tài khoản phù hợp.</p>:null}
-  </div>
+  {rows?<p className={styles.summary} role="status">
+     Đã xác minh {counts.verified} tài khoản · Đang hiển thị {filtered.length} · Quyền gia hạn theo phạm vi cán bộ được cấp
+   </p>:null}
+  {rows?<div className={styles.roleSections}>
+    {role!=="teacher"?<section className={styles.roleSection} data-role="learner" aria-labelledby="renewal-learner-heading">
+      <header className={styles.groupHeader}><div className={styles.groupIdentity}>
+        <span className={styles.groupIcon}><RenewalIcon name="learner"/></span>
+        <h3 id="renewal-learner-heading">Học viên</h3><span className={styles.groupCount}>{learners.length} tài khoản</span></div>
+        <p>Danh sách học viên đang theo học, theo dõi tiến độ và thời hạn tài khoản.</p>
+      </header>
+      <div className={styles.list}>{learners.map(accountTile)}
+       {!learners.length?<p className={styles.empty}>Không có học viên phù hợp bộ lọc hiện tại.</p>:null}
+      </div>
+    </section>:null}
+    {role!=="learner"?<section className={styles.roleSection} data-role="teacher" aria-labelledby="renewal-teacher-heading">
+      <header className={styles.groupHeader}><div className={styles.groupIdentity}>
+        <span className={styles.groupIcon}><RenewalIcon name="teacher"/></span>
+        <h3 id="renewal-teacher-heading">Giảng viên</h3><span className={styles.groupCount}>{teachers.length} tài khoản</span></div>
+        <p>Danh sách giảng viên và quyền sử dụng tài khoản.</p>
+      </header>
+      <div className={styles.list}>{teachers.map(accountTile)}
+       {!teachers.length?<p className={styles.empty}>Không có giảng viên phù hợp bộ lọc hiện tại.</p>:null}
+      </div>
+    </section>:null}
+   </div>:<p className={styles.loading} role="status">{busy?"Đang xác minh danh sách tài khoản từ D1…":"Chưa có dữ liệu tài khoản đã được xác minh."}</p>}
   {activeRecord?<div className={styles.backdrop} role="presentation"
     onMouseDown={event=>{if(event.target===event.currentTarget&&!busy)setEditing(null);}}>
     <section ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true"
@@ -144,8 +211,7 @@ export default function ManagerRenewalPanel(){
         <button type="button" className={styles.close} disabled={busy} aria-label="Đóng gia hạn"
           onClick={()=>setEditing(null)}>✕</button></header>
       <div className={styles.details}>
-        <div><small>Đang có hiệu lực đến</small><strong>{activeRecord.expiresAt===FOREVER_EXPIRES_AT?"Vĩnh viễn":
-          new Intl.DateTimeFormat("vi-VN",{dateStyle:"medium",timeStyle:"short"}).format(new Date(activeRecord.expiresAt))}</strong></div>
+        <div><small>{isUnlimitedAccountExpiry(activeRecord.expiresAt)?"Loại thời hạn":"Đang có hiệu lực đến"}</small><strong>{isUnlimitedAccountExpiry(activeRecord.expiresAt)?"Vĩnh viễn":expiryDateLabel(activeRecord.expiresAt)}</strong></div>
         {activeRecord.role==="learner"?<div><small>Tiến độ học tập</small>
           <strong>{activeRecord.progress?`${activeRecord.progress.completed}/${activeRecord.progress.total} bài`:"Chưa xác minh"}</strong></div>:null}
       </div>
