@@ -39,6 +39,7 @@ import "./manual-sync-badge.css";
 import "./teacher-contrast-content-first.css";
 // Transparent video result panel must win over legacy tiny row and nested scroll styles.
 import "./teacher-video-results-transparency.css";
+import "./teacher-task-icon-v39.css";
 import MultiAccountSwitcher from "./multi-account-switcher";
 
 const geistSans = Geist({
