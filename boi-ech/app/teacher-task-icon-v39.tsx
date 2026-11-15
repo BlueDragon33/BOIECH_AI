@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import {useState,type ReactNode} from "react";
 import type { TeacherAssignmentScheduleItem } from "./teacher-assignment-schedule";
 
 export type TaskFilter = "all" | "active" | "overdue" | "needs-help" | "completed";
@@ -38,7 +38,7 @@ type QuickProps={
  onAssign:(personCode:string)=>void;
 };
 export function TeacherTaskQuickActions({assignments,learners,filter,onFilterChange,showCreator,onCreatorChange,onAssign}:QuickProps){
- const [picked,setPicked]=ReactUseStateBridge("");
+ const [picked,setPicked]=useState("");
  const selected=learners.some(l=>l.personCode===picked)?picked:(learners[0]?.personCode||"");
  const active=assignments.filter(a=>["open","upcoming","acknowledged"].includes(a.scheduleState)).length;
  const overdue=assignments.filter(a=>a.scheduleState==="overdue").length;
@@ -72,8 +72,6 @@ export function TeacherTaskQuickActions({assignments,learners,filter,onFilterCha
  </section>;
 }
 
-// Dedicated React hook is kept within a client component, not in render helpers.
-import {useState as ReactUseStateBridge} from "react";
 
 export function TeacherTaskToday({assignments,helpCount,onFilterChange,onCreate,onReports}:{
  assignments:TeacherAssignmentScheduleItem[];helpCount:number;onFilterChange:(next:TaskFilter)=>void;
