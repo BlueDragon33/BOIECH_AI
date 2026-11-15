@@ -70,7 +70,14 @@ test('missing or wrong live Preview Origin stops bridge before credential mutati
 test('bridge installation needs exact action confirmation and only writes both named Preview secrets',async()=>{
  const denied=fixture();await assert.rejects(installPreviewBridge(env,denied.fetcher),/INSTALL_PREVIEW_BRIDGE/);
  assert.equal(denied.calls.length,0);
- const f=fixture();const result=await installPreviewBridge({...env,PREVIEW_BRIDGE_CONFIRMATION:'INSTALL_PREVIEW_BRIDGE'},f.fetcher);
+ const f=fixture();
+ const verifyRoles=async fetcher=>{
+  assert.equal(fetcher,f.fetcher);
+  assert.equal(f.calls.some(c=>c.method==='PUT'),false,"role asset check must precede secret rotation");
+  return {checked:2,files:["assets/learner-enhancements-fixture1.js","assets/teacher-enhancements-fixture2.js"]};
+ };
+ const result=await installPreviewBridge({...env,PREVIEW_BRIDGE_CONFIRMATION:'INSTALL_PREVIEW_BRIDGE'},f.fetcher,verifyRoles);
+ assert.equal(result.roleSmoke.checked,2);
  const writes=f.calls.filter(c=>c.method==='PUT');assert.equal(writes.length,2);
  assert.deepEqual(writes.map(c=>new URL(c.url).pathname.split('/')[7]),['boi-ech-preview','application-management-preview']);
  const secrets=writes.map(c=>JSON.parse(c.body));
@@ -84,6 +91,12 @@ test('bridge installation needs exact action confirmation and only writes both n
  assert.equal(result.v2Summary.personalRowsReturned,false);
  assert.equal(f.calls.filter(c=>c.method==='PUT').length,2,"read-only V2 verification must never write");
 
+});
+test('failed live role JS readback forbids both Preview secret writes',async()=>{
+ const f=fixture();
+ await assert.rejects(installPreviewBridge({...env,PREVIEW_BRIDGE_CONFIRMATION:'INSTALL_PREVIEW_BRIDGE'},f.fetcher,
+   async()=>{throw new Error('Preview role smoke: learner asset HTTP 404');}),/HTTP 404/);
+ assert.equal(f.calls.some(c=>c.method==='PUT'),false);
 });
 test('wrong account or post-deploy revision rejects before installing bridge credentials',async()=>{
  for(const badEnv of [{...env,CLOUDFLARE_ACCOUNT_ID:'wrong'},{...env,GITHUB_SHA:'c'.repeat(40)}]){

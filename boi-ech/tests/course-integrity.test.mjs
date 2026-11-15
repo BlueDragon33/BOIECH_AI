@@ -595,7 +595,7 @@ test("supports installable offline learning without offline answer submission", 
   assert.match(page, /navigator\.serviceWorker[\s\S]*register\("\/sw\.js", \{ updateViaCache: "none" \}\)/);
   assert.match(page, /controllerchange/);
   assert.match(page, /window\.location\.reload\(\)/);
-  assert.match(serviceWorker, /boi-ech-webapp-v4/);
+  assert.match(serviceWorker, /boi-ech-webapp-v5/);
   assert.match(page, /Bài kiểm tra cần kết nối mạng để chấm điểm an toàn trên máy chủ/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /\/bien-tap-noi-dung/);

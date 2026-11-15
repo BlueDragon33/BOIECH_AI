@@ -33,12 +33,12 @@ function workerHarness(initialKeys) {
 
 test("PWA upgrade removes only obsolete app-shell versions, retaining offline MediaPipe model", async () => {
   const worker = workerHarness([
-    "boi-ech-webapp-v2", "boi-ech-webapp-v3", "boi-ech-webapp-v4",
+    "boi-ech-webapp-v2", "boi-ech-webapp-v3", "boi-ech-webapp-v4", "boi-ech-webapp-v5",
     "boi-ech-pose-ai-v1", "boi-ech-pose-ai-v2", "some-other-application",
   ]);
   await worker.activate();
-  assert.deepEqual(worker.deleted.sort(), ["boi-ech-webapp-v2", "boi-ech-webapp-v3"]);
-  assert.ok(worker.present.has("boi-ech-webapp-v4"));
+  assert.deepEqual(worker.deleted.sort(), ["boi-ech-webapp-v2", "boi-ech-webapp-v3", "boi-ech-webapp-v4"]);
+  assert.ok(worker.present.has("boi-ech-webapp-v5"));
   assert.ok(worker.present.has("boi-ech-pose-ai-v1"));
   assert.ok(worker.present.has("boi-ech-pose-ai-v2"));
   assert.ok(worker.present.has("some-other-application"));

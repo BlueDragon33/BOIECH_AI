@@ -2,6 +2,7 @@
 
 import {createContext, useContext, type ReactNode} from "react";
 import {portableManagerProof,portableWorkspaceCredential} from "./multi-account-switcher";
+import {roleChunkReady} from "./role-asset-recovery";
 import type {LessonContentPayload,LessonOutline,ServerCourseState} from "./course-types";
 
 export type AccountWorkspaceDevice = {
@@ -78,6 +79,7 @@ export async function loadAccountWorkspace(
    return fail("Máy chủ chưa trả đầy đủ nội dung bài học đầu tiên. Chưa mở GO.");
   await import("./learner-enhancements");
   signal.throwIfAborted();
+  roleChunkReady();
   return {accountId,role,credential,device,course:{state:data.state,content:data.content,outlines:data.outlines}};
  }
  const overview=await postJson<{teacher?:{name?:string|null};summary?:unknown;learners?:unknown[]}>(
@@ -86,5 +88,6 @@ export async function loadAccountWorkspace(
   return fail("Bảng điều phối Giảng viên trả về chưa đầy đủ. Chưa mở GO.");
  await import("./teacher-enhancements");
  signal.throwIfAborted();
+ roleChunkReady();
  return {accountId,role,credential,device,teacherOverview:overview};
 }
