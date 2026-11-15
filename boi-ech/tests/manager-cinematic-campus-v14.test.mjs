@@ -1,0 +1,71 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
+import test from "node:test";
+
+const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../app");
+const source=(name)=>readFileSync(path.join(base,name),"utf8");
+
+test("V14 3D campus changes the actual shared manager UI rather than creating a standalone image",()=>{
+ const map=source("manager-campus-map.tsx");
+ const buildingStudio=source("manager-building-studio.tsx");
+ const roomTab=source("manager-console-v12.tsx");
+ const command=source("manager-command-center.tsx");
+ for(const page of [buildingStudio,roomTab,command])assert.match(page,/ManagerCampusMap/);
+ assert.match(map,/MainLectureHallArt/);
+ assert.match(map,/CampusBuildingArt/);
+ assert.match(map,/PracticePoolBuildingArt/);
+ assert.match(map,/onSelectBuilding\(real\)/);
+ assert.match(map,/onOpenMainTemplate/);
+ assert.match(map,/onOpenPoolTemplate/);
+ assert.match(map,/onCreateBuilding\(\)/);
+});
+test("V14 premium interface has frameless dioramas, big central hall, KPI strip and accessible real-time values",()=>{
+ const jsx=source("manager-campus-map.tsx"),css=source("manager-campus-map.module.css");
+ assert.match(jsx,/className=\{styles\.kpiGrid\}/);
+ assert.match(jsx,/\{buildings\.length\}/);
+ assert.match(jsx,/\{rooms\.length\}/);
+ assert.match(jsx,/\{activeRooms\}/);
+ assert.match(jsx,/const bookedIds=new Set\(board\.sessions/);
+ assert.match(jsx,/const stats=/);
+ assert.match(jsx,/aria-pressed=\{Boolean\(real&&selectedId===real\.id\)\}/);
+ assert.match(css,/\.shell \.scene \.node\{[^}]*background:transparent!important;/);
+ assert.match(css,/\.node\[data-node=main\] \.art\{height:365px/);
+ assert.match(css,/\.kpiGrid\{/);
+ assert.match(css,/\.skyline\{/);
+ assert.match(css,/\.groundGlow\{/);
+ assert.match(css,/@media\(max-width:420px\)/);
+ assert.match(css,/prefers-reduced-motion:reduce/);
+ assert.match(css,/focus-visible/);
+});
+test("V14 preserves the approved map arrangement and no artificial template inventory",()=>{
+ const jsx=source("manager-campus-map.tsx"),css=source("manager-campus-map.module.css");
+ assert.match(jsx,/sub:\[a,b,pool,c\]/);
+ assert.match(jsx,/extra:buildings\.filter/);
+ assert.ok(css.includes('grid-template-areas:"a main b" "pool main c"'));
+ assert.ok(css.includes('grid-template-areas:"main main" "a b" "pool c"'));
+ assert.match(jsx,/Mẫu có sẵn · Chưa tạo/);
+ assert.match(jsx,/Mẫu sơ đồ · Không tính vào số liệu/);
+ assert.match(jsx,/Chỉ hiển thị số liệu từ hồ sơ hiện có/);
+ for(const fake of ["42,300","92%","78%","64%"])assert.equal(jsx.includes(fake),false);
+});
+test("3D buildings have layered physical features, pool and foliage without external runtime dependencies",()=>{
+ const hall=source("manager-lecture-hall-art.tsx");
+ const satellites=source("manager-campus-illustration.tsx");
+ const pool=source("manager-practice-pool-art.tsx");
+ assert.match(hall,/viewBox="0 0 520 378"/);
+ assert.match(hall,/roofHighlight/);
+ assert.match(hall,/shingles/);
+ assert.match(hall,/pillar/);
+ assert.match(hall,/lightBloom/);
+ assert.match(satellites,/viewBox="0 0 280 210"/);
+ assert.match(satellites,/tiles/);
+ assert.match(satellites,/glass|gold/);
+ assert.match(satellites,/bloom/);
+ assert.match(pool,/viewBox="0 0 280 210"/);
+ assert.match(pool,/url\("water"\)/);
+ assert.match(pool,/strokeDasharray="11 6"/);
+ assert.match(pool,/PracticePoolBasinArt/);
+ for(const art of [hall,satellites,pool])assert.doesNotMatch(art,/https?:\/\//);
+});
