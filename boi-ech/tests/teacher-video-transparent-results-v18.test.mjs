@@ -96,7 +96,7 @@ test("teacher endpoint reads normalized media-free technical evidence, not raw v
  const route=read("api/teacher/overview/route.ts");
  assert.match(route,/source.categories/);
  assert.match(route,/detailErrors/);
- assert.match(route,/timeSec: measured\(row.timeSec, 30\)/);
+ assert.match(route,/timeSec: measuredSeconds\(row.timeSec\)/);
  assert.match(route,/recommendation: typeof row.recommendation/);
  assert.match(route,/poseCoverage: measured\(quality.poseCoverage\)/);
  assert.match(route,/sampledFrames: measured\(source.sampledFrames, 240\)/);
