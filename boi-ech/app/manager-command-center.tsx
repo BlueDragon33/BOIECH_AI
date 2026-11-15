@@ -4,6 +4,10 @@ import {classKey,classNames,type ResourceKind,type TrainingBoard,type TrainingPe
 import {AppIcon,Badge,ResourceStatusBars,eligible,roomOccupancy,stateText} from "./manager-status";
 import type {DetailTarget} from "./manager-details";
 import styles from "./manager-command-center.module.css";
+import {CampusBuildingArt} from "./manager-campus-illustration";
+import {PracticePoolBuildingArt,PracticePoolBasinArt} from "./manager-practice-pool-art";
+import {existingPracticePoolBuilding,isPracticePoolBuilding,isPracticePoolRoom,
+ PRACTICE_POOL_BUILDING_NAME} from "./manager-practice-pool";
 
 type Destination="schedule"|"people"|"class"|"room"|"building"|"settings"|"review";
 type Props={
@@ -208,11 +212,17 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
         const activeCount=related.filter(room=>room.status==="active").length;
         return <button type="button" className={styles.buildingNode} data-selected={false} data-index={index%6}
           key={building.id} onClick={()=>selectBuilding(building.id)} aria-label={`Mở tòa ${building.name}`}>
-          <span className={styles.buildingIllustration} aria-hidden="true"><AppIcon name="building"/></span>
+          <span className={styles.buildingIllustration} aria-hidden="true">{isPracticePoolBuilding(building)?<PracticePoolBuildingArt/>:<CampusBuildingArt variant={index}/>}</span>
           <strong>{building.name}</strong><small>{activeCount}/{related.length} phòng hoạt động</small>
           <span className={styles.nodeState} data-status={building.status}>{building.status==="active"?"● Đang hoạt động":building.status==="unavailable"?"● Tạm ngừng":"● Đã lưu trữ"}</span>
         </button>;
        })}
+       {!existingPracticePoolBuilding(buildings)?<button type="button" className={styles.buildingNode}
+        data-index="0" onClick={()=>onNavigate("building")} aria-label="Mở mẫu tòa bể bơi để tạo khu thực hành">
+         <span className={styles.buildingIllustration} aria-hidden="true"><PracticePoolBuildingArt/></span>
+         <strong>{PRACTICE_POOL_BUILDING_NAME}</strong><small>Mẫu có sẵn · 01 bể thực hành</small>
+         <span className={styles.nodeState} data-status="unavailable">Chưa tạo · Mở Tòa học</span>
+        </button>:null}
        {!buildings.length?<div className={styles.diagramEmpty}><strong>Chưa có tòa học</strong>
          <p>Hãy thêm cơ sở và phòng từ nguồn điều phối thực tế.</p>
          <button type="button" disabled={busy} onClick={()=>onCreateResource("building")}>＋ Tạo tòa</button></div>:null}
@@ -252,7 +262,7 @@ export default function ManagerCommandCenter({board,busy,onNavigate,onOpenDetail
              const alert=roomNeedsAttention(board,room.id,activeSessions);
              return <button type="button" key={room.id} className={styles.roomNode}
                onClick={()=>selectRoom(room.id)} aria-label={`Mở phòng ${room.name}`}>
-               <span className={styles.roomNodeHead}><AppIcon name="room"/><strong>{room.name}</strong></span>
+               <span className={styles.roomNodeHead}>{isPracticePoolRoom(room)?<span className={styles.poolRoomArt}><PracticePoolBasinArt/></span>:<AppIcon name="room"/>}<strong>{room.name}</strong></span>
                <small>{room.status!=="active"?"Tạm ngừng / lưu trữ":sessions.length?
                   `${new Set(sessions.map(s=>s.classId)).size} lớp · ${sessions.length} ca`:"Chưa có ca"}</small>
                <span className={styles.roomNodeState} data-alert={alert}>{alert?"Cần xử lý":stateText[room.state]}</span>
