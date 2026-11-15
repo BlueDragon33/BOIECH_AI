@@ -227,6 +227,34 @@ body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] {
   --tc-ok-bg: #174c40;
   --tc-ok-ink: #aff8db;
 }
+/* Stronger than v9's hardcoded dark table selectors, which used the same
+   background for header and body and could override surface tokens. */
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table th {
+  background: var(--tc-heading) !important;
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table tbody tr td {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table tbody tr:nth-child(even) td {
+  background: var(--tc-panel-alt) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table tbody tr:hover td {
+  background: var(--tc-heading) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table th {
+  background: var(--tc-heading) !important;
+  color: var(--tc-strong) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table tbody tr td {
+  background: var(--tc-panel) !important;
+  color: var(--tc-ink) !important;
+}
+body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table tbody tr:nth-child(even) td {
+  background: var(--tc-panel-alt) !important;
+}
+
 body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-roster-table :is(th,td,strong,small),
 body[data-teacher-role-ui="active"] .app-shell[data-appearance-theme="dark"] .teacher-table :is(th,td,strong,small) {
   /* Keep legacy v9 dark overrides from reintroducing low-contrast text. */
