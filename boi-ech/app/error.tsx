@@ -1,7 +1,6 @@
 "use client";
 
-import {useEffect} from "react";
-import {isRoleChunkLoadFailure,recoverRoleChunkOnce,refreshRoleAssetsManually} from "./role-asset-recovery";
+import {isRoleChunkLoadFailure,refreshRoleAssetsManually} from "./role-asset-recovery";
 
 /**
  * Runtime errors after GO (e.g. a lazy role module loaded during a rollout)
@@ -14,9 +13,8 @@ export default function WorkspaceError({
   reset:()=>void;
 }){
   const staleBundle=isRoleChunkLoadFailure(error);
-  useEffect(()=>{
-    if(staleBundle)recoverRoleChunkOnce(error);
-  },[staleBundle,error]);
+  // After GO, unsaved lesson answers may exist: never auto-reload here.
+  // An explicit button confirms the learner chooses to refresh.
   return <main role="alert" style={{
     minHeight:"80vh",display:"grid",placeItems:"center",
     padding:"2rem 1rem",background:"#082439",color:"#f3fbff"
@@ -30,7 +28,7 @@ export default function WorkspaceError({
       </h1>
       <p style={{lineHeight:1.6,marginBottom:"1.25rem"}}>
         {staleBundle
-          ? "Máy chủ đã cập nhật giao diện. Hãy tải phiên bản mới; tài khoản, quyền và tiến độ học được giữ nguyên."
+          ? "Máy chủ đã cập nhật giao diện. Hãy lưu phần đang làm nếu có rồi chọn tải bản mới. Tài khoản và dữ liệu đã lưu được giữ nguyên."
           : "Có lỗi hiển thị tạm thời. Bạn có thể thử mở lại màn hình, không cần đăng ký hoặc đăng nhập lại."}
       </p>
       <button type="button"
