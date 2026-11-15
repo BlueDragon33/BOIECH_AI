@@ -1,0 +1,315 @@
+/* CONTENT-FIRST-001 · teacher AI video transparent results.
+   Paired ink/surface for every element, no fake media thumbnails.
+   Loaded after all legacy teacher CSS so the details may expand without clipping. */
+body[data-teacher-role-ui="active"] .teacher-analysis-queue-list {
+  display:grid;gap:14px;min-height:0;max-height:none!important;
+  overflow:visible!important;padding:4px 0 12px;scrollbar-gutter:auto!important;
+}
+body[data-teacher-role-ui="active"] .teacher-video-list-note{
+  margin:0;padding:12px 14px;border:1px solid #528db3;border-radius:10px;
+  background:#0d3652;color:#e5f3ff;font-size:13px;line-height:1.55;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-queue-list>article{
+  display:grid!important;grid-template-columns:86px minmax(0,1fr) 145px!important;
+  align-items:start;gap:13px!important;min-width:0;min-height:0!important;
+  margin:0!important;padding:15px!important;
+  background:#f8fbff!important;color:#143453!important;
+  border:1px solid #93b9d4!important;border-radius:17px!important;
+  box-shadow:0 7px 21px #021d3152!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-thumb{
+  min-height:91px!important;border:1px solid #3b94c1!important;
+  border-radius:12px!important;background:linear-gradient(135deg,#104d78,#153d63)!important;
+  color:#e7faff!important;text-align:center;padding:8px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-thumb span{
+  position:static!important;display:block!important;margin-top:5px;
+  color:#e3faff!important;font-size:11px!important;line-height:1.4!important;
+  background:transparent!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-copy{
+  min-width:0;display:grid;gap:5px;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-copy strong{
+  color:#0c3159!important;font-size:17px!important;line-height:1.3!important;overflow-wrap:anywhere;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-copy small{
+  color:#3a5875!important;font-size:12px!important;line-height:1.45!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-copy p{
+  margin:2px 0!important;color:#254c67!important;
+  font-size:13px!important;line-height:1.5!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-copy .teacher-video-summary-line{
+  font-size:12px!important;font-weight:800!important;color:#16588c!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip{
+  min-width:0;display:grid!important;gap:5px;justify-items:center;
+  border:1px solid #9bbde2;border-radius:12px;background:#e4f1ff!important;
+  color:#0b355f!important;padding:9px;
+  text-align:center;box-shadow:none!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip.good{
+  border-color:#6ab8a3;background:#e2f5ef!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip.review{
+  border-color:#dfaf68;background:#fff0d7!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip b{
+  color:#0f4b78!important;font-size:25px!important;line-height:1.2!important;
+  font-variant-numeric:tabular-nums;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip b small{
+  display:inline;color:#315d7a!important;font-size:12px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip strong{
+  color:#08704a!important;font-size:16px!important;font-variant-numeric:tabular-nums;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip.review strong{
+  color:#98500d!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-score-chip :is(span,small){
+  display:block!important;color:#3a5873!important;font-size:11px!important;line-height:1.4!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-actions{
+  grid-column:1/-1!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:9px!important;min-width:0;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-actions :is(button,a){
+  display:flex!important;align-items:center;justify-content:center;
+  min-height:43px!important;padding:9px 10px!important;
+  font-size:13px!important;line-height:1.35!important;font-weight:800!important;
+  text-decoration:none!important;white-space:normal;
+  border:1px solid #2378a5!important;border-radius:10px!important;
+  color:#0b4c77!important;background:#e6f4ff!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-actions .teacher-video-expand{
+  color:#fff!important;background:#125a96!important;border-color:#125a96!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-actions :is(button,a):hover:not(:disabled){
+  color:#fff!important;background:#155985!important;
+}
+body[data-teacher-role-ui="active"] .teacher-analysis-actions :is(button,a):focus-visible{
+  outline:3px solid #bb6900!important;outline-offset:3px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-video-expanded{
+  grid-column:1/-1;min-width:0;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result{
+  --video-ink:#123759;--video-muted:#3b5978;--video-border:#adc8de;--video-paper:#fff;
+  display:grid;gap:17px;min-width:0;padding:clamp(14px,1.6vw,23px);
+  color:var(--video-ink);background:#f5f9ff;
+  border:1px solid #9fc5e0;border-radius:16px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result *{box-sizing:border-box}
+body[data-teacher-role-ui="active"] .teacher-video-result :is(p,h3,h4){margin:0}
+body[data-teacher-role-ui="active"] .teacher-video-result p{line-height:1.6}
+body[data-teacher-role-ui="active"] .teacher-video-result-head{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:15px;border:1px solid #2b75aa;border-radius:13px;
+  background:linear-gradient(120deg,#0b365c,#143f74);color:#fff;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result-head>div{display:grid;gap:5px;min-width:0}
+body[data-teacher-role-ui="active"] .teacher-video-result-head span{
+  font-size:11px;color:#99eaff;font-weight:850;letter-spacing:.08em;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result-head h3{
+  color:#fff;font-size:clamp(18px,2vw,24px);font-weight:850;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result-head p{color:#e3f2ff;font-size:12px}
+body[data-teacher-role-ui="active"] .teacher-video-quality{
+  max-width:100%;display:inline-flex;border-radius:999px;
+  background:#e4f5ed;color:#07563b!important;padding:8px 13px;font-size:12px!important;
+  font-weight:850;border:1px solid #60b497;
+}
+body[data-teacher-role-ui="active"] .teacher-video-quality[data-quality=limited]{
+  background:#fff0d6;color:#784409!important;border-color:#c79044;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article{
+  display:grid!important;grid-template-columns:1fr!important;gap:8px!important;
+  min-width:0;padding:15px!important;margin:0!important;
+  border-radius:13px!important;border:1px solid #a6c3de!important;background:#fff!important;
+  box-shadow:none!important;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article>span{
+  color:#345878;font-size:12px;font-weight:800;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article>strong{
+  color:#0b355e;font-size:clamp(20px,2.5vw,30px);font-weight:900;line-height:1.25;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article>strong small{
+  font-size:14px;color:#48627a;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article>small{
+  color:#3d5a73;font-size:12px;line-height:1.55;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article[data-level=needs-practice]{
+  border-color:#df977d!important;background:#fff3ed!important;
+}
+body[data-teacher-role-ui="active"] .teacher-video-kpis article[data-level=needs-practice]>strong{
+  color:#9f3925;
+}
+body[data-teacher-role-ui="active"] .teacher-video-limits{
+  padding:13px 15px;border-radius:11px;border:1px solid #69b3a4;
+  background:#e7f7f2;color:#135741;
+}
+body[data-teacher-role-ui="active"] .teacher-video-limits[data-quality=limited]{
+  border-color:#d49c5f;background:#fff2db;color:#6d4010;
+}
+body[data-teacher-role-ui="active"] .teacher-video-limits strong{
+  font-size:13px;color:inherit;
+}
+body[data-teacher-role-ui="active"] .teacher-video-limits p{
+  margin:5px 0 0;font-size:12px;color:inherit;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result :is(.teacher-video-breakdown,.teacher-video-errors,.teacher-video-evidence,.teacher-video-human){
+  display:grid;gap:12px;min-width:0;background:var(--video-paper);
+  border:1px solid var(--video-border);border-radius:13px;padding:15px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result h4{
+  color:#113b65;font-size:16px;font-weight:900;
+}
+body[data-teacher-role-ui="active"] .teacher-video-result :is(.teacher-video-breakdown,.teacher-video-errors,.teacher-video-human)>p{
+  color:var(--video-muted);font-size:12px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category{
+  display:grid;gap:6px;min-width:0;padding:13px;background:#eef5ff;
+  border:1px solid #a9cae7;border-radius:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category[data-weak=true]{
+  background:#fff3e7;border-color:#dca36b;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category>div{
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category strong{
+  color:#14375d;font-size:13px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category>div span{
+  color:#104b7e;font-size:13px;font-weight:850;font-variant-numeric:tabular-nums;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category :is(small,p){
+  color:#3d5773;font-size:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category progress{
+  display:block;width:100%;height:11px;appearance:none;
+  border:0;border-radius:9px;overflow:hidden;accent-color:#1a83b0;
+  background:#c4d9eb;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category progress::-webkit-progress-bar{
+  background:#c4d9eb;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category progress::-webkit-progress-value{
+  background:#087d9d;
+}
+body[data-teacher-role-ui="active"] .teacher-video-category progress::-moz-progress-bar{
+  background:#087d9d;
+}
+body[data-teacher-role-ui="active"] .teacher-video-priority{
+  color:#4e3518!important;background:#fff3df;padding:12px;border-radius:10px;
+  border-left:4px solid #b47921;font-size:12px!important;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors ol{
+  padding:0;margin:0;display:grid;gap:11px;list-style:none;counter-reset:issues;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li{
+  counter-increment:issues;display:grid;gap:6px;
+  padding:13px;border:1px solid #e0c29e;border-radius:12px;background:#fffbf6;color:#203d56;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li[data-severity=critical]{
+  background:#fff0ec;border-color:#dfa08b;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li>header{
+  display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li>header strong{
+  color:#8a3420;font-size:14px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li>header strong:before{
+  content:counter(issues) ". ";color:#8a3420;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li>header span{
+  color:#81431e;font-size:11px;font-weight:800;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors li p{
+  color:#274560;font-size:12px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors .teacher-video-correction{
+  padding:9px;border-radius:8px;color:#12503d;background:#e7f6ee;
+}
+body[data-teacher-role-ui="active"] .teacher-video-errors>small{
+  color:#48627a;font-size:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-evidence dl{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+  margin:0;
+}
+body[data-teacher-role-ui="active"] .teacher-video-evidence dl>div{
+  display:grid;gap:5px;padding:10px;border-radius:9px;border:1px solid #b7d3e7;background:#eff7fc;
+}
+body[data-teacher-role-ui="active"] .teacher-video-evidence dt{
+  color:#365a79;font-size:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-evidence dd{
+  margin:0;color:#10395b;font-size:14px;font-weight:850;
+}
+body[data-teacher-role-ui="active"] .teacher-video-human{
+  border-color:#91bdaf!important;background:#f0f9f6!important;
+}
+body[data-teacher-role-ui="active"] .teacher-video-human>strong{
+  color:#145f45;font-size:13px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-human small{
+  color:#365f4e;font-size:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-disclaimer{
+  padding:13px;border-radius:11px;border:1px solid #82aac6;
+  background:#e3f1fb;color:#24486b;font-size:12px;line-height:1.7;
+}
+@media(max-width:960px){
+ body[data-teacher-role-ui="active"] .teacher-analysis-queue-list>article{
+  grid-template-columns:75px minmax(0,1fr) 130px!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-analysis-actions{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+}
+@media(max-width:630px){
+ body[data-teacher-role-ui="active"] .teacher-analysis-queue-list>article{
+  grid-template-columns:67px minmax(0,1fr)!important;padding:11px!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-analysis-score-chip{
+  grid-column:1/-1;display:flex!important;justify-content:space-around;flex-wrap:wrap;
+ }
+ body[data-teacher-role-ui="active"] .teacher-analysis-actions{
+  grid-template-columns:1fr 1fr!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-video-kpis{
+  grid-template-columns:1fr!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-video-category-grid{
+  grid-template-columns:1fr!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-video-evidence dl{
+  grid-template-columns:1fr!important;
+ }
+ body[data-teacher-role-ui="active"] .teacher-video-result{padding:10px}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-teacher-role-ui="active"] .teacher-video-result *,
+ body[data-teacher-role-ui="active"] .teacher-analysis-queue-list>article *{
+  animation:none!important;transition:none!important;
+ }
+}
+
+body[data-teacher-role-ui="active"] .teacher-video-score-discrepancy {
+  margin:0;padding:13px 15px;background:#fff1da;border:1px solid #d2974d;
+  color:#6c3a06;font-size:12px;line-height:1.65;border-radius:11px;
+}
+body[data-teacher-role-ui="active"] .teacher-video-score-discrepancy strong { color:#6c3a06 }

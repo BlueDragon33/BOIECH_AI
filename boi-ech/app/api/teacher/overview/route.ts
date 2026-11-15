@@ -110,15 +110,50 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     return typeof title === "string" ? title.slice(0, 120) : "";
   }).filter(Boolean);
   const captureQuality: "good" | "review" = quality.level === "good" ? "good" : "review";
+  // Missing fields from legacy events are UNKNOWN, not measured as 0%.
+  const measured = (value: unknown, max = 100): number | null =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= max ? Math.round(value) : null;
+  const categories = source.categories && typeof source.categories === "object"
+    ? source.categories as Record<string, unknown>
+    : {};
+  // Time offsets preserve tenths of seconds so teachers can locate an error.
+  const measuredSeconds = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 30
+      ? Math.round(value * 10) / 10 : null;
+  const detailErrors = errors.slice(0, 6).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const label = typeof row.title === "string" ? row.title.trim().slice(0, 120) : "";
+    if (!label) return [];
+    return [{
+      title: label,
+      severity: row.severity === "critical" ? "critical" as const : "warning" as const,
+      timeSec: measuredSeconds(row.timeSec),
+      observed: typeof row.observed === "string" ? row.observed.slice(0, 100) : "",
+      expected: typeof row.expected === "string" ? row.expected.slice(0, 120) : "",
+      recommendation: typeof row.recommendation === "string" ? row.recommendation.slice(0, 240) : "",
+      confidence: measured(row.confidence),
+    }];
+  });
   return {
     score: Math.max(0, Math.min(100, Math.round(Number(source.score) || 0))),
     confidence: Math.max(0, Math.min(100, Math.round(Number(source.confidence) || 0))),
     captureQuality,
-    poseCoverage: Math.max(0, Math.min(100, Math.round(Number(quality.poseCoverage) || 0))),
-    averageVisibility: Math.max(0, Math.min(100, Math.round(Number(quality.averageVisibility) || 0))),
+    poseCoverage: measured(quality.poseCoverage),
+    averageVisibility: measured(quality.averageVisibility),
+    sampledFrames: measured(source.sampledFrames, 240),
+    detectedFrames: measured(source.detectedFrames, 240),
+    durationSec: measuredSeconds(source.durationSec),
     cameraView: source.cameraView === "side" ? "side" : "rear",
+    categories: {
+      legs: measured(categories.legs),
+      arms: measured(categories.arms),
+      coordination: measured(categories.coordination),
+      bodyLine: measured(categories.bodyLine),
+    },
     errorCount: errors.length,
     topErrors,
+    errors: detailErrors,
     analyzedAt: typeof source.analyzedAt === "string" && source.analyzedAt ? source.analyzedAt : fallbackAt,
   };
 }

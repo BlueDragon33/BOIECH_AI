@@ -37,6 +37,8 @@ import "./device-gate-premium.css";
 import "./manual-sync-badge.css";
 // Final teacher foreground/background pairing: loaded last to prevent legacy overrides.
 import "./teacher-contrast-content-first.css";
+// Transparent video result panel must win over legacy tiny row and nested scroll styles.
+import "./teacher-video-results-transparency.css";
 import MultiAccountSwitcher from "./multi-account-switcher";
 
 const geistSans = Geist({
