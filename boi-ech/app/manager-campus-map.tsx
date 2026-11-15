@@ -1,5 +1,6 @@
 "use client";
 
+import {useId} from "react";
 import {MainLectureHallArt} from "./manager-lecture-hall-art";
 import {CampusBuildingArt} from "./manager-campus-illustration";
 import {PracticePoolBuildingArt} from "./manager-practice-pool-art";
@@ -49,6 +50,7 @@ function BuildingArt({art,index}:{art:Slot["art"];index:number}){
 
 /** Shared true-data campus layout: a dominant lecture hall and four satellites, as in the approved mockup. */
 export default function ManagerCampusMap({board,mode,busy=false,selectedId,onSelectBuilding,onOpenMainTemplate,onOpenPoolTemplate,onCreateBuilding}:Props){
+ const id=useId().replace(/:/g,"");
  const buildings=board.resources.filter(r=>r.kind==="building");
  const rooms=board.resources.filter(r=>r.kind==="room");
  const {main,sub,extra}=campusSlots(buildings);
@@ -59,8 +61,8 @@ export default function ManagerCampusMap({board,mode,busy=false,selectedId,onSel
  const activeRooms=rooms.filter(r=>r.status==="active").length;
  const stats=[
   {label:"Tòa đang hoạt động",part:activeBuildings,total:buildings.length,tone:"green"},
-  {label:"Phòng khả dụng",part:activeRooms,total:rooms.length,tone:"orange"},
-  {label:"Phòng có lịch trong khoảng xem",part:bookedIds.size,total:rooms.length,tone:"blue"}
+  {label:"Phòng đang hoạt động",part:activeRooms,total:rooms.length,tone:"blue"},
+  {label:"Phòng có lịch trong kỳ",part:bookedIds.size,total:rooms.length,tone:"orange"}
  ];
  const node=(slot:Slot)=>{
   const real=slot.resource, isMain=slot.key==="main";
@@ -73,7 +75,7 @@ export default function ManagerCampusMap({board,mode,busy=false,selectedId,onSel
     aria-pressed={Boolean(real&&selectedId===real.id)} disabled={busy}
     aria-label={`${real?.name??slot.title}: ${state}. ${real?"Mở phòng thuộc tòa":"Mở tạo tòa trong phân hệ Tòa học"}`}
     onClick={click}>
-    <span className={styles.nodeTitle}><span className={styles.nodeSymbol} aria-hidden="true">{isMain?"▥":slot.art==="pool"?"≋":"⌂"}</span>{real?.name??slot.title}</span>
+    <span className={styles.nodeTitle}><span className={styles.nodeSymbol} aria-hidden="true">{isMain?"▥":slot.art==="pool"?"≋":"⌂"}</span><strong>{real?.name??slot.title}</strong></span>
     <span className={styles.art} aria-hidden="true"><BuildingArt art={slot.art} index={slot.index}/></span>
     <span className={styles.nodeFoot}><span>{real?`${linked.length} phòng/hồ · ${linked.filter(r=>r.status==="active").length} hoạt động`:"Mẫu sơ đồ · Không tính vào số liệu"}</span>
      <span className={styles.nodeStatus} data-status={real?.status??"template"}>{state}</span></span>
@@ -82,7 +84,12 @@ export default function ManagerCampusMap({board,mode,busy=false,selectedId,onSel
  return <section className={styles.shell} data-mode={mode} aria-label="Sơ đồ khuôn viên 3D kiểu tòa chính và các tòa phụ">
   {mode==="overview"?<aside className={styles.health} aria-label="Tình trạng khuôn viên theo dữ liệu thật">
     <span className={styles.eyebrow}>BƠI ẾCH AI · CAMPUS COMMAND</span>
-    <h3>Tình trạng khuôn viên</h3>
+    <div className={styles.kpiGrid} aria-label="Thống kê cơ sở theo dữ liệu thật">
+     <div className={styles.kpiCard}><span className={styles.kpiIcon} data-tone="blue" aria-hidden="true">▥</span><small>Tổng tòa nhà</small><strong>{buildings.length}</strong></div>
+     <div className={styles.kpiCard}><span className={styles.kpiIcon} data-tone="green" aria-hidden="true">⬡</span><small>Tổng phòng / hồ</small><strong>{rooms.length}</strong></div>
+     <div className={styles.kpiCard}><span className={styles.kpiIcon} data-tone="violet" aria-hidden="true">⌁</span><small>Phòng hoạt động</small><strong>{activeRooms}</strong></div>
+    </div>
+    <h3><span className={styles.healthPulse} aria-hidden="true">⌁</span>Sức khỏe cơ sở</h3>
     {stats.map(s=>{const pct=ratio(s.part,s.total);return <div className={styles.healthItem} key={s.label}>
       <div><span>{s.label}</span><strong>{pct===null?"—":`${pct}%`}</strong></div>
       <div className={styles.track} role="meter" aria-label={s.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct??undefined} aria-valuetext={pct===null?"Chưa có dữ liệu":`${s.part} trên ${s.total}`}>
@@ -91,13 +98,16 @@ export default function ManagerCampusMap({board,mode,busy=false,selectedId,onSel
     <p className={styles.dataNote}>Chỉ hiển thị số liệu từ hồ sơ hiện có. Tòa mẫu chưa được tạo không cộng vào tổng số.</p>
    </aside>:null}
   <div className={styles.mapArea}>
-   <div className={styles.mapHeader}><span>SƠ ĐỒ CƠ SỞ · TÒA CHÍNH VÀ TÒA PHỤ</span><strong>{buildings.length} tòa đã tạo</strong></div>
+   <div className={styles.mapHeader}><span>SƠ ĐỒ CƠ SỞ <b>·</b> TÒA CHÍNH VÀ TÒA PHỤ</span><strong>{buildings.length} tòa đã tạo</strong></div>
    <div className={styles.scene}>
+    <div className={styles.skyline} aria-hidden="true"/>
+    <div className={styles.groundGlow} aria-hidden="true"/>
     <svg className={styles.links} viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-     <defs><filter id="campus-hub-blur"><feGaussianBlur stdDeviation="7"/></filter></defs>
-     <path d="M500 485L240 280M500 485L758 280M500 485L244 580M500 485L755 580" stroke="#22bbff" strokeWidth="11" strokeLinecap="round" opacity=".65" fill="none" filter="url(#campus-hub-blur)"/>
-     <path d="M500 485L240 280M500 485L758 280M500 485L244 580M500 485L755 580" stroke="#7ee9ff" strokeWidth="3.5" strokeLinecap="round" fill="none"/>
-     <circle cx="500" cy="485" r="11" fill="#b9ffff" stroke="#0d7bdf" strokeWidth="3"/>
+     <defs><filter id={id+"campus-hub-blur"} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="8"/></filter></defs>
+     <path d="M497 445L285 320L207 317M497 445L715 320L794 317M497 445L287 550L204 552M497 445L715 550L794 552" stroke="#0aa6fe" strokeWidth="15" strokeLinejoin="round" strokeLinecap="round" opacity=".75" fill="none" filter={`url(#${id}campus-hub-blur)`}/>
+     <path d="M497 445L285 320L207 317M497 445L715 320L794 317M497 445L287 550L204 552M497 445L715 550L794 552" stroke="#37c4ff" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
+     <path d="M497 445L285 320L207 317M497 445L715 320L794 317M497 445L287 550L204 552M497 445L715 550L794 552" stroke="#d0ffff" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" opacity=".95"/>
+     <circle cx="497" cy="445" r="10" fill="#c5faff" stroke="#1596fc" strokeWidth="4"/>
     </svg>
     {node(main)}
     {sub.map(node)}
