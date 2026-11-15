@@ -110,6 +110,13 @@ test("free-room filter requires valid window, active parent, and no booking",()=
 
 function elements(node){if(Array.isArray(node))return node.flatMap(elements);if(!node||typeof node!=="object")return [];return [node,...elements(node.props?.children)];}
 function contentText(node){if(Array.isArray(node))return node.map(contentText).join("");if(node==null)return "";return typeof node==="object"?contentText(node.props?.children):String(node);}
+function openBuildingFromMap(tree,name){
+ const scene=tree.find(node=>node.type?.name==="ManagerCampusMap");
+ assert.ok(scene,"rendered campus map must remain connected to manager navigation");
+ const building=scene.props.board.resources.find(r=>r.kind==="building"&&r.name===name);
+ assert.ok(building,"real building must exist");
+ scene.props.onSelectBuilding(building);
+}
 function hookHarness(props){
  const state=[];let cursor=0;
  const hooks={...React,useState(initial){const slot=cursor++;if(!(slot in state))state[slot]=typeof initial==="function"?initial():initial;return [state[slot],next=>{state[slot]=typeof next==="function"?next(state[slot]):next;}] }};
@@ -120,7 +127,7 @@ test("contextual room creation stays under the selected real building",()=>{
  const creations=[];const render=hookHarness({board:board(),busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},
   onCreateResource:(...args)=>creations.push(args),onCreateSession:()=>{}});
  let tree=render();
- tree.find(node=>node.type==="button"&&node.props["aria-label"]==="Mở tòa Tòa B").props.onClick();
+ openBuildingFromMap(tree,"Tòa B");
  tree=render();
  const addRoom=tree.find(node=>node.type==="button"&&contentText(node).includes("＋ Phòng"));
  assert.ok(addRoom);addRoom.props.onClick();
@@ -130,7 +137,7 @@ test("nested building→room→class retains real context for new class session"
  const sessions=[];const render=hookHarness({board:board(),busy:false,onNavigate:()=>{},onOpenDetail:()=>{},onAssignPerson:()=>{},
   onCreateResource:()=>{},onCreateSession:(...args)=>sessions.push(args)});
  let tree=render();
- tree.find(node=>node.props?.["aria-label"]==="Mở tòa Tòa B").props.onClick();tree=render();
+ openBuildingFromMap(tree,"Tòa B");tree=render();
  assert.ok(tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m"));
  tree.find(node=>node.props?.["aria-label"]==="Mở phòng Hồ 25m").props.onClick();tree=render();
  assert.ok(tree.find(node=>node.props?.["aria-label"]==="Mở danh sách lớp Ếch cơ bản"));
