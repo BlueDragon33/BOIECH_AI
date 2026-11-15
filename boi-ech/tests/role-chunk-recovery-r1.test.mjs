@@ -134,6 +134,9 @@ test("production release checks both lazy role chunks in artifact and on actual 
   assert.throws(()=>roleAssetProbes(["learner-enhancements-a.js","learner-enhancements-b.js","teacher-enhancements-c.js"]),/ambiguous/);
   assert.match(prod,/const roleFiles=roleAssetProbes\(fs\.readdirSync\(directory\)\)/);
   assert.match(prod,/\.\.\.roleAssetProbes\(files\)/);
+  const edge=read("../worker/index.ts");
+  assert.match(edge,/no-store, max-age=0, must-revalidate/);
+  assert.match(edge,/response.headers.get\("content-type"\)\?\.includes\("text\/html"\)/);
   const filenames=["assets/index-hash.js","assets/index-hash.css",...roleAssetProbes(["learner-enhancements-aBC12.js","teacher-enhancements-b42.js"])];
   await assert.doesNotReject(verifyPublicAssets(filenames,async url=>new Response("ok",{headers:{"content-type":url.endsWith(".css")?"text/css":"text/javascript"}})));
   await assert.rejects(verifyPublicAssets(filenames,async url=>url.includes("learner-enhancements")
