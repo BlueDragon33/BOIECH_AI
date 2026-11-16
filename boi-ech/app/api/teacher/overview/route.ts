@@ -465,7 +465,14 @@ export async function POST(request: Request) {
       const teacherLoopNeedsFollowUp = ["negative", "mixed", "pending", "activity-only"].includes(
         learningAnalytics.latest?.observedChange ?? "",
       );
-      const needsSupport = inactivityHours > 7 * 24
+      // A credible critical technique issue MUST reach the teacher watchlist,
+      // even when the overall AI score is high. Missing metrics are never
+      // interpreted as an observed 0.
+      const technicalNeedsSupport = Boolean(analysis && analysis.captureQuality === "good"
+        && analysis.confidence >= 70
+        && (analysis.errors.some((issue) => issue.severity === "critical")
+          || Object.values(analysis.categories).some((score) => score !== null && score < 60)));
+      const needsSupport = technicalNeedsSupport || inactivityHours > 7 * 24
         || progress < 50
         || adaptiveAlerts.length > 0
         || teacherLoopNeedsFollowUp
