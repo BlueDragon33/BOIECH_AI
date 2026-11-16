@@ -208,3 +208,26 @@ test("Teacher source LIMIT saturation is disclosed, never misrepresented as comp
  assert.match(shell,/overview\?\.coverage\?\.possiblyTruncated/);
  assert.match(shell,/chưa đầy đủ do giới hạn số bản ghi/);
 });
+
+test("V43 cross-class scheduler never marks the same teacher primary for overlapping proposed classes",()=>{
+ const b=board();
+ b.resources.push(resource("c","C",{learnerCount:5,teacherCount:0,missingTeachers:1}));
+ b.people.push(person("t4","teacher","",{name:"Instructor 4"}));
+ b.sessions.push({id:"sC",title:"C",classId:"c",roomId:"r3",teacherId:"missing2",
+  assistantTeacherId:null,periodStart:null,periodEnd:null,startsAt:time,endsAt:end,status:"scheduled",version:1});
+ const r=buildAllocationReview(b);
+ const primaries=r.teacherShortlist.filter(x=>x.suggestedRole==="teacher-primary");
+ const sameTeacher=primaries.filter(x=>x.personId==="t1");
+ assert.ok(primaries.length>0);
+ assert.ok(sameTeacher.length<=1,"do not double-book one teacher across overlapping proposals");
+ assert.ok(r.teacherShortlist.some(x=>x.suggestedRole==="teacher-alternative"));
+ assert.ok(r.teacherShortlist.every(x=>x.warnings.some(w=>w.includes("không khóa giờ"))));
+ assert.equal(r.teacherShortlist.filter(x=>x.suggestedRole==="teacher-primary"&&x.classId==="c").length,1);
+});
+test("V43 candidate with missing or invalid target class sessions is NEVER marked primary",()=>{
+ const b=board();
+ b.sessions[0].endsAt=b.sessions[0].startsAt;
+ const r=buildAllocationReview(b);
+ assert.ok(r.teacherShortlist.every(x=>x.suggestedRole==="teacher-alternative"));
+ assert.ok(r.teacherShortlist.every(x=>x.evidenceStatus==="no-class-sessions"));
+});
