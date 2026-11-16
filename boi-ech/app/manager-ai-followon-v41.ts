@@ -116,9 +116,10 @@ export function summarizeManagerTrainingQuality(board:TrainingBoard):TrainingQua
  const invalidIntervals=board.sessions.filter(s=>s.status!=="cancelled"&&
   (!Number.isFinite(parsed(s.startsAt))||!Number.isFinite(parsed(s.endsAt))||parsed(s.endsAt)<=parsed(s.startsAt))).length;
  const active=learners.filter(p=>p.registered&&p.status==="approved"&&!p.expired);
- const withoutActiveClass=active.filter(p=>!classNames(p.className).some(n=>validClasses.has(classKey(n))));
- const unmatched=active.filter(p=>classNames(p.className).length>0&&
-  classNames(p.className).some(n=>!validClasses.has(classKey(n))));
+ const reportedNames=(p:TrainingPerson)=>classNames(p.className).filter(name=>
+  !["chưa phân lớp","chưa phân công"].includes(name.trim().toLocaleLowerCase("vi")));
+ const withoutActiveClass=active.filter(p=>!reportedNames(p).some(n=>validClasses.has(classKey(n))));
+ const unmatched=active.filter(p=>reportedNames(p).some(n=>!validClasses.has(classKey(n))));
  return {observedAt:board.observedAt,window:{from:board.from,to:board.to},
   learnerAccounts:{total:learners.length,active:active.length,inactiveOrExpired:learners.length-active.length,
    withoutActiveClass:withoutActiveClass.length,unmatchedClass:unmatched.length},
