@@ -141,3 +141,46 @@ test("V42 is read-only and cannot invoke independent backend, model provider or 
  assert.match(panel,/onReview\(r.personId,r.classId\)/);
  assert.match(managerRoot,/action:"assign-person"/);
 });
+
+test("V42 limits simulated primary seats and labels alternative proposals as non-reservations",()=>{
+ const b=board();
+ b.resources[0].teacherCount=1;b.resources[0].missingTeachers=0;
+ b.resources[0].capacity=13;b.resources[0].learnerCount=12;
+ b.resources[1].capacity=7;b.resources[1].learnerCount=6;
+ for(let i=2;i<=6;i++)b.people.push(person("l"+i,"learner","Chưa phân lớp",{name:"HV "+i}));
+ const copy=JSON.stringify(b);
+ const r=buildAllocationReview(b);
+ const preferred=r.learnerShortlist.filter(x=>x.suggestedRole==="primary");
+ assert.equal(preferred.length,2,"only two seats are left in the signed class snapshot");
+ const used=new Map();
+ for(const p of preferred)used.set(p.classId,(used.get(p.classId)??0)+1);
+ assert.equal(used.get("a"),1);assert.equal(used.get("b"),1);
+ assert.ok(r.learnerShortlist.every(x=>x.warnings.some(w=>w.includes("không giữ chỗ"))));
+ assert.equal(JSON.stringify(b),copy);
+});
+test("No class sessions is an explicit unverified teacher candidate, not confirmed availability",()=>{
+ const b=board();b.sessions=[];
+ const r=buildAllocationReview(b);
+ assert.ok(r.teacherShortlist.length>0);
+ assert.ok(r.teacherShortlist.every(x=>x.priority==="medium"&&x.evidenceStatus==="no-class-sessions"));
+ assert.ok(r.teacherShortlist.every(x=>/chưa thể xác nhận/.test(x.reason)));
+});
+test("An exact-video human review remains effective after unrelated teacher feedback",()=>{
+ const priorReview={action:"review",analysisAt:analysis.analyzedAt,note:"Đã đối chiếu",
+  reviewStatus:"reviewed",teacherName:"Giảng viên"};
+ const laterFeedback={...priorReview,action:"feedback",analysisAt:""};
+ const result=prioritizeTeacherVideo({...learner,latestTeacherAction:laterFeedback,
+   latestVideoReview:priorReview});
+ assert.equal(result.humanReviewed,true);
+ assert.equal(result.canDraftExercise,false);
+});
+test("Existing signed assignment requires atomic current-capacity guard for learner moves",()=>{
+ const server=fs.readFileSync(path.join(root,"training-management.server.ts"),"utf8");
+ assert.match(server,/const learnerNewClass=target.role==="learner"/);
+ assert.match(server,/const capacityGuard=learnerNewClass/);
+ assert.match(server,/seat\.capacity > \(/);
+ assert.match(server,/member\.person_role='learner'/);
+ assert.match(server,/entitlement\.state='active'/);
+ assert.match(server,/AND \$\{authorityGuard\} \$\{capacityGuard\}/);
+ assert.match(server,/\.bind\(className,personId,expectedClassName,target.role,ids.length,\.\.\.authorityBindings,\.\.\.\(learnerNewClass/);
+});
