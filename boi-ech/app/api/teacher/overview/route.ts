@@ -421,6 +421,18 @@ export async function POST(request: Request) {
       const progress = Math.round((completedLessons / LESSON_COUNT) * 100);
       const analysis = analysisSummary(row.last_analysis_json, row.last_analysis_at);
       const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
+      // Latest feedback can follow review. Locate a review for this exact video.
+      const videoReviewEvent = analysis?.analyzedAt
+        ? (learningEventsByDevice.get(row.device_id) ?? []).find((event) => {
+            if (event.event_type !== "teacher_analysis_review") return false;
+            const detail = parseJson<Record<string, unknown>>(event.detail_json, {});
+            return detail.analysisAt === analysis.analyzedAt;
+          })
+        : undefined;
+      const latestVideoReview = videoReviewEvent
+        ? teacherActionSummary("teacher_analysis_review", videoReviewEvent.detail_json, videoReviewEvent.created_at)
+        : latestTeacherAction?.action === "review" && latestTeacherAction.analysisAt === analysis?.analyzedAt
+          ? latestTeacherAction : null;
       const learnerProfile: AiLearnerProfile = {
         completed: parseJson<string[]>(row.completed_json, []),
         scores: parseJson<Record<string, number>>(row.scores_json, {}),
@@ -474,6 +486,7 @@ export async function POST(request: Request) {
         lastAnalysis: analysis,
         teacherActionCount: Math.max(0, Number(row.teacher_action_count) || 0),
         latestTeacherAction,
+        latestVideoReview,
         adaptive: {
           priorityLesson: intelligence.priorityLesson,
           priorityPart: intelligence.priorityPart,
