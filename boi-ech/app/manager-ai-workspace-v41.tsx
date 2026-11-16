@@ -139,7 +139,10 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
         <button type="submit" disabled={!question.trim()||busy}>Phân tích câu hỏi</button>
        </form>
        {answer?<div className={styles.answer} role="status"><strong>{answer.title}</strong><p>{answer.answer}</p>
-        <small>{answer.references.length} tham chiếu nguồn · {answer.disclaimer}</small></div>:null}
+        <small>{answer.references.length} tham chiếu nguồn · {answer.disclaimer}</small>
+        {answer.references.length?<details className={styles.answerRefs}><summary>Xem bằng chứng trả lời ({answer.references.length})</summary>
+          <ul>{answer.references.map((ref,i)=><li key={i}>{labelSource[ref.source]} · mã {ref.recordId} · {ref.fields} · {date(ref.observedAt)}</li>)}</ul>
+        </details>:null}</div>:null}
      </section>
      <section className={styles.section}>
       <div className={styles.sectionHeader}><div><small>03 · WHAT-IF</small><h3>Mô phỏng phân công</h3>
