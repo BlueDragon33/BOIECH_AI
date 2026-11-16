@@ -21,7 +21,7 @@ function Shortlist({title,rows,empty,navigate,onReview,target}:{
   <header><h4>{title}</h4><small>{rows.length} phương án xem xét, không tự áp dụng</small></header>
   <div className={styles.records}>
    {visible.map((r)=><article key={r.id} className={styles.record}>
-    <div className={styles.recordHead}><span>{r.evidenceStatus==="no-class-sessions"?"Chưa xác minh lịch":r.suggestedRole==="primary"?"Ưu tiên mô phỏng":r.suggestedRole==="alternative"?"Lựa chọn khác":r.priority==="high"?"Ưu tiên":"Đề xuất"}</span>
+    <div className={styles.recordHead}><span>{r.evidenceStatus==="no-class-sessions"?"Chưa xác minh lịch":r.suggestedRole==="teacher-primary"?"Ưu tiên ghép lịch":r.suggestedRole==="teacher-alternative"?"Chỉ là phương án khác":r.suggestedRole==="primary"?"Ưu tiên mô phỏng":r.suggestedRole==="alternative"?"Lựa chọn khác":r.priority==="high"?"Ưu tiên":"Đề xuất"}</span>
      <strong>{r.personName}</strong></div>
     <p><b>{r.className}</b> · {r.reason}</p>
     <dl><div><dt>Sĩ số cấu hình</dt><dd>{r.currentLearnerCount}/{r.classCapacity}</dd></div>
@@ -57,7 +57,7 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
  return <section className={styles.root} aria-label="Đề xuất phân bổ học viên và giảng viên" data-manager-ai-allocation="V42">
   <header className={styles.hero}>
    <div><small>V42 · PHÂN BỔ CÓ GIẢI THÍCH</small><h3>Gợi ý phân lớp & giảng viên</h3>
-    <p>Ứng viên được tự động sắp theo sĩ số, số lớp đang nhận và lịch có trong hệ thống. Cán bộ chọn quyết định cuối cùng.</p></div>
+    <p>Ứng viên được tự động sắp theo sĩ số, số lớp đang nhận và lịch có trong hệ thống. Các đề xuất giảng viên được kiểm tra chéo giữa những lớp trong cùng danh sách; mọi lựa chọn vẫn phải đối chiếu hồ sơ và lưu thủ công. Cán bộ quyết định cuối cùng.</p></div>
    <span>Chỉ đề xuất · Không tự lưu</span>
   </header>
   <div className={styles.stats}>
