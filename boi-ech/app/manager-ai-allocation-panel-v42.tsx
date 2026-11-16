@@ -11,7 +11,7 @@ function date(value:string){
  const d=new Date(value);
  return Number.isFinite(d.getTime())?new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(d):"Chưa xác minh";
 }
-type Decision={status:"reviewed"|"approved"|"rejected";revision:number};
+type Decision={status:"reviewed"|"approved"|"rejected"|"stale";revision:number};
 function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,decisions,decisionBusy,target}:{
  title:string;rows:AllocationProposal[];empty:string;navigate:(target:ManagerAiDestination)=>void;
  onReview:(personId:string,classId:string)=>void;
@@ -43,7 +43,7 @@ function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,decis
        onClick={()=>{if(onDecision)onDecision(r);else onReview(r.personId,r.classId);}}>
        {decisions[r.id]?.status==="approved"?"Mở lưu phân công":
         decisions[r.id]?.status==="reviewed"?"Phê duyệt & mở phân công":
-        decisions[r.id]?.status==="rejected"?"Đã từ chối":"Ghi nhận xem xét"}
+        decisions[r.id]?.status==="rejected"?"Đã từ chối":decisions[r.id]?.status==="stale"?"Xem xét lại dữ liệu":"Ghi nhận xem xét"}
       </button>
       {decisions[r.id]?.status==="reviewed"&&onReject?
        <button type="button" disabled={decisionBusy} onClick={()=>onReject(r)}>Từ chối đề xuất</button>:null}
