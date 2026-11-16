@@ -145,7 +145,7 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     sampledFrames: measured(source.sampledFrames, 240),
     detectedFrames: measured(source.detectedFrames, 240),
     durationSec: measuredSeconds(source.durationSec),
-    cameraView: source.cameraView === "side" ? "side" : "rear",
+    cameraView: source.cameraView === "side" ? "side" as const : "rear" as const,
     categories: {
       legs: measured(categories.legs),
       arms: measured(categories.arms),
@@ -162,7 +162,7 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
 function teacherActionSummary(type: string | null, value: string | null, createdAt: string | null) {
   const source = parseJson<Record<string, unknown> | null>(value, null);
   if (!source || !type) return null;
-  const action = type === "teacher_assignment"
+  const action: "feedback" | "assignment" | "review" | null = type === "teacher_assignment"
     ? "assignment"
     : type === "teacher_analysis_review"
       ? "review"
@@ -176,7 +176,7 @@ function teacherActionSummary(type: string | null, value: string | null, created
     title: typeof source.title === "string" ? source.title.slice(0, 160) : "",
     note: typeof source.note === "string" ? source.note.slice(0, 1200) : "",
     lessonNumber: typeof source.lessonNumber === "string" ? source.lessonNumber.slice(0, 2) : "",
-    reviewStatus: source.reviewStatus === "follow-up" ? "follow-up" : source.reviewStatus === "reviewed" ? "reviewed" : "",
+    reviewStatus: source.reviewStatus === "follow-up" ? "follow-up" as const : source.reviewStatus === "reviewed" ? "reviewed" as const : "" as const,
     analysisAt: typeof source.analysisAt === "string" ? source.analysisAt.slice(0, 80) : "",
     createdAt,
   };
