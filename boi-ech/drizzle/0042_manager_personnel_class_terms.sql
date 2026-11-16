@@ -19,7 +19,8 @@ CREATE INDEX IF NOT EXISTS training_teacher_class_terms_by_class ON training_tea
 -- teacher allocations existed since signup or a historic timetable entry.
 CREATE TRIGGER IF NOT EXISTS training_teacher_class_terms_update
 AFTER UPDATE OF class_name ON device_access
-WHEN NEW.person_role='teacher' AND COALESCE(NEW.class_name,'')<>COALESCE(OLD.class_name,'')
+WHEN OLD.registration_submitted_at IS NOT NULL AND NEW.person_role='teacher'
+ AND COALESCE(NEW.class_name,'')<>COALESCE(OLD.class_name,'')
 BEGIN
   UPDATE training_teacher_class_terms SET
     ended_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
