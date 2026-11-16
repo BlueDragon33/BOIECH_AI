@@ -22,7 +22,7 @@ type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; public
 type TeacherAnalysis = TeacherVideoAnalysis;
 type TeacherActionSummary = { action: "feedback" | "assignment" | "review"; teacherName: string; title: string; note: string; lessonNumber: string; reviewStatus: "" | "reviewed" | "follow-up"; analysisAt: string; createdAt: string | null };
 type TeacherAdaptive = { priorityLesson: string; priorityPart: string; averageMastery: number; alerts: { level: "info" | "warning" | "critical"; code: string; text: string }[] };
-type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; teacherActionCount: number; latestTeacherAction: TeacherActionSummary | null; adaptive: TeacherAdaptive | null; learningAnalytics: LearnerLearningAnalyticsClient; interventionSuggestions: SmartSuggestionClient[]; needsSupport: boolean; inactiveDays: number | null };
+type TeacherLearner = { name: string; personCode: string; className: string; completedLessons: number; totalLessons: number; progress: number; averageScore: number | null; totalActiveMinutes: number; lastActivityAt: string | null; lastLesson: string | null; lastPart: string | null; analysisCount: number; lastAnalysis: TeacherAnalysis | null; teacherActionCount: number; latestTeacherAction: TeacherActionSummary | null; latestVideoReview?: TeacherActionSummary | null; adaptive: TeacherAdaptive | null; learningAnalytics: LearnerLearningAnalyticsClient; interventionSuggestions: SmartSuggestionClient[]; needsSupport: boolean; inactiveDays: number | null };
 type TeacherOverview = { teacher: { name: string | null; personCode: string | null; className: string | null; classes?: string[] }; summary: { learnerCount: number; active7d: number; needingSupport: number; analysisCount: number; averageProgress: number }; learners: TeacherLearner[]; messages: TeacherLearnerReply[]; assignments: TeacherAssignmentScheduleItem[]; privacy: { mediaStored: false; note: string } };
 type TeacherTab = "overview" | "class" | "learners" | "analysis" | "tasks" | "reports" | "messages" | "schedule" | "profile";
 type TabSetter = (tab: TeacherTab) => void;
@@ -213,7 +213,7 @@ function AnalysisQueue({ learners, setTab, onAction }: {
      <a href={teacherVideoHref("analysis")}>Phân tích local</a>
     </div>
     {isOpen?<div className="teacher-video-expanded" id={id}>
-      <TeacherVideoResultDetails analysis={analysis} review={learner.latestTeacherAction}/>
+      <TeacherVideoResultDetails analysis={analysis} review={learner.latestVideoReview ?? learner.latestTeacherAction}/>
      </div>:null}
    </article>;
   })}
