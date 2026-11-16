@@ -66,3 +66,34 @@ Approved source corpus with citations, model evaluation against deterministic ba
 ## 6. Measurement
 
 P0 quality metrics: valid evidence reference coverage (target 100% of findings), exact same snapshot deterministic output, unverified-generative-answer count (target zero), absent source ⇒ explicit uncertainty, unauthorized mutations (target zero), stale/invalid snapshots flagged for review, no regression in account authorization. Track false positives/false negatives from manager review in later approved stages. Never fake PASS, coverage or usage.
+
+
+---
+
+## 7. Follow-on implementation on stacked branch (V41.0-P1 / V41.1 / V41.2 / V41.3)
+
+**Status: source code candidate only.** Built on the exact P0 PR #185 SHA \`fdb74ad2df5eb4b314aa40724df3d66f631b0091\`. Not a merge or Production deployment.
+
+| Stage | Actual new feature | Explicit non-feature / missing proof |
+| --- | --- | --- |
+| V41.0-P1 | Count **all conflicting pairs** within the authorized loaded scheduling window; correctly detect any teacher/assistant, class or room intersection; show source-cap warning when near 1,000 records. Candidate teacher review sorted by account status, existing class workload and observed time conflicts | No credential/competency assessment, no official availability, no complete system-wide claim outside window |
+| V41.1 | Bounded management-only **learner account and session-quality aggregates**: active roster, unassigned/unmatched classes, session status and invalid intervals | No learner video or raw chat, no individual technique score, actual attendance, or personalized risk without a permissioned source |
+| V41.2 | Read-only **existing-session time/room alternatives**. Compare overlaps against room, class and both teacher roles; reject time outside observed board, inactive rooms and cancelled sessions; flag capacity uncertainty | No automatic rebooking, no persisted proposal, no button that calls a privileged mutation API, no claimed total safety approval |
+| V41.3 | Explicit **evidence structural audit**: referenced source IDs + timestamps, missing/duplicate findings, display/source truncation, quality gating | Not an accuracy metric, no LLM, no accepted internal knowledge base or paid model provider; no inferred FP/FN without human labels |
+
+### Further stages intentionally NOT enabled
+
+- **Real technique / video analytics for manager:** blocked pending a separately reviewed, least-privilege aggregate endpoint and provenance metadata; instructor/learner content must not be reused merely because it exists elsewhere.
+- **Message intelligence:** blocked pending explicit policy, privacy review, necessity and manager scope; no broad inbox read.
+- **Automatic staffing/timetable decisions:** blocked pending authenticated server-side CAS transaction, independent policy review, human decision record and rollback evidence.
+- **Forecasting/ML or generic AI conversation:** blocked pending approved model, retained evaluation set, budget/timeouts, consent and sensitive-data controls.
+- **Internal Knowledge Base:** blocked pending a verified allowlist of approved versioned documents with access metadata; no synthesized regulations.
+- **Review feedback telemetry:** in this source candidate only deterministic structural completeness is measured. No false compliance, no invented adoption or outcome success.
+
+### Source & live runtime acceptance
+
+1. Exact stacked PR HEAD tests for all-pairs overlaps, cancelled sessions, assistant/teacher, active/inactive accounts, long/empty windows, unauthorized operations, readonly what-if, source identifiers and traceable uncertainty.
+2. Source CI (lint, TypeScript, full regression, Constitution, Paired read-only QA) **must PASS on exact HEAD**; do not use inherited P0 PASS as substitute.
+3. Same-worker Cloudflare Preview with branch HEAD, login as authorized manager and deny non-manager; responsive 320/390/768/1024/1440, light/dark computed contrast, keyboard controls.
+4. Test manually against a known live schedule: verify counts and "within loaded window" disclaimer; never present a "safe/free" result as booking approval.
+5. Remain **stacked Draft** on \`feat/manager-ai-v41-p0-evidence-20261116\` until P0 approval/merge and separate Owner permission. No main/Production deployment.
