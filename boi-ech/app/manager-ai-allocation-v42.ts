@@ -4,6 +4,7 @@
  */
 import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource} from "./training-types";
 import {reviewTeacherCandidates} from "./manager-ai-followon-v41";
+import {assessProfilePlacement,assessInstructorForClass,type AdmissionResult} from "./manager-ai-profile-admission-v43";
 
 export type AllocationProposal={
  id:string;kind:"teacher"|"learner";personId:string;personName:string;
@@ -14,6 +15,8 @@ export type AllocationProposal={
  warnings:string[];decision:"human-review-required";
  evidenceStatus:"checked-window"|"no-class-sessions"|"profile-missing";
  suggestedRole:"primary"|"alternative"|"teacher-primary"|"teacher-alternative";
+ admissionStatus?:"verified"|"insufficient-source"|"hard-veto";
+ admissionSources?:string[];admissible?:boolean;
 };
 export type AllocationReview={observedAt:string;from:string;to:string;
  teacherShortlist:AllocationProposal[];learnerShortlist:AllocationProposal[];
@@ -32,7 +35,10 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
  const freeTeachers=teachers.filter(t=>!assignedToActive(t,classes));
  const unassignedLearners=learners.filter(p=>!assignedToActive(p,classes));
  const shortage=classes.filter(c=>c.missingTeachers>0&&c.requiredTeachers>0);
- const sourceMayBeTruncated=(board.sessions??[]).length>=1000||people.length>=1000;
+ const admission=board.admissionProfiles;
+ const sourceMayBeTruncated=(board.sessions??[]).length>=1000||people.length>=1000||
+  Boolean(admission?.sourceMayBeTruncated);
+ const sourceTime=board.observedAt;
  const teacherShortlist:AllocationProposal[]=[];
  const learnerShortlist:AllocationProposal[]=[];
  const staffWarnings=[
@@ -61,12 +67,20 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
    if(candidatesShown>=3)break;
    const person=teachers.find(t=>t.id===c.teacherId);
    if(!person)continue;
+   const professional=admission?assessInstructorForClass({
+    teacherId:person.id,classId:klass.id,now:sourceTime,
+    teacher:admission.teacher.find(profile=>profile.teacherId===person.id),
+    klass:admission.safety.find(profile=>profile.classId===klass.id),
+    existingTeacherClasses:c.currentClassLoad,registeredLearners:klass.learnerCount,
+   }):null;
+   if(professional?.status==="hard-veto")continue;
    const assignedWindows=projectedTeacherWindows.get(person.id)??[];
    const proposedConflict=classWindows.some(next=>assignedWindows.some(previous=>
      next.start<previous.end&&next.end>previous.start));
    const projectedClassLoad=c.currentClassLoad+new Set(assignedWindows.map(s=>s.classId)).size;
    const timetableVerified=c.classSessionsExamined>0&&classWindows.length===c.classSessionsExamined;
-   const primary=timetableVerified&&!proposedConflict&&projectedClassLoad<12&&primaryCount<klass.missingTeachers;
+   const primary=timetableVerified&&!proposedConflict&&projectedClassLoad<12&&
+    (!admission||professional?.status==="eligible")&&primaryCount<klass.missingTeachers;
    if(primary){
     primaryCount++;
     projectedTeacherWindows.set(person.id,[...assignedWindows,...classWindows]);
@@ -94,10 +108,15 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
      ...(!timetableVerified?["Lịch buổi học thiếu/không hợp lệ; không được coi là sẵn sàng."]:[]),
      ...(proposedConflict?["Mô phỏng cho thấy trùng giờ với lớp đã được ưu tiên ở danh sách này."]:[]),
      ...(projectedClassLoad>=12?["Tải lớp mô phỏng đã đạt giới hạn 12 lớp."]:[]),
+     ...(professional?.reasons??[]),
      "Phân công ưu tiên chỉ là mô phỏng; không khóa giờ, lớp hay giảng viên trên D1.",
      ...staffWarnings
     ],
     evidenceStatus:timetableVerified?"checked-window":"no-class-sessions",
+    admissionStatus:admission?(professional?.status==="eligible"?"verified":
+     professional?.status??"insufficient-source"):undefined,
+    admissionSources:professional?.checkedSourceIds,
+    admissible:!admission||professional?.status==="eligible",
     suggestedRole:primary?"teacher-primary":"teacher-alternative",decision:"human-review-required"
    });
   }
@@ -107,22 +126,44 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
  // offer 40 first-choice placements into a class with 1 remaining seat.
  const rooms=classes.filter(c=>c.capacity>0&&c.learnerCount<c.capacity&&
    c.teacherCount>=c.requiredTeachers&&c.requiredTeachers>0);
+ const learnerAdmission=(learner:TrainingPerson,klass:TrainingResource):AdmissionResult|null=>{
+  if(!admission)return null;
+  const classSafety=admission.safety.find(profile=>profile.classId===klass.id);
+  const learnerProfile=admission.learner.find(profile=>profile.learnerId===learner.id);
+  const assigned=teachers.filter(t=>classNames(t.className).some(n=>classKey(n)===classKey(klass.name)));
+  const reviewed=assigned.map(t=>assessProfilePlacement({
+    teacherId:t.id,learnerId:learner.id,classId:klass.id,now:sourceTime,
+    teacher:admission.teacher.find(p=>p.teacherId===t.id),
+    learner:learnerProfile,klass:classSafety,
+    existingTeacherClasses:Math.max(0,classNames(t.className).length-1),
+    registeredLearners:klass.learnerCount,
+  }));
+  return reviewed.find(x=>x.status==="eligible")??reviewed.find(x=>x.status==="insufficient-source")
+   ??reviewed[0]??{status:"insufficient-source",reasons:["Chưa xác minh giảng viên phù hợp trong lớp."],
+    checkedSourceIds:[],profileRevisionIds:[]};
+ };
  const projectedPrimary=new Map<string,number>();
  const projectedRatio=(c:TrainingResource)=>
    (c.learnerCount+(projectedPrimary.get(c.id)??0))/Math.max(1,c.capacity);
  for(const learner of unassignedLearners.slice()
   .sort((a,b)=>a.name.localeCompare(b.name,"vi")||a.id.localeCompare(b.id)).slice(0,40)){
   const choices=rooms.filter(c=>c.learnerCount+(projectedPrimary.get(c.id)??0)<c.capacity)
-   .sort((a,b)=>projectedRatio(a)-projectedRatio(b)||
-    a.name.localeCompare(b.name,"vi")||a.id.localeCompare(b.id))
-   .slice(0,2);
+   .filter(c=>learnerAdmission(learner,c)?.status!=="hard-veto")
+   .sort((a,b)=>{
+    const ar=learnerAdmission(learner,a)?.status==="eligible"?0:1;
+    const br=learnerAdmission(learner,b)?.status==="eligible"?0:1;
+    return ar-br||projectedRatio(a)-projectedRatio(b)||
+      a.name.localeCompare(b.name,"vi")||a.id.localeCompare(b.id);
+   }).slice(0,2);
   if(!choices.length)continue;
   const preferred=choices[0];
   projectedPrimary.set(preferred.id,(projectedPrimary.get(preferred.id)??0)+1);
   for(const [index,klass] of choices.entries()){
+   const matched=learnerAdmission(learner,klass);
    learnerShortlist.push({
     id:"learner:"+learner.id+":"+klass.id,kind:"learner",personId:learner.id,
-    personName:learner.name,classId:klass.id,className:klass.name,priority:"medium",
+    personName:learner.name,classId:klass.id,className:klass.name,
+    priority:matched?.status==="eligible"?"high":"medium",
     reason:"Lớp đang còn "+(klass.capacity-klass.learnerCount)+" chỗ theo dữ liệu đã tải; "+
      klass.teacherCount+"/"+klass.requiredTeachers+" giảng viên được ghi nhận. "+
      (index===0?"Lựa chọn mô phỏng ưu tiên để cân bằng sĩ số.":"Lựa chọn thay thế, không giữ chỗ."),
@@ -132,10 +173,15 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
     sourceRecords:[{source:"people",id:learner.id},{source:"resources",id:klass.id}],
     warnings:[
      "Các đề xuất không giữ chỗ thật; sĩ số và quyền được kiểm tra lại trên máy chủ lúc lưu.",
-     "Chưa có dữ liệu ca giờ mong muốn, trình độ bơi, nhóm tuổi, nhu cầu hỗ trợ hoặc xác nhận phù hợp thực tế.",
+     ...(matched?.reasons??["Chưa có dữ liệu ca giờ mong muốn, trình độ bơi, nhu cầu hỗ trợ hoặc xác nhận phù hợp thực tế."]),
      "Chỉ dùng sức chứa và phân công cấu hình; chưa xác minh an toàn thực hành, bể hoặc tỷ lệ huấn luyện thực tế."
     ],
-    evidenceStatus:"profile-missing",suggestedRole:index===0?"primary":"alternative",
+    evidenceStatus:"profile-missing",
+    admissionStatus:admission?(matched?.status==="eligible"?"verified":
+      matched?.status??"insufficient-source"):undefined,
+    admissionSources:matched?.checkedSourceIds,
+    admissible:!admission||matched?.status==="eligible",
+    suggestedRole:index===0?"primary":"alternative",
     decision:"human-review-required"
    });
   }
