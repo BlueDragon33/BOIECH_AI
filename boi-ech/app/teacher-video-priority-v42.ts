@@ -6,6 +6,7 @@ import type {TeacherVideoAnalysis,TeacherVideoReview} from "./teacher-video-resu
 
 type LearnerVideoInput={
  lastAnalysis:TeacherVideoAnalysis|null;latestTeacherAction:TeacherVideoReview|null;
+ latestVideoReview?:TeacherVideoReview|null;
  adaptive?:{priorityLesson?:string}|null;lastLesson?:string|null;
 };
 export type VideoCoachingDecision={
@@ -26,8 +27,9 @@ export function prioritizeTeacherVideo(learner:LearnerVideoInput):VideoCoachingD
  const analysis=learner.lastAnalysis;
  const lessonNumber=/^0[1-8]$/.test(learner.adaptive?.priorityLesson??"")?
   learner.adaptive!.priorityLesson!: /^0[1-8]$/.test(learner.lastLesson??"")?learner.lastLesson!:"01";
- const reviewed=Boolean(analysis?.analyzedAt&&learner.latestTeacherAction?.action==="review"&&
-  learner.latestTeacherAction.analysisAt===analysis.analyzedAt);
+ const review=learner.latestVideoReview??learner.latestTeacherAction;
+ const reviewed=Boolean(analysis?.analyzedAt&&review?.action==="review"&&
+  review.analysisAt===analysis.analyzedAt);
  if(!analysis)return {rank:-1,label:"Chưa có phân tích",reason:"Chưa có bản tóm tắt video.",
   nextStep:"Chờ học viên phân tích và đồng bộ kết quả.",
   exerciseTitle:"",exerciseNote:"",lessonNumber,evidenceStatus:"missing",canDraftExercise:false,humanReviewed:false};
