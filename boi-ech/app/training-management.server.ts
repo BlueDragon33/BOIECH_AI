@@ -106,7 +106,15 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
   visiblePeople=people;
   visibleSessions=sessions;
  }
- return {resources,people:visiblePeople,sessions:visibleSessions,teacherClassTerms:(teacherTerms.results??[]).filter(t=>visiblePeople.some(p=>p.id===t.teacherDeviceId&&p.role==="teacher")),leaders:ls.results??[],leaderHistory:leaderHistory.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
+ // Only an enabled, separately approved profile-admission policy may expose
+ // explicit self-consented and manager-verified matching fields.
+ let admissionProfiles:TrainingBoard["admissionProfiles"];
+ if(actor){
+  const {profileAdmissionEnabled,readManagerProfileAdmission}=await import("./training-ai-profile-data.server");
+  if(await profileAdmissionEnabled())
+   admissionProfiles=await readManagerProfileAdmission(db,{people:visiblePeople,resources});
+ }
+ return {admissionProfiles,resources,people:visiblePeople,sessions:visibleSessions,teacherClassTerms:(teacherTerms.results??[]).filter(t=>visiblePeople.some(p=>p.id===t.teacherDeviceId&&p.role==="teacher")),leaders:ls.results??[],leaderHistory:leaderHistory.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
 export async function trainingCommand(actor:PublicDeviceState,payload:Record<string,unknown>) {
  requireManager(actor);
