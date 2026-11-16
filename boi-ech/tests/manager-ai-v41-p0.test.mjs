@@ -158,7 +158,8 @@ test("V41 P0 navigation is explicit, does not alter five-button mobile dock or a
  assert.match(source,/<ManagerAiContextNoticeV41 board=\{board\}/);
  assert.match(source,/aria-label="Mở AI Điều hành"/);
  assert.match(source,/const dock:[^\n]*Trang chủ[^\n]*Gia hạn[^\n]*Lịch[^\n]*Lớp học[^\n]*Nhân sự/);
- assert.match(ui,/Kết quả chỉ dựa trên snapshot có phân quyền/); // actual disclaimer is in engine, verified separately below
+ assert.match(ui,/chưa kết nối mô hình AI tạo sinh/);
+ assert.match(fs.readFileSync(path.join(root,"manager-ai-evidence-v41.ts"),"utf8"),/Kết quả chỉ dựa trên snapshot có phân quyền/);
  assert.doesNotMatch(ui,/\bfetch\(|\/api\/|onCommand\(|onMutation\(|openai\.|bearer/i);
  assert.match(ui,/chưa kết nối mô hình AI tạo sinh/);
  assert.match(css,/@media\(max-width:390px\)/);
