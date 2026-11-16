@@ -421,6 +421,18 @@ export async function POST(request: Request) {
       const progress = Math.round((completedLessons / LESSON_COUNT) * 100);
       const analysis = analysisSummary(row.last_analysis_json, row.last_analysis_at);
       const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
+      // Latest feedback can follow review. Locate a review for this exact video.
+      const videoReviewEvent = analysis?.analyzedAt
+        ? (learningEventsByDevice.get(row.device_id) ?? []).find((event) => {
+            if (event.event_type !== "teacher_analysis_review") return false;
+            const detail = parseJson<Record<string, unknown>>(event.detail_json, {});
+            return detail.analysisAt === analysis.analyzedAt;
+          })
+        : undefined;
+      const latestVideoReview = videoReviewEvent
+        ? teacherActionSummary("teacher_analysis_review", videoReviewEvent.detail_json, videoReviewEvent.created_at)
+        : latestTeacherAction?.action === "review" && latestTeacherAction.analysisAt === analysis?.analyzedAt
+          ? latestTeacherAction : null;
       const learnerProfile: AiLearnerProfile = {
         completed: parseJson<string[]>(row.completed_json, []),
         scores: parseJson<Record<string, number>>(row.scores_json, {}),
@@ -453,7 +465,14 @@ export async function POST(request: Request) {
       const teacherLoopNeedsFollowUp = ["negative", "mixed", "pending", "activity-only"].includes(
         learningAnalytics.latest?.observedChange ?? "",
       );
-      const needsSupport = inactivityHours > 7 * 24
+      // A credible critical technique issue MUST reach the teacher watchlist,
+      // even when the overall AI score is high. Missing metrics are never
+      // interpreted as an observed 0.
+      const technicalNeedsSupport = Boolean(analysis && analysis.captureQuality === "good"
+        && analysis.confidence >= 70
+        && (analysis.errors.some((issue) => issue.severity === "critical")
+          || Object.values(analysis.categories).some((score) => score !== null && score < 60)));
+      const needsSupport = technicalNeedsSupport || inactivityHours > 7 * 24
         || progress < 50
         || adaptiveAlerts.length > 0
         || teacherLoopNeedsFollowUp
@@ -474,6 +493,7 @@ export async function POST(request: Request) {
         lastAnalysis: analysis,
         teacherActionCount: Math.max(0, Number(row.teacher_action_count) || 0),
         latestTeacherAction,
+        latestVideoReview,
         adaptive: {
           priorityLesson: intelligence.priorityLesson,
           priorityPart: intelligence.priorityPart,
@@ -499,7 +519,22 @@ export async function POST(request: Request) {
     const pendingFollowUp = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.pendingFollowUp, 0);
     const interventionSuggestionCount = learners.reduce((sum, item) => sum + item.interventionSuggestions.length, 0);
 
+    // Exact query LIMIT is not proof of completeness. Never claim that all
+    // historical video reviews/learner actions were inspected when caps may hit.
+    const coverage = {
+      possiblyTruncated: (result.results ?? []).length >= 200
+        || (assessmentsResult.results ?? []).length >= 3000
+        || (learningEventsResult.results ?? []).length >= 12000
+        || (learnerRepliesResult.results ?? []).length >= 200
+        || (assignmentEventsResult.results ?? []).length >= 1500,
+      learnerLimitReached: (result.results ?? []).length >= 200,
+      learningEventLimitReached: (learningEventsResult.results ?? []).length >= 12000,
+      assessmentLimitReached: (assessmentsResult.results ?? []).length >= 3000,
+      replyLimitReached: (learnerRepliesResult.results ?? []).length >= 200,
+      assignmentLimitReached: (assignmentEventsResult.results ?? []).length >= 1500,
+    };
     return json({
+      coverage,
       teacher: {
         name: teacher.learnerName,
         personCode: teacher.personCode,
