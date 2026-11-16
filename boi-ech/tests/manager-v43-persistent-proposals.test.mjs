@@ -59,11 +59,11 @@ function fixture(t){
   }
  };
  const exports={};
- const module={exports};
- new Function("require","module","exports",js)((name)=>mocks[name]??require(name),module,exports);
+ const runtimeModule={exports};
+ new Function("require","module","exports",js)((name)=>mocks[name]??require(name),runtimeModule,exports);
  const post=async(action,{commandId,expectedRevision=0,reason="Đã đối chiếu lịch và chứng từ.",proposalId=proposal.id}={})=>{
   const payload={action,commandId,expectedRevision,reason,proposalId,from:board.from,to:board.to};
-  const res=await module.exports.POST(new Request("https://example.org/api/training-ai-proposals",{
+  const res=await runtimeModule.exports.POST(new Request("https://example.org/api/training-ai-proposals",{
    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)
   }));
   return {status:res.status,data:await res.json()};
