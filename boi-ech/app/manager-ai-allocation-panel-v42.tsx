@@ -21,12 +21,13 @@ function Shortlist({title,rows,empty,navigate,onReview,target}:{
   <header><h4>{title}</h4><small>{rows.length} phương án xem xét, không tự áp dụng</small></header>
   <div className={styles.records}>
    {visible.map((r)=><article key={r.id} className={styles.record}>
-    <div className={styles.recordHead}><span>{r.priority==="high"?"Ưu tiên":"Đề xuất"}</span>
+    <div className={styles.recordHead}><span>{r.evidenceStatus==="no-class-sessions"?"Chưa xác minh lịch":r.suggestedRole==="primary"?"Ưu tiên mô phỏng":r.suggestedRole==="alternative"?"Lựa chọn khác":r.priority==="high"?"Ưu tiên":"Đề xuất"}</span>
      <strong>{r.personName}</strong></div>
     <p><b>{r.className}</b> · {r.reason}</p>
     <dl><div><dt>Sĩ số cấu hình</dt><dd>{r.currentLearnerCount}/{r.classCapacity}</dd></div>
       <div><dt>Giảng viên hiện có</dt><dd>{r.teacherCoverage}</dd></div>
       {r.currentClassLoad!==null?<div><dt>Tải của ứng viên</dt><dd>{r.currentClassLoad} lớp</dd></div>:null}
+      {r.currentSessionLoad!==null?<div><dt>Buổi đã xếp (khoảng tải)</dt><dd>{r.currentSessionLoad} buổi</dd></div>:null}
     </dl>
     <div className={styles.actions}>
       <button type="button" aria-expanded={expanded===r.id} onClick={()=>setExpanded(expanded===r.id?null:r.id)}>
