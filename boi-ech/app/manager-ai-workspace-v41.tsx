@@ -33,6 +33,16 @@ function Glyph({name}:{name:"ai"|"users"|"calendar"|"alert"|"class"|"arrow"|"shi
  };
  return <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{nodes[name]}</svg>;
 }
+export function ManagerAiOverviewEntryV41({board,onOpen}:{board:TrainingBoard;onOpen:()=>void}){
+ const report=analyzeManagerBoard(board,20);
+ const pending=report.counts.critical+report.counts.high;
+ return <button className={styles.overviewEntry} type="button" onClick={onOpen} aria-label="Mở Trung tâm AI Điều hành, xem cảnh báo có bằng chứng">
+  <span className={styles.overviewEntryIcon}><Glyph name="ai"/></span>
+  <span><strong>AI Điều hành · V41.0</strong><small>{pending?"Có "+pending+" cảnh báo khẩn hoặc cần xử lý":"Không phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại"}</small>
+   <small>Phân tích nhân sự, lớp và lịch · Không tự thực thi</small></span>
+  <Glyph name="arrow"/>
+ </button>;
+}
 export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
  board:TrainingBoard;busy:boolean;onNavigate:(id:ManagerAiDestination)=>void;
 }){
