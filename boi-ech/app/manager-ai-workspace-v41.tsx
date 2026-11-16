@@ -72,8 +72,8 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
  const teacher=board.people.filter(p=>p.role==="teacher"&&p.registered&&p.status==="approved"&&!p.expired);
  const selectedClass=classes.some(c=>c.id===scenarioClass)?scenarioClass:classes[0]?.id??"";
  const selectedTeacher=teacher.some(p=>p.id===scenarioTeacher)?scenarioTeacher:teacher[0]?.id??"";
- const scenario=useMemo(()=>simulated&&selectedClass&&selectedTeacher?
-  simulateTeacherAllocation(board,selectedClass,selectedTeacher):null,[simulated,selectedClass,selectedTeacher,board]);
+ const scenario=simulated&&selectedClass&&selectedTeacher?
+  simulateTeacherAllocation(board,selectedClass,selectedTeacher):null;
  const answered=(event:FormEvent)=>{event.preventDefault();setSubmitted(question.trim().slice(0,350));};
  function navigate(target:ManagerAiDestination){onNavigate(target);}
  return <section className={styles.root} aria-label="Trung tâm AI Điều hành có bằng chứng" data-manager-ai-version="V41.0">
