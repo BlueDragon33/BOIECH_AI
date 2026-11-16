@@ -141,7 +141,7 @@ test("No generative model, unauthorized message/video pipeline or automatic admi
  const view=fs.readFileSync(path.join(root,"manager-ai-followon-v41.tsx"),"utf8");
  const main=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
  assert.doesNotMatch(engine,/\bfetch\(|new WebSocket|process\.env|Math\.random|db\.prepare|onCommand|MODEL_API_KEY/);
- assert.doesNotMatch(view,/\bfetch\(|onCommand|/api\/|sendMessage|updateClass|commitProposal/);
+ assert.doesNotMatch(view,/\bfetch\(|onCommand|\/api\/|sendMessage|updateClass|commitProposal/);
  assert.match(main,/<ManagerAiFollowonV41 board=\{board\} report=\{report\}/);
  assert.match(view,/chưa được cấp nguồn để đọc kết quả video/);
  assert.match(view,/không phải điểm chính xác AI/);
