@@ -5,6 +5,7 @@ import {ManagerSheet} from "./manager-details";
 import {AppIcon} from "./manager-status";
 import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource,type TrainingSession,type TrainingClassLeader} from "./training-types";
 import styles from "./manager-console-v12.module.css";
+import ManagerPersonnelV40 from "./manager-personnel-v40";
 import {CampusBuildingArt} from "./manager-campus-illustration";
 import ManagerCampusMap from "./manager-campus-map";
 import {MainLectureHallArt} from "./manager-lecture-hall-art";
@@ -148,31 +149,7 @@ export default function ManagerConsoleV12({board,tab,busy,managerName,onCommand,
    })}
    {!classes.some(c=>matches(c.name))?<p className={styles.empty}>Không có lớp phù hợp. Tạo lớp tại nút “+ Thêm lớp” phía trên.</p>:null}
   </div>:null}
-  {tab==="people"?<div className={styles.staffGrid}>
-   {teachers.filter(t=>matches(t.name+" "+t.className)).map(t=>{
-    const assigned=classes.filter(c=>classNames(t.className).some(n=>classKey(n)===classKey(c.name)));
-    const sessions=todaySessions.filter(s=>s.teacherId===t.id||s.assistantTeacherId===t.id).sort((a,b)=>a.startsAt.localeCompare(b.startsAt));
-    const active=sessions.find(s=>Date.parse(s.startsAt)<=observed&&Date.parse(s.endsAt)>observed);
-    return <article key={t.id} className={styles.teacherCard}>
-     <button type="button" className={styles.teacherIdentity} onClick={()=>onSelectPerson(t)}>
-      <span className={styles.avatar}>{t.name.slice(0,1)}</span>
-      <span><strong>{t.name}</strong><small>Giảng viên · {t.recordSource==="account-first"?"Tài khoản mới":"Hồ sơ đã có"}</small></span>
-      <span aria-hidden="true">↗</span>
-     </button>
-     <div className={styles.teacherClasses}><small>Lớp trực tiếp phụ trách</small>
-      <div>{assigned.length?assigned.map(c=><span key={c.id}>{c.name}</span>):<em>Chưa phân lớp</em>}</div>
-     </div>
-     <div className={styles.teacherSchedule}>
-      <strong>{active?"Đang giảng dạy":sessions.length?"Lịch trong khoảng xem":"Chưa có lịch"}</strong>
-      {sessions.map(s=><div key={s.id}><span>{fmt(s.startsAt)}–{fmt(s.endsAt)} · {nameOf(s.classId)}</span>
-       <small>{nameOf(s.roomId)} · {s.teacherId===t.id?"Giảng viên chính":"Giảng viên phụ"}
-       {s.periodStart!==null?` · Tiết ${s.periodStart}–${s.periodEnd}`:""}</small></div>)}
-     </div>
-     <button type="button" className={styles.detailButton} onClick={()=>onAssignPerson(t)}>Phân công lớp</button>
-    </article>;
-   })}
-   {!teachers.some(t=>matches(t.name+" "+t.className))?<p className={styles.empty}>Không tìm thấy giảng viên. Tab này không hiển thị học viên.</p>:null}
-  </div>:null}
+  {tab==="people"?<ManagerPersonnelV40 board={board} busy={busy} onSelectPerson={onSelectPerson} onAssignPerson={onAssignPerson} onCommand={onCommand}/>:null}
   {tab==="room"?<div className={styles.buildings}>
    <ManagerCampusMap board={board} mode="room" busy={busy} selectedId={activeBuilding?.id}
     onSelectBuilding={b=>{setQuery("");setSelectedRoomBuilding(b.id);}}
