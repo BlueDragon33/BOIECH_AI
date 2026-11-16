@@ -1,16 +1,11 @@
 import type {CourseDocument} from "./course-content.server";
-import type {TeacherVideoAnalysis} from "./teacher-video-result-details";
+import type {TeacherVideoAnalysis,TeacherPublishedGuidance} from "./teacher-video-result-details";
 
 export type PublishedCurriculumSource={
  id:string;version_number:number;reviewed_by:string|null;
  reviewed_at:string|null;published_at:string|null;
 };
-export type PublishedTechniqueGuidance={
- source:"published-course-content";
- versionId:string;versionNumber:number;reviewedBy:string;publishedAt:string;
- lessonNumber:string;sourceItemId:string;title:string;
- correction:string;practice:string;
-};
+export type PublishedTechniqueGuidance=TeacherPublishedGuidance;
 /**
  * Only match against content ACTUALLY PUBLISHED and HUMAN REVIEWED in D1.
  * A static fallback lesson (or an unreviewed draft) is not an admitted KB.
