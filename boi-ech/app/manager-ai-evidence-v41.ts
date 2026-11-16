@@ -102,8 +102,31 @@ export function analyzeManagerBoard(board:TrainingBoard,limit=40):ManagerAiRepor
   target:"people",evidence:available.slice(0,4).map(p=>citation("people",p.id,"role,status,registered,expired,className",board)),
   limitations:["Không có lớp hoạt động không có nghĩa là nhân sự rảnh hoàn toàn; có thể có nhiệm vụ ngoài hệ thống."]});
  const teacherSet=new Set(teachers.map(t=>t.id));
+ const flaggedRoomCapacity=new Set<string>();
  for(const s of sessions){
   const klass=byId.get(s.classId),room=byId.get(s.roomId);
+  if(!room||room.kind!=="room"||room.status!=="active"||
+     room.parentId && byId.get(room.parentId)?.status!=="active"){
+   added(out,{id:"room-unavailable:"+s.id,area:"rooms",priority:"high",
+    title:"Phòng/bể của buổi "+(s.title||s.id)+" cần xác minh",
+    details:"Lịch đã xếp đang dùng phòng không có trong danh mục đang hoạt động, hoặc tòa chứa phòng không còn hoạt động.",
+    recommendedAction:"Mở Phòng học để xác minh tài nguyên và sắp xếp lại nếu cần.",
+    target:"room",evidence:[citation("sessions",s.id,"roomId,classId,startsAt,endsAt,status",board),
+      ...(room?[citation("resources",room.id,"kind,status,parentId",board)]:[])],
+    limitations:["Phòng bị ghi không hoạt động không tự hủy buổi học hoặc chứng minh việc học đã diễn ra."]});
+  }else if(klass?.kind==="class"&&klass.status==="active"&&klass.learnerCount>room.capacity){
+   const pair=klass.id+":"+room.id;
+   if(!flaggedRoomCapacity.has(pair)){
+    flaggedRoomCapacity.add(pair);
+    added(out,{id:"room-capacity:"+pair,area:"rooms",priority:"medium",
+     title:"Cần đối chiếu sức chứa phòng "+room.name,
+     details:"Lớp "+klass.name+" ghi nhận "+klass.learnerCount+" học viên; cấu hình phòng là "+room.capacity+" chỗ.",
+     recommendedAction:"Đối chiếu số học viên thực tế tham gia buổi và giới hạn an toàn của phòng/bể.",
+     target:"room",evidence:[citation("resources",klass.id,"learnerCount,status",board),
+       citation("resources",room.id,"capacity,status",board)],
+     limitations:["Sĩ số lớp không chứng minh tất cả học viên có mặt cùng một buổi; sức chứa cấu hình không thay cho kiểm định an toàn."]});
+   }
+  }
   if(!klass||klass.kind!=="class"||klass.status!=="active"||
      !room||room.kind!=="room"||room.status!=="active"||
      !teacherSet.has(s.teacherId)){
