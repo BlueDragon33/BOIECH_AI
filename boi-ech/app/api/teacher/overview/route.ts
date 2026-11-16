@@ -136,8 +136,8 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     }];
   });
   return {
-    score: Math.max(0, Math.min(100, Math.round(Number(source.score) || 0))),
-    confidence: Math.max(0, Math.min(100, Math.round(Number(source.confidence) || 0))),
+    score: measured(source.score),
+    confidence: measured(source.confidence),
     captureQuality,
     poseCoverage: measured(quality.poseCoverage),
     averageVisibility: measured(quality.averageVisibility),
@@ -469,14 +469,14 @@ export async function POST(request: Request) {
       // even when the overall AI score is high. Missing metrics are never
       // interpreted as an observed 0.
       const technicalNeedsSupport = Boolean(analysis && analysis.captureQuality === "good"
-        && analysis.confidence >= 70
+        && analysis.confidence !== null && analysis.confidence >= 70
         && (analysis.errors.some((issue) => issue.severity === "critical")
           || Object.values(analysis.categories).some((score) => score !== null && score < 60)));
       const needsSupport = technicalNeedsSupport || inactivityHours > 7 * 24
         || progress < 50
         || adaptiveAlerts.length > 0
         || teacherLoopNeedsFollowUp
-        || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
+        || Boolean(analysis && (analysis.confidence === null || analysis.confidence < 70 || analysis.captureQuality === "review"));
       return {
         name: row.learner_name?.trim() || "Học viên",
         personCode: row.person_code?.trim() || "",
