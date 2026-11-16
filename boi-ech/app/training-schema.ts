@@ -16,6 +16,14 @@ export const TRAINING_SCHEMA = [
  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,CHECK(starts_at<ends_at))`,
 `CREATE INDEX IF NOT EXISTS training_sessions_interval ON training_sessions(status,starts_at,ends_at)`,
 `CREATE TABLE IF NOT EXISTS training_commands(command_id TEXT PRIMARY KEY,actor_id TEXT NOT NULL,payload_json TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+`CREATE TABLE IF NOT EXISTS training_teacher_class_terms (
+ teacher_device_id TEXT NOT NULL REFERENCES device_access(device_id),
+ class_id TEXT NOT NULL REFERENCES training_resources(id),
+ started_at TEXT NOT NULL,planned_end_at TEXT,ended_at TEXT,
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1),updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(teacher_device_id,class_id),
+ CHECK(planned_end_at IS NULL OR julianday(planned_end_at)>julianday(started_at)))`,
+`CREATE INDEX IF NOT EXISTS training_teacher_class_terms_by_class ON training_teacher_class_terms(class_id,ended_at)`,
 ...(["INSERT","UPDATE"] as const).map(event=>`CREATE TRIGGER IF NOT EXISTS training_session_${event.toLowerCase()} BEFORE ${event} ON training_sessions WHEN NEW.status!='cancelled' BEGIN
  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM training_resources c,training_resources r,training_resources b,device_access t
  WHERE c.id=NEW.class_id AND c.kind='class' AND c.status='active'
