@@ -122,11 +122,16 @@ test("V42 review is linked to the exact analysis and suppresses repeated task dr
  }});
  assert.equal(other.humanReviewed,false);
 });
-test("V42 is read-only and cannot invoke independent backend, model provider or mutate source",()=>{
- for(const name of ["manager-ai-allocation-v42.ts","manager-ai-allocation-panel-v42.tsx","teacher-video-priority-v42.ts"]){
+test("V43 allocation remains source-pure; only signed audited manager decisions may reach its dedicated API",()=>{
+ for(const name of ["manager-ai-allocation-v42.ts","teacher-video-priority-v42.ts"]){
   const c=fs.readFileSync(path.join(root,name),"utf8");
   assert.doesNotMatch(c,/\bfetch\(|\.prepare\(|process\.env|localStorage|sessionStorage|onCommand\(/);
  }
+ const approvalPanel=fs.readFileSync(path.join(root,"manager-ai-allocation-panel-v42.tsx"),"utf8");
+ assert.match(approvalPanel,/api\\/training-ai-proposals/);
+ assert.match(approvalPanel,/const proof=await getProof/);
+ assert.match(approvalPanel,/action==="approve"\\)onReviewProposal/);
+ assert.doesNotMatch(approvalPanel,/\\.prepare\\(|process\\.env|localStorage|sessionStorage|\\btrainingCommand\\(/);
  const shell=fs.readFileSync(path.join(root,"teacher-role-shell.tsx"),"utf8");
  assert.match(shell,/data-video-coaching-draft/);
  assert.match(shell,/prioritizeTeacherVideo\(learner\)/);
