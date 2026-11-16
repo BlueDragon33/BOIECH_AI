@@ -85,7 +85,7 @@ export function reviewTeacherCandidates(board:TrainingBoard,classId:string,limit
  const activeClasses=new Set(board.resources.filter(x=>x.kind==="class"&&x.status==="active").map(x=>classKey(x.name)));
  const targetSessions=activeSessions(board).filter(x=>x.classId===classId);
  const cap=Math.max(1,Math.min(100,Number.isFinite(limit)?Math.floor(limit):30));
- return board.people.filter(eligibleTeacher).map(teacher=>{
+ return board.people.filter(eligibleTeacher).map((teacher):TeacherCandidateReview=>{
   const load=[...new Set(classNames(teacher.className).map(classKey).filter(k=>activeClasses.has(k)))];
   const teacherLessons=activeSessions(board).filter(s=>
     s.classId!==classId&&personIds(s).includes(teacher.id));
