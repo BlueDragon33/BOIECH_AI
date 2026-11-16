@@ -514,7 +514,8 @@ export async function POST(request: Request) {
     const scopedLearnerIndex = new Map((result.results ?? []).map((row, index) => [row.device_id, index]));
     const videoInbox = (learningEventsResult.results ?? [])
       .filter((event) => event.event_type === "video_ai_analysis"
-        && Number.isSafeInteger(event.id) && scopedLearnerIndex.has(event.device_id))
+        && typeof event.id === "number" && Number.isSafeInteger(event.id)
+        && scopedLearnerIndex.has(event.device_id))
       .flatMap((event) => {
         const learnerIndex = scopedLearnerIndex.get(event.device_id);
         if (learnerIndex === undefined || !learners[learnerIndex]) return [];
