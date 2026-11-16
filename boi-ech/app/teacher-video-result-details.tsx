@@ -4,6 +4,10 @@ export type TeacherVideoIssue = {
  title:string;severity:"warning"|"critical";timeSec:number|null;
  observed:string;expected:string;recommendation:string;confidence:number|null;
 };
+export type TeacherPublishedGuidance={
+ source:"published-course-content";versionId:string;versionNumber:number;reviewedBy:string;publishedAt:string;
+ lessonNumber:string;sourceItemId:string;title:string;correction:string;practice:string;
+};
 export type TeacherVideoAnalysis = {
  score:number|null;confidence:number|null;captureQuality:"good"|"review";
  poseCoverage:number|null;averageVisibility:number|null;
@@ -11,6 +15,7 @@ export type TeacherVideoAnalysis = {
  cameraView:"rear"|"side";
  categories:{legs:number|null;arms:number|null;coordination:number|null;bodyLine:number|null};
  errorCount:number;topErrors:string[];errors:TeacherVideoIssue[];analyzedAt:string|null;
+ publishedGuidance?:TeacherPublishedGuidance[];
 };
 export type TeacherVideoReview = {
  action:"feedback"|"assignment"|"review";reviewStatus:""|"reviewed"|"follow-up";
@@ -101,6 +106,18 @@ export default function TeacherVideoResultDetails({analysis,review}:{
      {error.recommendation?<p className="teacher-video-correction"><b>Nên luyện:</b> {error.recommendation}</p>:<p>Chưa có hướng dẫn điều chỉnh cụ thể trong bản ghi này.</p>}
      </li>)}</ol>:<p>{analysis.errorCount>0?"Bản phân tích cũ chỉ có tên lỗi; chưa có bằng chứng chi tiết để hiển thị.":"Không phát hiện lỗi theo các quy tắc đang áp dụng không đồng nghĩa đã đạt chuẩn bơi thực tế."}</p>}
    {analysis.errorCount>analysis.errors.length?<small>Chỉ hiển thị tối đa {analysis.errors.length} lỗi có thông tin chi tiết trong bản tóm tắt hiện tại.</small>:null}
+  </section>
+  <section className="teacher-video-evidence" aria-label="Đối chiếu giáo trình đã xuất bản">
+   <h4>Đối chiếu giáo trình có kiểm duyệt</h4>
+   {analysis.publishedGuidance?.length?
+    <ol>{analysis.publishedGuidance.map(item=><li key={item.versionId+":"+item.sourceItemId}>
+      <strong>{item.title}</strong>
+      <p><b>Trong giáo trình:</b> {item.correction}</p>
+      {item.practice?<p><b>Bài tập tham chiếu:</b> {item.practice}</p>:null}
+      <small>Nguồn: Bản giáo trình #{item.versionNumber} · mục {item.sourceItemId} ·
+       Giảng viên/biên tập duyệt: {item.reviewedBy} · Xuất bản: {instant(item.publishedAt)}</small>
+     </li>)}</ol>:
+    <p>Chưa tìm thấy nội dung khớp trong bản giáo trình đã xuất bản và có người duyệt. Không tự tạo chỉ dẫn thay thế.</p>}
   </section>
   <section className="teacher-video-evidence" aria-label="Thông số chất lượng video được lưu">
    <h4>Căn cứ chất lượng ghi hình</h4>
