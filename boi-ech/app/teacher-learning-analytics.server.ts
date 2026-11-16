@@ -1,4 +1,6 @@
 type LearningEventRow = {
+  /** D1 event identity is populated by scoped overview queries; legacy rows may omit it. */
+  id?: number;
   device_id: string;
   event_type: string;
   lesson_number: string | null;
