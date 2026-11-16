@@ -90,6 +90,7 @@ test("V41.1 training quality uses only roster/session aggregates and explicitly 
  const q=summarizeManagerTrainingQuality(board());
  assert.equal(q.learnerAccounts.total,3);
  assert.equal(q.learnerAccounts.withoutActiveClass,2);
+ assert.equal(q.learnerAccounts.unmatchedClass,1,"unassigned placeholder is not an invalid class name");
  assert.equal(q.sessions.scheduled,3);
  assert.equal(q.sessions.completed,0);
  assert.equal(q.unavailableDatasets.length,5);
