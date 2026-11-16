@@ -315,3 +315,12 @@
 .rosterClean button:disabled{cursor:not-allowed!important;opacity:.55!important}
 @media(max-width:580px){.rosterCleanControls>*{flex:1 1 100%}.rosterCleanChoices button{width:100%}
  .rosterCleanSummary span{flex:1 1 30%}}
+
+/* V41-P0 AI visible from header even when mobile dock retains exactly five items. */
+.workspace .aiShortcut{display:inline-flex;align-items:center;justify-content:center;
+ min-height:44px;min-width:44px;border:1px solid #94cbe6;border-radius:13px;
+ background:#e0f3ff;color:#085594;box-shadow:0 3px 11px #164f7220}
+.workspace .aiShortcut .appIcon{background:transparent;color:inherit}
+.workspace .aiShortcut[aria-current="page"]{background:#0c659c;border-color:#0c659c;color:#fff}
+.workspace .aiShortcut:focus-visible{outline:3px solid #e4a21f;outline-offset:2px}
+@media(max-width:380px){.workspace .aiShortcut{min-width:42px;min-height:42px}}

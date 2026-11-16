@@ -93,6 +93,7 @@ export function PersonStatusBar({person,resources}:{person:TrainingPerson;resour
 export function AppIcon({name}:{name:string}) {
   const paths:Record<string,React.ReactNode>={
     overview:<><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></>,
+    ai:<><path d="m12 2 2.2 7 6.8 2.5-6.8 2.5L12 21l-2.2-7L3 11.5 9.8 9z"/></>,
     schedule:<><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/></>,
     people:<><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m2-16a3 3 0 0 1 0 6m1 3a5 5 0 0 1 3 5v2"/></>,
     approval:<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h9M8 13h5M14 17l2 2 4-4"/></>,
