@@ -37,7 +37,8 @@ export function prioritizeTeacherVideo(learner:LearnerVideoInput):VideoCoachingD
    exerciseTitle:"",exerciseNote:"",lessonNumber,evidenceStatus:"capture-review",canDraftExercise:false,humanReviewed:reviewed};
  }
  const weak=categories.map(([key,name])=>({key,name,score:analysis.categories?.[key]}))
-  .filter((c):c is {key:typeof categories[number][0];name:string;score:number}=>valid(c.score))
+  .filter(c=>valid(c.score))
+  .map(c=>({...c,score:c.score as number}))
   .sort((a,b)=>a.score-b.score)[0];
  const error=(analysis.errors??[]).find(e=>e.severity==="critical")??analysis.errors?.[0];
  const issue=error?.title||analysis.topErrors?.[0]||"";
