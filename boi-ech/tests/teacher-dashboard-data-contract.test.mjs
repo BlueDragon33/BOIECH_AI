@@ -17,7 +17,10 @@ test("teacher data V6 loads after the visual fidelity layer", () => {
 test("teacher dashboard derives additional indicators only from returned learner evidence", () => {
   assert.match(shell, /function teacherInsights\(learners: TeacherLearner\[\]\)/);
   assert.match(shell, /completedCount = learners\.filter/);
-  assert.match(shell, /averageConfidence = analyses\.length/);
+  assert.match(shell, /measuredConfidence = analyses\.map/);
+  assert.match(shell, /filter\(\(value\):value is number=>value!==null\)/);
+  assert.match(shell, /averageConfidence = measuredConfidence\.length/);
+  assert.doesNotMatch(shell, /averageConfidence = analyses\.length/);
   assert.match(shell, /totalStudyMinutes = learners\.reduce/);
   assert.match(shell, /completionRate = learners\.length/);
   assert.match(shell, /issueCounts = new Map<string, number>/);
