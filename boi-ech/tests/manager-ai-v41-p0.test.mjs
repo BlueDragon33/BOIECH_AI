@@ -164,7 +164,7 @@ test("V41 P0 navigation is explicit, does not alter five-button mobile dock or a
  const source=fs.readFileSync(path.join(root,"manager-workspace.tsx"),"utf8");
  const ui=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
  const css=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.module.css"),"utf8");
- assert.match(source,/type Tab="overview"\|"ai"/);
+ assert.match(source,/type Tab="overview"\|"approval"\|"ai"/);
  assert.match(source,/label:"AI Điều hành"/);
  assert.match(source,/<ManagerAiWorkspaceV41 board=\{board\} busy=\{busy\} onNavigate=\{selectTab\}/);
  assert.match(source,/<ManagerAiContextNoticeV41 board=\{board\}/);
