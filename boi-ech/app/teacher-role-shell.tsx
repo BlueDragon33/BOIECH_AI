@@ -339,7 +339,7 @@ export default function TeacherRoleShell() {
   }, []);
   // No polling in inactive or hidden teacher sessions; 3-minute on-screen refresh.
   useEffect(()=>{
-   if(!active)return;
+   if(!active||typeof window.setInterval!=="function"||typeof window.clearInterval!=="function")return;
    const timer=window.setInterval(()=>{if(document.visibilityState==="visible")refresh();},180_000);
    const onVisible=()=>{if(document.visibilityState==="visible")refresh();};
    document.addEventListener("visibilitychange",onVisible);
