@@ -13,7 +13,7 @@ export type AllocationProposal={
  observedAt:string;sourceRecords:{source:"people"|"resources"|"sessions";id:string}[];
  warnings:string[];decision:"human-review-required";
  evidenceStatus:"checked-window"|"no-class-sessions"|"profile-missing";
- suggestedRole:"primary"|"alternative"|"teacher-candidate";
+ suggestedRole:"primary"|"alternative"|"teacher-primary"|"teacher-alternative";
 };
 export type AllocationReview={observedAt:string;from:string;to:string;
  teacherShortlist:AllocationProposal[];learnerShortlist:AllocationProposal[];
@@ -42,32 +42,63 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
  const sessionLoad=(personId:string)=>board.sessions.filter(session=>
    session.status!=="cancelled"&&
    (session.teacherId===personId||session.assistantTeacherId===personId)).length;
+ const projectedTeacherWindows=new Map<string,{classId:string;start:number;end:number}[]>();
+ const recordedWindows=(classId:string)=>board.sessions.filter(session=>
+   session.classId===classId&&session.status!=="cancelled")
+   .map(session=>({classId,start:Date.parse(session.startsAt),end:Date.parse(session.endsAt)}))
+   .filter(s=>Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.end>s.start);
  for(const klass of shortage.sort((a,b)=>b.missingTeachers-a.missingTeachers||a.name.localeCompare(b.name,"vi"))){
+  const classWindows=recordedWindows(klass.id);
+  let primaryCount=0;
   const candidates=reviewTeacherCandidates(board,klass.id,100)
    .filter(c=>!c.alreadyAssigned&&c.overlappingExistingSessions===0)
    .sort((a,b)=>a.currentClassLoad-b.currentClassLoad||
      sessionLoad(a.teacherId)-sessionLoad(b.teacherId)||
      a.displayName.localeCompare(b.displayName,"vi")||a.teacherId.localeCompare(b.teacherId))
-   .slice(0,3);
+   .slice(0,12);
+  let candidatesShown=0;
   for(const c of candidates){
+   if(candidatesShown>=3)break;
    const person=teachers.find(t=>t.id===c.teacherId);
    if(!person)continue;
+   const assignedWindows=projectedTeacherWindows.get(person.id)??[];
+   const proposedConflict=classWindows.some(next=>assignedWindows.some(previous=>
+     next.start<previous.end&&next.end>previous.start));
+   const projectedClassLoad=c.currentClassLoad+new Set(assignedWindows.map(s=>s.classId)).size;
+   const timetableVerified=c.classSessionsExamined>0&&classWindows.length===c.classSessionsExamined;
+   const primary=timetableVerified&&!proposedConflict&&projectedClassLoad<12&&primaryCount<klass.missingTeachers;
+   if(primary){
+    primaryCount++;
+    projectedTeacherWindows.set(person.id,[...assignedWindows,...classWindows]);
+   }
+   candidatesShown++;
    teacherShortlist.push({
     id:"teacher:"+klass.id+":"+person.id,kind:"teacher",personId:person.id,personName:person.name,
-    classId:klass.id,className:klass.name,priority:c.classSessionsExamined===0?"medium":"high",
+    classId:klass.id,className:klass.name,priority:primary?"high":"medium",
     reason:"Lớp thiếu "+klass.missingTeachers+" giảng viên; ứng viên đang phụ trách "+c.currentClassLoad+
-     (c.classSessionsExamined===0
-      ?" lớp hoạt động. Không có buổi học để đối chiếu thời gian, chưa thể xác nhận không trùng lịch."
-      :" lớp hoạt động, có "+sessionLoad(person.id)+" buổi đã xếp trong cửa sổ tải và không phát hiện trùng giờ trong "+c.classSessionsExamined+" buổi của lớp đã tải."),
+     (!timetableVerified
+      ?" lớp hoạt động. Lịch buổi học thiếu hoặc không hợp lệ; chưa thể xác nhận không trùng lịch."
+      :proposedConflict
+       ?" lớp hoạt động, nhưng TRÙNG GIỜ với một phân công ưu tiên đã mô phỏng. Chỉ là phương án thay thế."
+       :projectedClassLoad>=12
+        ?" lớp hoạt động, đạt giới hạn 12 lớp khi tính phương án đang mô phỏng."
+        :" lớp hoạt động, có "+sessionLoad(person.id)+" buổi đã xếp trong cửa sổ tải; đã đối chiếu "+c.classSessionsExamined+" buổi với lịch thực tế và các phương án ưu tiên."),
     currentClassLoad:c.currentClassLoad,currentSessionLoad:sessionLoad(person.id),
     currentLearnerCount:klass.learnerCount,
     classCapacity:klass.capacity,teacherCoverage:klass.teacherCount+"/"+klass.requiredTeachers,
     observedAt:board.observedAt,
-    sourceRecords:[{source:"resources",id:klass.id},{source:"people",id:person.id}],
-    warnings:c.classSessionsExamined===0?
-     ["Không có lịch buổi của lớp trong khoảng tải nên chưa kiểm tra được xung đột.",...staffWarnings]:staffWarnings,
-    evidenceStatus:c.classSessionsExamined===0?"no-class-sessions":"checked-window",
-    suggestedRole:"teacher-candidate",decision:"human-review-required"
+    sourceRecords:[{source:"resources",id:klass.id},{source:"people",id:person.id},
+     ...board.sessions.filter(s=>s.classId===klass.id&&s.status!=="cancelled").slice(0,4)
+       .map(s=>({source:"sessions" as const,id:s.id}))],
+    warnings:[
+     ...(!timetableVerified?["Lịch buổi học thiếu/không hợp lệ; không được coi là sẵn sàng."]:[]),
+     ...(proposedConflict?["Mô phỏng cho thấy trùng giờ với lớp đã được ưu tiên ở danh sách này."]:[]),
+     ...(projectedClassLoad>=12?["Tải lớp mô phỏng đã đạt giới hạn 12 lớp."]:[]),
+     "Phân công ưu tiên chỉ là mô phỏng; không khóa giờ, lớp hay giảng viên trên D1.",
+     ...staffWarnings
+    ],
+    evidenceStatus:timetableVerified?"checked-window":"no-class-sessions",
+    suggestedRole:primary?"teacher-primary":"teacher-alternative",decision:"human-review-required"
    });
   }
  }
