@@ -1,3 +1,9 @@
+import type {InstructorAdmissionProfile,LearnerAdmissionProfile,
+ ClassAdmissionProfile} from "./manager-ai-profile-admission-v43";
+export type TrainingAdmissionProfiles={
+ teacher:InstructorAdmissionProfile[];learner:LearnerAdmissionProfile[];
+ safety:ClassAdmissionProfile[];sourceMayBeTruncated:boolean;
+};
 export type ResourceKind = "building" | "room" | "class";
 export type ResourceStatus = "active" | "unavailable" | "archived";
 export type TrainingResource = { id:string; kind:ResourceKind; name:string; parentId:string|null; capacity:number; requiredTeachers:number; status:ResourceStatus; version:number; learnerCount:number; teacherCount:number; remaining:number; missingTeachers:number; bookingCount:number; state:"available"|"full"|"missing"|"overloaded"|"inactive"; roomCount:number };
@@ -13,7 +19,7 @@ export type TrainingLeaderHistory = {id:string;classId:string;slot:"cadre"|"stud
  previousMemberDeviceId:string|null;previousDisplayName:string|null;previousBirthDate:string|null;
  previousMilitaryRank:string|null;previousBattalion:string|null;replacedAt:string};
 export type TrainingTeacherClassTerm={teacherDeviceId:string;classId:string;startedAt:string;plannedEndAt:string|null;endedAt:string|null;version:number};
-export type TrainingBoard = { teacherClassTerms:TrainingTeacherClassTerm[];leaderHistory:TrainingLeaderHistory[];leaders:TrainingClassLeader[];periods:TrainingPeriod[];resources:TrainingResource[]; people:TrainingPerson[]; sessions:TrainingSession[]; from:string; to:string; observedAt:string; summary:{ freeRooms:number; occupiedRooms:number; missingLearners:number; missingTeachers:number; unassignedLearners:number; unassignedTeachers:number } };
+export type TrainingBoard = { admissionProfiles?:TrainingAdmissionProfiles; teacherClassTerms:TrainingTeacherClassTerm[];leaderHistory:TrainingLeaderHistory[];leaders:TrainingClassLeader[];periods:TrainingPeriod[];resources:TrainingResource[]; people:TrainingPerson[]; sessions:TrainingSession[]; from:string; to:string; observedAt:string; summary:{ freeRooms:number; occupiedRooms:number; missingLearners:number; missingTeachers:number; unassignedLearners:number; unassignedTeachers:number } };
 export function classNames(value:string) { return value.split(/[;,\n]+/).map(s=>s.trim()).filter(Boolean); }
 // Match SQLite's built-in lower() exactly; manager assignments write canonical names.
 export function classKey(value:string) { return value.trim().replace(/[A-Z]/g,c=>c.toLowerCase()); }
