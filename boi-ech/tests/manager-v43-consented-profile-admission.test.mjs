@@ -34,14 +34,17 @@ function fixture(t){
  INSERT INTO training_resources VALUES('C1','class','active');`);
  sqlite.exec(schema.replace(/^--.*$/gm,"").replaceAll("--> statement-breakpoint",""));
  const db={
-  prepare(sql){return {bind(...args){
-   const stmt=sqlite.prepare(sql);
-   return {
-    async run(){const r=stmt.run(...args);return {meta:{changes:r.changes,last_row_id:Number(r.lastInsertRowid)}};},
-    async all(){return {results:stmt.all(...args)};},
-    async first(){return stmt.get(...args)??null;}
+  prepare(sql){
+   const bind=(...args)=>{
+    const stmt=sqlite.prepare(sql);
+    return {
+     async run(){const r=stmt.run(...args);return {meta:{changes:r.changes,last_row_id:Number(r.lastInsertRowid)}};},
+     async all(){return {results:stmt.all(...args)};},
+     async first(){return stmt.get(...args)??null;}
+    };
    };
-  }};},
+   return Object.assign(bind(),{bind});
+  },
   async batch(prepared){
    sqlite.exec("BEGIN");try{const rows=[];for(const p of prepared)rows.push(await p.run());
     sqlite.exec("COMMIT");return rows;
