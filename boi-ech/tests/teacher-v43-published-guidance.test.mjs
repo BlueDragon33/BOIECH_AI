@@ -44,6 +44,9 @@ test("published lesson 01 foundation mistakes are separately traceable",()=>{
 });
 test("signed teacher overview joins published D1 metadata and exact video lesson before citing content",()=>{
  assert.match(api,/FROM course_content_versions WHERE status='published'/);
+ assert.match(api,/parseCourseDocument\(publishedSource\.payload_json\)/);
+ assert.match(api,/const admittedSource=admittedPublishedDocument\?publishedSource:null/);
+ assert.match(api,/admittedPublishedDocument\?\?document,admittedSource,analysisSource/);
  assert.match(api,/reviewed_by,reviewed_at,published_at/);
  assert.match(api,/AS last_analysis_lesson/);
  assert.match(api,/groundedSwimmingCorrections\(/);
