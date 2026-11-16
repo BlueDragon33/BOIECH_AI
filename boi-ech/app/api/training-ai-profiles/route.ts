@@ -112,7 +112,7 @@ export async function POST(request:Request){
   }
   const classId=payload.classId;
   if(typeof classId!=="string"||!board.resources.some(r=>r.id===classId&&r.kind==="class"&&r.status==="active"))
-   return respond({error:"Lớp không hợp lệ.",403});
+   return respond({error:"Lớp không hợp lệ."},403);
   const validated=validateClassSafetyProfile(payload.profile);
   if(!validated.ok||!validated.payload)return respond({error:validated.message},400);
   const data=JSON.stringify(validated.payload);
