@@ -33,6 +33,18 @@ function Glyph({name}:{name:"ai"|"users"|"calendar"|"alert"|"class"|"arrow"|"shi
  };
  return <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{nodes[name]}</svg>;
 }
+export function ManagerAiContextNoticeV41({board,area,onOpen}:{board:TrainingBoard;area:"people"|"class"|"schedule"|"room";onOpen:()=>void}){
+ const report=analyzeManagerBoard(board,60);
+ const wanted=area==="people"?["staff"]:area==="class"?["class","staff"]:area==="schedule"?["schedule"]:["schedule"];
+ const selected=report.findings.filter(f=>wanted.includes(f.area));
+ const urgent=selected.filter(f=>f.priority==="critical"||f.priority==="high");
+ return <aside className={styles.contextNotice} aria-label="AI phát hiện theo ngữ cảnh, chỉ đọc">
+  <span><Glyph name="ai"/></span>
+  <div><strong>AI phân tích · {urgent.length} tín hiệu ưu tiên</strong>
+   <small>{urgent[0]?urgent[0].title:"Chưa phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại."} · Dữ liệu có bằng chứng, không tự thực thi.</small></div>
+  <button type="button" onClick={onOpen}>Xem phân tích <Glyph name="arrow"/></button>
+ </aside>;
+}
 export function ManagerAiOverviewEntryV41({board,onOpen}:{board:TrainingBoard;onOpen:()=>void}){
  const report=analyzeManagerBoard(board,20);
  const pending=report.counts.critical+report.counts.high;
