@@ -46,7 +46,10 @@ test("teacher inbox never performs automated send or claims push and retains hum
  assert.match(shell,/analysisAt:entry\.analysis\.analyzedAt/);
  assert.match(shell,/mode:"review",learner:previewLearner/);
  assert.match(shell,/mode:"assignment",learner:previewLearner/);
- assert.match(shell,/Đây chưa phải thông báo push/);
+ assert.match(shell,/chưa phải thông báo push/);
+ assert.match(shell,/data-mark-video-seen/);
+ assert.match(shell,/markVideoInboxSeen\(deviceId,entry\.eventId,entry\.receiptRevision\)/);
+ assert.match(shell,/api\/teacher\/video-inbox/);
  assert.doesNotMatch(shell.slice(shell.indexOf("function TeacherVideoEventInbox"),shell.indexOf("function AnalysisQueue")),/\bfetch\(|\bwindow\.localStorage|localStorage/);
 });
 test("completed review of exact video is not inferred for a later video",()=>{
