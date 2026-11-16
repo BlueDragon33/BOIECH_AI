@@ -143,7 +143,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   ${scopedTarget?"AND EXISTS(SELECT 1 FROM manager_device_assignments ma WHERE ma.manager_device_id=a.device_id AND ma.target_device_id=?)":""})`:AUTH_GUARD;
  const authorityBindings=actor.accountId?[managerStorageDeviceId,accountSessionHash,...(scopedTarget?[scopedTarget]:[])]:[actor.deviceId];
  const db=await trainingDatabase();const commandId=id(payload.commandId);
- const action=payload.action;let command:Record<string,unknown>;let write:D1PreparedStatement;
+ const action=payload.action;let command:Record<string,unknown>;let write:D1PreparedStatement;const followups:D1PreparedStatement[]=[];
  if(action==="save-resource") {
   const kind=payload.kind;if(kind!=="class"&&kind!=="room"&&kind!=="building")fail("Loại tài nguyên không hợp lệ.");
   const name=text(payload.name,50);if(/[;,]/.test(name))fail("Tên lớp/phòng không được chứa dấu phẩy hoặc chấm phẩy.");
@@ -274,6 +274,27 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(!Array.isArray(payload.classIds)||payload.classIds.length>(target.role==="learner"?1:12))fail("Học viên thuộc một lớp; giảng viên tối đa 12 lớp.");
   const ids=[...new Set(payload.classIds.map(id))];const names:string[]=[];
   for(const key of ids){const row=await db.prepare("SELECT name FROM training_resources WHERE id=? AND kind='class' AND status='active'").bind(key).first<{name:string}>();if(!row)fail("Lớp học chưa sẵn sàng.","TRAINING_RESOURCE_UNAVAILABLE",409);names.push(row.name);}
+  if(target.role==="teacher"){
+    // Stamp only new manager-authorized allocations; previous legacy classes remain unknown.
+    const prior=new Set(classNames(expectedClassName).map(classKey));
+    const newIds=ids.filter((classId,index)=>!prior.has(classKey(names[index])));
+    if(newIds.length){
+      const placeholders=newIds.map(()=>"?").join(",");
+      followups.push(db.prepare(`INSERT INTO training_teacher_class_terms(teacher_device_id,class_id,started_at,planned_end_at,ended_at,version)
+        SELECT ?,c.id,strftime('%Y-%m-%dT%H:%M:%fZ','now'),NULL,NULL,1 FROM training_resources c
+        WHERE c.id IN (${placeholders}) AND c.kind='class' AND c.status='active'
+          AND EXISTS (SELECT 1 FROM training_commands WHERE command_id=? AND actor_id=?)
+        ON CONFLICT(teacher_device_id,class_id) DO UPDATE SET started_at=excluded.started_at,
+          planned_end_at=NULL,ended_at=NULL,version=training_teacher_class_terms.version+1,updated_at=CURRENT_TIMESTAMP`)
+        .bind(personId,...newIds,commandId,actor.deviceId));
+    }
+    const exclude=ids.length?`AND class_id NOT IN (${ids.map(()=>"?").join(",")})`:"";
+    followups.push(db.prepare(`UPDATE training_teacher_class_terms
+      SET ended_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),version=version+1,updated_at=CURRENT_TIMESTAMP
+      WHERE teacher_device_id=? AND ended_at IS NULL ${exclude}
+        AND EXISTS (SELECT 1 FROM training_commands WHERE command_id=? AND actor_id=?)`)
+      .bind(personId,...ids,commandId,actor.deviceId));
+  }
   const className=names.join("; ")||(target.role==="learner"?"Chưa phân lớp":"Chưa phân công");
   command={action,personId,classIds:ids,expectedClassName};
   write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=?
@@ -293,7 +314,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
  async function receipt(){return db.prepare("SELECT actor_id,payload_json FROM training_commands WHERE command_id=?").bind(commandId).first<{actor_id:string;payload_json:string}>();}
  const existing=await receipt();if(existing){if(existing.actor_id!==actor.deviceId||existing.payload_json!==canonical)fail("Mã thao tác đã dùng cho thay đổi khác.","TRAINING_COMMAND_CONFLICT",409);return;}
  try {
-  const result=await db.batch([write,db.prepare("INSERT INTO training_commands(command_id,actor_id,payload_json) SELECT ?,?,? WHERE changes()=1").bind(commandId,actor.deviceId,canonical),db.prepare("INSERT INTO course_audit_log(actor,action,target,detail_json) SELECT ?,'training_management',?,? WHERE changes()=1").bind(actor.deviceCode,commandId,canonical)]);
+  const result=await db.batch([write,db.prepare("INSERT INTO training_commands(command_id,actor_id,payload_json) SELECT ?,?,? WHERE changes()=1").bind(commandId,actor.deviceId,canonical),db.prepare("INSERT INTO course_audit_log(actor,action,target,detail_json) SELECT ?,'training_management',?,? WHERE changes()=1").bind(actor.deviceCode,commandId,canonical),...followups]);
   if(Number(result[0].meta.changes)!==1)fail("Dữ liệu hoặc quyền điều phối đã thay đổi. Đồng bộ rồi kiểm tra lại bản nháp.","TRAINING_VERSION_CONFLICT",409);
  }catch(error){const replay=await receipt();if(replay&&replay.actor_id===actor.deviceId&&replay.payload_json===canonical)return;throw error;}
 }
