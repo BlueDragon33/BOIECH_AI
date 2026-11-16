@@ -5,6 +5,7 @@ import {analyzeManagerBoard,answerManagerQuestion,simulateTeacherAllocation,type
 import {classKey,classNames,type TrainingBoard} from "./training-types";
 import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
 import ManagerAiAllocationPanelV42 from "./manager-ai-allocation-panel-v42";
+import {buildAllocationReview} from "./manager-ai-allocation-v42";
 import styles from "./manager-ai-workspace-v41.module.css";
 
 const categories:{key:"all"|ManagerAiArea;label:string}[]=[
@@ -40,9 +41,12 @@ export function ManagerAiContextNoticeV41({board,area,onOpen}:{board:TrainingBoa
  const wanted=area==="people"?["staff"]:area==="class"?["class","staff"]:area==="schedule"?["schedule"]:["schedule"];
  const selected=report.findings.filter(f=>wanted.includes(f.area));
  const urgent=selected.filter(f=>f.priority==="critical"||f.priority==="high");
+ const allocation=buildAllocationReview(board);
+ const proposed=area==="people"?allocation.teacherShortlist.length:
+  area==="class"?allocation.learnerShortlist.length:0;
  return <aside className={styles.contextNotice} aria-label="AI phát hiện theo ngữ cảnh, chỉ đọc">
   <span><Glyph name="ai"/></span>
-  <div><strong>AI phân tích · {urgent.length} tín hiệu ưu tiên</strong>
+  <div><strong>AI phân tích · {urgent.length} tín hiệu ưu tiên · {proposed} phương án phân bổ</strong>
    <small>{urgent[0]?urgent[0].title:"Chưa phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại."} · Dữ liệu có bằng chứng, không tự thực thi.</small></div>
   <button type="button" onClick={onOpen}>Xem phân tích <Glyph name="arrow"/></button>
  </aside>;
@@ -50,10 +54,12 @@ export function ManagerAiContextNoticeV41({board,area,onOpen}:{board:TrainingBoa
 export function ManagerAiOverviewEntryV41({board,onOpen}:{board:TrainingBoard;onOpen:()=>void}){
  const report=analyzeManagerBoard(board,20);
  const pending=report.counts.critical+report.counts.high;
+ const allocation=buildAllocationReview(board);
+ const toReview=allocation.teacherShortlist.length+allocation.learnerShortlist.length;
  return <button className={styles.overviewEntry} type="button" onClick={onOpen} aria-label="Mở Trung tâm AI Điều hành, xem cảnh báo có bằng chứng">
   <span className={styles.overviewEntryIcon}><Glyph name="ai"/></span>
-  <span><strong>AI Điều hành · V41.0</strong><small>{pending?"Có "+pending+" cảnh báo khẩn hoặc cần xử lý":"Không phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại"}</small>
-   <small>Phân tích nhân sự, lớp và lịch · Không tự thực thi</small></span>
+  <span><strong>AI Điều hành · V42</strong><small>{pending?"Có "+pending+" cảnh báo khẩn hoặc cần xử lý":"Không phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại"}</small>
+   <small>{toReview} phương án phân bố học viên/giảng viên cần cán bộ chọn · Không tự thực thi</small></span>
   <Glyph name="arrow"/>
  </button>;
 }
