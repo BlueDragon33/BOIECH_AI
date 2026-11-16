@@ -8,7 +8,7 @@ import {reviewTeacherCandidates} from "./manager-ai-followon-v41";
 export type AllocationProposal={
  id:string;kind:"teacher"|"learner";personId:string;personName:string;
  classId:string;className:string;priority:"high"|"medium";
- reason:string;currentClassLoad:number|null;currentLearnerCount:number;
+ reason:string;currentClassLoad:number|null;currentSessionLoad:number|null;currentLearnerCount:number;
  classCapacity:number;teacherCoverage:string;
  observedAt:string;sourceRecords:{source:"people"|"resources"|"sessions";id:string}[];
  warnings:string[];decision:"human-review-required";
@@ -39,10 +39,14 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
   "Chưa xác minh chuyên môn, chứng chỉ, lịch rảnh chính thức và thời gian di chuyển.",
   "Chỉ xét buổi học thuộc khoảng dữ liệu đã tải; không có trùng giờ không đồng nghĩa sẵn sàng nhận lớp."
  ];
+ const sessionLoad=(personId:string)=>board.sessions.filter(session=>
+   session.status!=="cancelled"&&
+   (session.teacherId===personId||session.assistantTeacherId===personId)).length;
  for(const klass of shortage.sort((a,b)=>b.missingTeachers-a.missingTeachers||a.name.localeCompare(b.name,"vi"))){
   const candidates=reviewTeacherCandidates(board,klass.id,100)
    .filter(c=>!c.alreadyAssigned&&c.overlappingExistingSessions===0)
    .sort((a,b)=>a.currentClassLoad-b.currentClassLoad||
+     sessionLoad(a.teacherId)-sessionLoad(b.teacherId)||
      a.displayName.localeCompare(b.displayName,"vi")||a.teacherId.localeCompare(b.teacherId))
    .slice(0,3);
   for(const c of candidates){
@@ -54,8 +58,9 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
     reason:"Lớp thiếu "+klass.missingTeachers+" giảng viên; ứng viên đang phụ trách "+c.currentClassLoad+
      (c.classSessionsExamined===0
       ?" lớp hoạt động. Không có buổi học để đối chiếu thời gian, chưa thể xác nhận không trùng lịch."
-      :" lớp hoạt động và không phát hiện trùng giờ trong "+c.classSessionsExamined+" buổi của lớp đã tải."),
-    currentClassLoad:c.currentClassLoad,currentLearnerCount:klass.learnerCount,
+      :" lớp hoạt động, có "+sessionLoad(person.id)+" buổi đã xếp trong cửa sổ tải và không phát hiện trùng giờ trong "+c.classSessionsExamined+" buổi của lớp đã tải."),
+    currentClassLoad:c.currentClassLoad,currentSessionLoad:sessionLoad(person.id),
+    currentLearnerCount:klass.learnerCount,
     classCapacity:klass.capacity,teacherCoverage:klass.teacherCount+"/"+klass.requiredTeachers,
     observedAt:board.observedAt,
     sourceRecords:[{source:"resources",id:klass.id},{source:"people",id:person.id}],
@@ -90,7 +95,7 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
     reason:"Lớp đang còn "+(klass.capacity-klass.learnerCount)+" chỗ theo dữ liệu đã tải; "+
      klass.teacherCount+"/"+klass.requiredTeachers+" giảng viên được ghi nhận. "+
      (index===0?"Lựa chọn mô phỏng ưu tiên để cân bằng sĩ số.":"Lựa chọn thay thế, không giữ chỗ."),
-    currentClassLoad:null,currentLearnerCount:klass.learnerCount,
+    currentClassLoad:null,currentSessionLoad:null,currentLearnerCount:klass.learnerCount,
     classCapacity:klass.capacity,teacherCoverage:klass.teacherCount+"/"+klass.requiredTeachers,
     observedAt:board.observedAt,
     sourceRecords:[{source:"people",id:learner.id},{source:"resources",id:klass.id}],
