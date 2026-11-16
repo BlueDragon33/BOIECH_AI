@@ -1,5 +1,5 @@
 import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } from "../../../ai-engine.server";
-import { publishedCourseDocument } from "../../../course-content.server";
+import { publishedCourseDocument,parseCourseDocument } from "../../../course-content.server";
 import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-learning-analytics.server";
 import { buildInterventionSuggestions } from "../../../teacher-intervention-engine.server";
 import {groundedSwimmingCorrections,type PublishedCurriculumSource} from "../../../teacher-published-guidance.server";
@@ -318,12 +318,17 @@ export async function POST(request: Request) {
           LIMIT 1500`,
       ).bind(...teacherClasses).all<AssignmentEventRow>(),
       database.prepare(
-        `SELECT id,version_number,reviewed_by,reviewed_at,published_at
+        `SELECT id,version_number,reviewed_by,reviewed_at,published_at,payload_json
          FROM course_content_versions WHERE status='published'
          ORDER BY version_number DESC LIMIT 1`,
-      ).first<PublishedCurriculumSource>(),
+      ).first<PublishedCurriculumSource&{payload_json:string}>(),
     ]);
 
+    // Read published content + provenance from ONE verified version record;
+    // parse failure must not falsely cite a static fallback as human-approved.
+    const admittedPublishedDocument=publishedSource?.payload_json?
+      parseCourseDocument(publishedSource.payload_json):null;
+    const admittedSource=admittedPublishedDocument?publishedSource:null;
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
     for (const row of assessmentsResult.results ?? []) {
       const current = assessmentsByDevice.get(row.device_id) ?? [];
@@ -433,7 +438,7 @@ export async function POST(request: Request) {
       const analysisSource = analysisSummary(row.last_analysis_json, row.last_analysis_at);
       const analysis = analysisSource?{...analysisSource,
         publishedGuidance:groundedSwimmingCorrections(
-          document,publishedSource,analysisSource,row.last_analysis_lesson??""
+          admittedPublishedDocument??document,admittedSource,analysisSource,row.last_analysis_lesson??""
         )}:null;
       const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
       // Latest feedback can follow review. Locate a review for this exact video.
@@ -537,7 +542,7 @@ export async function POST(request: Request) {
         if (!analysisSource || !analysisSource.analyzedAt) return [];
         const analysis = {...analysisSource,
           publishedGuidance:groundedSwimmingCorrections(
-            document,publishedSource,analysisSource,event.lesson_number??""
+            admittedPublishedDocument??document,admittedSource,analysisSource,event.lesson_number??""
           )};
         const exactReviewEvent = (learningEventsByDevice.get(event.device_id) ?? []).find((row) => {
           if (row.event_type !== "teacher_analysis_review") return false;
