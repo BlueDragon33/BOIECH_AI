@@ -7,6 +7,7 @@ import {ManagerDetailSheet,ManagerSheet,type DetailTarget} from "./manager-detai
 import styles from "./manager-workspace.module.css";
 import ManagerRenewalPanel from "./manager-renewal-panel";
 import ManagerCommandCenter from "./manager-command-center";
+import ManagerAiWorkspaceV41,{ManagerAiOverviewEntryV41} from "./manager-ai-workspace-v41";
 import ManagerRosterCleanup from "./manager-roster-cleanup";
 import ManagerConsoleV12 from "./manager-console-v12";
 import ManagerBuildingStudio from "./manager-building-studio";
@@ -16,9 +17,9 @@ import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,PRACTICE_POOL_ROOM
  existingPracticePoolRoom,isPracticePoolRoom} from "./manager-practice-pool";
 import {readPendingSync,flushVerifiedSync} from "./verified-sync-client";
 import {useBoiSyncNotices,broadcastBoiChange} from "./manual-sync-notices";
-type Tab="overview"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
+type Tab="overview"|"ai"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
 type Write=(payload:Record<string,unknown>)=>Promise<boolean>;
-const apps:{id:Tab;label:string;description:string}[]=[{id:"approval",label:"Gia hạn tài khoản",description:"Học viên và giảng viên"},{id:"schedule",label:"Xếp lịch",description:"Buổi học & thời gian"},{id:"class",label:"Lớp học",description:"Sĩ số & giảng viên"},{id:"people",label:"Nhân sự",description:"Học viên & giảng viên"},{id:"room",label:"Phòng học",description:"Sức chứa & lịch trống"},{id:"building",label:"Tòa học",description:"Tòa & các phòng"},{id:"settings",label:"Cài đặt",description:"Giao diện & thiết lập"}];
+const apps:{id:Tab;label:string;description:string}[]=[{id:"ai",label:"AI Điều hành",description:"Phân tích có bằng chứng"},{id:"approval",label:"Gia hạn tài khoản",description:"Học viên và giảng viên"},{id:"schedule",label:"Xếp lịch",description:"Buổi học & thời gian"},{id:"class",label:"Lớp học",description:"Sĩ số & giảng viên"},{id:"people",label:"Nhân sự",description:"Học viên & giảng viên"},{id:"room",label:"Phòng học",description:"Sức chứa & lịch trống"},{id:"building",label:"Tòa học",description:"Tòa & các phòng"},{id:"settings",label:"Cài đặt",description:"Giao diện & thiết lập"}];
 // Five primary mobile destinations fit one row; Settings is in the header and account menu.
 const dock:{id:Tab;label:string}[]=[{id:"overview",label:"Trang chủ"},{id:"approval",label:"Gia hạn"},{id:"schedule",label:"Lịch"},{id:"class",label:"Lớp học"},{id:"people",label:"Nhân sự"}];
 function localDate(iso:string){const d=new Date(iso);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
@@ -98,7 +99,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
  const people=board.people.filter(p=>p.role==="teacher"&&matches(`${p.name} ${p.className}`)&&(filter==="all"||filter===p.role||filter==="legacy"&&p.recordSource==="legacy"||filter==="account-first"&&p.recordSource==="account-first"||filter==="inactive"&&!eligible(p)||filter==="review"&&(p.status==="pending"||!p.registered)||filter==="available"&&personReadiness(p,board.resources).ready&&p.bookingCount===0||filter==="unassigned"&&eligible(p)&&!personReadiness(p,board.resources).ready));
  const sessions=board.sessions.filter(s=>matches(`${s.title} ${label(s.classId)} ${label(s.roomId)}`)&&(filter==="all"||filter===s.status));
  const attention=board.resources.filter(r=>r.kind==="class"&&r.status==="active"&&(r.state==="overloaded"||r.missingTeachers>0||r.remaining>0)).sort((a,b)=>Number(b.state==="overloaded")-Number(a.state==="overloaded")||b.missingTeachers-a.missingTeachers);
- const count=(id:Tab)=>id==="approval"?null:id==="schedule"?board.sessions.filter(s=>s.status!=="cancelled").length:id==="people"?board.people.filter(p=>p.role==="teacher").length:id==="settings"?null:board.resources.filter(r=>r.kind===id).length;
+ const count=(id:Tab)=>id==="ai"||id==="approval"?null:id==="schedule"?board.sessions.filter(s=>s.status!=="cancelled").length:id==="people"?board.people.filter(p=>p.role==="teacher").length:id==="settings"?null:board.resources.filter(r=>r.kind===id).length;
  const title=apps.find(a=>a.id===tab)?.label||"Tổng quan";
  return <main className={styles.workspace} data-theme={appearance.theme} data-text-size={appearance.textSize} aria-busy={busy}><div className={styles.appShell}>
   <aside className={styles.desktopRail} aria-label="Phân hệ cán bộ quản lý">
@@ -115,6 +116,8 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
       <div><small>BƠI ẾCH AI · ĐIỀU PHỐI PREMIUM</small><h1>Cán bộ quản lý</h1></div></div>
     <div id="boi-account-lease-slot" className={styles.headerLeaseSlot} aria-label="Thời hạn tài khoản cán bộ"/>
     <div className={styles.headerActions}>
+      <button type="button" className={`${styles.iconButton} ${styles.aiShortcut}`} aria-label="Mở AI Điều hành"
+        aria-current={tab==="ai"?"page":undefined} onClick={()=>selectTab("ai")}><AppIcon name="ai"/></button>
       <button type="button" className={`${styles.iconButton} ${styles.settingsShortcut}`} aria-label="Mở cài đặt điều phối" aria-current={tab==="settings"?"page":undefined}
         onClick={()=>selectTab("settings")}><AppIcon name="settings"/></button>
       <div className={styles.accountMenuAnchor}
@@ -152,10 +155,12 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
       else selectTab(next);
     }} onOpenDetail={setDetail} onAssignPerson={assignPerson} onCreateResource={newResource}
       onCreateSession={(roomId,classId)=>editSession(undefined,roomId,classId)}/>
+    <ManagerAiOverviewEntryV41 board={board} onOpen={()=>selectTab("ai")}/>
   </>:null}
+  {tab==="ai"?<ManagerAiWorkspaceV41 board={board} busy={busy} onNavigate={selectTab}/>:null}
   {tab!=="overview"?<div className={styles.sectionHeading}><div><button type="button" className={styles.backButton} onClick={()=>selectTab("overview")}>← Trang chủ</button><h2>{title}</h2></div>{tab==="schedule"?<button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>editSession()}>+ Xếp buổi học</button>:(["class","room","building"] as Tab[]).includes(tab)?<button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>newResource(tab as ResourceKind)}>+ Thêm {tab==="class"?"lớp":tab==="room"?"phòng":"tòa"}</button>:tab==="people"&&getProof?<button type="button" className={styles.primaryButton}
     onClick={()=>setCleanupTarget("all")}>♻ Thanh lọc hồ sơ cũ</button>:null}</div>:null}
-  {tab!=="overview"&&tab!=="settings"&&tab!=="approval"&&tab!=="building"&&!(v12Enabled&&["class","room","people"].includes(tab))?<div className={styles.toolbar}><label>Tìm kiếm<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Tên hoặc lớp…"/></label><label>Lọc trạng thái<select value={filter} onChange={event=>setFilter(event.target.value)}><option value="all">Tất cả</option>{tab==="people"?<><option value="legacy">Hồ sơ cũ / chưa liên kết</option><option value="account-first">Có tài khoản Account-first</option><option value="available">Còn trống trong khung giờ</option><option value="unassigned">Chưa có lớp hoạt động</option><option value="inactive">Chờ duyệt / khóa / hết hạn</option><option value="review">Hồ sơ cần xem · chỉ đọc</option></>:tab==="schedule"?<><option value="scheduled">Đã xếp</option><option value="completed">Hoàn thành</option><option value="cancelled">Đã hủy</option></>:Object.entries(stateText).map(([key,value])=><option key={key} value={key}>{value}</option>)}</select></label><span className={styles.resultCount}>{tab==="people"?people.length:tab==="schedule"?sessions.length:resources.length} kết quả</span></div>:null}
+  {tab!=="overview"&&tab!=="ai"&&tab!=="settings"&&tab!=="approval"&&tab!=="building"&&!(v12Enabled&&["class","room","people"].includes(tab))?<div className={styles.toolbar}><label>Tìm kiếm<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Tên hoặc lớp…"/></label><label>Lọc trạng thái<select value={filter} onChange={event=>setFilter(event.target.value)}><option value="all">Tất cả</option>{tab==="people"?<><option value="legacy">Hồ sơ cũ / chưa liên kết</option><option value="account-first">Có tài khoản Account-first</option><option value="available">Còn trống trong khung giờ</option><option value="unassigned">Chưa có lớp hoạt động</option><option value="inactive">Chờ duyệt / khóa / hết hạn</option><option value="review">Hồ sơ cần xem · chỉ đọc</option></>:tab==="schedule"?<><option value="scheduled">Đã xếp</option><option value="completed">Hoàn thành</option><option value="cancelled">Đã hủy</option></>:Object.entries(stateText).map(([key,value])=><option key={key} value={key}>{value}</option>)}</select></label><span className={styles.resultCount}>{tab==="people"?people.length:tab==="schedule"?sessions.length:resources.length} kết quả</span></div>:null}
   {tab==="people"&&!v12Enabled&&filter==="review"?<p role="note">Hàng chờ nhân sự chỉ đọc. Mở tab Gia hạn tài khoản để điều chỉnh thời gian sử dụng.</p>:null}
   {tab==="people"&&!v12Enabled?<p role="note" className={styles.rosterSourceNote}>
     Danh sách nhân sự gồm hồ sơ thiết bị cũ và tài khoản Account-first. Số lượng tại đây
