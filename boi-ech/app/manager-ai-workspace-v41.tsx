@@ -4,6 +4,7 @@ import {useMemo,useState,type FormEvent} from "react";
 import {analyzeManagerBoard,answerManagerQuestion,simulateTeacherAllocation,type ManagerAiArea,type ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {classKey,classNames,type TrainingBoard} from "./training-types";
 import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
+import ManagerAiAllocationPanelV42 from "./manager-ai-allocation-panel-v42";
 import styles from "./manager-ai-workspace-v41.module.css";
 
 const categories:{key:"all"|ManagerAiArea;label:string}[]=[
@@ -167,7 +168,8 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
      </section>
     </aside>
    </div>
+   <ManagerAiAllocationPanelV42 board={board} onNavigate={onNavigate}/>
    <ManagerAiFollowonV41 board={board} report={report}/>
-   <footer className={styles.footer}>V41.0–V41.3 · Các năng lực đã bật vẫn là phân tích có bằng chứng, chưa hỗ trợ tự thực thi, dự báo ML hoặc kết luận vượt phạm vi dữ liệu. Mọi quyết định do cán bộ phê duyệt.</footer>
+   <footer className={styles.footer}>V41.0–V42 · Các năng lực đã bật vẫn là phân tích có bằng chứng, chưa hỗ trợ tự thực thi, dự báo ML hoặc kết luận vượt phạm vi dữ liệu. Mọi quyết định do cán bộ phê duyệt.</footer>
   </section>;
 }
