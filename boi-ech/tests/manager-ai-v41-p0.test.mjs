@@ -97,6 +97,18 @@ test("foreign resource and invalid inactive room produce a data verification war
  assert.ok(analyzeManagerBoard(missing).findings.some(f=>f.id==="broken-session:z"));
 });
 
+test("room P0 warnings state actual resource references without assuming class attendance",()=>{
+ const b=board();b.resources=b.resources.map(r=>r.id==="rm-1"?{...r,status:"unavailable"}:r);
+ const report=analyzeManagerBoard(b);
+ assert.ok(report.findings.some(f=>f.id==="room-unavailable:a"&&f.area==="rooms"));
+ const small=board();small.resources=small.resources.map(r=>r.id==="rm-1"?{...r,capacity:20}:r);
+ const capacity=analyzeManagerBoard(small).findings.find(f=>f.id==="room-capacity:cl-a:rm-1");
+ assert.equal(capacity?.priority,"medium");
+ assert.match(capacity.details,/33 học viên/);
+ assert.match(capacity.limitations.join(" "),/không chứng minh tất cả học viên có mặt/);
+ assert.equal(analyzeManagerBoard(small).findings.filter(f=>f.id==="room-capacity:cl-a:rm-1").length,1);
+});
+
 test("only known non-ended allocation term dates can create due-date warning",()=>{
  const b=board();let report=analyzeManagerBoard(b);
  assert.ok(report.findings.some(f=>f.id==="term-ended:t1:cl-a"));
