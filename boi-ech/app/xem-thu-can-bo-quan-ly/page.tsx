@@ -10,7 +10,7 @@ const DEMO_BOARD:TrainingBoard={
   from:"2026-11-02T08:00:00.000Z",to:"2026-11-02T18:00:00.000Z",
   observedAt:"2026-11-02T08:00:00.000Z",
   summary:{freeRooms:1,occupiedRooms:0,missingLearners:0,missingTeachers:0,unassignedLearners:1,unassignedTeachers:0},
-  leaders:[],leaderHistory:[],periods:[],
+  leaders:[],leaderHistory:[],periods:[],teacherClassTerms:[],
   resources:[
     {id:"demo-building",kind:"building",name:"Tòa học mẫu",parentId:null,capacity:100,
       requiredTeachers:1,status:"active",version:1,learnerCount:0,teacherCount:0,
@@ -24,9 +24,9 @@ const DEMO_BOARD:TrainingBoard={
   ],
   people:[
     {id:"demo-learner",name:"Học viên mẫu",code:"DEMO-HV-01",role:"learner",className:"Lớp Bơi Ếch A",
-      status:"pending",expired:false,registered:true,bookingCount:0},
+      status:"pending",expired:false,registered:true,bookingCount:0,deviceType:"unknown",devicePlatform:null,deviceLastSeenAt:null},
     {id:"demo-teacher",name:"Giảng viên mẫu",code:"DEMO-GV-01",role:"teacher",className:"Lớp Bơi Ếch A",
-      status:"approved",expired:false,registered:true,bookingCount:0}
+      status:"approved",expired:false,registered:true,bookingCount:0,deviceType:"unknown",devicePlatform:null,deviceLastSeenAt:null}
   ],
   sessions:[{id:"demo-session",title:"Buổi học minh họa",classId:"demo-class",
     roomId:"demo-room",teacherId:"demo-teacher",assistantTeacherId:null,periodStart:null,periodEnd:null,startsAt:"2026-11-02T09:00:00.000Z",
