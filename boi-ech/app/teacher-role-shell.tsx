@@ -108,7 +108,7 @@ function supportReason(learner: TeacherLearner) {
   const critical=video.errors.find(issue=>issue.severity==="critical");
   if(critical)return "Video AI cần sửa: "+critical.title;
   const weak=[["legs","chân"],["arms","tay"],["coordination","phối hợp"],["bodyLine","tư thế"]] as const;
-  const category=weak.find(([key])=>video.categories[key]!==null&&video.categories[key]!<60);
+  const category=weak.find(([key])=>{const score=video.categories[key];return score!==null&&score<60;});
   if(category)return "Video AI: nhóm "+category[1]+" cần hướng dẫn";
  }
  const loop = learner.learningAnalytics.latest; if (loop?.observedChange === "negative") return "Tín hiệu sau can thiệp đang giảm"; if (loop?.observedChange === "mixed") return "Tín hiệu sau can thiệp chưa đồng nhất"; if (loop?.observedChange === "pending" || loop?.observedChange === "activity-only") return `Cần theo dõi sau ${loop.actionLabel.toLowerCase()}`; const adaptiveAlert = learner.adaptive?.alerts.find((alert) => alert.level === "critical") ?? learner.adaptive?.alerts.find((alert) => alert.level === "warning"); if (adaptiveAlert) return adaptiveAlert.text; if ((learner.inactiveDays ?? 0) >= 7) return `Chưa hoạt động ${learner.inactiveDays} ngày`; if (learner.lastAnalysis && learner.lastAnalysis.confidence < 70) return `Độ tin cậy AI ${learner.lastAnalysis.confidence}%`; if (learner.progress < 50) return `Tiến độ mới ${learner.progress}%`; return "Cần Giảng viên kiểm tra thêm"; }
