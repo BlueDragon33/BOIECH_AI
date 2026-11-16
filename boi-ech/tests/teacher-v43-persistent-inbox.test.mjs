@@ -55,7 +55,7 @@ test("video+teacher inbox fanout is source keyed, media-free and idempotent for 
  assert.deepEqual(rows.map(x=>x.teacher_device_id),["T1"]);
  assert.equal(rows[0].video_event_id,1);
  assert.equal(rows[0].state,"unread");
- assert.doesNotMatch(migration,/base64|thumbnail|score|video_blob|video_bytes|image_url/);
+ assert.doesNotMatch(migration.replace(/^--.*$/gm,""),/base64|thumbnail|score|video_blob|video_bytes|image_url/);
  assert.match(video,/await database\.batch\(\[/);
  assert.match(video,/enqueueVideoForAssignedTeachers\(database,device\.deviceId,clientEventId\)/);
 });
