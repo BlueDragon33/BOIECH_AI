@@ -16,6 +16,7 @@ import TeacherAssignmentSchedule, { type TeacherAssignmentScheduleItem } from ".
 import {TeacherTaskQuickActions,TeacherTaskToday,type TaskFilter} from "./teacher-task-icon-v39";
 import TeacherClassWorkspace from "./teacher-class-workspace";
 import TeacherVideoResultDetails, {type TeacherVideoAnalysis} from "./teacher-video-result-details";
+import {prioritizeTeacherVideo} from "./teacher-video-priority-v42";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type TeacherAnalysis = TeacherVideoAnalysis;
@@ -166,13 +167,15 @@ function AnalysisQueue({ learners, setTab, onAction }: {
 }) {
  const [expanded,setExpanded]=useState<string|null>(null);
  const items=learners.filter(item=>item.lastAnalysis)
-  .sort((a,b)=>Date.parse(b.lastAnalysis?.analyzedAt??"")-Date.parse(a.lastAnalysis?.analyzedAt??""))
-  .slice(0,10);
+  .sort((a,b)=>prioritizeTeacherVideo(b).rank-prioritizeTeacherVideo(a).rank||
+   (Date.parse(b.lastAnalysis?.analyzedAt??"")||0)-(Date.parse(a.lastAnalysis?.analyzedAt??"")||0))
+  .slice(0,30);
  return <div className="teacher-analysis-queue-list">
-  <p className="teacher-video-list-note">Hiển thị kết quả gần nhất của từng học viên trong phạm vi lớp hiện tại; đây không phải toàn bộ lịch sử phân tích. Điểm AI và độ tin cậy là hai chỉ số khác nhau.</p>
+  <p className="teacher-video-list-note">Tự xếp theo chất lượng ghi hình, lỗi kỹ thuật, trạng thái review và thời gian; tối đa 30 kết quả gần nhất theo học viên trong lớp phụ trách, không phải toàn bộ lịch sử. Đề xuất chỉ gửi khi Giảng viên xác nhận.</p>
   {items.map((learner,index)=>{
    const analysis=learner.lastAnalysis!;
    const quality=analysisQuality(analysis);
+   const decision=prioritizeTeacherVideo(learner);
    const id=`teacher-video-evidence-${learner.personCode.replace(/[^A-Za-z0-9_-]/g,"-")}-${index}`;
    const isOpen=expanded===id;
    return <article key={`${learner.personCode}-${analysis.analyzedAt}`} data-analysis-quality={quality}>
@@ -185,8 +188,9 @@ function AnalysisQueue({ learners, setTab, onAction }: {
      <small>{learner.className} · {shortDate(analysis.analyzedAt)}</small>
      <p>{analysis.topErrors[0]||"Chưa có tín hiệu lỗi nổi bật theo bộ quy tắc hiện tại"}</p>
      <small className="teacher-video-summary-line">
-      {quality==="good"?"Đủ dữ liệu để đối chiếu":"Cần đối chiếu thêm"} · {analysis.errorCount} lỗi được ghi nhận
+      {decision.label} · {analysis.errorCount} lỗi được ghi nhận
      </small>
+     <small className="teacher-video-summary-line">Hướng dẫn: {decision.nextStep}</small>
     </div>
     <div className={`teacher-analysis-score-chip ${quality}`}>
      <b>{(analysis.score/10).toLocaleString("vi-VN",{maximumFractionDigits:1})}<small>/10</small></b>
@@ -202,6 +206,10 @@ function AnalysisQueue({ learners, setTab, onAction }: {
       onClick={()=>onAction({mode:"feedback",learner,analysisAt:analysis.analyzedAt})}>Nhận xét</button>
      <button type="button" data-server-review
       onClick={()=>onAction({mode:"review",learner,analysisAt:analysis.analyzedAt})}>Review</button>
+     {decision.canDraftExercise?<button type="button" data-video-coaching-draft
+      onClick={()=>onAction({mode:"assignment",learner,analysisAt:analysis.analyzedAt,
+       suggestedNote:decision.exerciseNote,suggestedTitle:decision.exerciseTitle,
+       suggestedLessonNumber:decision.lessonNumber})}>Soạn bài luyện gợi ý</button>:null}
      <a href={teacherVideoHref("analysis")}>Phân tích local</a>
     </div>
     {isOpen?<div className="teacher-video-expanded" id={id}>
@@ -329,6 +337,14 @@ export default function TeacherRoleShell() {
         if (isCurrent()) { requestRef.current = null; setLoading(false); }
       });
   }, []);
+  // No polling in inactive or hidden teacher sessions; 3-minute on-screen refresh.
+  useEffect(()=>{
+   if(!active)return;
+   const timer=window.setInterval(()=>{if(document.visibilityState==="visible")refresh();},180_000);
+   const onVisible=()=>{if(document.visibilityState==="visible")refresh();};
+   document.addEventListener("visibilitychange",onVisible);
+   return ()=>{window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible);};
+  },[active,refresh]);
   const submitAction = useMemo<SubmitTeacherAction>(() => async (draft, payload) => { const deviceId = deviceIdRef.current; if (!deviceId) throw new Error("Chưa xác định được thiết bị Giảng viên."); await saveTeacherAction(deviceId, draft, payload); }, []);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
