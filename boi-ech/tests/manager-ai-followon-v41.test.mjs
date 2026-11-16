@@ -138,7 +138,7 @@ test("V41.3 evidence audit verifies source identities and timestamps without cla
 });
 test("No generative model, unauthorized message/video pipeline or automatic administrative operation",()=>{
  const engine=fs.readFileSync(path.join(root,"manager-ai-followon-v41.ts"),"utf8");
- const view=fs.readFileSync(path.join(root,"manager-ai-followon-v41.tsx"),"utf8");
+ const view=fs.readFileSync(path.join(root,"manager-ai-followon-panel-v41.tsx"),"utf8");
  const main=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
  assert.doesNotMatch(engine,/\bfetch\(|new WebSocket|process\.env|Math\.random|db\.prepare|onCommand|MODEL_API_KEY/);
  assert.doesNotMatch(view,/\bfetch\(|onCommand|\/api\/|sendMessage|updateClass|commitProposal/);
