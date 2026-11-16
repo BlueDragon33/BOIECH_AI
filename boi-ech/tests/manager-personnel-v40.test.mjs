@@ -54,8 +54,8 @@ test("V40 stores manually verified per-class dates; does not infer historic allo
   const inserted=await f.call({...base,expectedVersion:0});
   assert.equal(inserted.status,200,JSON.stringify(inserted));
   const term=inserted.board.teacherClassTerms.find(x=>x.teacherDeviceId===p.device.deviceId&&x.classId==="class");
-  assert.equal(term?.startedAt,base.startedAt);
-  assert.equal(term?.plannedEndAt,base.plannedEndAt);
+  assert.equal(term?.startedAt,new Date(base.startedAt).toISOString());
+  assert.equal(term?.plannedEndAt,new Date(base.plannedEndAt).toISOString());
   assert.equal(term?.version,1);
   const update=await f.call({...base,plannedEndAt:"2030-11-30T10:00:00Z",expectedVersion:1});
   assert.equal(update.status,200,JSON.stringify(update));
