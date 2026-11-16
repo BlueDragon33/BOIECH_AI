@@ -253,15 +253,20 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
    ]);
    if(person?.role!=="teacher"||!klass||!classNames(person.className||"").some(n=>classKey(n)===classKey(klass.name)))
      fail("Giảng viên không còn được phân công lớp này. Đồng bộ lại danh sách.","TRAINING_RESOURCE_UNAVAILABLE",409);
+   // Re-check class membership inside the same SQL write to close manager-to-manager races.
+   const membershipGuard=`EXISTS(SELECT 1 FROM device_access d JOIN training_resources c ON c.id=? AND c.kind='class' AND c.status='active'
+     WHERE d.device_id=? AND d.person_role='teacher' AND d.registration_submitted_at IS NOT NULL
+     AND EXISTS (SELECT 1 FROM json_each('[' || replace(json_quote(replace(replace(COALESCE(d.class_name,''),char(10),';'),',',';')),';','","') || ']') token
+       WHERE lower(trim(token.value))=lower(c.name)))`;
    command={action,teacherDeviceId,classId,startedAt,plannedEndAt,version};
    write=version===0?
      db.prepare(`INSERT INTO training_teacher_class_terms(teacher_device_id,class_id,started_at,planned_end_at,ended_at,version)
-       SELECT ?,?,?,?,NULL,1 WHERE ${authorityGuard} AND NOT EXISTS (
+       SELECT ?,?,?,?,NULL,1 WHERE ${authorityGuard} AND ${membershipGuard} AND NOT EXISTS (
         SELECT 1 FROM training_teacher_class_terms WHERE teacher_device_id=? AND class_id=?)`)
-       .bind(teacherDeviceId,classId,startedAt,plannedEndAt,...authorityBindings,teacherDeviceId,classId)
+       .bind(teacherDeviceId,classId,startedAt,plannedEndAt,...authorityBindings,classId,teacherDeviceId,teacherDeviceId,classId)
      :db.prepare(`UPDATE training_teacher_class_terms SET started_at=?,planned_end_at=?,version=version+1,updated_at=CURRENT_TIMESTAMP
-       WHERE teacher_device_id=? AND class_id=? AND ended_at IS NULL AND version=? AND ${authorityGuard}`)
-       .bind(startedAt,plannedEndAt,teacherDeviceId,classId,version,...authorityBindings);
+       WHERE teacher_device_id=? AND class_id=? AND ended_at IS NULL AND version=? AND ${authorityGuard} AND ${membershipGuard}`)
+       .bind(startedAt,plannedEndAt,teacherDeviceId,classId,version,...authorityBindings,classId,teacherDeviceId);
  } else if(action==="assign-person") {
   const personId=id(payload.personId),expectedClassName=typeof payload.expectedClassName==="string"?payload.expectedClassName:fail("Thiếu lớp hiện tại để kiểm tra thay đổi đồng thời.");
   const target=await db.prepare("SELECT person_role AS role FROM device_access WHERE device_id=? AND person_role IN ('learner','teacher') AND registration_submitted_at IS NOT NULL").bind(personId).first<{role:string}>();
