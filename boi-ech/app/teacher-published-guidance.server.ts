@@ -30,12 +30,14 @@ export function groundedSwimmingCorrections(
   ...analysis.errors.map(x=>x.title+" "+x.observed),
   ...analysis.topErrors,
  ].join(" ").toLocaleLowerCase("vi");
- const words=new Set(observations.split(/[^\p{L}\p{N}]+/u)
-  .filter(x=>x.length>=3&&!["động","tác","theo","trong","được","không","những","video","phân","tích"].includes(x)));
+ const generic=new Set(["sai","lỗi","động","tác","theo","trong","được","không",
+   "những","video","phân","tích","cần","vấn","đề","phát","hiện","luyện","tập"]);
+ const tokens=(value:string)=>value.toLocaleLowerCase("vi")
+   .split(/[^\p{L}\p{N}]+/u).filter(token=>token.length>=3&&!generic.has(token));
+ const words=new Set(tokens(observations));
  if(!words.size)return [];
  const scored=rows.map(x=>{
-  const terms=new Set((x.title+" "+x.sign).toLocaleLowerCase("vi")
-   .split(/[^\p{L}\p{N}]+/u).filter(t=>t.length>=3));
+  const terms=new Set(tokens(x.title+" "+x.sign));
   const matching=[...terms].filter(t=>words.has(t)).length;
   return {x,matching};
  }).filter(row=>row.matching>0&&row.x.fix.trim().length>0)
