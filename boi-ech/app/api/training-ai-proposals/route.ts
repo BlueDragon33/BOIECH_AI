@@ -81,6 +81,8 @@ export async function POST(request:Request){
    return respond({error:"Phiên bản hoặc lý do xem xét không hợp lệ."},400);
   const proposal=choices.find(x=>x.id===payload.proposalId);
   if(!proposal)return respond({error:"Phương án không còn thuộc dữ liệu đang được phép xem.",code:"AI_PROPOSAL_STALE"},409);
+  if(board.admissionProfiles&&proposal.admissible===false)
+   return respond({error:"Đề xuất chưa có đủ hồ sơ, chứng chỉ/lịch hoặc an toàn bể được xác minh.",code:"AI_PROFILE_EVIDENCE_REQUIRED"},409);
   const fingerprint=proposalFingerprint(board,proposal);
   const canonical=hash(JSON.stringify({action,proposalId:proposal.id,actorId:actor.deviceId,
     expectedRevision,reason:reason.trim(),fingerprint}));
