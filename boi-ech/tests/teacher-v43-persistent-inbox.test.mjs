@@ -109,3 +109,18 @@ test("teacher action needs actual source analysis, an actor-bound payload and co
  assert.match(teacherAction,/teacherDeviceId: teacher\.deviceId/);
  assert.match(teacherAction,/TEACHER_ACTION_REPLAY_CONFLICT/);
 });
+
+test("suspended or expired learner entitlement blocks inbox fanout, reading and acknowledgement",async t=>{
+ const {db,sqlite}=fixture(t);
+ await enqueueVideoForAssignedTeachers(db,"L1","video-ai:video1").run();
+ assert.equal((await readTeacherVideoInbox(db,"T1",["A"])).items.length,1);
+ sqlite.exec("INSERT INTO accounts VALUES ('acc-learner','L1'); INSERT INTO account_onboarding VALUES ('acc-learner','active'); INSERT INTO account_entitlements VALUES ('acc-learner','suspended','2099-01-01T00:00:00Z');");
+ assert.equal((await readTeacherVideoInbox(db,"T1",["A"])).items.length,0);
+ assert.equal((await markTeacherVideoSeen({db,teacherDeviceId:"T1",teacherClasses:["A"],eventId:1,expectedRevision:1})).ok,false);
+ sqlite.exec("DELETE FROM teacher_video_inbox");
+ await syncTeacherVideoInbox(db,"T1",["A"]).run();
+ assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM teacher_video_inbox").get().n,0);
+ sqlite.exec("UPDATE account_entitlements SET state='active'");
+ await syncTeacherVideoInbox(db,"T1",["A"]).run();
+ assert.equal((await readTeacherVideoInbox(db,"T1",["A"])).items.length,1);
+});
