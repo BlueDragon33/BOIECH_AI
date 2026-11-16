@@ -121,3 +121,16 @@
 .overviewEntry small{color:#e2f4ff;font-size:11px;line-height:1.4}
 .overviewEntry>svg{flex:none;color:#e2f4ff}
 @media(max-width:480px){.overviewEntry{padding:12px;gap:9px}.overviewEntryIcon{width:39px;height:39px}.overviewEntry strong{font-size:13px}}
+
+.contextNotice{display:flex;align-items:center;gap:11px;padding:13px 15px;margin:5px 0 14px;
+ border:1px solid #a6cde4;border-radius:13px;background:#e7f5ff;color:#235575}
+.contextNotice>span{display:grid;place-items:center;flex:none;width:37px;height:37px;border-radius:10px;background:#d1eaff;color:#0861a0}
+.contextNotice>div{flex:1;display:grid;gap:3px}
+.contextNotice strong{font-size:12px;color:#174362}
+.contextNotice small{font-size:11px;color:#3e6680;line-height:1.5}
+.contextNotice button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:39px;
+ padding:8px 11px;border:1px solid #0865ae;background:#0767b6;color:#fff;
+ border-radius:10px;font-size:11px;font-weight:800;cursor:pointer}
+.contextNotice button:focus-visible{outline:3px solid #e6a31e;outline-offset:3px}
+.contextNotice button svg{width:17px;height:17px}
+@media(max-width:580px){.contextNotice{flex-wrap:wrap}.contextNotice button{width:100%}}
