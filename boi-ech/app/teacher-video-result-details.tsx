@@ -5,7 +5,7 @@ export type TeacherVideoIssue = {
  observed:string;expected:string;recommendation:string;confidence:number|null;
 };
 export type TeacherVideoAnalysis = {
- score:number;confidence:number;captureQuality:"good"|"review";
+ score:number|null;confidence:number|null;captureQuality:"good"|"review";
  poseCoverage:number|null;averageVisibility:number|null;
  sampledFrames:number|null;detectedFrames:number|null;durationSec:number|null;
  cameraView:"rear"|"side";
@@ -24,7 +24,7 @@ export function technicalLevel(score:number):{id:TechnicalLevel;label:string;pri
  return {id:"strong",label:"Tốt theo thang AI",priority:"Duy trì kỹ thuật và nhờ Giảng viên xác nhận trực tiếp khi cần."};
 }
 export function reliableVideoEvidence(item:TeacherVideoAnalysis){
- return item.captureQuality==="good"&&item.confidence>=70;
+ return item.captureQuality==="good"&&item.confidence!==null&&item.confidence>=70;
 }
 export function validMetric(n:unknown,max=100):number|null{
  return typeof n==="number"&&Number.isFinite(n)&&n>=0&&n<=max?n:null;
@@ -54,7 +54,7 @@ const instant=(value:string|null)=>{if(!value)return "Chưa ghi nhận";const d=
 export default function TeacherVideoResultDetails({analysis,review}:{
  analysis:TeacherVideoAnalysis;review:TeacherVideoReview|null|undefined;
 }){
- const level=technicalLevel(analysis.score),quality=qualityStatement(analysis);
+ const level=analysis.score===null?null:technicalLevel(analysis.score),quality=qualityStatement(analysis);
  const human=teacherReviewForAnalysis(review,analysis);
  const sorted=categories.map(row=>({...row,score:validMetric(analysis.categories?.[row.key])}))
   .filter((row):row is (typeof row & {score:number})=>row.score!==null)
@@ -67,9 +67,9 @@ export default function TeacherVideoResultDetails({analysis,review}:{
    <span className="teacher-video-quality" data-quality={quality.id}>{quality.title}</span>
   </header>
   <div className="teacher-video-kpis">
-   <article><span>Điểm kỹ thuật AI</span><strong>{scoreToTen(analysis.score)}<small>/10</small></strong><small>{analysis.score}/100 điểm · không phải điểm Giảng viên</small></article>
-   <article><span>Độ tin cậy nhận diện</span><strong>{analysis.confidence}<small>%</small></strong><small>Độ chắc chắn của phân tích, không phải % đúng kỹ thuật</small></article>
-   <article data-level={level.id}><span>Nhận định theo thang AI</span><strong>{level.label}</strong><small>{quality.id==="limited"?"Chưa đủ bằng chứng để kết luận":"Dựa trên điểm số do AI tạo ra"}</small></article>
+   <article><span>Điểm kỹ thuật AI</span><strong>{analysis.score===null?"Chưa có dữ liệu":<>{scoreToTen(analysis.score)}<small>/10</small></>}</strong><small>{analysis.score===null?"Kết quả cũ chưa lưu điểm tổng":analysis.score+"/100 điểm · không phải điểm Giảng viên"}</small></article>
+   <article><span>Độ tin cậy nhận diện</span><strong>{analysis.confidence===null?"Chưa có dữ liệu":<>{analysis.confidence}<small>%</small></>}</strong><small>Độ chắc chắn của phân tích, không phải % đúng kỹ thuật</small></article>
+   <article data-level={level?.id??"unknown"}><span>Nhận định theo thang AI</span><strong>{level?.label??"Chưa đủ số liệu"}</strong><small>{quality.id==="limited"?"Chưa đủ bằng chứng để kết luận":level?"Dựa trên điểm số do AI tạo ra":"Điểm tổng không có trong sự kiện này"}</small></article>
   </div>
   <div className="teacher-video-limits" data-quality={quality.id}>
     <strong>{quality.title}</strong><p>{quality.detail}</p>
@@ -87,7 +87,7 @@ export default function TeacherVideoResultDetails({analysis,review}:{
    {weak?<p className="teacher-video-priority"><strong>Ưu tiên luyện tập:</strong> {weak.name} ({weak.score}/100) là nhóm có điểm thấp nhất trong những nhóm đã được ghi nhận.</p>
     :<p className="teacher-video-priority">Chưa đủ dữ liệu điểm nhóm để xác định động tác cần ưu tiên.</p>}
   </section>
-  {analysis.score>=85&&analysis.errorCount>0?<p className="teacher-video-score-discrepancy" role="note">
+  {analysis.score!==null&&analysis.score>=85&&analysis.errorCount>0?<p className="teacher-video-score-discrepancy" role="note">
    <strong>Điểm cao vẫn có lỗi:</strong> AI ghi nhận {analysis.errorCount} lỗi kỹ thuật dù điểm tổng là {analysis.score}/100.
    Điểm tổng, điểm theo nhóm và các lỗi quy tắc không phải một phép cộng trừ trực tiếp.
    Cần kiểm tra lỗi cụ thể trước khi kết luận.
@@ -119,7 +119,7 @@ export default function TeacherVideoResultDetails({analysis,review}:{
      <p>Giảng viên cần xem lại bằng chứng và đánh giá riêng. Thông tin ở đây không khẳng định chưa từng có review trong toàn bộ lịch sử.</p></>}
   </section>
   <footer className="teacher-video-disclaimer">
-   <strong>Kết luận sử dụng:</strong> {quality.id==="sufficient"?level.priority:"Ưu tiên quay lại với đủ tư thế, ánh sáng và góc quay rõ trước khi quyết định kỹ thuật."}
+   <strong>Kết luận sử dụng:</strong> {quality.id==="sufficient"&&level?level.priority:"Ưu tiên quay lại với đủ tư thế, ánh sáng và góc quay rõ trước khi quyết định kỹ thuật."}
    {" "}Kết quả này không chứng minh học viên bơi an toàn trong nước. Video/ảnh gốc không được chuyển về bảng Giảng viên.
   </footer>
  </section>;
