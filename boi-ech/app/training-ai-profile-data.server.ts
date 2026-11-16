@@ -124,7 +124,7 @@ export function admitVerifiedTrainingProfiles(rows:TrainingProfileRow[],classes:
  }
  return {teacher,learner,safety};
 }
-export async function readManagerProfileAdmission(db:D1Database,board:TrainingBoard){
+export async function readManagerProfileAdmission(db:D1Database,board:Pick<TrainingBoard,"people"|"resources">){
  const ids=new Set(board.people.map(x=>x.id));
  const classIds=new Set(board.resources.filter(x=>x.kind==="class").map(x=>x.id));
  const [a,b]=await Promise.all([
