@@ -1,7 +1,7 @@
 import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import { DeviceAccessError, getCourseDatabase, type PublicDeviceState } from "./device-auth.server";
 import { TRAINING_SCHEMA } from "./training-schema";
-import { classKey, classNames, type TrainingBoard, type TrainingPerson, type TrainingResource, type TrainingSession, type TrainingClassLeader, type TrainingPeriod, type TrainingLeaderHistory } from "./training-types";
+import { classKey, classNames, type TrainingBoard, type TrainingPerson, type TrainingResource, type TrainingSession, type TrainingClassLeader, type TrainingPeriod, type TrainingLeaderHistory, type TrainingTeacherClassTerm } from "./training-types";
 let schemaReady:Promise<unknown>|undefined;
 export async function trainingDatabase() {
  const db=await getCourseDatabase();
@@ -20,10 +20,12 @@ export function requireManager(actor:PublicDeviceState) { if(actor.personRole!==
 const AUTH_GUARD=`EXISTS(SELECT 1 FROM device_access a WHERE a.device_id=? AND a.person_role='manager' AND a.management_enabled=1 AND a.status='approved' AND a.registration_submitted_at IS NOT NULL AND (a.access_expires_at IS NULL OR datetime(a.access_expires_at)>CURRENT_TIMESTAMP))`;
 export async function trainingBoard(from:string,to:string,actor?:PublicDeviceState):Promise<TrainingBoard> {
  const db=await trainingDatabase();
- const [rs,ps,ss,ls,periods,leaderHistory]=await Promise.all([
+ const [rs,ps,ss,ls,periods,leaderHistory,teacherTerms]=await Promise.all([
  db.prepare('SELECT id,kind,name,parent_id AS parentId,capacity,required_teachers AS requiredTeachers,status,version FROM training_resources ORDER BY name LIMIT 1001').all<TrainingResource>(),
  db.prepare(`SELECT d.device_id AS id,d.learner_name AS name,d.person_code AS code,d.person_role AS role,
  COALESCE(d.class_name,'') AS className,d.status,
+  CASE WHEN COALESCE(d.device_type_override,d.device_type) IN ('phone','tablet','desktop') THEN COALESCE(d.device_type_override,d.device_type) ELSE 'unknown' END AS deviceType,
+  d.platform AS devicePlatform,d.last_seen_at AS deviceLastSeenAt,
  CASE WHEN a.account_id IS NULL THEN 'legacy' ELSE 'account-first' END AS recordSource,
  CASE WHEN e.account_id IS NOT NULL OR o.first_review_by IS NOT NULL THEN
    CASE WHEN o.stage='active' AND e.state='active' AND datetime(e.expires_at)>CURRENT_TIMESTAMP THEN 0 ELSE 1 END
@@ -45,8 +47,9 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  previous_birth_date AS previousBirthDate,previous_military_rank AS previousMilitaryRank,
  previous_battalion AS previousBattalion,replaced_at AS replacedAt
  FROM training_class_leader_history ORDER BY replaced_at DESC LIMIT 1000`).all<TrainingLeaderHistory>(),
+  db.prepare(`SELECT teacher_device_id AS teacherDeviceId,class_id AS classId,started_at AS startedAt,planned_end_at AS plannedEndAt,ended_at AS endedAt,version FROM training_teacher_class_terms WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1001`).all<TrainingTeacherClassTerm>(),
  ]);
- if([rs,ps,ss,ls].some(r=>(r.results?.length??0)>1000))fail("Khoảng xem có hơn 1.000 bản ghi. Thu hẹp thời gian hoặc liên hệ quản trị; chưa thể hiển thị tổng số đầy đủ.","TRAINING_RESULT_LIMIT",413);
+ if([rs,ps,ss,ls,teacherTerms].some(r=>(r.results?.length??0)>1000))fail("Khoảng xem có hơn 1.000 bản ghi. Thu hẹp thời gian hoặc liên hệ quản trị; chưa thể hiển thị tổng số đầy đủ.","TRAINING_RESULT_LIMIT",413);
  const sourceResources=rs.results??[];
  const byId=new Map(sourceResources.map(resource=>[resource.id,resource]));
  const sessions=ss.results??[];
@@ -63,6 +66,9 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
  const people=(ps.results??[]).map(p=>({...p,
   name:(typeof p.name==="string"&&p.name.trim())||(typeof p.code==="string"&&p.code.trim())||"Hồ sơ chưa hoàn thiện",
   code:typeof p.code==="string"?p.code:"",
+   deviceType:p.deviceType==="phone"||p.deviceType==="tablet"||p.deviceType==="desktop"?p.deviceType:"unknown" as const,
+   devicePlatform:typeof p.devicePlatform==="string"&&p.devicePlatform.trim()?p.devicePlatform.trim().slice(0,72):null,
+   deviceLastSeenAt:typeof p.deviceLastSeenAt==="string"&&Number.isFinite(Date.parse(p.deviceLastSeenAt))?p.deviceLastSeenAt:null,
   className:typeof p.className==="string"?p.className:"",
   expired:Boolean(p.expired),registered:Boolean(p.registered),
   bookingCount:p.role==="teacher"?(teacherBookings.get(p.id)??0):(classNameBookings.get(classKey(p.className??""))??0)}));
@@ -100,7 +106,7 @@ export async function trainingBoard(from:string,to:string,actor?:PublicDeviceSta
   visiblePeople=people;
   visibleSessions=sessions;
  }
- return {resources,people:visiblePeople,sessions:visibleSessions,leaders:ls.results??[],leaderHistory:leaderHistory.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
+ return {resources,people:visiblePeople,sessions:visibleSessions,teacherClassTerms:(teacherTerms.results??[]).filter(t=>visiblePeople.some(p=>p.id===t.teacherDeviceId&&p.role==="teacher")),leaders:ls.results??[],leaderHistory:leaderHistory.results??[],periods:periods.results??[],from,to,observedAt:new Date().toISOString(),summary:{freeRooms:resources.filter(r=>r.kind==="room"&&r.state==="available").length,occupiedRooms:resources.filter(r=>r.kind==="room"&&r.bookingCount>0).length,missingLearners:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.remaining,0),missingTeachers:classes.filter(r=>r.status==="active").reduce((s,r)=>s+r.missingTeachers,0),unassignedLearners:visiblePeople.filter(p=>p.role==="learner"&&active(p)&&!classKeys.has(classKey(p.className))).length,unassignedTeachers:visiblePeople.filter(p=>p.role==="teacher"&&active(p)&&!classNames(p.className).some(name=>classKeys.has(classKey(name)))).length}};
 }
 export async function trainingCommand(actor:PublicDeviceState,payload:Record<string,unknown>) {
  requireManager(actor);
@@ -233,6 +239,29 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
     :db.prepare(`UPDATE training_periods SET start_time=?,end_time=?,timezone=?,version=version+1,updated_at=CURRENT_TIMESTAMP
        WHERE number=? AND version=? AND ${authorityGuard}`)
       .bind(startTime,endTime,timezone,number,version,...authorityBindings);
+
+ } else if(action==="save-teacher-class-term") {
+   // Metadata is separate from membership; never grant a class by editing dates.
+   const teacherDeviceId=id(payload.teacherDeviceId),classId=id(payload.classId);
+   const startedAt=instant(payload.startedAt);
+   const plannedEndAt=payload.plannedEndAt==null||payload.plannedEndAt===""?null:instant(payload.plannedEndAt);
+   if(plannedEndAt&&plannedEndAt<=startedAt)fail("Ngày dự kiến kết thúc phải sau ngày nhận lớp.");
+   const version=integer(payload.expectedVersion,0,1000000);
+   const [person,klass]=await Promise.all([
+     db.prepare("SELECT person_role AS role,class_name AS className FROM device_access WHERE device_id=? AND registration_submitted_at IS NOT NULL").bind(teacherDeviceId).first<{role:string;className:string}>(),
+     db.prepare("SELECT name FROM training_resources WHERE id=? AND kind='class' AND status='active'").bind(classId).first<{name:string}>()
+   ]);
+   if(person?.role!=="teacher"||!klass||!classNames(person.className||"").some(n=>classKey(n)===classKey(klass.name)))
+     fail("Giảng viên không còn được phân công lớp này. Đồng bộ lại danh sách.","TRAINING_RESOURCE_UNAVAILABLE",409);
+   command={action,teacherDeviceId,classId,startedAt,plannedEndAt,version};
+   write=version===0?
+     db.prepare(`INSERT INTO training_teacher_class_terms(teacher_device_id,class_id,started_at,planned_end_at,ended_at,version)
+       SELECT ?,?,?,?,NULL,1 WHERE ${authorityGuard} AND NOT EXISTS (
+        SELECT 1 FROM training_teacher_class_terms WHERE teacher_device_id=? AND class_id=?)`)
+       .bind(teacherDeviceId,classId,startedAt,plannedEndAt,...authorityBindings,teacherDeviceId,classId)
+     :db.prepare(`UPDATE training_teacher_class_terms SET started_at=?,planned_end_at=?,version=version+1,updated_at=CURRENT_TIMESTAMP
+       WHERE teacher_device_id=? AND class_id=? AND ended_at IS NULL AND version=? AND ${authorityGuard}`)
+       .bind(startedAt,plannedEndAt,teacherDeviceId,classId,version,...authorityBindings);
  } else if(action==="assign-person") {
   const personId=id(payload.personId),expectedClassName=typeof payload.expectedClassName==="string"?payload.expectedClassName:fail("Thiếu lớp hiện tại để kiểm tra thay đổi đồng thời.");
   const target=await db.prepare("SELECT person_role AS role FROM device_access WHERE device_id=? AND person_role IN ('learner','teacher') AND registration_submitted_at IS NOT NULL").bind(personId).first<{role:string}>();
