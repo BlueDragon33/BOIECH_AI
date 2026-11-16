@@ -64,7 +64,7 @@ function classRows(board:TrainingBoard):TeacherRow[]{
    resource,term:terms.find(x=>x.teacherDeviceId===person.id&&x.classId===resource.id&&!x.endedAt)
   }));
   const unmatched=names.filter(n=>!classes.some(c=>classKey(c.name)===classKey(n)));
-  const dates=assigned.map(a=>a.term?.startedAt).filter((x):x is string=>Boolean(x)&&Number.isFinite(Date.parse(x)));
+  const dates=assigned.map(a=>a.term?.startedAt).filter((x):x is string=>typeof x==="string"&&Number.isFinite(Date.parse(x)));
   dates.sort((a,b)=>a.localeCompare(b));
   return {person,assigned,unmatched,firstStart:dates[0]??null,latestStart:dates.at(-1)??null};
  });
@@ -107,7 +107,7 @@ export default function ManagerPersonnelV40({board,busy,onSelectPerson,onAssignP
    if(category==="multiple"&&r.assigned.length<=1)return false;
    if(category==="needs-review"&&!r.unmatched.length)return false;
    if(startFrom||startTo){
-    const dates=r.assigned.map(a=>a.term?.startedAt).filter((s):s is string=>Boolean(s)&&Number.isFinite(Date.parse(s)));
+    const dates=r.assigned.map(a=>a.term?.startedAt).filter((s):s is string=>typeof s==="string"&&Number.isFinite(Date.parse(s)));
     if(!dates.some(s=>(!startFrom||s.slice(0,10)>=startFrom)&&(!startTo||s.slice(0,10)<=startTo)))return false;
    }
    return true;
@@ -192,7 +192,7 @@ export default function ManagerPersonnelV40({board,busy,onSelectPerson,onAssignP
     </tr></thead><tbody>
     {visible.map(row=>{
      const statuses=row.unmatched.length?"review":!row.assigned.length?"none":"assigned";
-     const endDates=row.assigned.map(a=>a.term?.plannedEndAt).filter((x):x is string=>Boolean(x)&&Number.isFinite(Date.parse(x)));
+     const endDates=row.assigned.map(a=>a.term?.plannedEndAt).filter((x):x is string=>typeof x==="string"&&Number.isFinite(Date.parse(x)));
      endDates.sort((a,b)=>a.localeCompare(b));
      return <tr key={row.person.id} data-selected={selected===row.person.id} data-state={statuses}>
       <td><button type="button" className={styles.teacherLink} onClick={()=>{setSelected(row.person.id);setDetailTab("classes");setDraft(null);}}>
