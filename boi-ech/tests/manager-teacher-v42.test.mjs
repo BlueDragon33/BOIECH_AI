@@ -196,3 +196,15 @@ test("Credible critical technique error reaches teacher watchlist, not only the 
  assert.match(shell,/sort\(compareAttention\)/);
  assert.match(shell,/function compareAttention\(/);
 });
+
+test("Teacher source LIMIT saturation is disclosed, never misrepresented as complete review history",()=>{
+ const route=fs.readFileSync(path.join(root,"api/teacher/overview/route.ts"),"utf8");
+ const shell=fs.readFileSync(path.join(root,"teacher-role-shell.tsx"),"utf8");
+ assert.match(route,/const coverage = \{/);
+ assert.match(route,/learningEventLimitReached: \(learningEventsResult\.results \?\? \[\]\)\.length >= 12000/);
+ assert.match(route,/learnerLimitReached: \(result\.results \?\? \[\]\)\.length >= 200/);
+ assert.match(route,/return json\(\{\s*coverage,/);
+ assert.match(shell,/coverage\?: \{ possiblyTruncated:boolean/);
+ assert.match(shell,/overview\?\.coverage\?\.possiblyTruncated/);
+ assert.match(shell,/chưa đầy đủ do giới hạn số bản ghi/);
+});
