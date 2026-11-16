@@ -29,7 +29,7 @@ BEGIN
       SELECT 1 FROM training_resources c
       WHERE c.id=training_teacher_class_terms.class_id AND c.kind='class'
       AND EXISTS (
-        SELECT 1 FROM json_each('["' || replace(replace(replace(COALESCE(NEW.class_name,''),char(10),';'),',',';'),';','","') || '"]') token
+        SELECT 1 FROM json_each('[' || replace(json_quote(replace(replace(COALESCE(NEW.class_name,''),char(10),';'),',',';')),';','","') || ']') token
         WHERE lower(trim(token.value))=lower(c.name)
       )
     );
@@ -38,11 +38,11 @@ BEGIN
   FROM training_resources c
   WHERE c.kind='class' AND c.status='active'
     AND EXISTS (
-      SELECT 1 FROM json_each('["' || replace(replace(replace(COALESCE(NEW.class_name,''),char(10),';'),',',';'),';','","') || '"]') token
+      SELECT 1 FROM json_each('[' || replace(json_quote(replace(replace(COALESCE(NEW.class_name,''),char(10),';'),',',';')),';','","') || ']') token
       WHERE lower(trim(token.value))=lower(c.name)
     )
     AND NOT EXISTS (
-      SELECT 1 FROM json_each('["' || replace(replace(replace(COALESCE(OLD.class_name,''),char(10),';'),',',';'),';','","') || '"]') token
+      SELECT 1 FROM json_each('[' || replace(json_quote(replace(replace(COALESCE(OLD.class_name,''),char(10),';'),',',';')),';','","') || ']') token
       WHERE lower(trim(token.value))=lower(c.name)
     )
   ON CONFLICT(teacher_device_id,class_id) DO UPDATE SET
