@@ -63,13 +63,13 @@ export async function POST(request:Request){
    const statement=db.prepare(`SELECT proposal_id,kind,person_id,class_id,source_fingerprint,state,revision,actor_id,updated_at
     FROM training_ai_proposals WHERE proposal_id IN (${ids.map(()=>"?").join(",")})`);
    const rows=(await statement.bind(...ids).all<Row>()).results??[];
-   return respond({items:rows.filter(row=>{
+   return respond({items:rows.flatMap(row=>{
     const current=choices.find(x=>x.id===row.proposal_id);
-    return current&&row.source_fingerprint===proposalFingerprint(board,current);
-   }).map(row=>({
-    id:row.proposal_id,kind:row.kind,personId:row.person_id,classId:row.class_id,
-    status:row.state,revision:row.revision,updatedAt:row.updated_at
-   })),sourceAvailable:true,observedAt:board.observedAt});
+    if(!current)return [];
+    const stale=row.source_fingerprint!==proposalFingerprint(board,current);
+    return [{id:row.proposal_id,kind:row.kind,personId:row.person_id,classId:row.class_id,
+     status:stale?"stale":row.state,revision:row.revision,updatedAt:row.updated_at}];
+   }),sourceAvailable:true,observedAt:board.observedAt});
   }
   if(action!=="review"&&action!=="approve"&&action!=="reject")
    return respond({error:"Thao tác không hợp lệ."},400);
@@ -101,11 +101,16 @@ export async function POST(request:Request){
     (proposal_id,kind,person_id,class_id,source_fingerprint,state,revision,actor_id)
     VALUES (?,?,?,?,?,?,1,?)`)
     .bind(proposal.id,proposal.kind,proposal.personId,proposal.classId,fingerprint,targetStatus,actor.deviceId)
-   :db.prepare(`UPDATE training_ai_proposals SET state=?,revision=revision+1,
-     actor_id=?,updated_at=CURRENT_TIMESTAMP
-     WHERE proposal_id=? AND source_fingerprint=? AND revision=?
-     AND state=${action==="approve"?"'reviewed'":action==="reject"?"'reviewed'":"'not-allowed'"}`)
-    .bind(targetStatus,actor.deviceId,proposal.id,fingerprint,expectedRevision);
+   :action==="review"&&expectedRevision>0
+    ?db.prepare(`UPDATE training_ai_proposals SET state='reviewed',source_fingerprint=?,
+      revision=revision+1,actor_id=?,updated_at=CURRENT_TIMESTAMP
+      WHERE proposal_id=? AND revision=? AND source_fingerprint!=?`)
+      .bind(fingerprint,actor.deviceId,proposal.id,expectedRevision,fingerprint)
+    :db.prepare(`UPDATE training_ai_proposals SET state=?,revision=revision+1,
+      actor_id=?,updated_at=CURRENT_TIMESTAMP
+      WHERE proposal_id=? AND source_fingerprint=? AND revision=?
+      AND state=${action==="approve"?"'reviewed'":action==="reject"?"'reviewed'":"'not-allowed'"}`)
+      .bind(targetStatus,actor.deviceId,proposal.id,fingerprint,expectedRevision);
   const commands=db.prepare(`INSERT INTO training_ai_proposal_commands
    (command_id,proposal_id,actor_id,action,request_fingerprint)
    SELECT ?,?,?,?,? WHERE changes()=1`)
