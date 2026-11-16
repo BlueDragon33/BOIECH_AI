@@ -39,9 +39,9 @@ function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,decis
       <button type="button" aria-expanded={expanded===r.id} onClick={()=>setExpanded(expanded===r.id?null:r.id)}>
        {expanded===r.id?"Ẩn căn cứ":"Vì sao đề xuất?"}
       </button>
-      <button type="button" disabled={decisionBusy||decisions[r.id]?.status==="rejected"}
+      <button type="button" disabled={decisionBusy||r.admissible===false||decisions[r.id]?.status==="rejected"}
        onClick={()=>{if(onDecision)onDecision(r);else onReview(r.personId,r.classId);}}>
-       {decisions[r.id]?.status==="approved"?"Mở lưu phân công":
+       {r.admissible===false?"Thiếu hồ sơ xác minh":decisions[r.id]?.status==="approved"?"Mở lưu phân công":
         decisions[r.id]?.status==="reviewed"?"Phê duyệt & mở phân công":
         decisions[r.id]?.status==="rejected"?"Đã từ chối":decisions[r.id]?.status==="stale"?"Xem xét lại dữ liệu":"Ghi nhận xem xét"}
       </button>
@@ -51,6 +51,9 @@ function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,decis
     </div>
     {expanded===r.id?<div className={styles.evidence}>
       <strong>Bằng chứng · {date(r.observedAt)}</strong>
+      {r.admissionStatus?<p>Đối chiếu hồ sơ: {r.admissionStatus==="verified"?"Đã xác minh theo nguồn":
+       r.admissionStatus==="hard-veto"?"Không đủ điều kiện":"Chưa có đủ chứng cứ"}</p>:null}
+      {r.admissionSources?.map(source=><small key={source}>Hồ sơ xác minh: {source}</small>)}
       {r.sourceRecords.map(x=><small key={x.source+":"+x.id}>{x.source} · {x.id}</small>)}
       {r.warnings.map((w,i)=><p key={i}>{w}</p>)}
       <p>Chưa có thay đổi dữ liệu hoặc thông báo phân công chính thức.</p>
@@ -139,9 +142,10 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
    <div><strong>{date(review.observedAt)}</strong><span>Mốc dữ liệu xác thực</span></div>
   </div>
   <p className={styles.qualification} role="note">
-   Chưa có trong snapshot: năng lực/chứng chỉ chuyên môn, giờ rảnh từ hồ sơ bổ sung,
-   nhu cầu học viên và ràng buộc an toàn thực tế. Vì vậy hệ thống chỉ xếp hạng ứng viên,
-   không xác nhận đã phù hợp tuyệt đối. {review.sourceMayBeTruncated?"Nguồn có thể bị giới hạn số bản ghi.":""}
+   {board.admissionProfiles?
+    "Đang dùng hồ sơ đã tự nguyện khai báo và được cán bộ đối chiếu nguồn. Phương án thiếu chứng từ hoặc không đủ điều kiện bị khóa thao tác AI; mọi quyết định còn phải kiểm tra lại trên máy chủ."
+    :"Chưa kích hoạt nguồn hồ sơ bổ sung có đồng ý và kiểm chứng; chỉ hiển thị gợi ý theo sĩ số/lịch, không xác nhận chuyên môn hoặc an toàn."}
+   {review.sourceMayBeTruncated?" Nguồn có thể bị giới hạn số bản ghi.":""}
   </p>
   <div className={styles.columns}>
    <Shortlist title="01 · Giảng viên → lớp thiếu người" rows={review.teacherShortlist}
