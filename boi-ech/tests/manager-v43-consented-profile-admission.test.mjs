@@ -71,7 +71,10 @@ function fixture(t){
    ...data,profileAdmissionEnabled:async()=>enabled
   }
  };
- const js=ts.transpileModule(api,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ // Diagnostic is limited to the transient local test build; runtime API stays generic.
+ const debugApi=api.replace('  if(error instanceof SyntaxError)return respond(', '  if(error instanceof SyntaxError)return respond(')
+  .replace('  return respond({error:"Không thể xử lý hồ sơ bổ sung;', '  console.error("V43_PROFILE_TEST_CAUSE",error); return respond({error:"Không thể xử lý hồ sơ bổ sung;');
+ const js=ts.transpileModule(debugApi,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const apiModule={exports:{}};
  new Function("require","module","exports",js)((name)=>mocks[name]??require(name),apiModule,apiModule.exports);
  const post=async(action,body={})=>{
