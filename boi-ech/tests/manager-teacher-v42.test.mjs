@@ -184,3 +184,15 @@ test("Existing signed assignment requires atomic current-capacity guard for lear
  assert.match(server,/AND \$\{authorityGuard\} \$\{capacityGuard\}/);
  assert.match(server,/\.bind\(className,personId,expectedClassName,target.role,ids.length,\.\.\.authorityBindings,\.\.\.\(learnerNewClass/);
 });
+
+test("Credible critical technique error reaches teacher watchlist, not only the video tab",()=>{
+ const route=fs.readFileSync(path.join(root,"api/teacher/overview/route.ts"),"utf8");
+ const shell=fs.readFileSync(path.join(root,"teacher-role-shell.tsx"),"utf8");
+ assert.match(route,/const technicalNeedsSupport = Boolean\(analysis/);
+ assert.match(route,/analysis\.errors\.some\(\(issue\) => issue\.severity === "critical"\)/);
+ assert.match(route,/score !== null && score < 60/);
+ assert.match(route,/const needsSupport = technicalNeedsSupport \|\|/);
+ assert.match(shell,/Video AI cần sửa:/);
+ assert.match(shell,/sort\(compareAttention\)/);
+ assert.match(shell,/function compareAttention\(/);
+});
