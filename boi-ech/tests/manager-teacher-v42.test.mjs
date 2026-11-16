@@ -128,10 +128,10 @@ test("V43 allocation remains source-pure; only signed audited manager decisions 
   assert.doesNotMatch(c,/\bfetch\(|\.prepare\(|process\.env|localStorage|sessionStorage|onCommand\(/);
  }
  const approvalPanel=fs.readFileSync(path.join(root,"manager-ai-allocation-panel-v42.tsx"),"utf8");
- assert.match(approvalPanel,/api\\/training-ai-proposals/);
+ assert.match(approvalPanel,/api\/training-ai-proposals/);
  assert.match(approvalPanel,/const proof=await getProof/);
- assert.match(approvalPanel,/action==="approve"\\)onReviewProposal/);
- assert.doesNotMatch(approvalPanel,/\\.prepare\\(|process\\.env|localStorage|sessionStorage|\\btrainingCommand\\(/);
+ assert.match(approvalPanel,/action==="approve"\)onReviewProposal/);
+ assert.doesNotMatch(approvalPanel,/\.prepare\(|process\.env|localStorage|sessionStorage|\btrainingCommand\(/);
  const shell=fs.readFileSync(path.join(root,"teacher-role-shell.tsx"),"utf8");
  assert.match(shell,/data-video-coaching-draft/);
  assert.match(shell,/prioritizeTeacherVideo\(learner\)/);
