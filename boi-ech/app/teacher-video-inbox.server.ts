@@ -6,6 +6,15 @@ const assignedClassSql = `EXISTS(
   '[' || replace(json_quote(replace(replace(COALESCE(teacher.class_name,''),',',';'),char(10),';')),';','","') || ']'
  ) AS listed WHERE lower(trim(listed.value))=lower(trim(learner.class_name))
 )`;
+const activeLearnerSql=`(
+ EXISTS(SELECT 1 FROM accounts account
+   JOIN account_onboarding onboard ON onboard.account_id=account.account_id
+   JOIN account_entitlements entitlement ON entitlement.account_id=account.account_id
+   WHERE account.storage_device_id=learner.device_id AND onboard.stage='active'
+     AND entitlement.state='active' AND datetime(entitlement.expires_at)>CURRENT_TIMESTAMP)
+ OR (NOT EXISTS(SELECT 1 FROM accounts account WHERE account.storage_device_id=learner.device_id)
+   AND (learner.access_expires_at IS NULL OR datetime(learner.access_expires_at)>CURRENT_TIMESTAMP))
+)`;
 const activeTeacherSql=`(
  EXISTS(SELECT 1 FROM accounts account
    JOIN account_onboarding onboard ON onboard.account_id=account.account_id
@@ -32,6 +41,7 @@ export function enqueueVideoForAssignedTeachers(db:D1Database,learnerDeviceId:st
  WHERE source.device_id=? AND source.client_event_id=? AND source.event_type='video_ai_analysis'
  AND learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
+ AND ${activeLearnerSql}
  AND teacher.status='approved' AND teacher.registration_submitted_at IS NOT NULL
  AND ${activeTeacherSql} AND ${assignedClassSql}`)
  .bind(learnerDeviceId,clientEventId);
@@ -52,6 +62,7 @@ export function syncTeacherVideoInbox(db:D1Database,teacherDeviceId:string,teach
  JOIN device_access learner ON learner.device_id=source.device_id
  WHERE learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
+ AND ${activeLearnerSql}
  AND lower(trim(learner.class_name)) IN (${scoped})
  AND source.event_type='video_ai_analysis'
  ORDER BY source.id DESC LIMIT 250`)
@@ -73,6 +84,7 @@ export async function readTeacherVideoInbox(
  WHERE receipt.teacher_device_id=?
  AND learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
+ AND ${activeLearnerSql}
  AND lower(trim(learner.class_name)) IN (${scoped})
  ORDER BY source.id DESC LIMIT ?`).bind(teacherDeviceId,...teacherClasses,cap+1).all<VideoReceipt>();
  const rows=result.results??[];
@@ -91,6 +103,7 @@ export async function markTeacherVideoSeen(input:{
   WHERE source.id=teacher_video_inbox.video_event_id AND source.event_type='video_ai_analysis'
   AND learner.person_role='learner' AND learner.status='approved'
   AND learner.registration_submitted_at IS NOT NULL
+ AND ${activeLearnerSql}
   AND lower(trim(learner.class_name)) IN (${scoped}))`;
  const result=await db.prepare(`UPDATE teacher_video_inbox
   SET state='seen',revision=revision+1,updated_at=CURRENT_TIMESTAMP
@@ -104,6 +117,7 @@ export async function markTeacherVideoSeen(input:{
  WHERE receipt.teacher_device_id=? AND receipt.video_event_id=?
  AND learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
+ AND ${activeLearnerSql}
  AND lower(trim(learner.class_name)) IN (${scoped})`)
  .bind(teacherDeviceId,eventId,...teacherClasses).first<{revision:number;state:string}>();
  if(existing?.state==="seen")return {ok:true,code:"ALREADY_SEEN",revision:existing.revision};
