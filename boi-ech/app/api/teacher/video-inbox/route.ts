@@ -16,9 +16,11 @@ function teacherClassNames(value:string|null){
  */
 export async function POST(request:Request){
  try{
-  const size=Number(request.headers.get("content-length")??0);
-  if(size>8192)return respond({error:"Yêu cầu vượt giới hạn."},413);
-  const payload=await request.json() as Record<string,unknown>;
+  // Content-Length is optional/untrusted. Reject the ACTUAL body size before
+  // parsing an attacker-controlled signed payload.
+  const raw=await request.text();
+  if(raw.length>8192)return respond({error:"Yêu cầu vượt giới hạn."},413);
+  const payload=JSON.parse(raw) as Record<string,unknown>;
   if(!payload||typeof payload!=="object"||Array.isArray(payload))
    return respond({error:"Dữ liệu yêu cầu không hợp lệ."},400);
   const hostname=new URL(request.url).hostname;
