@@ -7,7 +7,7 @@ import {ManagerDetailSheet,ManagerSheet,type DetailTarget} from "./manager-detai
 import styles from "./manager-workspace.module.css";
 import ManagerRenewalPanel from "./manager-renewal-panel";
 import ManagerCommandCenter from "./manager-command-center";
-import ManagerAiWorkspaceV41,{ManagerAiOverviewEntryV41} from "./manager-ai-workspace-v41";
+import ManagerAiWorkspaceV41,{ManagerAiOverviewEntryV41,ManagerAiContextNoticeV41} from "./manager-ai-workspace-v41";
 import ManagerRosterCleanup from "./manager-roster-cleanup";
 import ManagerConsoleV12 from "./manager-console-v12";
 import ManagerBuildingStudio from "./manager-building-studio";
@@ -157,6 +157,8 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
       onCreateSession={(roomId,classId)=>editSession(undefined,roomId,classId)}/>
     <ManagerAiOverviewEntryV41 board={board} onOpen={()=>selectTab("ai")}/>
   </>:null}
+  {(["people","class","schedule","room"] as Tab[]).includes(tab)?
+    <ManagerAiContextNoticeV41 board={board} area={tab as "people"|"class"|"schedule"|"room"} onOpen={()=>selectTab("ai")}/>:null}
   {tab==="ai"?<ManagerAiWorkspaceV41 board={board} busy={busy} onNavigate={selectTab}/>:null}
   {tab!=="overview"?<div className={styles.sectionHeading}><div><button type="button" className={styles.backButton} onClick={()=>selectTab("overview")}>← Trang chủ</button><h2>{title}</h2></div>{tab==="schedule"?<button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>editSession()}>+ Xếp buổi học</button>:(["class","room","building"] as Tab[]).includes(tab)?<button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>newResource(tab as ResourceKind)}>+ Thêm {tab==="class"?"lớp":tab==="room"?"phòng":"tòa"}</button>:tab==="people"&&getProof?<button type="button" className={styles.primaryButton}
     onClick={()=>setCleanupTarget("all")}>♻ Thanh lọc hồ sơ cũ</button>:null}</div>:null}
