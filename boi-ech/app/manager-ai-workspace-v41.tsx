@@ -3,7 +3,7 @@
 import {useMemo,useState,type FormEvent} from "react";
 import {analyzeManagerBoard,answerManagerQuestion,simulateTeacherAllocation,type ManagerAiArea,type ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {classKey,classNames,type TrainingBoard} from "./training-types";
-import ManagerAiFollowonV41 from "./manager-ai-followon-v41";
+import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
 import styles from "./manager-ai-workspace-v41.module.css";
 
 const categories:{key:"all"|ManagerAiArea;label:string}[]=[
