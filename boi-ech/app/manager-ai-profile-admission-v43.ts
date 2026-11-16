@@ -97,3 +97,45 @@ export function assessProfilePlacement(input:{
   "Còn phải kiểm tra phiên bản và sức chứa thực tế tại thời điểm ghi vào D1; không tự phân lớp."
  ],...trace};
 }
+
+/**
+ * Instructor-only hard gates for understaffed classes. Deliberately does NOT
+ * infer learner skill compatibility; this checks coach/calendar/capacity only.
+ */
+export function assessInstructorForClass(input:{
+ teacherId:string;classId:string;now:string;
+ teacher?:InstructorAdmissionProfile|null;klass?:ClassAdmissionProfile|null;
+ existingTeacherClasses:number;registeredLearners:number;
+}):AdmissionResult{
+ const {teacher,klass,now}=input;
+ const seals=[teacher?.seal,klass?.seal].filter((v):v is AdmissionSeal=>Boolean(v));
+ const checkedSourceIds=seals.map(s=>s.sourceId);
+ const profileRevisionIds=seals.map(s=>s.sourceId+"@"+s.revision);
+ const result=(status:AdmissionResult["status"],reason:string):AdmissionResult=>({
+  status,reasons:[reason],checkedSourceIds,profileRevisionIds
+ });
+ if(!validSeal(teacher?.seal,now)||!validSeal(klass?.seal,now)||!teacher||!klass)
+  return result("insufficient-source","Thiếu xác nhận chuyên môn, lịch hoặc an toàn bể có nguồn và đồng ý.");
+ if(teacher.teacherId!==input.teacherId||klass.classId!==input.classId)
+  return result("hard-veto","Chứng cứ không thuộc giảng viên hoặc lớp đang xét.");
+ if(!klass.poolSafetyApproved||!Number.isInteger(klass.trainerToLearnerLimit)||
+  klass.trainerToLearnerLimit<1||!Number.isInteger(input.registeredLearners)||
+  input.registeredLearners>klass.trainerToLearnerLimit)
+  return result("hard-veto","Chưa đạt điều kiện an toàn hoặc sĩ số tối đa bể.");
+ if(!Number.isInteger(teacher.maxActiveClasses)||teacher.maxActiveClasses<1||
+  !Number.isInteger(input.existingTeacherClasses)||
+  input.existingTeacherClasses>=teacher.maxActiveClasses)
+  return result("hard-veto","Giảng viên đã đạt giới hạn lớp được xác minh.");
+ if(!teacher.certificates.some(c=>c.verified&&c.code===klass.requiredCertification&&
+  isIso(c.validUntil)&&Date.parse(c.validUntil)>Date.parse(now)))
+  return result("hard-veto","Chứng chỉ phù hợp thiếu hoặc đã hết hạn.");
+ if(!klass.trainingWindows.length||!klass.trainingWindows.every(range)||
+  !teacher.available.length||!teacher.available.every(range)||!teacher.absences.every(range))
+  return result("insufficient-source","Thiếu lịch lớp hoặc giờ làm việc được xác minh.");
+ for(const lesson of klass.trainingWindows){
+  if(!teacher.available.some(slot=>contains(slot,lesson))||
+     teacher.absences.some(absence=>overlaps(absence,lesson)))
+   return result("hard-veto","Giảng viên không rảnh hoặc có lịch vắng trùng giờ.");
+ }
+ return result("eligible","Giảng viên đủ điều kiện chuyên môn, lịch và an toàn theo hai hồ sơ đã xác minh; chưa thay thế rà soát học viên.");
+}
