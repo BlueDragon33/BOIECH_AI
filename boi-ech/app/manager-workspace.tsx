@@ -17,7 +17,7 @@ import {PRACTICE_POOL_BUILDING_ID,PRACTICE_POOL_BUILDING_NAME,PRACTICE_POOL_ROOM
  existingPracticePoolRoom,isPracticePoolRoom} from "./manager-practice-pool";
 import {readPendingSync,flushVerifiedSync} from "./verified-sync-client";
 import {useBoiSyncNotices,broadcastBoiChange} from "./manual-sync-notices";
-type Tab="overview"|"ai"|"approval"|"schedule"|"people"|"settings"|ResourceKind;
+type Tab="overview"|"approval"|"ai"|"schedule"|"people"|"settings"|ResourceKind;
 type Write=(payload:Record<string,unknown>)=>Promise<boolean>;
 const apps:{id:Tab;label:string;description:string}[]=[{id:"ai",label:"AI Điều hành",description:"Phân tích có bằng chứng"},{id:"approval",label:"Gia hạn tài khoản",description:"Học viên và giảng viên"},{id:"schedule",label:"Xếp lịch",description:"Buổi học & thời gian"},{id:"class",label:"Lớp học",description:"Sĩ số & giảng viên"},{id:"people",label:"Nhân sự",description:"Học viên & giảng viên"},{id:"room",label:"Phòng học",description:"Sức chứa & lịch trống"},{id:"building",label:"Tòa học",description:"Tòa & các phòng"},{id:"settings",label:"Cài đặt",description:"Giao diện & thiết lập"}];
 // Five primary mobile destinations fit one row; Settings is in the header and account menu.
