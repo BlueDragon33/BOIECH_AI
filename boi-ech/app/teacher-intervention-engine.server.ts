@@ -19,7 +19,7 @@ type SuggestionLearner = {
   inactiveDays: number | null;
   lastLesson: string | null;
   lastAnalysis: {
-    confidence: number;
+    confidence: number | null;
     captureQuality: "good" | "review";
     topErrors: string[];
   } | null;
@@ -93,19 +93,21 @@ export function buildInterventionSuggestions(learner: SuggestionLearner): Interv
     ));
   }
 
-  if (learner.lastAnalysis && (learner.lastAnalysis.confidence < 70 || learner.lastAnalysis.captureQuality === "review")) {
+  if (learner.lastAnalysis && ((learner.lastAnalysis.confidence === null || learner.lastAnalysis.confidence < 70) || learner.lastAnalysis.captureQuality === "review")) {
     const lesson = cleanLesson(learner.lastLesson, adaptiveLesson);
     output.push(suggestion(
       "review",
       "high",
       lesson,
       "Review bằng chứng AI trước khi giao bài",
-      learner.lastAnalysis.confidence < 70
+      learner.lastAnalysis.confidence === null
+        ? "Sự kiện cũ chưa có độ tin cậy để đối chiếu."
+        : learner.lastAnalysis.confidence < 70
         ? `Độ tin cậy AI hiện chỉ ${learner.lastAnalysis.confidence}%.`
         : "Chất lượng capture cần Giảng viên đối chiếu.",
       "Đối chiếu lại bản phân tích, góc quay và lỗi kỹ thuật trước khi dùng kết quả để hướng dẫn học viên.",
       [
-        `Confidence: ${learner.lastAnalysis.confidence}%`,
+        learner.lastAnalysis.confidence===null?"Confidence chưa được ghi nhận":`Confidence: ${learner.lastAnalysis.confidence}%`,
         learner.lastAnalysis.topErrors[0] ? `Lỗi nổi bật: ${learner.lastAnalysis.topErrors[0]}` : "",
       ],
     ));
