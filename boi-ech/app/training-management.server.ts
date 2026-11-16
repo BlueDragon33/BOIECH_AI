@@ -277,7 +277,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(target.role==="teacher"){
     // Stamp only new manager-authorized allocations; previous legacy classes remain unknown.
     const prior=new Set(classNames(expectedClassName).map(classKey));
-    const newIds=ids.filter((classId,index)=>!prior.has(classKey(names[index])));
+    const newIds=ids.filter((classId,index)=>!prior.has(classKey(names[index]??"")));
     if(newIds.length){
       const placeholders=newIds.map(()=>"?").join(",");
       followups.push(db.prepare(`INSERT INTO training_teacher_class_terms(teacher_device_id,class_id,started_at,planned_end_at,ended_at,version)
