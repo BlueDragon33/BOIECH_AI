@@ -1,0 +1,94 @@
+/**
+ * V42 decision-support: accountable placement shortlist on an existing signed TrainingBoard.
+ * No writes, guessed personnel credentials or unknown learner preferences.
+ */
+import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource} from "./training-types";
+import {reviewTeacherCandidates} from "./manager-ai-followon-v41";
+
+export type AllocationProposal={
+ id:string;kind:"teacher"|"learner";personId:string;personName:string;
+ classId:string;className:string;priority:"high"|"medium";
+ reason:string;currentClassLoad:number|null;currentLearnerCount:number;
+ classCapacity:number;teacherCoverage:string;
+ observedAt:string;sourceRecords:{source:"people"|"resources"|"sessions";id:string}[];
+ warnings:string[];decision:"human-review-required";
+};
+export type AllocationReview={observedAt:string;from:string;to:string;
+ teacherShortlist:AllocationProposal[];learnerShortlist:AllocationProposal[];
+ unassignedTeachers:number;unassignedLearners:number;classesNeedingTeachers:number;
+ sourceMayBeTruncated:boolean;rulesVersion:"v42-rules-only";};
+
+const eligible=(p:TrainingPerson)=>p.registered&&p.status==="approved"&&!p.expired;
+const activeClasses=(b:TrainingBoard)=>b.resources.filter(r=>r.kind==="class"&&r.status==="active");
+const assignedToActive=(p:TrainingPerson,classes:TrainingResource[])=>
+ classNames(p.className).some(name=>classes.some(c=>classKey(c.name)===classKey(name)));
+const byLoad=(a:TrainingResource,b:TrainingResource)=>a.learnerCount/Math.max(1,a.capacity)-b.learnerCount/Math.max(1,b.capacity)||
+ a.name.localeCompare(b.name,"vi")||a.id.localeCompare(b.id);
+
+export function buildAllocationReview(board:TrainingBoard):AllocationReview {
+ const classes=activeClasses(board),people=board.people??[];
+ const teachers=people.filter(p=>p.role==="teacher"&&eligible(p));
+ const learners=people.filter(p=>p.role==="learner"&&eligible(p));
+ const freeTeachers=teachers.filter(t=>!assignedToActive(t,classes));
+ const unassignedLearners=learners.filter(p=>!assignedToActive(p,classes));
+ const shortage=classes.filter(c=>c.missingTeachers>0&&c.requiredTeachers>0);
+ const sourceMayBeTruncated=(board.sessions??[]).length>=1000||people.length>=1000;
+ const teacherShortlist:AllocationProposal[]=[];
+ const learnerShortlist:AllocationProposal[]=[];
+ const staffWarnings=[
+  "Chưa xác minh chuyên môn, chứng chỉ, lịch rảnh chính thức và thời gian di chuyển.",
+  "Chỉ xét buổi học thuộc khoảng dữ liệu đã tải; không có trùng giờ không đồng nghĩa sẵn sàng nhận lớp."
+ ];
+ for(const klass of shortage.sort((a,b)=>b.missingTeachers-a.missingTeachers||a.name.localeCompare(b.name,"vi"))){
+  const candidates=reviewTeacherCandidates(board,klass.id,100)
+   .filter(c=>!c.alreadyAssigned&&c.overlappingExistingSessions===0)
+   .sort((a,b)=>a.currentClassLoad-b.currentClassLoad||
+     a.displayName.localeCompare(b.displayName,"vi")||a.teacherId.localeCompare(b.teacherId))
+   .slice(0,3);
+  for(const c of candidates){
+   const person=teachers.find(t=>t.id===c.teacherId);
+   if(!person)continue;
+   teacherShortlist.push({
+    id:"teacher:"+klass.id+":"+person.id,kind:"teacher",personId:person.id,personName:person.name,
+    classId:klass.id,className:klass.name,priority:"high",
+    reason:"Lớp thiếu "+klass.missingTeachers+" giảng viên; ứng viên đang phụ trách "+c.currentClassLoad+
+     " lớp hoạt động và chưa thấy trùng giờ trong "+c.classSessionsExamined+" buổi của lớp đã tải.",
+    currentClassLoad:c.currentClassLoad,currentLearnerCount:klass.learnerCount,
+    classCapacity:klass.capacity,teacherCoverage:klass.teacherCount+"/"+klass.requiredTeachers,
+    observedAt:board.observedAt,
+    sourceRecords:[{source:"resources",id:klass.id},{source:"people",id:person.id}],
+    warnings:c.classSessionsExamined===0?
+     ["Không có lịch buổi của lớp trong khoảng tải nên chưa kiểm tra được xung đột.",...staffWarnings]:staffWarnings,
+    decision:"human-review-required"
+   });
+  }
+ }
+ // Learner suggestions are class *candidates*, never qualification/time matches.
+ const rooms=classes.filter(c=>c.capacity>0&&c.learnerCount<c.capacity&&c.teacherCount>=c.requiredTeachers&&c.requiredTeachers>0)
+  .sort(byLoad);
+ for(const learner of unassignedLearners.slice().sort((a,b)=>a.name.localeCompare(b.name,"vi")||a.id.localeCompare(b.id)).slice(0,40)){
+  for(const klass of rooms.slice(0,2)){
+   learnerShortlist.push({
+    id:"learner:"+learner.id+":"+klass.id,kind:"learner",personId:learner.id,
+    personName:learner.name,classId:klass.id,className:klass.name,priority:"medium",
+    reason:"Lớp đang còn "+(klass.capacity-klass.learnerCount)+" chỗ theo cấu hình; "+
+     klass.teacherCount+"/"+klass.requiredTeachers+" giảng viên được ghi nhận. "+
+     "Ưu tiên cân bằng tỷ lệ sĩ số theo số liệu hiện có.",
+    currentClassLoad:null,currentLearnerCount:klass.learnerCount,
+    classCapacity:klass.capacity,teacherCoverage:klass.teacherCount+"/"+klass.requiredTeachers,
+    observedAt:board.observedAt,
+    sourceRecords:[{source:"people",id:learner.id},{source:"resources",id:klass.id}],
+    warnings:[
+     "Chưa có dữ liệu ca giờ mong muốn, trình độ bơi, nhóm tuổi, nhu cầu hỗ trợ hoặc xác nhận phù hợp thực tế.",
+     "Chỉ dùng sức chứa và phân công cấu hình; chưa xác minh an toàn thực hành, bể hoặc tỷ lệ huấn luyện thực tế."
+    ],
+    decision:"human-review-required"
+   });
+  }
+ }
+ return {observedAt:board.observedAt,from:board.from,to:board.to,
+  teacherShortlist,learnerShortlist,
+  unassignedTeachers:freeTeachers.length,unassignedLearners:unassignedLearners.length,
+  classesNeedingTeachers:shortage.length,sourceMayBeTruncated,
+  rulesVersion:"v42-rules-only"};
+}
