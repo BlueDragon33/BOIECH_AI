@@ -2,6 +2,7 @@ import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } fro
 import { publishedCourseDocument } from "../../../course-content.server";
 import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-learning-analytics.server";
 import { buildInterventionSuggestions } from "../../../teacher-intervention-engine.server";
+import { prioritizeTeacherVideo } from "../../../teacher-video-priority-v42";
 import {
   DeviceAccessError,
   getCourseDatabase,
@@ -269,7 +270,7 @@ export async function POST(request: Request) {
           LIMIT 3000`,
       ).bind(...teacherClasses).all<AssessmentRow>(),
       database.prepare(
-        `SELECT e.device_id, e.event_type, e.lesson_number, e.part, e.detail_json, e.created_at
+        `SELECT e.id, e.device_id, e.event_type, e.lesson_number, e.part, e.detail_json, e.created_at
            FROM course_activity_events e
            JOIN device_access da ON da.device_id = e.device_id
           WHERE da.person_role = 'learner'
@@ -507,6 +508,40 @@ export async function POST(request: Request) {
       };
     });
 
+    // Per-event VIDEO inbox is derived only from the exact signed role/class
+    // scope and source events already loaded by this endpoint. No media, external
+    // notification, read receipt or persistent inbox record is created.
+    const scopedLearnerIndex = new Map((result.results ?? []).map((row, index) => [row.device_id, index]));
+    const videoInbox = (learningEventsResult.results ?? [])
+      .filter((event) => event.event_type === "video_ai_analysis"
+        && Number.isSafeInteger(event.id) && scopedLearnerIndex.has(event.device_id))
+      .flatMap((event) => {
+        const learnerIndex = scopedLearnerIndex.get(event.device_id);
+        if (learnerIndex === undefined || !learners[learnerIndex]) return [];
+        const analysis = analysisSummary(event.detail_json, event.created_at);
+        if (!analysis || !analysis.analyzedAt) return [];
+        const exactReviewEvent = (learningEventsByDevice.get(event.device_id) ?? []).find((row) => {
+          if (row.event_type !== "teacher_analysis_review") return false;
+          const detail = parseJson<Record<string, unknown>>(row.detail_json, {});
+          return detail.analysisAt === analysis.analyzedAt;
+        });
+        const review = exactReviewEvent
+          ? teacherActionSummary("teacher_analysis_review", exactReviewEvent.detail_json, exactReviewEvent.created_at)
+          : null;
+        const decision = prioritizeTeacherVideo({
+          lastAnalysis: analysis, latestTeacherAction: null, latestVideoReview: review,
+          lastLesson: learners[learnerIndex].lastLesson, adaptive: learners[learnerIndex].adaptive,
+        });
+        return [{
+          eventId: event.id!, learnerIndex,
+          receivedAt: event.created_at, analysis, review,
+          priority: decision.rank, state: review?.action === "review" ? "reviewed" as const : "needs-review" as const,
+        }];
+      })
+      .sort((a, b) => b.priority - a.priority
+        || (Date.parse(b.receivedAt) || 0) - (Date.parse(a.receivedAt) || 0)
+        || b.eventId - a.eventId)
+      .slice(0, 40);
     const active7d = learners.filter((item) => item.inactiveDays !== null && item.inactiveDays < 7).length;
     const needingSupport = learners.filter((item) => item.needsSupport).length;
     const analysisCount = learners.reduce((sum, item) => sum + item.analysisCount, 0);
@@ -554,6 +589,7 @@ export async function POST(request: Request) {
         interventionSuggestionCount,
       },
       learners,
+      videoInbox,
       messages,
       assignments,
       privacy: {
