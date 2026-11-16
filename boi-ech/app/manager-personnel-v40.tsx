@@ -55,7 +55,7 @@ function isoInput(value:string){
  return d.toISOString();
 }
 function classRows(board:TrainingBoard):TeacherRow[]{
- const classes=board.resources.filter(r=>r.kind==="class");
+ const classes=board.resources.filter(r=>r.kind==="class"&&r.status==="active");
  const terms=board.teacherClassTerms??[];
  return board.people.filter(p=>p.role==="teacher").map(person=>{
   const names=[...new Map(classNames(person.className).filter(n=>!["Chưa phân công","Chưa phân lớp"].includes(n))
