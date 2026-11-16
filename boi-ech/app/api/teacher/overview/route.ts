@@ -2,6 +2,7 @@ import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } fro
 import { publishedCourseDocument } from "../../../course-content.server";
 import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-learning-analytics.server";
 import { buildInterventionSuggestions } from "../../../teacher-intervention-engine.server";
+import {groundedSwimmingCorrections,type PublishedCurriculumSource} from "../../../teacher-published-guidance.server";
 import { prioritizeTeacherVideo } from "../../../teacher-video-priority-v42";
 import {
   DeviceAccessError,
@@ -29,6 +30,7 @@ type LearnerRow = {
   analysis_count: number | null;
   last_analysis_json: string | null;
   last_analysis_at: string | null;
+  last_analysis_lesson: string | null;
   teacher_action_count: number | null;
   last_teacher_action_type: string | null;
   last_teacher_action_json: string | null;
@@ -212,7 +214,7 @@ export async function POST(request: Request) {
     const classPlaceholders = teacherClasses.map(() => "lower(trim(?))").join(", ");
 
     const database = await getCourseDatabase();
-    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult, assignmentEventsResult] = await Promise.all([
+    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult, assignmentEventsResult, publishedSource] = await Promise.all([
       publishedCourseDocument(database),
       database.prepare(
       `SELECT
@@ -236,6 +238,9 @@ export async function POST(request: Request) {
           (SELECT e.created_at FROM course_activity_events e
             WHERE e.device_id = da.device_id AND e.event_type = 'video_ai_analysis'
             ORDER BY e.id DESC LIMIT 1) AS last_analysis_at,
+          (SELECT e.lesson_number FROM course_activity_events e
+            WHERE e.device_id = da.device_id AND e.event_type = 'video_ai_analysis'
+            ORDER BY e.id DESC LIMIT 1) AS last_analysis_lesson,
           (SELECT COUNT(*) FROM course_activity_events e
             WHERE e.device_id = da.device_id
               AND e.event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')) AS teacher_action_count,
@@ -312,6 +317,11 @@ export async function POST(request: Request) {
           ORDER BY e.id DESC
           LIMIT 1500`,
       ).bind(...teacherClasses).all<AssignmentEventRow>(),
+      database.prepare(
+        `SELECT id,version_number,reviewed_by,reviewed_at,published_at
+         FROM course_content_versions WHERE status='published'
+         ORDER BY version_number DESC LIMIT 1`,
+      ).first<PublishedCurriculumSource>(),
     ]);
 
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
@@ -420,7 +430,11 @@ export async function POST(request: Request) {
     const learners = (result.results ?? []).map((row) => {
       const completedLessons = completedLessonCount(row.completed_json);
       const progress = Math.round((completedLessons / LESSON_COUNT) * 100);
-      const analysis = analysisSummary(row.last_analysis_json, row.last_analysis_at);
+      const analysisSource = analysisSummary(row.last_analysis_json, row.last_analysis_at);
+      const analysis = analysisSource?{...analysisSource,
+        publishedGuidance:groundedSwimmingCorrections(
+          document,publishedSource,analysisSource,row.last_analysis_lesson??""
+        )}:null;
       const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
       // Latest feedback can follow review. Locate a review for this exact video.
       const videoReviewEvent = analysis?.analyzedAt
@@ -519,8 +533,12 @@ export async function POST(request: Request) {
       .flatMap((event) => {
         const learnerIndex = scopedLearnerIndex.get(event.device_id);
         if (learnerIndex === undefined || !learners[learnerIndex]) return [];
-        const analysis = analysisSummary(event.detail_json, event.created_at);
-        if (!analysis || !analysis.analyzedAt) return [];
+        const analysisSource = analysisSummary(event.detail_json, event.created_at);
+        if (!analysisSource || !analysisSource.analyzedAt) return [];
+        const analysis = {...analysisSource,
+          publishedGuidance:groundedSwimmingCorrections(
+            document,publishedSource,analysisSource,event.lesson_number??""
+          )};
         const exactReviewEvent = (learningEventsByDevice.get(event.device_id) ?? []).find((row) => {
           if (row.event_type !== "teacher_analysis_review") return false;
           const detail = parseJson<Record<string, unknown>>(row.detail_json, {});
