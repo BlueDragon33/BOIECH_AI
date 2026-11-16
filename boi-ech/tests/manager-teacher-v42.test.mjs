@@ -132,5 +132,12 @@ test("V42 is read-only and cannot invoke independent backend, model provider or 
  assert.match(shell,/prioritizeTeacherVideo\(learner\)/);
  assert.match(shell,/Soạn bài luyện gợi ý/);
  const manager=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
- assert.match(manager,/<ManagerAiAllocationPanelV42 board=\{board\} onNavigate=\{onNavigate\}/);
+ assert.match(manager,/<ManagerAiAllocationPanelV42 board=\\{board\\} onNavigate=\\{onNavigate\\} onReviewProposal=\\{onReviewAllocation\\}/);
+ const managerRoot=fs.readFileSync(path.join(root,"manager-workspace.tsx"),"utf8");
+ assert.match(managerRoot,/onReviewAllocation=\\{reviewAllocation\\}/);
+ assert.match(managerRoot,/assignPerson\\(person,classId\\)/);
+ assert.match(managerRoot,/targetClassId/);
+ const panel=fs.readFileSync(path.join(root,"manager-ai-allocation-panel-v42.tsx"),"utf8");
+ assert.match(panel,/onReview\\(r.personId,r.classId\\)/);
+ assert.match(managerRoot,/action:"assign-person"/);
 });
