@@ -10,9 +10,9 @@ function date(value:string){
  const d=new Date(value);
  return Number.isFinite(d.getTime())?new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(d):"Chưa xác minh";
 }
-function Shortlist({title,rows,empty,navigate,target}:{
+function Shortlist({title,rows,empty,navigate,onReview,target}:{
  title:string;rows:AllocationProposal[];empty:string;navigate:(target:ManagerAiDestination)=>void;
- target:ManagerAiDestination;
+ onReview:(personId:string,classId:string)=>void;target:ManagerAiDestination;
 }){
  const [showAll,setShowAll]=useState(false);
  const [expanded,setExpanded]=useState<string|null>(null);
@@ -32,7 +32,8 @@ function Shortlist({title,rows,empty,navigate,target}:{
       <button type="button" aria-expanded={expanded===r.id} onClick={()=>setExpanded(expanded===r.id?null:r.id)}>
        {expanded===r.id?"Ẩn căn cứ":"Vì sao đề xuất?"}
       </button>
-      <button type="button" onClick={()=>navigate(target)}>Mở {target==="people"?"Nhân sự":"Lớp học"} để xét duyệt</button>
+      <button type="button" onClick={()=>onReview(r.personId,r.classId)}>Xem xét &amp; xác nhận</button>
+      <button type="button" onClick={()=>navigate(target)}>Mở {target==="people"?"Nhân sự":"Lớp học"}</button>
     </div>
     {expanded===r.id?<div className={styles.evidence}>
       <strong>Bằng chứng · {date(r.observedAt)}</strong>
@@ -47,8 +48,9 @@ function Shortlist({title,rows,empty,navigate,target}:{
    {showAll?"Thu gọn":"Xem thêm "+(rows.length-8)+" phương án"}</button>:null}
  </section>;
 }
-export default function ManagerAiAllocationPanelV42({board,onNavigate}:{
+export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewProposal}:{
  board:TrainingBoard;onNavigate:(id:ManagerAiDestination)=>void;
+ onReviewProposal:(personId:string,classId:string)=>void;
 }){
  const review=useMemo(()=>buildAllocationReview(board),[board]);
  return <section className={styles.root} aria-label="Đề xuất phân bổ học viên và giảng viên" data-manager-ai-allocation="V42">
@@ -71,10 +73,10 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate}:{
   <div className={styles.columns}>
    <Shortlist title="01 · Giảng viên → lớp thiếu người" rows={review.teacherShortlist}
      empty="Không có ứng viên không trùng giờ được nhận diện trong dữ liệu tải; xem xét thủ công."
-     target="people" navigate={onNavigate}/>
+     target="people" navigate={onNavigate} onReview={onReviewProposal}/>
    <Shortlist title="02 · Học viên → lớp còn chỗ" rows={review.learnerShortlist}
      empty="Chưa tìm thấy hồ sơ học viên cần phân lớp hoặc lớp còn sức chứa/đủ giảng viên cấu hình."
-     target="class" navigate={onNavigate}/>
+     target="class" navigate={onNavigate} onReview={onReviewProposal}/>
   </div>
   <footer>Thứ tự là gợi ý theo bộ quy tắc {review.rulesVersion}, không phải điểm phù hợp AI dự báo.
    Quyết định cần đối chiếu hồ sơ, giờ học, tiêu chuẩn an toàn và xác nhận có thẩm quyền.</footer>
