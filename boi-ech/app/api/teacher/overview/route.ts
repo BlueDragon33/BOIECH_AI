@@ -519,7 +519,22 @@ export async function POST(request: Request) {
     const pendingFollowUp = learners.reduce((sum, item) => sum + item.learningAnalytics.summary.pendingFollowUp, 0);
     const interventionSuggestionCount = learners.reduce((sum, item) => sum + item.interventionSuggestions.length, 0);
 
+    // Exact query LIMIT is not proof of completeness. Never claim that all
+    // historical video reviews/learner actions were inspected when caps may hit.
+    const coverage = {
+      possiblyTruncated: (result.results ?? []).length >= 200
+        || (assessmentsResult.results ?? []).length >= 3000
+        || (learningEventsResult.results ?? []).length >= 12000
+        || (learnerRepliesResult.results ?? []).length >= 200
+        || (assignmentEventsResult.results ?? []).length >= 1500,
+      learnerLimitReached: (result.results ?? []).length >= 200,
+      learningEventLimitReached: (learningEventsResult.results ?? []).length >= 12000,
+      assessmentLimitReached: (assessmentsResult.results ?? []).length >= 3000,
+      replyLimitReached: (learnerRepliesResult.results ?? []).length >= 200,
+      assignmentLimitReached: (assignmentEventsResult.results ?? []).length >= 1500,
+    };
     return json({
+      coverage,
       teacher: {
         name: teacher.learnerName,
         personCode: teacher.personCode,
