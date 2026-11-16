@@ -176,6 +176,13 @@ function normalize(text:string){return text.normalize("NFD").replace(/[\u0300-\u
 export type ManagerAiAnswer={kind:"evidence-answer"|"unsupported";title:string;answer:string;references:ManagerAiEvidence[];disclaimer:string};
 export function answerManagerQuestion(question:string,report:ManagerAiReport):ManagerAiAnswer{
  const q=normalize(question.slice(0,350));
+ // Manager questions never authorize a mutation. Refuse imperative requests
+ // before intent matching (e.g. "hãy đổi lớp" must not become a class report).
+ if(/\b(xoa|sua|chuyen|doi|cap quyen|tu dong|thuc hien|khoa tai khoan)\b/.test(q)){
+  return {kind:"unsupported",title:"Chỉ phân tích, không thực thi lệnh quản trị",
+   answer:"Không tự suy đoán hoặc thực hiện thay đổi dữ liệu. Nếu muốn phân công, đổi lịch hay cập nhật tài khoản, hãy mở phân hệ phù hợp để cán bộ xem xét và phê duyệt.",
+   references:[],disclaimer:"V41.0 không có quyền tự thực thi hoặc cấp quyền quản trị."};
+ }
  const groups:[string,ManagerAiArea[]][]=[
   ["nhan su",["staff"]],["giang vien",["staff"]],["thieu nguoi",["staff"]],
   ["lop",["class","staff"]],["si so",["class"]],["qua tai",["class"]],
