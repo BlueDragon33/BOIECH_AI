@@ -23,9 +23,20 @@ function proposalFingerprint(board:TrainingBoard,proposal:AllocationProposal){
   .sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
  const sessions=board.sessions.map(x=>[x.id,x.classId,x.teacherId,x.assistantTeacherId,x.roomId,x.status,x.startsAt,x.endsAt,x.version])
   .sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
- return hash(JSON.stringify({version:"v43-manager-review-1",window:[board.from,board.to],
+ // A consent withdrawal, new verification revision or pool safety change
+ // MUST stale an old AI decision, even when class seats remain unchanged.
+ const admission=board.admissionProfiles?{
+  truncated:board.admissionProfiles.sourceMayBeTruncated,
+  teacher:board.admissionProfiles.teacher.map(x=>[x.teacherId,x.seal.sourceId,x.seal.revision,x.seal.expiresAt])
+   .sort((a,b)=>String(a[0]).localeCompare(String(b[0]))),
+  learner:board.admissionProfiles.learner.map(x=>[x.learnerId,x.seal.sourceId,x.seal.revision,x.seal.expiresAt])
+   .sort((a,b)=>String(a[0]).localeCompare(String(b[0]))),
+  safety:board.admissionProfiles.safety.map(x=>[x.classId,x.seal.sourceId,x.seal.revision,x.seal.expiresAt])
+   .sort((a,b)=>String(a[0]).localeCompare(String(b[0])))
+ }:null;
+ return hash(JSON.stringify({version:"v44-manager-review-profile-bound",window:[board.from,board.to],
   proposal:[proposal.id,proposal.kind,proposal.personId,proposal.classId,proposal.priority,proposal.suggestedRole],
-  resources,people,sessions}));
+  resources,people,sessions,admission}));
 }
 function validId(value:unknown):value is string{
  return typeof value==="string"&&/^(teacher|learner):[A-Za-z0-9_-]{1,96}:[A-Za-z0-9_-]{1,96}$/.test(value);
