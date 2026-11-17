@@ -26,7 +26,9 @@ export type ManagerAiReport={
 };
 const weights:Record<ManagerAiPriority,number>={critical:0,high:1,medium:2,info:3};
 const activeTeacher=(p:TrainingPerson)=>p.role==="teacher"&&p.registered&&p.status==="approved"&&!p.expired;
-const activeSessions=(b:TrainingBoard)=>(b.sessions??[]).filter(s=>s.status!=="cancelled"&&Number.isFinite(Date.parse(s.startsAt))&&Number.isFinite(Date.parse(s.endsAt))&&Date.parse(s.endsAt)>Date.parse(s.startsAt));
+const validSessionTime=(s:TrainingSession)=>Number.isFinite(Date.parse(s.startsAt))&&
+ Number.isFinite(Date.parse(s.endsAt))&&Date.parse(s.endsAt)>Date.parse(s.startsAt);
+const activeSessions=(b:TrainingBoard)=>(b.sessions??[]).filter(s=>s.status!=="cancelled"&&validSessionTime(s));
 function teacherClassMap(board:TrainingBoard){
  const classes=(board.resources??[]).filter(r=>r.kind==="class"&&r.status==="active");
  const keyed=new Set(classes.map(r=>classKey(r.name)));
@@ -101,7 +103,17 @@ export function analyzeManagerBoard(board:TrainingBoard,limit=40):ManagerAiRepor
   recommendedAction:"Kiểm tra nguồn nhân lực và lịch trước khi phân công các lớp đang thiếu.",
   target:"people",evidence:available.slice(0,4).map(p=>citation("people",p.id,"role,status,registered,expired,className",board)),
   limitations:["Không có lớp hoạt động không có nghĩa là nhân sự rảnh hoàn toàn; có thể có nhiệm vụ ngoài hệ thống."]});
- const teacherSet=new Set(teachers.map(t=>t.id));
+ // A blocked, expired or unregistered teacher is not an operationally
+ // eligible assignment, even if their identity still exists in D1.
+ const teacherSet=new Set(teachers.filter(activeTeacher).map(t=>t.id));
+ for(const s of (board.sessions??[]).filter(item=>item.status!=="cancelled"&&!validSessionTime(item))){
+  added(out,{id:"invalid-schedule-time:"+s.id,area:"quality",priority:"high",
+   title:"Buổi học "+(s.title||s.id)+" có mốc thời gian cần sửa",
+   details:"Thời điểm bắt đầu/kết thúc không xác minh được hoặc thứ tự giờ sai. Buổi này không được đưa vào kiểm tra trùng lịch.",
+   recommendedAction:"Mở Lịch học, kiểm tra giờ bắt đầu/kết thúc và tải lại trước khi xác nhận lịch.",
+   target:"schedule",evidence:[citation("sessions",s.id,"startsAt,endsAt,status",board)],
+   limitations:["Không có đủ mốc thời gian hợp lệ để kết luận buổi này không trùng lịch với các buổi khác."]});
+ }
  const flaggedRoomCapacity=new Set<string>();
  for(const s of sessions){
   const klass=byId.get(s.classId),room=byId.get(s.roomId);
