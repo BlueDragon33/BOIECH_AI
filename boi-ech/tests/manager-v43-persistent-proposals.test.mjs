@@ -50,12 +50,17 @@ function fixture(t){
   },
   "../../training-management.server":{
    requireManager:actor=>{if(actor.personRole!=="manager")throw new DeviceAccessError("role",403,"ROLE");},
+   trainingCommand:async()=>{throw new Error("Review and approve must never call apply.");},
    trainingBoard:async()=>board,
    trainingDatabase:async()=>db,
    trainingWindow:payload=>({from:payload.from,to:payload.to})
   },
   "../../manager-ai-allocation-v42":{
    buildAllocationReview:()=>({teacherShortlist:[proposal],learnerShortlist:[],sourceMayBeTruncated:truncated})
+  },
+  "../../training-types":{
+   classNames:s=>s.split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean),
+   classKey:s=>s.trim().replace(/[A-Z]/g,c=>c.toLowerCase())
   }
  };
  const exports={};
@@ -123,5 +128,10 @@ test("manager UI uses separately signed manager capability; approve opens existi
  assert.match(panel,/api\/training-ai-proposals/);
  assert.match(panel,/if\(action==="approve"\)onReviewProposal/);
  assert.match(manager,/onReviewAllocation=\{reviewAllocation\} getProof=\{getProof\}/);
- assert.doesNotMatch(api,/\btrainingCommand\(/);
+ assert.match(api,/if\(action==="apply"\)/);
+ assert.match(api,/await trainingCommand\(actor,/);
+ assert.equal((api.match(/await trainingCommand\(actor,/g)??[]).length,1,
+  "Only the explicit apply branch can call the canonical class mutation");
+ assert.match(panel,/data-ai-apply-confirm/);
+
 });
