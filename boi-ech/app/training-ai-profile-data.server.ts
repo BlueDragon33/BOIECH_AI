@@ -127,12 +127,19 @@ export function admitVerifiedTrainingProfiles(rows:TrainingProfileRow[],classes:
 export async function readManagerProfileAdmission(db:D1Database,board:Pick<TrainingBoard,"people"|"resources">){
  const ids=new Set(board.people.map(x=>x.id));
  const classIds=new Set(board.resources.filter(x=>x.kind==="class").map(x=>x.id));
+ // Filter by the manager-visible roster BEFORE LIMIT, otherwise another
+ // manager's 1,000 submissions can starve this manager's real candidates.
+ // JSON-list binds use one D1 parameter even with a large roster.
  const [a,b]=await Promise.all([
   db.prepare(`SELECT device_id,role,payload_json,revision,state,consent_at,
    verified_revision,verified_by,verification_reference,verified_at,valid_until
-   FROM training_ai_profile_submissions WHERE state='verified' LIMIT 1000`).all<TrainingProfileRow>(),
+   FROM training_ai_profile_submissions WHERE state='verified'
+   AND device_id IN (SELECT value FROM json_each(?))
+   ORDER BY updated_at DESC LIMIT 1001`).bind(JSON.stringify([...ids])).all<TrainingProfileRow>(),
   db.prepare(`SELECT class_id,payload_json,revision,verification_reference,verified_by,verified_at,valid_until
-   FROM training_ai_class_safety_attestations LIMIT 500`).all<ClassSafetyRow>()
+   FROM training_ai_class_safety_attestations
+   WHERE class_id IN (SELECT value FROM json_each(?))
+   ORDER BY updated_at DESC LIMIT 501`).bind(JSON.stringify([...classIds])).all<ClassSafetyRow>()
  ]);
  const profiles=(a.results??[]).filter(row=>ids.has(row.device_id));
  const classes=(b.results??[]).filter(row=>classIds.has(row.class_id));
@@ -140,6 +147,6 @@ export async function readManagerProfileAdmission(db:D1Database,board:Pick<Train
  return {
   teacher:[...admitted.teacher.values()],learner:[...admitted.learner.values()],
   safety:[...admitted.safety.values()],
-  sourceMayBeTruncated:(a.results??[]).length>=1000||(b.results??[]).length>=500,
+  sourceMayBeTruncated:(a.results??[]).length>1000||(b.results??[]).length>500,
  };
 }
