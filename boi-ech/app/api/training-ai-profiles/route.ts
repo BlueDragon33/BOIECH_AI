@@ -80,13 +80,23 @@ export async function POST(request:Request){
   if(action==="manager-list"){
    const profiles=await readManagerProfileAdmission(db,board);
    const ids=new Set(board.people.map(p=>p.id));
-   const rawRows=await db.prepare(`SELECT device_id,role,payload_json,revision,state,submitted_at
-      FROM training_ai_profile_submissions WHERE state='pending' ORDER BY updated_at DESC LIMIT 100`)
-     .all<{device_id:string;role:string;payload_json:string;revision:number;state:string;submitted_at:string}>();
-   return respond({pending:(rawRows.results??[]).filter(x=>ids.has(x.device_id))
+   const classIds=board.resources.filter(r=>r.kind==="class").map(r=>r.id);
+   const [rawRows,safetyRows]=await Promise.all([
+    db.prepare(`SELECT device_id,role,payload_json,revision,state,submitted_at
+      FROM training_ai_profile_submissions WHERE state='pending'
+      AND device_id IN (SELECT value FROM json_each(?))
+      ORDER BY updated_at DESC LIMIT 101`).bind(JSON.stringify([...ids]))
+     .all<{device_id:string;role:string;payload_json:string;revision:number;state:string;submitted_at:string}>(),
+    db.prepare(`SELECT class_id,revision FROM training_ai_class_safety_attestations
+      WHERE class_id IN (SELECT value FROM json_each(?)) ORDER BY class_id LIMIT 501`)
+      .bind(JSON.stringify(classIds)).all<{class_id:string;revision:number}>(),
+   ]);
+   return respond({pending:(rawRows.results??[]).slice(0,100)
     .map(x=>({deviceId:x.device_id,role:x.role,revision:x.revision,submittedAt:x.submitted_at,
       profile:JSON.parse(x.payload_json)})),
-    verified:profiles,sourcePossiblyTruncated:(rawRows.results??[]).length>=100});
+    verified:profiles,safetyRevisions:(safetyRows.results??[]).slice(0,500),
+    sourcePossiblyTruncated:(rawRows.results??[]).length>100||(safetyRows.results??[]).length>500||
+      profiles.sourceMayBeTruncated});
   }
   if(!sourceRef(payload.verificationReference)||!expiry(payload.validUntil))
    return respond({error:"Thiếu mã chứng từ nguồn và thời hạn kiểm chứng tối đa 90 ngày."},400);
