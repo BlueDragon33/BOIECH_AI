@@ -186,8 +186,8 @@ test("Existing signed assignment requires atomic current-capacity guard for lear
  assert.match(server,/seat\.capacity > \(/);
  assert.match(server,/member\.person_role='learner'/);
  assert.match(server,/entitlement\.state='active'/);
- assert.match(server,/AND \$\{authorityGuard\} \$\{capacityGuard\}/);
- assert.match(server,/\.bind\(className,personId,expectedClassName,target.role,ids.length,\.\.\.authorityBindings,\.\.\.\(learnerNewClass/);
+ assert.match(server,/AND \$\{authorityGuard\} \$\{capacityGuard\} \$\{aiGuard\}/);
+ assert.match(server,/\.bind\(className,personId,expectedClassName,target.role,ids.length,\.\.\.authorityBindings,\s*\.\.\.\(learnerNewClass/);
 });
 
 test("Credible critical technique error reaches teacher watchlist, not only the video tab",()=>{
