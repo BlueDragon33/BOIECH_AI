@@ -25,6 +25,11 @@ A client-side manager AI snapshot gate rejects stale (older than five minutes), 
 
 The browser check is **defense in depth only**; authorization, proposal fingerprint, profile/safety CAS, single audit and D1 readback MUST remain enforced by the server. This candidate does not change server D1 code.
 
+The existing deterministic Manager AI evidence analyzer is additionally hardened, without adding a competing detection engine:
+- Blocked, expired or unregistered teachers in current scheduled data are no longer treated as operationally eligible.
+- Malformed non-cancelled session timestamps now yield a source-cited quality warning instead of being silently excluded from conflict detection.
+- Regression tests verify both cases, cancellation exclusions and read-only behavior. These warnings flag review work; they do not autonomously modify classes, sessions or personnel.
+
 ## Release boundary and conflict-cleanliness checklist
 
 1. Keep every PR Draft and account for its own base/head SHA; no unreviewed retarget or hidden squash.
