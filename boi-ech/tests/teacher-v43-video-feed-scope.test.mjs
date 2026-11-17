@@ -41,7 +41,7 @@ function fixture(t){
  const db={prepare(sql){return {bind(...args){
   lastParameterCount=args.length;
   return {async all(){return {results:sqlite.prepare(sql).all(...args)}}};
- };}};
+ }}}};
  const load=(classes=["Lớp A"],ids=["L1","L2","U1","N1"],limit=80)=>
   loadTeacherScopedVideoEvents(db,classes,ids,limit);
  return {sqlite,db,load,lastParameterCount:()=>lastParameterCount};
