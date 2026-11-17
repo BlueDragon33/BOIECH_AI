@@ -10,12 +10,12 @@ function moduleOf(path,dependencies={}){
  const output=ts.transpileModule(code(path),{compilerOptions:{
   module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022
  }}).outputText;
- const module={exports:{}};
+ const holder={exports:{}};
  new Function("require","module","exports",output)(
   key=>{if(key in dependencies)return dependencies[key];throw new Error("Unexpected import "+key);},
-  module,module.exports
+  holder,holder.exports
  );
- return module.exports;
+ return holder.exports;
 }
 const retrieval=moduleOf("app/teacher-knowledge-retrieval-v43.ts");
 const knowledge=moduleOf("app/teacher-approved-knowledge.server.ts",{
