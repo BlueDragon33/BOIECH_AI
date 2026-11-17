@@ -23,19 +23,22 @@ export async function loadTeacherScopedVideoEvents(
  }
  if(!learnerIds.length)return {events:[],possiblyTruncated:false};
  const cap=Math.max(1,Math.min(80,Number.isFinite(limit)?Math.floor(limit):80));
- const classClause=classes.map(()=>"lower(trim(?))").join(",");
- const learnerClause=learnerIds.map(()=>"?").join(",");
+ // Cloudflare D1 permits at most 100 bound parameters per SQL statement.
+ // JSON arrays use TWO bound values regardless of the visible 200 learners.
+ // SQLite json_each(?) preserves parameterization without interpolating IDs.
  const rows=await db.prepare(`SELECT e.id,e.device_id,e.event_type,e.lesson_number,e.part,
   e.detail_json,e.created_at
  FROM course_activity_events e
  JOIN device_access learner ON learner.device_id=e.device_id
  WHERE learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
- AND lower(trim(learner.class_name)) IN (${classClause})
- AND learner.device_id IN (${learnerClause})
+ AND lower(trim(learner.class_name)) IN (
+  SELECT lower(trim(value)) FROM json_each(?)
+ )
+ AND learner.device_id IN (SELECT value FROM json_each(?))
  AND e.event_type='video_ai_analysis'
  ORDER BY e.id DESC LIMIT ?`)
- .bind(...classes,...learnerIds,cap+1).all<TeacherVideoEventRow>();
+ .bind(JSON.stringify(classes),JSON.stringify(learnerIds),cap+1).all<TeacherVideoEventRow>();
  const events=rows.results??[];
  return {events:events.slice(0,cap),possiblyTruncated:events.length>cap};
 }
