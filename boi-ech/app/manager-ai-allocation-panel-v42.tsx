@@ -7,6 +7,7 @@ import type {ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {buildAllocationReview,type AllocationProposal} from "./manager-ai-allocation-v42";
 import styles from "./manager-ai-allocation-v42.module.css";
 import ManagerAiProfilesV44 from "./manager-ai-profiles-v44";
+import AiCoachPanelV44 from "./ai-coach-panel-v44";
 
 function date(value:string){
  const d=new Date(value);
@@ -191,7 +192,7 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
      onApply={getProof?proposal=>void recordApply(proposal):undefined}
      decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&!decisionsReady)}/>
   </div>
-  {getProof?<ManagerAiProfilesV44 board={board} getProof={getProof}/>:null}
+  {getProof?<><ManagerAiProfilesV44 board={board} getProof={getProof}/><AiCoachPanelV44 getProof={getProof}/></>:null}
   <footer>Thứ tự là gợi ý theo bộ quy tắc {review.rulesVersion}, không phải điểm phù hợp AI dự báo.
    Quyết định cần đối chiếu hồ sơ, giờ học, tiêu chuẩn an toàn và xác nhận có thẩm quyền.</footer>
  </section>;
