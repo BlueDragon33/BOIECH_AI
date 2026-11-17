@@ -63,3 +63,13 @@ test("V46 source guard is pure and cannot mutate D1 or call an AI provider",()=>
  assert.equal(assessManagerAiSnapshot(frozen,now).canDecide,true);
  assert.equal(JSON.stringify(frozen),before);
 });
+
+test("V46 manager panel gates both review and apply even if source becomes stale during sign-in",()=>{
+ const panel=readFileSync(new URL("../app/manager-ai-allocation-panel-v42.tsx",import.meta.url),"utf8");
+ const checks=panel.match(/assessManagerAiSnapshot\(snapshotInput,Date\.now\(\)\)/g)??[];
+ assert.equal(checks.length,4,"Both actions must recheck before and after signed proof");
+ assert.match(panel,/getProof&&\(!decisionsReady\|\|!snapshot\.canDecide\)/);
+ assert.match(panel,/role="alert"/);
+ assert.match(panel,/Làm mới bảng quản lý/);
+ assert.match(panel,/await trainingCommand|recordApply\(proposal/);
+});
