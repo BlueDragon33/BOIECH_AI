@@ -76,8 +76,11 @@ test("sign-in submit text meets WCAG AA at both gradient endpoints",()=>{
  const textColor=button.match(/\bcolor\s*:\s*(#[0-9a-f]+)\s*;/i)?.[1];
  const stops=button.match(/\bbackground\s*:\s*linear-gradient\([^,]+,\s*(#[0-9a-f]{6})\s*,\s*(#[0-9a-f]{6})\s*\)/i);
  assert.ok(textColor&&stops,"Missing sign-in submit text color or gradient");
+ const foreground=textColor.length===4
+  ? "#"+[...textColor.slice(1)].map(channel=>channel.repeat(2)).join("")
+  : textColor;
  for(const stop of stops.slice(1)){
-  assert.ok(contrastRatio(textColor,stop)>=4.5,"Sign-in submit contrast below AA at "+stop);
+  assert.ok(contrastRatio(foreground,stop)>=4.5,"Sign-in submit contrast below AA at "+stop);
  }
 });
 test("all important modals are explicitly readable in both color schemes",()=>{
