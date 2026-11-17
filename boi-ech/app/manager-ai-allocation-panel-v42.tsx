@@ -6,17 +6,19 @@ import type {TrainingProof} from "./training-client";
 import type {ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {buildAllocationReview,type AllocationProposal} from "./manager-ai-allocation-v42";
 import styles from "./manager-ai-allocation-v42.module.css";
+import ManagerAiProfilesV44 from "./manager-ai-profiles-v44";
 
 function date(value:string){
  const d=new Date(value);
  return Number.isFinite(d.getTime())?new Intl.DateTimeFormat("vi-VN",{dateStyle:"short",timeStyle:"short"}).format(d):"Chưa xác minh";
 }
-type Decision={status:"reviewed"|"approved"|"rejected"|"stale";revision:number};
-function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,decisions,decisionBusy,target}:{
+type Decision={status:"reviewed"|"approved"|"applied"|"rejected"|"stale";revision:number};
+function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,onApply,decisions,decisionBusy,target}:{
  title:string;rows:AllocationProposal[];empty:string;navigate:(target:ManagerAiDestination)=>void;
  onReview:(personId:string,classId:string)=>void;
  onDecision?:(proposal:AllocationProposal)=>void;
  onReject?:(proposal:AllocationProposal)=>void;
+ onApply?:(proposal:AllocationProposal)=>void;
  decisions:Record<string,Decision>;decisionBusy:boolean;
  target:ManagerAiDestination;
 }){
@@ -39,12 +41,16 @@ function Shortlist({title,rows,empty,navigate,onReview,onDecision,onReject,decis
       <button type="button" aria-expanded={expanded===r.id} onClick={()=>setExpanded(expanded===r.id?null:r.id)}>
        {expanded===r.id?"Ẩn căn cứ":"Vì sao đề xuất?"}
       </button>
-      <button type="button" disabled={decisionBusy||r.admissible===false||decisions[r.id]?.status==="rejected"}
+      <button type="button" disabled={decisionBusy||r.admissible===false||decisions[r.id]?.status==="rejected"||decisions[r.id]?.status==="applied"}
        onClick={()=>{if(onDecision)onDecision(r);else onReview(r.personId,r.classId);}}>
-       {r.admissible===false?"Thiếu hồ sơ xác minh":decisions[r.id]?.status==="approved"?"Mở lưu phân công":
+       {r.admissible===false?"Thiếu hồ sơ xác minh":decisions[r.id]?.status==="applied"?"Đã áp dụng phân công":decisions[r.id]?.status==="approved"?"Mở lưu phân công":
         decisions[r.id]?.status==="reviewed"?"Phê duyệt & mở phân công":
         decisions[r.id]?.status==="rejected"?"Đã từ chối":decisions[r.id]?.status==="stale"?"Xem xét lại dữ liệu":"Ghi nhận xem xét"}
       </button>
+      {decisions[r.id]?.status==="approved"&&r.admissible===true&&onApply?
+       <button type="button" data-ai-apply-confirm disabled={decisionBusy} onClick={()=>onApply(r)}>
+        Áp dụng phân công đã duyệt
+       </button>:null}
       {decisions[r.id]?.status==="reviewed"&&onReject?
        <button type="button" disabled={decisionBusy} onClick={()=>onReject(r)}>Từ chối đề xuất</button>:null}
       <button type="button" onClick={()=>navigate(target)}>Mở {target==="people"?"Nhân sự":"Lớp học"}</button>
@@ -100,6 +106,28 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
   })();
   return ()=>{live=false;controller.abort();};
  },[getProof,board.from,board.to,board.observedAt]);
+ async function recordApply(proposal:AllocationProposal){
+  const current=decisions[proposal.id];
+  if(!getProof||decisionBusy||!decisionsReady||!board.admissionProfiles||
+    current?.status!=="approved"||proposal.admissible!==true)return;
+  if(!window.confirm("Áp dụng phân công sau khi kiểm tra lại hồ sơ, chứng chỉ, lớp và sĩ số trên máy chủ?"))return;
+  setDecisionBusy(true);setDecisionError("");
+  try{
+   const proof=await getProof();
+   const response=await fetch("/api/training-ai-proposals",{
+    method:"POST",credentials:"same-origin",cache:"no-store",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({...proof,from:board.from,to:board.to,action:"apply",
+      proposalId:proposal.id,expectedRevision:current.revision,commandId:crypto.randomUUID()})
+   });
+   const result=await response.json() as {ok?:boolean;applied?:boolean;error?:string;code?:string};
+   if(!response.ok||!result.ok||!result.applied)
+    throw new Error(result.error??"Chưa xác minh được việc áp dụng phân công.");
+   setDecisions(prev=>({...prev,[proposal.id]:{status:"applied",revision:current.revision}}));
+   setDecisionError("Đã ghi phân công và có biên nhận D1; đồng bộ bảng để xem danh sách mới.");
+  }catch(error){setDecisionError(error instanceof Error?error.message:"Không áp dụng được đề xuất.");}
+  finally{setDecisionBusy(false);}
+ }
  async function recordDecision(proposal:AllocationProposal,mode?:"reject"){
   if(!getProof){onReviewProposal(proposal.personId,proposal.classId);return;}
   if(!decisionsReady||decisionBusy)return;
@@ -153,14 +181,17 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
      target="people" navigate={onNavigate} onReview={onReviewProposal}
      onDecision={getProof?proposal=>void recordDecision(proposal):undefined}
      onReject={getProof?proposal=>void recordDecision(proposal,"reject"):undefined}
+     onApply={getProof?proposal=>void recordApply(proposal):undefined}
      decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&!decisionsReady)}/>
    <Shortlist title="02 · Học viên → lớp còn chỗ" rows={review.learnerShortlist}
      empty="Chưa tìm thấy hồ sơ học viên cần phân lớp hoặc lớp còn sức chứa/đủ giảng viên cấu hình."
      target="class" navigate={onNavigate} onReview={onReviewProposal}
      onDecision={getProof?proposal=>void recordDecision(proposal):undefined}
      onReject={getProof?proposal=>void recordDecision(proposal,"reject"):undefined}
+     onApply={getProof?proposal=>void recordApply(proposal):undefined}
      decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&!decisionsReady)}/>
   </div>
+  {getProof?<ManagerAiProfilesV44 board={board} getProof={getProof}/>:null}
   <footer>Thứ tự là gợi ý theo bộ quy tắc {review.rulesVersion}, không phải điểm phù hợp AI dự báo.
    Quyết định cần đối chiếu hồ sơ, giờ học, tiêu chuẩn an toàn và xác nhận có thẩm quyền.</footer>
  </section>;
