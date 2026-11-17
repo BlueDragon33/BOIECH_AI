@@ -37,12 +37,14 @@ function fixture(t){
  (3,'U1','video_ai_analysis','01',NULL,'{"score":92}','2030-01-01T00:00:00Z'),
  (4,'N1','video_ai_analysis','01',NULL,'{"score":93}','2030-01-01T00:00:00Z');
  `);
- const db={prepare(sql){return {bind(...args){return {
-  async all(){return {results:sqlite.prepare(sql).all(...args)};}
- };}};}};
+ let lastParameterCount=0;
+ const db={prepare(sql){return {bind(...args){
+  lastParameterCount=args.length;
+  return {async all(){return {results:sqlite.prepare(sql).all(...args)}}};
+ };}};
  const load=(classes=["Lớp A"],ids=["L1","L2","U1","N1"],limit=80)=>
   loadTeacherScopedVideoEvents(db,classes,ids,limit);
- return {sqlite,db,load};
+ return {sqlite,db,load,lastParameterCount:()=>lastParameterCount};
 }
 
 test("video feed is not starved by 12,001 later heartbeat events from same learner",async t=>{
@@ -87,6 +89,16 @@ test("video source query requires bounded, real class and learner input",async t
  await assert.rejects(()=>load(Array.from({length:13},(_,i)=>"C"+i),["L1"]),/VIDEO_FEED_SCOPE_REQUIRED/);
  await assert.rejects(()=>load(["Lớp A"],Array.from({length:201},(_,i)=>"L"+i)),/VIDEO_FEED_SCOPE_REQUIRED/);
  assert.match(source,/e\.event_type='video_ai_analysis'/);
- assert.match(source,/learner\.device_id IN \(\$\{learnerClause\}\)/);
+ assert.match(source,/learner\.device_id IN \(SELECT value FROM json_each\(\?\)\)/);
+ assert.match(source,/\.bind\(JSON\.stringify\(classes\),JSON\.stringify\(learnerIds\),cap\+1\)/);
  assert.doesNotMatch(source,/\bfetch\(|\bPOST\(|\bDELETE\s+FROM/);
+});
+
+test("200 visible learners with 12 classes still use only three D1 bound parameters",async t=>{
+ const f=fixture(t);
+ const visible=["L1",...Array.from({length:199},(_,i)=>"candidate_"+i)];
+ const classes=["Lớp A",...Array.from({length:11},(_,i)=>"C"+i)];
+ const result=await f.load(classes,visible);
+ assert.deepEqual(result.events.map(x=>x.id),[1]);
+ assert.equal(f.lastParameterCount(),3,"D1's maximum is 100, even if SQLite local permits more");
 });
