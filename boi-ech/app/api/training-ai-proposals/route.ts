@@ -92,6 +92,13 @@ export async function POST(request:Request){
    if(!board.admissionProfiles||board.admissionProfiles.sourceMayBeTruncated||
      !proposal||proposal.admissible!==true||proposal.admissionStatus!=="verified")
     return respond({error:"Không có đề xuất đủ hồ sơ tự nguyện và chứng từ xác minh còn hiệu lực.",code:"AI_APPLY_EVIDENCE_REQUIRED"},409);
+   const profileSeal=(proposal.kind==="teacher"?
+     board.admissionProfiles.teacher.find(x=>x.teacherId===proposal.personId):
+     board.admissionProfiles.learner.find(x=>x.learnerId===proposal.personId))?.seal;
+   const safetySeal=board.admissionProfiles.safety.find(x=>x.classId===proposal.classId)?.seal;
+   if(!profileSeal||!safetySeal)
+    return respond({error:"Chứng từ hồ sơ hoặc an toàn lớp đã thiếu; không thể áp dụng.",
+     code:"AI_APPLY_SEAL_MISSING"},409);
    const fingerprint=proposalFingerprint(board,proposal);
    const approval=await db.prepare(`SELECT state,revision,source_fingerprint FROM training_ai_proposals
      WHERE proposal_id=? AND person_id=? AND class_id=? AND kind=?`)
@@ -116,7 +123,8 @@ export async function POST(request:Request){
    await trainingCommand(actor,{
     action:"assign-person",commandId:payload.commandId,personId:person.id,
     classIds,expectedClassName:person.className,
-    aiApproval:{proposalId:proposal.id,revision:approval.revision,fingerprint,classId:klass.id}
+    aiApproval:{proposalId:proposal.id,revision:approval.revision,fingerprint,classId:klass.id,
+      profileRevision:profileSeal.revision,safetyRevision:safetySeal.revision}
    });
    // Never return "applied" without actual receipt + canonical readback.
    const saved=await db.prepare(`SELECT proposal_id,actor_id,approved_revision FROM training_ai_proposal_applications
