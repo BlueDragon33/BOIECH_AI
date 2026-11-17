@@ -57,3 +57,11 @@ test("completed review of exact video is not inferred for a later video",()=>{
  assert.match(shell,/entry\.state==="needs-review"/);
  assert.match(shell,/entry\.state==="reviewed"/);
 });
+
+test("teacher drawer and overview preserve unavailable historical metrics without fabricating a score",()=>{
+ assert.match(shell,/learner\.lastAnalysis\.score===null\?"Chưa có điểm AI"/);
+ assert.match(shell,/learner\.lastAnalysis\.confidence===null\?"Chưa có dữ liệu tin cậy"/);
+ assert.doesNotMatch(shell,/<h3>\{learner\.lastAnalysis\.score\}\/100 · \{learner\.lastAnalysis\.confidence\}%/);
+ assert.match(shell,/insight\.averageConfidence===null \? "—" : `\$\{insight\.averageConfidence\}%`/);
+ assert.match(shell,/teacherInsights\(workScopedLearners\)\.averageConfidence===null \? "—"/);
+});
