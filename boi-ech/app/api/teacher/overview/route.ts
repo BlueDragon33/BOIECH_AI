@@ -4,6 +4,7 @@ import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-
 import { buildInterventionSuggestions } from "../../../teacher-intervention-engine.server";
 import {groundedSwimmingCorrections,type PublishedCurriculumSource} from "../../../teacher-published-guidance.server";
 import { prioritizeTeacherVideo } from "../../../teacher-video-priority-v42";
+import {loadTeacherScopedVideoEvents} from "../../../teacher-video-feed.server";
 import {
   DeviceAccessError,
   getCourseDatabase,
@@ -329,6 +330,12 @@ export async function POST(request: Request) {
     const admittedPublishedDocument=publishedSource?.payload_json?
       parseCourseDocument(publishedSource.payload_json):null;
     const admittedSource=admittedPublishedDocument?publishedSource:null;
+    // Video-specific indexed lookup cannot be starved by 12,000 mixed
+    // heartbeats, assignments or other learning events. It is independently
+    // scoped to the authenticated teacher's classes and this visible roster.
+    const videoFeed=await loadTeacherScopedVideoEvents(
+      database,teacherClasses,(result.results??[]).map(row=>row.device_id),
+    );
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
     for (const row of assessmentsResult.results ?? []) {
       const current = assessmentsByDevice.get(row.device_id) ?? [];
@@ -527,11 +534,11 @@ export async function POST(request: Request) {
       };
     });
 
-    // Per-event VIDEO inbox is derived only from the exact signed role/class
-    // scope and source events already loaded by this endpoint. No media, external
-    // notification, read receipt or persistent inbox record is created.
+    // Per-event video display is independently bounded and class-scoped.
+    // Durable per-teacher unread/seen receipts are resolved separately by
+    // the signed video-inbox endpoint; no original video is transferred.
     const scopedLearnerIndex = new Map((result.results ?? []).map((row, index) => [row.device_id, index]));
-    const videoInbox = (learningEventsResult.results ?? [])
+    const videoInbox = videoFeed.events
       .filter((event) => event.event_type === "video_ai_analysis"
         && typeof event.id === "number" && Number.isSafeInteger(event.id)
         && scopedLearnerIndex.has(event.device_id))
@@ -585,7 +592,9 @@ export async function POST(request: Request) {
         || (assessmentsResult.results ?? []).length >= 3000
         || (learningEventsResult.results ?? []).length >= 12000
         || (learnerRepliesResult.results ?? []).length >= 200
-        || (assignmentEventsResult.results ?? []).length >= 1500,
+        || (assignmentEventsResult.results ?? []).length >= 1500
+        || videoFeed.possiblyTruncated,
+      videoEventLimitReached: videoFeed.possiblyTruncated,
       learnerLimitReached: (result.results ?? []).length >= 200,
       learningEventLimitReached: (learningEventsResult.results ?? []).length >= 12000,
       assessmentLimitReached: (assessmentsResult.results ?? []).length >= 3000,
