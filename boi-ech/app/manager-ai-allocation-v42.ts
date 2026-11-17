@@ -5,6 +5,7 @@
 import {classKey,classNames,type TrainingBoard,type TrainingPerson,type TrainingResource} from "./training-types";
 import {reviewTeacherCandidates} from "./manager-ai-followon-v41";
 import {assessProfilePlacement,assessInstructorForClass,type AdmissionResult} from "./manager-ai-profile-admission-v43";
+import {planTeacherCoverage,type TeacherPlanClass,type TeacherPlan} from "./manager-ai-teacher-plan";
 
 export type AllocationProposal={
  id:string;kind:"teacher"|"learner";personId:string;personName:string;
@@ -21,7 +22,7 @@ export type AllocationProposal={
 export type AllocationReview={observedAt:string;from:string;to:string;
  teacherShortlist:AllocationProposal[];learnerShortlist:AllocationProposal[];
  unassignedTeachers:number;unassignedLearners:number;classesNeedingTeachers:number;
- sourceMayBeTruncated:boolean;rulesVersion:"v42-rules-only";};
+ sourceMayBeTruncated:boolean;rulesVersion:"v45-rules-only";teacherPlan:TeacherPlan;};
 
 const eligible=(p:TrainingPerson)=>p.registered&&p.status==="approved"&&!p.expired;
 const activeClasses=(b:TrainingBoard)=>b.resources.filter(r=>r.kind==="class"&&r.status==="active");
@@ -48,44 +49,50 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
  const sessionLoad=(personId:string)=>board.sessions.filter(session=>
    session.status!=="cancelled"&&
    (session.teacherId===personId||session.assistantTeacherId===personId)).length;
- const projectedTeacherWindows=new Map<string,{classId:string;start:number;end:number}[]>();
  const recordedWindows=(classId:string)=>board.sessions.filter(session=>
    session.classId===classId&&session.status!=="cancelled")
    .map(session=>({classId,start:Date.parse(session.startsAt),end:Date.parse(session.endsAt)}))
    .filter(s=>Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.end>s.start);
- for(const klass of shortage.sort((a,b)=>b.missingTeachers-a.missingTeachers||a.name.localeCompare(b.name,"vi"))){
+ const candidateGroups=shortage.map(klass=>{
   const classWindows=recordedWindows(klass.id);
-  let primaryCount=0;
   const candidates=reviewTeacherCandidates(board,klass.id,100)
    .filter(c=>!c.alreadyAssigned&&c.overlappingExistingSessions===0)
    .sort((a,b)=>a.currentClassLoad-b.currentClassLoad||
      sessionLoad(a.teacherId)-sessionLoad(b.teacherId)||
      a.displayName.localeCompare(b.displayName,"vi")||a.teacherId.localeCompare(b.teacherId))
-   .slice(0,12);
-  let candidatesShown=0;
-  for(const c of candidates){
-   if(candidatesShown>=3)break;
+   .slice(0,12).flatMap(c=>{
    const person=teachers.find(t=>t.id===c.teacherId);
-   if(!person)continue;
+   if(!person)return [];
    const professional=admission?assessInstructorForClass({
     teacherId:person.id,classId:klass.id,now:sourceTime,
     teacher:admission.teacher.find(profile=>profile.teacherId===person.id),
     klass:admission.safety.find(profile=>profile.classId===klass.id),
     existingTeacherClasses:c.currentClassLoad,registeredLearners:klass.learnerCount,
    }):null;
-   if(professional?.status==="hard-veto")continue;
-   const assignedWindows=projectedTeacherWindows.get(person.id)??[];
+   if(professional?.status==="hard-veto")return [];
+   const timetableVerified=c.classSessionsExamined>0&&classWindows.length===c.classSessionsExamined;
+   const maxLoad=Math.min(12,admission?.teacher.find(profile=>profile.teacherId===person.id)?.maxActiveClasses??12);
+   return [{candidate:c,person,professional,timetableVerified,maxLoad}];
+  });
+  return {klass,classWindows,candidates};
+ });
+ const planClasses:TeacherPlanClass[]=candidateGroups.map(({klass,classWindows,candidates})=>({
+  classId:klass.id,missing:klass.missingTeachers,windows:classWindows,
+  candidates:candidates.filter(row=>row.timetableVerified&&(!admission||row.professional?.status==="eligible"))
+   .map(row=>({teacherId:row.person.id,currentLoad:row.candidate.currentClassLoad,maxLoad:row.maxLoad}))
+ }));
+ const teacherPlan=planTeacherCoverage(planClasses);
+ const selected=new Set(teacherPlan.assignments.map(item=>item.classId+":"+item.teacherId));
+ for(const {klass,classWindows,candidates} of candidateGroups){
+  const ordered=candidates.slice().sort((a,b)=>Number(selected.has(klass.id+":"+b.person.id))-Number(selected.has(klass.id+":"+a.person.id)));
+  const primaryCount=ordered.filter(row=>selected.has(klass.id+":"+row.person.id)).length;
+  for(const {candidate:c,person,professional,timetableVerified,maxLoad} of ordered.slice(0,Math.max(3,primaryCount))){
+   const otherAssignments=teacherPlan.assignments.filter(item=>item.teacherId===person.id&&item.classId!==klass.id);
+   const assignedWindows=otherAssignments.flatMap(item=>recordedWindows(item.classId));
    const proposedConflict=classWindows.some(next=>assignedWindows.some(previous=>
      next.start<previous.end&&next.end>previous.start));
-   const projectedClassLoad=c.currentClassLoad+new Set(assignedWindows.map(s=>s.classId)).size;
-   const timetableVerified=c.classSessionsExamined>0&&classWindows.length===c.classSessionsExamined;
-   const primary=timetableVerified&&!proposedConflict&&projectedClassLoad<12&&
-    (!admission||professional?.status==="eligible")&&primaryCount<klass.missingTeachers;
-   if(primary){
-    primaryCount++;
-    projectedTeacherWindows.set(person.id,[...assignedWindows,...classWindows]);
-   }
-   candidatesShown++;
+   const projectedClassLoad=c.currentClassLoad+otherAssignments.length;
+   const primary=selected.has(klass.id+":"+person.id);
    teacherShortlist.push({
     id:"teacher:"+klass.id+":"+person.id,kind:"teacher",personId:person.id,personName:person.name,
     classId:klass.id,className:klass.name,priority:primary?"high":"medium",
@@ -94,8 +101,8 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
       ?" lớp hoạt động. Lịch buổi học thiếu hoặc không hợp lệ; chưa thể xác nhận không trùng lịch."
       :proposedConflict
        ?" lớp hoạt động, nhưng TRÙNG GIỜ với một phân công ưu tiên đã mô phỏng. Chỉ là phương án thay thế."
-       :projectedClassLoad>=12
-        ?" lớp hoạt động, đạt giới hạn 12 lớp khi tính phương án đang mô phỏng."
+       :projectedClassLoad>=maxLoad
+        ?" lớp hoạt động, đạt giới hạn "+maxLoad+" lớp khi tính phương án đang mô phỏng."
         :" lớp hoạt động, có "+sessionLoad(person.id)+" buổi đã xếp trong cửa sổ tải; đã đối chiếu "+c.classSessionsExamined+" buổi với lịch thực tế và các phương án ưu tiên."),
     currentClassLoad:c.currentClassLoad,currentSessionLoad:sessionLoad(person.id),
     currentLearnerCount:klass.learnerCount,
@@ -107,7 +114,7 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
     warnings:[
      ...(!timetableVerified?["Lịch buổi học thiếu/không hợp lệ; không được coi là sẵn sàng."]:[]),
      ...(proposedConflict?["Mô phỏng cho thấy trùng giờ với lớp đã được ưu tiên ở danh sách này."]:[]),
-     ...(projectedClassLoad>=12?["Tải lớp mô phỏng đã đạt giới hạn 12 lớp."]:[]),
+     ...(projectedClassLoad>=maxLoad?["Tải lớp mô phỏng đã đạt giới hạn "+maxLoad+" lớp."]:[]),
      ...(professional?.reasons??[]),
      "Phân công ưu tiên chỉ là mô phỏng; không khóa giờ, lớp hay giảng viên trên D1.",
      ...staffWarnings
@@ -186,9 +193,9 @@ export function buildAllocationReview(board:TrainingBoard):AllocationReview {
    });
   }
  }
- return {observedAt:board.observedAt,from:board.from,to:board.to,
+ return {observedAt:board.observedAt,from:board.from,to:board.to,teacherPlan,
   teacherShortlist,learnerShortlist,
   unassignedTeachers:freeTeachers.length,unassignedLearners:unassignedLearners.length,
   classesNeedingTeachers:shortage.length,sourceMayBeTruncated,
-  rulesVersion:"v42-rules-only"};
+  rulesVersion:"v45-rules-only"};
 }

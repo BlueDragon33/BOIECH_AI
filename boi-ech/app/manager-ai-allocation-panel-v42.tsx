@@ -176,6 +176,10 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
     :"Chưa kích hoạt nguồn hồ sơ bổ sung có đồng ý và kiểm chứng; chỉ hiển thị gợi ý theo sĩ số/lịch, không xác nhận chuyên môn hoặc an toàn."}
    {review.sourceMayBeTruncated?" Nguồn có thể bị giới hạn số bản ghi.":""}
   </p>
+  {review.teacherPlan.positionsNeeded>0?<p className={styles.qualification}>
+   Phương án ghép lịch phủ {review.teacherPlan.assignments.length}/{review.teacherPlan.positionsNeeded} vị trí giảng viên còn thiếu trong khoảng dữ liệu đang xem.
+   {!review.teacherPlan.searchComplete?" Đã đạt giới hạn tìm kiếm; còn phương án cần xem xét.":""}
+  </p>:null}
   <div className={styles.columns}>
    <Shortlist title="01 · Giảng viên → lớp thiếu người" rows={review.teacherShortlist}
      empty="Không có ứng viên không trùng giờ được nhận diện trong dữ liệu tải; xem xét thủ công."

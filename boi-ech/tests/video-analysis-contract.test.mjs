@@ -73,7 +73,10 @@ test("phase calibration remains local, bounded and tied to exact video timestamp
   ]);
   assert.match(phase, /data-phase-calibration-local-only/);
   assert.match(phase, /summarizeCalibration/);
-  assert.match(phase, /Math\.ceil\(calibrationFrames\.length \/ 60\)/);
+  assert.match(phase, /calibrationFrames\.slice\(calibrationPage \* 60, \(calibrationPage \+ 1\) \* 60\)/);
+  assert.match(phase, /Math\.min\(150, Math\.ceil\(video\.duration \* SAMPLE_FPS\)\)/);
+  assert.match(phase, /Mốc trước/);
+  assert.match(phase, /Mốc tiếp/);
   assert.match(phase, /jumpToFrame\(frame\.time\)/);
   assert.match(phase, /setCalibrationFrames\(frames\)/);
   assert.match(core, /export const PHASE_THRESHOLDS/);

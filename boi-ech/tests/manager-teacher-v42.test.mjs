@@ -26,6 +26,7 @@ function load(entry){
 }
 const {buildAllocationReview}=load("manager-ai-allocation-v42.ts");
 const {prioritizeTeacherVideo}=load("teacher-video-priority-v42.ts");
+const {planTeacherCoverage}=load("manager-ai-teacher-plan.ts");
 const resource=(id,name,other={})=>({
  id,kind:"class",name,parentId:null,capacity:25,requiredTeachers:1,
  status:"active",version:1,learnerCount:0,teacherCount:0,remaining:25,
@@ -235,4 +236,62 @@ test("V43 candidate with missing or invalid target class sessions is NEVER marke
  const r=buildAllocationReview(b);
  assert.ok(r.teacherShortlist.every(x=>x.suggestedRole==="teacher-alternative"));
  assert.ok(r.teacherShortlist.every(x=>x.evidenceStatus==="no-class-sessions"));
+});
+
+test("V45 global coverage leaves the flexible teacher available for the constrained class",()=>{
+ const b=board();
+ b.resources=[resource("a","A",{requiredTeachers:2,teacherCount:1,missingTeachers:1}),
+  resource("b","B",{requiredTeachers:2,teacherCount:1,missingTeachers:1}),
+  resource("c","C",{teacherCount:1})];
+ b.people=[person("GV1","teacher",""),person("GV2","teacher","C"),
+  person("GV-A","teacher","A"),person("GV-B","teacher","B")];
+ const slot=(id,classId,teacherId,start,finish)=>({id,classId,teacherId,roomId:id,
+  startsAt:`2030-06-06T${start}:00Z`,endsAt:`2030-06-06T${finish}:00Z`,status:"scheduled"});
+ b.sessions=[slot("a-slot","a","GV-A","10:00","11:00"),slot("b-slot","b","GV-B","10:30","11:30"),
+  slot("c-slot","c","GV2","11:00","12:00")];
+ const before=JSON.stringify(b);
+ const r=buildAllocationReview(b);
+ assert.equal(r.teacherPlan.positionsNeeded,2);
+ assert.equal(r.teacherPlan.searchComplete,true);
+ assert.deepEqual(r.teacherPlan.assignments,[{classId:"b",teacherId:"GV1"},{classId:"a",teacherId:"GV2"}]);
+ assert.equal(r.teacherShortlist.filter(p=>p.suggestedRole==="teacher-primary").length,2);
+ assert.equal(JSON.stringify(b),before);
+});
+
+test("V45 planner respects overlap, distinct class positions, individual load limits and its search budget",()=>{
+ const options=[{teacherId:"one",currentLoad:0,maxLoad:1},{teacherId:"two",currentLoad:0,maxLoad:2}];
+ const classes=[{classId:"A",missing:2,windows:[{start:0,end:10}],candidates:options},
+  {classId:"B",missing:1,windows:[{start:10,end:20}],candidates:options}];
+ const result=planTeacherCoverage(classes);
+ assert.equal(result.assignments.length,3);
+ assert.equal(result.assignments.filter(x=>x.teacherId==="one").length,1);
+ assert.equal(result.assignments.filter(x=>x.classId==="A").length,2);
+ const overlapping=planTeacherCoverage([classes[0],{...classes[1],windows:[{start:5,end:15}]}]);
+ assert.equal(overlapping.assignments.length,2);
+ const bounded=planTeacherCoverage(classes,2);
+ assert.equal(bounded.searchComplete,false);
+ assert.ok(bounded.visitedNodes<=2);
+ assert.deepEqual(planTeacherCoverage(classes,2),bounded);
+ assert.equal(planTeacherCoverage([{...classes[0],windows:[]}]).assignments.length,0);
+});
+
+test("V45 bounded planner agrees with exhaustive coverage on small overlapping schedules",()=>{
+ for(let mask=0;mask<64;mask++){
+  const classes=Array.from({length:3},(_,i)=>({classId:String(i),missing:1,
+   windows:[{start:i*5,end:i*5+8}],candidates:[0,1].filter(t=>mask&(1<<(i*2+t))).map(t=>({teacherId:String(t),currentLoad:0,maxLoad:2}))}));
+  let expected=0;
+  function oracle(index,picks){
+   if(index===classes.length){expected=Math.max(expected,picks.length);return;}
+   oracle(index+1,picks);
+   for(const candidate of classes[index].candidates){
+    const prior=picks.filter(x=>x.teacherId===candidate.teacherId);
+    if(prior.length>=2||prior.some(x=>Math.abs(Number(x.classId)-index)<=1))continue;
+    oracle(index+1,[...picks,{classId:String(index),teacherId:candidate.teacherId}]);
+   }
+  }
+  oracle(0,[]);
+  const actual=planTeacherCoverage(classes);
+  assert.equal(actual.searchComplete,true);
+  assert.equal(actual.assignments.length,expected,"candidate mask "+mask);
+ }
 });
