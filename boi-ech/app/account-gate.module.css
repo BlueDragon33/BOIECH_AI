@@ -41,7 +41,7 @@
 .authRoot .authTextLink:hover{color:#064956;background:transparent}
 .authRoot .authForm>button[type=submit]{min-height:52px;margin-top:3px;border:0;
   border-radius:13px;color:#fff;font-weight:750;font-size:1.04rem;
-  background:linear-gradient(115deg,#05b7a3,#075369);box-shadow:0 11px 20px #007c871f}
+  background:linear-gradient(115deg,#00796d,#075369);box-shadow:0 11px 20px #007c871f}
 .authFooter{display:flex;justify-content:center;gap:7px;align-items:center;flex-wrap:wrap;
   padding-top:15px;color:#4c6976;font-size:.94rem}
 .authFootnote{border-top:1px solid #d7e7eb;padding-top:13px;margin:19px 0 0;

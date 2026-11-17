@@ -68,6 +68,18 @@ test("real custom appearance palettes meet WCAG 4.5:1 for normal text",()=>{
   assert.ok(page.includes('"--'+key+'": readableForeground('),key);
  }
 });
+test("sign-in submit text meets WCAG AA at both gradient endpoints",()=>{
+ const {contrastRatio}=actualPalette();
+ const css=read("account-gate.module.css");
+ const button=css.match(/\.authRoot\s+\.authForm\s*>\s*button\[type=submit\]\s*\{([^}]+)\}/)?.[1];
+ assert.ok(button,"Missing sign-in submit styles");
+ const textColor=button.match(/\bcolor\s*:\s*(#[0-9a-f]+)\s*;/i)?.[1];
+ const stops=button.match(/\bbackground\s*:\s*linear-gradient\([^,]+,\s*(#[0-9a-f]{6})\s*,\s*(#[0-9a-f]{6})\s*\)/i);
+ assert.ok(textColor&&stops,"Missing sign-in submit text color or gradient");
+ for(const stop of stops.slice(1)){
+  assert.ok(contrastRatio(textColor,stop)>=4.5,"Sign-in submit contrast below AA at "+stop);
+ }
+});
 test("all important modals are explicitly readable in both color schemes",()=>{
  assert.match(managerCss,/\.sheetBody small,\.sheetBody \.metricDetail,\.detailRow small/);
  assert.match(accountCss,/\.main\{background:#f6faff!important;color:#152e4e!important\}/);
