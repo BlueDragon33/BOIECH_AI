@@ -58,12 +58,15 @@ export function syncTeacherVideoInbox(db:D1Database,teacherDeviceId:string,teach
  const scoped=teacherClasses.map(()=>"lower(trim(?))").join(",");
  return db.prepare(`INSERT OR IGNORE INTO teacher_video_inbox
  (teacher_device_id,video_event_id,state,revision)
- SELECT ?,source.id,'unread',1 FROM course_activity_events source
+ SELECT teacher.device_id,source.id,'unread',1 FROM course_activity_events source
  JOIN device_access learner ON learner.device_id=source.device_id
- WHERE learner.person_role='learner' AND learner.status='approved'
+ JOIN device_access teacher ON teacher.device_id=?
+ WHERE teacher.person_role='teacher' AND teacher.status='approved'
+ AND teacher.registration_submitted_at IS NOT NULL AND ${activeTeacherSql}
+ AND learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
  AND ${activeLearnerSql}
- AND lower(trim(learner.class_name)) IN (${scoped})
+ AND lower(trim(learner.class_name)) IN (${scoped}) AND ${assignedClassSql}
  AND source.event_type='video_ai_analysis'
  ORDER BY source.id DESC LIMIT 250`)
  .bind(teacherDeviceId,...teacherClasses);
@@ -81,12 +84,15 @@ export async function readTeacherVideoInbox(
  FROM teacher_video_inbox receipt
  JOIN course_activity_events source ON source.id=receipt.video_event_id AND source.event_type='video_ai_analysis'
  JOIN device_access learner ON learner.device_id=source.device_id
+ JOIN device_access teacher ON teacher.device_id=?
  WHERE receipt.teacher_device_id=?
+ AND teacher.person_role='teacher' AND teacher.status='approved'
+ AND teacher.registration_submitted_at IS NOT NULL AND ${activeTeacherSql}
  AND learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
  AND ${activeLearnerSql}
- AND lower(trim(learner.class_name)) IN (${scoped})
- ORDER BY source.id DESC LIMIT ?`).bind(teacherDeviceId,...teacherClasses,cap+1).all<VideoReceipt>();
+ AND lower(trim(learner.class_name)) IN (${scoped}) AND ${assignedClassSql}
+ ORDER BY source.id DESC LIMIT ?`).bind(teacherDeviceId,teacherDeviceId,...teacherClasses,cap+1).all<VideoReceipt>();
  const rows=result.results??[];
  return {items:rows.slice(0,cap),possiblyTruncated:rows.length>cap};
 }
@@ -100,26 +106,32 @@ export async function markTeacherVideoSeen(input:{
  const scoped=teacherClasses.map(()=>"lower(trim(?))").join(",");
  const scope=`EXISTS(SELECT 1 FROM course_activity_events source
   JOIN device_access learner ON learner.device_id=source.device_id
+  JOIN device_access teacher ON teacher.device_id=?
   WHERE source.id=teacher_video_inbox.video_event_id AND source.event_type='video_ai_analysis'
+  AND teacher.person_role='teacher' AND teacher.status='approved'
+  AND teacher.registration_submitted_at IS NOT NULL AND ${activeTeacherSql}
   AND learner.person_role='learner' AND learner.status='approved'
   AND learner.registration_submitted_at IS NOT NULL
  AND ${activeLearnerSql}
-  AND lower(trim(learner.class_name)) IN (${scoped}))`;
+  AND lower(trim(learner.class_name)) IN (${scoped}) AND ${assignedClassSql} )`;
  const result=await db.prepare(`UPDATE teacher_video_inbox
   SET state='seen',revision=revision+1,updated_at=CURRENT_TIMESTAMP
   WHERE teacher_device_id=? AND video_event_id=? AND state='unread'
   AND revision=? AND ${scope}`)
- .bind(teacherDeviceId,eventId,expectedRevision,...teacherClasses).run();
+ .bind(teacherDeviceId,eventId,expectedRevision,teacherDeviceId,...teacherClasses).run();
  if(result.meta?.changes===1)return {ok:true,code:"OK",revision:expectedRevision+1};
  const existing=await db.prepare(`SELECT receipt.revision,receipt.state FROM teacher_video_inbox receipt
  JOIN course_activity_events source ON source.id=receipt.video_event_id AND source.event_type='video_ai_analysis'
  JOIN device_access learner ON learner.device_id=source.device_id
+ JOIN device_access teacher ON teacher.device_id=?
  WHERE receipt.teacher_device_id=? AND receipt.video_event_id=?
+ AND teacher.person_role='teacher' AND teacher.status='approved'
+ AND teacher.registration_submitted_at IS NOT NULL AND ${activeTeacherSql}
  AND learner.person_role='learner' AND learner.status='approved'
  AND learner.registration_submitted_at IS NOT NULL
  AND ${activeLearnerSql}
- AND lower(trim(learner.class_name)) IN (${scoped})`)
- .bind(teacherDeviceId,eventId,...teacherClasses).first<{revision:number;state:string}>();
+ AND lower(trim(learner.class_name)) IN (${scoped}) AND ${assignedClassSql}`)
+ .bind(teacherDeviceId,teacherDeviceId,eventId,...teacherClasses).first<{revision:number;state:string}>();
  if(existing?.state==="seen")return {ok:true,code:"ALREADY_SEEN",revision:existing.revision};
  return {ok:false,code:"CONFLICT_OR_OUT_OF_SCOPE",revision:existing?.revision??null};
 }
