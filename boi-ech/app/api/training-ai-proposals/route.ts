@@ -1,6 +1,7 @@
 import {createHash} from "node:crypto";
 import {DeviceAccessError,deviceErrorResponse,verifyDeviceRequest} from "../../device-auth.server";
-import {requireManager,trainingBoard,trainingDatabase,trainingWindow} from "../../training-management.server";
+import {requireManager,trainingBoard,trainingCommand,trainingDatabase,trainingWindow} from "../../training-management.server";
+import {classNames,classKey} from "../../training-types";
 import {buildAllocationReview,type AllocationProposal} from "../../manager-ai-allocation-v42";
 import type {TrainingBoard} from "../../training-types";
 
@@ -67,6 +68,69 @@ export async function POST(request:Request){
    return respond({error:"Nguồn nhân sự/lịch đã đạt giới hạn tải; không thể ghi quyết định thiếu căn cứ.",code:"AI_SOURCE_TRUNCATED"},409);
   const choices=flatten(review);
   const action=payload.action;
+  if(action==="apply"){
+   // A separate, deliberately clicked human action, not implied by "approve".
+   // The allocation, command audit and applied receipt commit together in the
+   // canonical D1 batch; never invent success from a cached shortlist.
+   if(!validId(payload.proposalId)||!validCommandId(payload.commandId)||
+     typeof payload.expectedRevision!=="number"||!Number.isSafeInteger(payload.expectedRevision)||
+     payload.expectedRevision<1)
+    return respond({error:"Thiếu mã đề xuất, mã lệnh hoặc phiên bản phê duyệt."},400);
+   const db=await trainingDatabase();
+   type Applied={proposal_id:string;actor_id:string;approved_revision:number};
+   const prior=await db.prepare(`SELECT proposal_id,actor_id,approved_revision
+     FROM training_ai_proposal_applications WHERE command_id=?`)
+      .bind(payload.commandId).first<Applied>();
+   if(prior){
+    if(prior.proposal_id!==payload.proposalId||prior.actor_id!==actor.deviceId||
+      prior.approved_revision!==payload.expectedRevision)
+     return respond({error:"Mã áp dụng đã được dùng cho quyết định khác.",code:"AI_APPLY_COMMAND_CONFLICT"},409);
+    return respond({ok:true,applied:true,replayed:true,proposalId:prior.proposal_id,
+     message:"Phân công đã ghi vào hệ thống ở yêu cầu trước; không ghi trùng."});
+   }
+   const proposal=choices.find(p=>p.id===payload.proposalId);
+   if(!board.admissionProfiles||board.admissionProfiles.sourceMayBeTruncated||
+     !proposal||proposal.admissible!==true||proposal.admissionStatus!=="verified")
+    return respond({error:"Không có đề xuất đủ hồ sơ tự nguyện và chứng từ xác minh còn hiệu lực.",code:"AI_APPLY_EVIDENCE_REQUIRED"},409);
+   const fingerprint=proposalFingerprint(board,proposal);
+   const approval=await db.prepare(`SELECT state,revision,source_fingerprint FROM training_ai_proposals
+     WHERE proposal_id=? AND person_id=? AND class_id=? AND kind=?`)
+     .bind(proposal.id,proposal.personId,proposal.classId,proposal.kind)
+     .first<{state:string;revision:number;source_fingerprint:string}>();
+   if(!approval||approval.state!=="approved"||approval.revision!==payload.expectedRevision||
+     approval.source_fingerprint!==fingerprint)
+    return respond({error:"Bản duyệt đã cũ hoặc chưa được cán bộ phê duyệt.",code:"AI_APPLY_STALE_APPROVAL"},409);
+   const person=board.people.find(p=>p.id===proposal.personId&&p.role===proposal.kind&&
+     p.registered&&p.status==="approved"&&!p.expired);
+   const klass=board.resources.find(r=>r.id===proposal.classId&&r.kind==="class"&&r.status==="active");
+   if(!person||!klass)
+    return respond({error:"Học viên, giảng viên hoặc lớp không còn hợp lệ.",code:"AI_APPLY_TARGET_STALE"},409);
+   const existingNames=classNames(person.className).filter(name=>
+     name!=="Chưa phân lớp"&&name!=="Chưa phân công");
+   const existingIds=existingNames.map(name=>board.resources.find(r=>
+     r.kind==="class"&&r.status==="active"&&classKey(r.name)===classKey(name))?.id);
+   if(existingIds.some(x=>!x)|| (proposal.kind==="learner"&&existingIds.length>0)||
+     (proposal.kind==="teacher"&&existingIds.length>=12))
+    return respond({error:"Dữ liệu phân công hiện có không đủ chắc chắn để tự chuyển lớp.",code:"AI_APPLY_EXISTING_CLASS"},409);
+   const classIds=proposal.kind==="learner"?[klass.id]:[...new Set([...existingIds as string[],klass.id])];
+   await trainingCommand(actor,{
+    action:"assign-person",commandId:payload.commandId,personId:person.id,
+    classIds,expectedClassName:person.className,
+    aiApproval:{proposalId:proposal.id,revision:approval.revision,fingerprint,classId:klass.id}
+   });
+   // Never return "applied" without actual receipt + canonical readback.
+   const saved=await db.prepare(`SELECT proposal_id,actor_id,approved_revision FROM training_ai_proposal_applications
+     WHERE command_id=?`).bind(payload.commandId).first<Applied>();
+   const live=await db.prepare("SELECT class_name FROM device_access WHERE device_id=?")
+    .bind(person.id).first<{class_name:string|null}>();
+   if(!saved||saved.proposal_id!==proposal.id||saved.actor_id!==actor.deviceId||
+     saved.approved_revision!==approval.revision||
+     !classNames(live?.class_name??"").some(name=>classKey(name)===classKey(klass.name)))
+    return respond({error:"Lệnh đã gửi nhưng chưa xác minh được kết quả. Kiểm tra lịch sử bằng chính mã thao tác, không thử lệnh khác.",code:"AI_APPLY_READBACK_UNKNOWN"},503);
+   return respond({ok:true,applied:true,replayed:false,proposalId:proposal.id,
+    commandId:payload.commandId,className:live!.class_name,
+    message:"Đã áp dụng phân công sau kiểm tra lại quyền, chứng từ và chỗ học bằng giao dịch D1."});
+  }
   if(action==="list"){
    if(!choices.length)return respond({items:[],sourceAvailable:true});
    const ids=[...new Set(choices.map(x=>x.id))].slice(0,100);
