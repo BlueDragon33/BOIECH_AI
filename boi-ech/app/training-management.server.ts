@@ -155,7 +155,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
  // Optional manager-confirmed AI approval strengthens, never replaces, the
  // canonical manager session, person/class membership and D1 CAS guards.
  const approvedInput=payload.aiApproval;
- let aiApproval:null|{proposalId:string;revision:number;fingerprint:string;classId:string}=null;
+ let aiApproval:null|{proposalId:string;revision:number;fingerprint:string;classId:string;profileRevision:number;safetyRevision:number}=null;
  if(approvedInput!==undefined){
   if(action!=="assign-person"||!approvedInput||typeof approvedInput!=="object"||Array.isArray(approvedInput))
    fail("Xác nhận AI chỉ hợp lệ cho phân công người.", "AI_APPROVAL_INVALID",400);
@@ -163,9 +163,12 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
   if(typeof a.proposalId!=="string"||!/^(teacher|learner):[A-Za-z0-9_-]{1,96}:[A-Za-z0-9_-]{1,96}$/.test(a.proposalId)||
     typeof a.revision!=="number"||!Number.isSafeInteger(a.revision)||a.revision<1||
     typeof a.fingerprint!=="string"||!/^[a-f0-9]{64}$/.test(a.fingerprint)||
-    typeof a.classId!=="string"||!/^[A-Za-z0-9_-]{3,80}$/.test(a.classId))
+    typeof a.classId!=="string"||!/^[A-Za-z0-9_-]{3,80}$/.test(a.classId)||
+     typeof a.profileRevision!=="number"||!Number.isSafeInteger(a.profileRevision)||a.profileRevision<1||
+     typeof a.safetyRevision!=="number"||!Number.isSafeInteger(a.safetyRevision)||a.safetyRevision<1)
    fail("Xác minh đề xuất AI chưa hợp lệ.", "AI_APPROVAL_INVALID",400);
-  aiApproval={proposalId:a.proposalId,revision:a.revision,fingerprint:a.fingerprint,classId:a.classId};
+  aiApproval={proposalId:a.proposalId,revision:a.revision,fingerprint:a.fingerprint,
+     classId:a.classId,profileRevision:a.profileRevision,safetyRevision:a.safetyRevision};
  }
  if(action==="save-resource") {
   const kind=payload.kind;if(kind!=="class"&&kind!=="room"&&kind!=="building")fail("Loại tài nguyên không hợp lệ.");
@@ -359,14 +362,14 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
     SELECT 1 FROM training_ai_proposal_applications used WHERE used.proposal_id=?
   ) AND EXISTS(
     SELECT 1 FROM training_ai_profile_submissions live_profile
-    WHERE live_profile.device_id=? AND live_profile.role=?
+    WHERE live_profile.device_id=? AND live_profile.role=? AND live_profile.revision=?
       AND live_profile.state='verified' AND live_profile.consent_at IS NOT NULL
       AND live_profile.verified_revision=live_profile.revision
       AND datetime(live_profile.valid_until)>CURRENT_TIMESTAMP
   ) AND EXISTS(
     SELECT 1 FROM training_ai_class_safety_attestations live_pool
     JOIN training_resources live_class ON live_class.id=live_pool.class_id
-    WHERE live_pool.class_id=? AND live_class.kind='class' AND live_class.status='active'
+    WHERE live_pool.class_id=? AND live_pool.revision=? AND live_class.kind='class' AND live_class.status='active'
       AND datetime(live_pool.valid_until)>CURRENT_TIMESTAMP
   )`:"";
   command={action,personId,classIds:ids,expectedClassName,...(aiApproval?{aiApproval}: {})};
@@ -384,7 +387,8 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
     .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings,
       ...(learnerNewClass?[learnerNewClass]:[]),
       ...(aiApproval?[aiApproval.proposalId,personId,aiApproval.classId,target.role,aiApproval.revision,
-        aiApproval.fingerprint,aiApproval.proposalId,personId,target.role,aiApproval.classId]:[]));
+        aiApproval.fingerprint,aiApproval.proposalId,personId,target.role,
+        aiApproval.profileRevision,aiApproval.classId,aiApproval.safetyRevision]:[]));
   if(aiApproval){
    // D1 batch is atomic: class update, canonical command receipt/audit,
    // teacher-term followups and proposal-application receipt must all commit.
