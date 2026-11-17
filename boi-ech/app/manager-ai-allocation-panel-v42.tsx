@@ -5,6 +5,7 @@ import type {TrainingBoard} from "./training-types";
 import type {TrainingProof} from "./training-client";
 import type {ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {buildAllocationReview,type AllocationProposal} from "./manager-ai-allocation-v42";
+import {assessManagerAiSnapshot} from "./manager-ai-snapshot-v46";
 import styles from "./manager-ai-allocation-v42.module.css";
 import ManagerAiProfilesV44 from "./manager-ai-profiles-v44";
 import AiCoachPanelV44 from "./ai-coach-panel-v44";
@@ -82,6 +83,16 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
  const [decisionBusy,setDecisionBusy]=useState(false);
  const [decisionError,setDecisionError]=useState("");
  const [decisionsReady,setDecisionsReady]=useState(false);
+ const [snapshotClock,setSnapshotClock]=useState<number|null>(null);
+ useEffect(()=>{
+  // Periodic UI disablement, with a second check at each sensitive click.
+  // Server-side signed authorization and D1 CAS remain mandatory.
+  const first=window.setTimeout(()=>setSnapshotClock(Date.now()),0);
+  const timer=window.setInterval(()=>setSnapshotClock(Date.now()),30000);
+  return ()=>{window.clearTimeout(first);window.clearInterval(timer);};
+ },[board.observedAt,review.sourceMayBeTruncated]);
+ const snapshotInput={observedAt:board.observedAt,sourceMayBeTruncated:review.sourceMayBeTruncated};
+ const snapshot=assessManagerAiSnapshot(snapshotInput,snapshotClock??NaN);
  useEffect(()=>{
   let live=true;
   if(!getProof){return;}
@@ -111,10 +122,14 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
   const current=decisions[proposal.id];
   if(!getProof||decisionBusy||!decisionsReady||!board.admissionProfiles||
     current?.status!=="approved"||proposal.admissible!==true)return;
+  const clickedSnapshot=assessManagerAiSnapshot(snapshotInput,Date.now());
+  if(!clickedSnapshot.canDecide){setDecisionError(clickedSnapshot.message);return;}
   if(!window.confirm("Áp dụng phân công sau khi kiểm tra lại hồ sơ, chứng chỉ, lớp và sĩ số trên máy chủ?"))return;
   setDecisionBusy(true);setDecisionError("");
   try{
    const proof=await getProof();
+   if(!assessManagerAiSnapshot(snapshotInput,Date.now()).canDecide)
+    throw new Error("Dữ liệu đã cũ trong khi xác thực; làm mới bảng rồi thử lại.");
    const response=await fetch("/api/training-ai-proposals",{
     method:"POST",credentials:"same-origin",cache:"no-store",
     headers:{"content-type":"application/json"},
@@ -132,6 +147,8 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
  async function recordDecision(proposal:AllocationProposal,mode?:"reject"){
   if(!getProof){onReviewProposal(proposal.personId,proposal.classId);return;}
   if(!decisionsReady||decisionBusy)return;
+  const clickedSnapshot=assessManagerAiSnapshot(snapshotInput,Date.now());
+  if(!clickedSnapshot.canDecide){setDecisionError(clickedSnapshot.message);return;}
   const old=decisions[proposal.id];
   if(old?.status==="approved"&&!mode){onReviewProposal(proposal.personId,proposal.classId);return;}
   if(old?.status==="rejected")return;
@@ -139,6 +156,8 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
   setDecisionBusy(true);setDecisionError("");
   try{
    const proof=await getProof();
+   if(!assessManagerAiSnapshot(snapshotInput,Date.now()).canDecide)
+    throw new Error("Dữ liệu đã cũ trong khi xác thực; làm mới bảng rồi thử lại.");
    const response=await fetch("/api/training-ai-proposals",{
     method:"POST",credentials:"same-origin",cache:"no-store",
     headers:{"content-type":"application/json"},
@@ -160,6 +179,10 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
     <p>Ứng viên được tự động sắp theo sĩ số, số lớp đang nhận và lịch có trong hệ thống. Các đề xuất giảng viên được kiểm tra chéo giữa những lớp trong cùng danh sách; mọi lựa chọn vẫn phải đối chiếu hồ sơ và lưu thủ công. Cán bộ quyết định cuối cùng.</p></div>
    <span>Chỉ đề xuất · Không tự lưu</span>
   </header>
+  {getProof&&!snapshot.canDecide?<p role="alert" className={styles.qualification}>
+   {snapshotClock===null?"Đang kiểm tra độ mới của dữ liệu quản lý…":snapshot.message}
+   {" "}Làm mới bảng quản lý trước khi ghi quyết định AI.
+  </p>:null}
   {getProof?<p role="note" className={styles.qualification}>
    {decisionError||(!decisionsReady?"Đang xác minh trạng thái đề xuất trên máy chủ…":
     "Quy trình: Ghi nhận xem xét → Phê duyệt → Mở biểu mẫu Lưu phân công. Phê duyệt chưa tự ghi thay đổi lớp.")}
@@ -187,14 +210,14 @@ export default function ManagerAiAllocationPanelV42({board,onNavigate,onReviewPr
      onDecision={getProof?proposal=>void recordDecision(proposal):undefined}
      onReject={getProof?proposal=>void recordDecision(proposal,"reject"):undefined}
      onApply={getProof?proposal=>void recordApply(proposal):undefined}
-     decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&!decisionsReady)}/>
+     decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&(!decisionsReady||!snapshot.canDecide))}/>
    <Shortlist title="02 · Học viên → lớp còn chỗ" rows={review.learnerShortlist}
      empty="Chưa tìm thấy hồ sơ học viên cần phân lớp hoặc lớp còn sức chứa/đủ giảng viên cấu hình."
      target="class" navigate={onNavigate} onReview={onReviewProposal}
      onDecision={getProof?proposal=>void recordDecision(proposal):undefined}
      onReject={getProof?proposal=>void recordDecision(proposal,"reject"):undefined}
      onApply={getProof?proposal=>void recordApply(proposal):undefined}
-     decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&!decisionsReady)}/>
+     decisions={decisions} decisionBusy={decisionBusy||Boolean(getProof&&(!decisionsReady||!snapshot.canDecide))}/>
   </div>
   {getProof?<><ManagerAiProfilesV44 board={board} getProof={getProof}/><AiCoachPanelV44 getProof={getProof}/></>:null}
   <footer>Thứ tự là gợi ý theo bộ quy tắc {review.rulesVersion}, không phải điểm phù hợp AI dự báo.
