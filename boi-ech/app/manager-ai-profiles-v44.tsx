@@ -56,7 +56,7 @@ export default function ManagerAiProfilesV44({board,getProof}:Props){
    body:JSON.stringify({...proof,action:"manager-list",from:board.from,to:board.to})
   });
   const json=await response.json() as ProfileList&{error?:string;code?:string};
-  if(response.status===409&&json.code==="AI_PROFILE_ADMISSION_DISABLED"){
+  if(!response.ok&&json.code==="AI_PROFILE_ADMISSION_DISABLED"){
    setState("disabled");setMessage("Dữ liệu cá nhân bổ sung chưa được kích hoạt theo chính sách lưu trữ/đồng ý.");return;
   }
   if(!response.ok)throw new Error(json.error??"Không thể đọc hồ sơ xác minh.");

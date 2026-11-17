@@ -52,7 +52,7 @@ export default function AiPersonalProfileV44({role,deviceId}:{role:Role;deviceId
   });
   const data=await response.json() as {status?:string;revision?:number;error?:string;code?:string;
    profile?:Record<string,unknown>};
-  if(response.status===409&&data.code==="AI_PROFILE_ADMISSION_DISABLED"){
+  if(!response.ok&&data.code==="AI_PROFILE_ADMISSION_DISABLED"){
    setStatus("disabled");setError("Hồ sơ tự nguyện chưa được phép kích hoạt lưu trữ.");return;
   }
   if(!response.ok)throw new Error(data.error??"Không thể kiểm tra hồ sơ.");
