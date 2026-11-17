@@ -18,6 +18,11 @@ type Props={board:TrainingBoard;getProof: (signal?:AbortSignal)=>Promise<Trainin
 const blank:ProfileList={pending:[],verified:{teacher:[],learner:[],safety:[],sourceMayBeTruncated:false},
  safetyRevisions:[],sourcePossiblyTruncated:false};
 const iso=(value:string)=>value&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():"";
+function proofWindowValid(reference:string,until:string){
+ const now=Date.now();
+ return /^[A-Za-z0-9._:-]{8,120}$/.test(reference)&&Boolean(until)&&
+  Date.parse(until)>now&&Date.parse(until)<=now+90*86400000;
+}
 function summary(profile:PendingProfile){
  if(profile.role==="teacher"){
   const codes=Array.isArray(profile.profile.certificates)?profile.profile.certificates
@@ -59,7 +64,7 @@ export default function ManagerAiProfilesV44({board,getProof}:Props){
  },[getProof,board.from,board.to]);
  useEffect(()=>{
   const controller=new AbortController();
-  void refresh(controller.signal).catch(error=>{
+  void Promise.resolve().then(()=>refresh(controller.signal)).catch(error=>{
    if(controller.signal.aborted)return;
    setState("error");setMessage(error instanceof Error?error.message:"Không thể đồng bộ.");
   });
@@ -68,8 +73,7 @@ export default function ManagerAiProfilesV44({board,getProof}:Props){
  async function submit(action:"verify"|"attest-class",deviceId="",revision=0){
   if(busy)return;
   const until=iso(validUntil);
-  if(!/^[A-Za-z0-9._:-]{8,120}$/.test(reference)||!until||
-    Date.parse(until)<=Date.now()||Date.parse(until)>Date.now()+90*86400000){
+  if(!proofWindowValid(reference,until)){
    setMessage("Cần mã chứng từ tối thiểu 8 ký tự và hạn kiểm chứng trong 90 ngày tới.");return;
   }
   if(action==="attest-class"&&(!targetClass||!safetyConfirmed||!requiredCertification||
