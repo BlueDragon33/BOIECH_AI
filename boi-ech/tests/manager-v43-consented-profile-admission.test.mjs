@@ -85,7 +85,15 @@ function fixture(t){
 }
 test("profile sources are disabled by default until explicit data-owner policy",async t=>{
  const f=fixture(t);f.enabled(false);
- assert.equal((await f.post("submit",{consent:true,expectedRevision:0,profile:certifiedTeacher})).status,409);
+ const teacher=await f.post("submit",{consent:true,expectedRevision:0,profile:certifiedTeacher});
+ f.as("learner","L1");
+ const learner=await f.post("own-list");
+ f.as("manager","M1");
+ const manager=await f.post("manager-list");
+ for(const denied of [teacher,learner,manager]){
+  assert.equal(denied.status,403);
+  assert.equal(denied.data.code,"AI_PROFILE_ADMISSION_DISABLED");
+ }
  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM training_ai_profile_submissions").get().n,0);
  assert.match(source,/BOI_ECH_AI_PROFILE_ADMISSION/);
 });
