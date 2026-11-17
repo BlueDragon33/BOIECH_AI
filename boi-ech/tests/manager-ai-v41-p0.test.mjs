@@ -182,3 +182,35 @@ test("V41 P0 navigation is explicit, does not alter five-button mobile dock or a
  assert.doesNotMatch(engine,/\bfetch\(|process\.env|new WebSocket|Math\.random|AI_API_KEY/);
  assert.match(engine,/engineMode:"rules-only"/);
 });
+
+test("V46 flags invalid schedule timestamps instead of silently treating them as conflict-free",()=>{
+ const b=board();
+ b.sessions=[
+  session("invalid","rm-1","t1","not-a-date","2030-04-15T10:00:00.000Z"),
+  session("valid","rm-1","t1","2030-04-15T10:00:00.000Z","2030-04-15T11:00:00.000Z"),
+  session("cancelled-invalid","rm-1","t1","bad","bad",{status:"cancelled"})
+ ];
+ const before=JSON.stringify(b);
+ const report=analyzeManagerBoard(b);
+ const invalid=report.findings.find(f=>f.id==="invalid-schedule-time:invalid");
+ assert.equal(invalid?.priority,"high");
+ assert.equal(invalid?.area,"quality");
+ assert.equal(invalid?.evidence[0].recordId,"invalid");
+ assert.match(invalid?.limitations.join(" ")??"",/không trùng lịch/);
+ assert.equal(report.findings.some(f=>f.id==="invalid-schedule-time:cancelled-invalid"),false);
+ assert.equal(report.findings.some(f=>f.id.startsWith("conflict:")),false);
+ assert.equal(JSON.stringify(b),before);
+});
+
+test("V46 warns about scheduled sessions held by blocked or expired teachers",()=>{
+ const b=board();
+ b.people.push(person("t4","teacher","Hết hạn","A",{expired:true}));
+ b.sessions=[
+  session("blocked","rm-1","t3","2030-04-15T08:00:00.000Z","2030-04-15T09:00:00.000Z"),
+  session("expired","rm-2","t4","2030-04-15T09:00:00.000Z","2030-04-15T10:00:00.000Z")
+ ];
+ const report=analyzeManagerBoard(b);
+ assert.equal(report.findings.some(f=>f.id==="broken-session:blocked"),true);
+ assert.equal(report.findings.some(f=>f.id==="broken-session:expired"),true);
+ assert.equal(report.findings.some(f=>f.id.startsWith("conflict:")),false);
+});
