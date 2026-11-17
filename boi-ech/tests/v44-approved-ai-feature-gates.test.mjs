@@ -27,6 +27,7 @@ const llm=moduleOf("app/teacher-llm-budget-v44.server.ts");
 
 test("V44: two mandatory remote-provider gates, server-only key, token quota and no background request",()=>{
  const s=code("app/teacher-llm-budget-v44.server.ts");
+ assert.match(s,/BOI_ECH_AI_COST_MODE!=="OWNER_APPROVED_PAID_MODE"/);
  assert.match(s,/BOI_ECH_AI_LLM_ENABLED!=="enabled"/);
  assert.match(s,/BOI_ECH_AI_LLM_REMOTE_TRANSFER!=="approved"/);
  assert.match(s,/BOI_ECH_AI_LLM_PROVIDER!=="openai"/);
