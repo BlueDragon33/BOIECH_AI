@@ -122,11 +122,16 @@ test("V42 review is linked to the exact analysis and suppresses repeated task dr
  }});
  assert.equal(other.humanReviewed,false);
 });
-test("V42 is read-only and cannot invoke independent backend, model provider or mutate source",()=>{
- for(const name of ["manager-ai-allocation-v42.ts","manager-ai-allocation-panel-v42.tsx","teacher-video-priority-v42.ts"]){
+test("V43 allocation remains source-pure; only signed audited manager decisions may reach its dedicated API",()=>{
+ for(const name of ["manager-ai-allocation-v42.ts","teacher-video-priority-v42.ts"]){
   const c=fs.readFileSync(path.join(root,name),"utf8");
   assert.doesNotMatch(c,/\bfetch\(|\.prepare\(|process\.env|localStorage|sessionStorage|onCommand\(/);
  }
+ const approvalPanel=fs.readFileSync(path.join(root,"manager-ai-allocation-panel-v42.tsx"),"utf8");
+ assert.match(approvalPanel,/api\/training-ai-proposals/);
+ assert.match(approvalPanel,/const proof=await getProof/);
+ assert.match(approvalPanel,/action==="approve"\)onReviewProposal/);
+ assert.doesNotMatch(approvalPanel,/\.prepare\(|process\.env|localStorage|sessionStorage|\btrainingCommand\(/);
  const shell=fs.readFileSync(path.join(root,"teacher-role-shell.tsx"),"utf8");
  assert.match(shell,/data-video-coaching-draft/);
  assert.match(shell,/prioritizeTeacherVideo\(learner\)/);
@@ -181,8 +186,8 @@ test("Existing signed assignment requires atomic current-capacity guard for lear
  assert.match(server,/seat\.capacity > \(/);
  assert.match(server,/member\.person_role='learner'/);
  assert.match(server,/entitlement\.state='active'/);
- assert.match(server,/AND \$\{authorityGuard\} \$\{capacityGuard\}/);
- assert.match(server,/\.bind\(className,personId,expectedClassName,target.role,ids.length,\.\.\.authorityBindings,\.\.\.\(learnerNewClass/);
+ assert.match(server,/AND \$\{authorityGuard\} \$\{capacityGuard\} \$\{aiGuard\}/);
+ assert.match(server,/\.bind\(className,personId,expectedClassName,target.role,ids.length,\.\.\.authorityBindings,\s*\.\.\.\(learnerNewClass/);
 });
 
 test("Credible critical technique error reaches teacher watchlist, not only the video tab",()=>{
@@ -207,4 +212,27 @@ test("Teacher source LIMIT saturation is disclosed, never misrepresented as comp
  assert.match(shell,/coverage\?: \{ possiblyTruncated:boolean/);
  assert.match(shell,/overview\?\.coverage\?\.possiblyTruncated/);
  assert.match(shell,/chưa đầy đủ do giới hạn số bản ghi/);
+});
+
+test("V43 cross-class scheduler never marks the same teacher primary for overlapping proposed classes",()=>{
+ const b=board();
+ b.resources.push(resource("c","C",{learnerCount:5,teacherCount:0,missingTeachers:1}));
+ b.people.push(person("t4","teacher","",{name:"Instructor 4"}));
+ b.sessions.push({id:"sC",title:"C",classId:"c",roomId:"r3",teacherId:"missing2",
+  assistantTeacherId:null,periodStart:null,periodEnd:null,startsAt:time,endsAt:end,status:"scheduled",version:1});
+ const r=buildAllocationReview(b);
+ const primaries=r.teacherShortlist.filter(x=>x.suggestedRole==="teacher-primary");
+ const sameTeacher=primaries.filter(x=>x.personId==="t1");
+ assert.ok(primaries.length>0);
+ assert.ok(sameTeacher.length<=1,"do not double-book one teacher across overlapping proposals");
+ assert.ok(r.teacherShortlist.some(x=>x.suggestedRole==="teacher-alternative"));
+ assert.ok(r.teacherShortlist.every(x=>x.warnings.some(w=>w.includes("không khóa giờ"))));
+ assert.equal(r.teacherShortlist.filter(x=>x.suggestedRole==="teacher-primary"&&x.classId==="c").length,1);
+});
+test("V43 candidate with missing or invalid target class sessions is NEVER marked primary",()=>{
+ const b=board();
+ b.sessions[0].endsAt=b.sessions[0].startsAt;
+ const r=buildAllocationReview(b);
+ assert.ok(r.teacherShortlist.every(x=>x.suggestedRole==="teacher-alternative"));
+ assert.ok(r.teacherShortlist.every(x=>x.evidenceStatus==="no-class-sessions"));
 });

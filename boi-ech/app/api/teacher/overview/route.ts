@@ -1,7 +1,10 @@
 import { learnerIntelligence, type AiLearnerProfile, type AiSelfAssessment } from "../../../ai-engine.server";
-import { publishedCourseDocument } from "../../../course-content.server";
+import { publishedCourseDocument,parseCourseDocument } from "../../../course-content.server";
 import { buildLearningAnalytics, type LearningEventRow } from "../../../teacher-learning-analytics.server";
 import { buildInterventionSuggestions } from "../../../teacher-intervention-engine.server";
+import {groundedSwimmingCorrections,type PublishedCurriculumSource} from "../../../teacher-published-guidance.server";
+import { prioritizeTeacherVideo } from "../../../teacher-video-priority-v42";
+import {loadTeacherScopedVideoEvents} from "../../../teacher-video-feed.server";
 import {
   DeviceAccessError,
   getCourseDatabase,
@@ -28,6 +31,7 @@ type LearnerRow = {
   analysis_count: number | null;
   last_analysis_json: string | null;
   last_analysis_at: string | null;
+  last_analysis_lesson: string | null;
   teacher_action_count: number | null;
   last_teacher_action_type: string | null;
   last_teacher_action_json: string | null;
@@ -136,15 +140,15 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
     }];
   });
   return {
-    score: Math.max(0, Math.min(100, Math.round(Number(source.score) || 0))),
-    confidence: Math.max(0, Math.min(100, Math.round(Number(source.confidence) || 0))),
+    score: measured(source.score),
+    confidence: measured(source.confidence),
     captureQuality,
     poseCoverage: measured(quality.poseCoverage),
     averageVisibility: measured(quality.averageVisibility),
     sampledFrames: measured(source.sampledFrames, 240),
     detectedFrames: measured(source.detectedFrames, 240),
     durationSec: measuredSeconds(source.durationSec),
-    cameraView: source.cameraView === "side" ? "side" : "rear",
+    cameraView: source.cameraView === "side" ? "side" as const : "rear" as const,
     categories: {
       legs: measured(categories.legs),
       arms: measured(categories.arms),
@@ -161,7 +165,7 @@ function analysisSummary(value: string | null, fallbackAt: string | null) {
 function teacherActionSummary(type: string | null, value: string | null, createdAt: string | null) {
   const source = parseJson<Record<string, unknown> | null>(value, null);
   if (!source || !type) return null;
-  const action = type === "teacher_assignment"
+  const action: "feedback" | "assignment" | "review" | null = type === "teacher_assignment"
     ? "assignment"
     : type === "teacher_analysis_review"
       ? "review"
@@ -175,7 +179,7 @@ function teacherActionSummary(type: string | null, value: string | null, created
     title: typeof source.title === "string" ? source.title.slice(0, 160) : "",
     note: typeof source.note === "string" ? source.note.slice(0, 1200) : "",
     lessonNumber: typeof source.lessonNumber === "string" ? source.lessonNumber.slice(0, 2) : "",
-    reviewStatus: source.reviewStatus === "follow-up" ? "follow-up" : source.reviewStatus === "reviewed" ? "reviewed" : "",
+    reviewStatus: source.reviewStatus === "follow-up" ? "follow-up" as const : source.reviewStatus === "reviewed" ? "reviewed" as const : "" as const,
     analysisAt: typeof source.analysisAt === "string" ? source.analysisAt.slice(0, 80) : "",
     createdAt,
   };
@@ -211,7 +215,7 @@ export async function POST(request: Request) {
     const classPlaceholders = teacherClasses.map(() => "lower(trim(?))").join(", ");
 
     const database = await getCourseDatabase();
-    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult, assignmentEventsResult] = await Promise.all([
+    const [document, result, assessmentsResult, learningEventsResult, learnerRepliesResult, assignmentEventsResult, publishedSource] = await Promise.all([
       publishedCourseDocument(database),
       database.prepare(
       `SELECT
@@ -235,6 +239,9 @@ export async function POST(request: Request) {
           (SELECT e.created_at FROM course_activity_events e
             WHERE e.device_id = da.device_id AND e.event_type = 'video_ai_analysis'
             ORDER BY e.id DESC LIMIT 1) AS last_analysis_at,
+          (SELECT e.lesson_number FROM course_activity_events e
+            WHERE e.device_id = da.device_id AND e.event_type = 'video_ai_analysis'
+            ORDER BY e.id DESC LIMIT 1) AS last_analysis_lesson,
           (SELECT COUNT(*) FROM course_activity_events e
             WHERE e.device_id = da.device_id
               AND e.event_type IN ('teacher_feedback', 'teacher_assignment', 'teacher_analysis_review')) AS teacher_action_count,
@@ -269,7 +276,7 @@ export async function POST(request: Request) {
           LIMIT 3000`,
       ).bind(...teacherClasses).all<AssessmentRow>(),
       database.prepare(
-        `SELECT e.device_id, e.event_type, e.lesson_number, e.part, e.detail_json, e.created_at
+        `SELECT e.id, e.device_id, e.event_type, e.lesson_number, e.part, e.detail_json, e.created_at
            FROM course_activity_events e
            JOIN device_access da ON da.device_id = e.device_id
           WHERE da.person_role = 'learner'
@@ -311,8 +318,24 @@ export async function POST(request: Request) {
           ORDER BY e.id DESC
           LIMIT 1500`,
       ).bind(...teacherClasses).all<AssignmentEventRow>(),
+      database.prepare(
+        `SELECT id,version_number,reviewed_by,reviewed_at,published_at,payload_json
+         FROM course_content_versions WHERE status='published'
+         ORDER BY version_number DESC LIMIT 1`,
+      ).first<PublishedCurriculumSource&{payload_json:string}>(),
     ]);
 
+    // Read published content + provenance from ONE verified version record;
+    // parse failure must not falsely cite a static fallback as human-approved.
+    const admittedPublishedDocument=publishedSource?.payload_json?
+      parseCourseDocument(publishedSource.payload_json):null;
+    const admittedSource=admittedPublishedDocument?publishedSource:null;
+    // Video-specific indexed lookup cannot be starved by 12,000 mixed
+    // heartbeats, assignments or other learning events. It is independently
+    // scoped to the authenticated teacher's classes and this visible roster.
+    const videoFeed=await loadTeacherScopedVideoEvents(
+      database,teacherClasses,(result.results??[]).map(row=>row.device_id),
+    );
     const assessmentsByDevice = new Map<string, AiSelfAssessment[]>();
     for (const row of assessmentsResult.results ?? []) {
       const current = assessmentsByDevice.get(row.device_id) ?? [];
@@ -419,7 +442,11 @@ export async function POST(request: Request) {
     const learners = (result.results ?? []).map((row) => {
       const completedLessons = completedLessonCount(row.completed_json);
       const progress = Math.round((completedLessons / LESSON_COUNT) * 100);
-      const analysis = analysisSummary(row.last_analysis_json, row.last_analysis_at);
+      const analysisSource = analysisSummary(row.last_analysis_json, row.last_analysis_at);
+      const analysis = analysisSource?{...analysisSource,
+        publishedGuidance:groundedSwimmingCorrections(
+          admittedPublishedDocument??document,admittedSource,analysisSource,row.last_analysis_lesson??""
+        )}:null;
       const latestTeacherAction = teacherActionSummary(row.last_teacher_action_type, row.last_teacher_action_json, row.last_teacher_action_at);
       // Latest feedback can follow review. Locate a review for this exact video.
       const videoReviewEvent = analysis?.analyzedAt
@@ -469,14 +496,14 @@ export async function POST(request: Request) {
       // even when the overall AI score is high. Missing metrics are never
       // interpreted as an observed 0.
       const technicalNeedsSupport = Boolean(analysis && analysis.captureQuality === "good"
-        && analysis.confidence >= 70
+        && analysis.confidence !== null && analysis.confidence >= 70
         && (analysis.errors.some((issue) => issue.severity === "critical")
           || Object.values(analysis.categories).some((score) => score !== null && score < 60)));
       const needsSupport = technicalNeedsSupport || inactivityHours > 7 * 24
         || progress < 50
         || adaptiveAlerts.length > 0
         || teacherLoopNeedsFollowUp
-        || Boolean(analysis && (analysis.confidence < 70 || analysis.captureQuality === "review"));
+        || Boolean(analysis && (analysis.confidence === null || analysis.confidence < 70 || analysis.captureQuality === "review"));
       return {
         name: row.learner_name?.trim() || "Học viên",
         personCode: row.person_code?.trim() || "",
@@ -507,6 +534,45 @@ export async function POST(request: Request) {
       };
     });
 
+    // Per-event video display is independently bounded and class-scoped.
+    // Durable per-teacher unread/seen receipts are resolved separately by
+    // the signed video-inbox endpoint; no original video is transferred.
+    const scopedLearnerIndex = new Map((result.results ?? []).map((row, index) => [row.device_id, index]));
+    const videoInbox = videoFeed.events
+      .filter((event) => event.event_type === "video_ai_analysis"
+        && typeof event.id === "number" && Number.isSafeInteger(event.id)
+        && scopedLearnerIndex.has(event.device_id))
+      .flatMap((event) => {
+        const learnerIndex = scopedLearnerIndex.get(event.device_id);
+        if (learnerIndex === undefined || !learners[learnerIndex]) return [];
+        const analysisSource = analysisSummary(event.detail_json, event.created_at);
+        if (!analysisSource || !analysisSource.analyzedAt) return [];
+        const analysis = {...analysisSource,
+          publishedGuidance:groundedSwimmingCorrections(
+            admittedPublishedDocument??document,admittedSource,analysisSource,event.lesson_number??""
+          )};
+        const exactReviewEvent = (learningEventsByDevice.get(event.device_id) ?? []).find((row) => {
+          if (row.event_type !== "teacher_analysis_review") return false;
+          const detail = parseJson<Record<string, unknown>>(row.detail_json, {});
+          return detail.analysisAt === analysis.analyzedAt;
+        });
+        const review = exactReviewEvent
+          ? teacherActionSummary("teacher_analysis_review", exactReviewEvent.detail_json, exactReviewEvent.created_at)
+          : null;
+        const decision = prioritizeTeacherVideo({
+          lastAnalysis: analysis, latestTeacherAction: null, latestVideoReview: review,
+          lastLesson: learners[learnerIndex].lastLesson, adaptive: learners[learnerIndex].adaptive,
+        });
+        return [{
+          eventId: event.id!, learnerIndex,
+          receivedAt: event.created_at, analysis, review,
+          priority: decision.rank, state: review?.action === "review" ? "reviewed" as const : "needs-review" as const,
+        }];
+      })
+      .sort((a, b) => b.priority - a.priority
+        || (Date.parse(b.receivedAt) || 0) - (Date.parse(a.receivedAt) || 0)
+        || b.eventId - a.eventId)
+      .slice(0, 40);
     const active7d = learners.filter((item) => item.inactiveDays !== null && item.inactiveDays < 7).length;
     const needingSupport = learners.filter((item) => item.needsSupport).length;
     const analysisCount = learners.reduce((sum, item) => sum + item.analysisCount, 0);
@@ -526,7 +592,9 @@ export async function POST(request: Request) {
         || (assessmentsResult.results ?? []).length >= 3000
         || (learningEventsResult.results ?? []).length >= 12000
         || (learnerRepliesResult.results ?? []).length >= 200
-        || (assignmentEventsResult.results ?? []).length >= 1500,
+        || (assignmentEventsResult.results ?? []).length >= 1500
+        || videoFeed.possiblyTruncated,
+      videoEventLimitReached: videoFeed.possiblyTruncated,
       learnerLimitReached: (result.results ?? []).length >= 200,
       learningEventLimitReached: (learningEventsResult.results ?? []).length >= 12000,
       assessmentLimitReached: (assessmentsResult.results ?? []).length >= 3000,
@@ -554,6 +622,7 @@ export async function POST(request: Request) {
         interventionSuggestionCount,
       },
       learners,
+      videoInbox,
       messages,
       assignments,
       privacy: {

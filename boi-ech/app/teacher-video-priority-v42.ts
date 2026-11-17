@@ -45,6 +45,7 @@ export function prioritizeTeacherVideo(learner:LearnerVideoInput):VideoCoachingD
  const error=(analysis.errors??[]).find(e=>e.severity==="critical")??analysis.errors?.[0];
  const issue=error?.title||analysis.topErrors?.[0]||"";
  const recommendations=(analysis.errors??[]).map(e=>safeText(e.recommendation,180)).filter(Boolean);
+ const citedGuidance=(analysis.publishedGuidance??[]).slice(0,2);
  const priority=Boolean((error?.severity==="critical")||(valid(analysis.score)&&analysis.score<70)||
    (weak&&weak.score<60));
  const coaching=Boolean(issue||(weak&&weak.score<80)||(valid(analysis.score)&&analysis.score<80));
@@ -54,6 +55,9 @@ export function prioritizeTeacherVideo(learner:LearnerVideoInput):VideoCoachingD
   weak?"Nhóm cần đối chiếu: "+weak.name+" ("+weak.score+"/100).":"",
   issue?"Dấu hiệu cần kiểm tra trực tiếp: "+safeText(issue,120)+".":"",
   recommendations.length?"Gợi ý từ bản phân tích: "+recommendations.slice(0,2).join("; ")+".":"",
+  ...citedGuidance.map(item=>"Giáo trình đã xuất bản và duyệt, bản "+item.versionNumber+
+    ", mục "+safeText(item.sourceItemId,55)+": "+safeText(item.correction,180)+". "+
+    (item.practice?"Luyện tham chiếu: "+safeText(item.practice,120)+".":"")),
   "Giảng viên kiểm tra lại kỹ thuật trong buổi thực hành, điều chỉnh mục tiêu, số lần tập và an toàn trước khi gửi.",
  ].filter(Boolean).join("\n").slice(0,1150);
  return {rank:reviewed?0:priority?2:coaching?1:0,

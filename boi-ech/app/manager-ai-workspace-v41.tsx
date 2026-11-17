@@ -6,6 +6,7 @@ import {classKey,classNames,type TrainingBoard} from "./training-types";
 import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
 import ManagerAiAllocationPanelV42 from "./manager-ai-allocation-panel-v42";
 import {buildAllocationReview} from "./manager-ai-allocation-v42";
+import type {TrainingProof} from "./training-client";
 import styles from "./manager-ai-workspace-v41.module.css";
 
 const categories:{key:"all"|ManagerAiArea;label:string}[]=[
@@ -63,9 +64,10 @@ export function ManagerAiOverviewEntryV41({board,onOpen}:{board:TrainingBoard;on
   <Glyph name="arrow"/>
  </button>;
 }
-export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAllocation}:{
+export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAllocation,getProof}:{
  board:TrainingBoard;busy:boolean;onNavigate:(id:ManagerAiDestination)=>void;
  onReviewAllocation:(personId:string,classId:string)=>void;
+ getProof?:(signal?:AbortSignal)=>Promise<TrainingProof>;
 }){
  const report=useMemo(()=>analyzeManagerBoard(board,40),[board]);
  const [area,setArea]=useState<"all"|ManagerAiArea>("all");
@@ -175,7 +177,7 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAll
      </section>
     </aside>
    </div>
-   <ManagerAiAllocationPanelV42 board={board} onNavigate={onNavigate} onReviewProposal={onReviewAllocation}/>
+   <ManagerAiAllocationPanelV42 board={board} onNavigate={onNavigate} onReviewProposal={onReviewAllocation} getProof={getProof}/>
    <ManagerAiFollowonV41 board={board} report={report}/>
    <footer className={styles.footer}>V41.0–V42 · Các năng lực đã bật vẫn là phân tích có bằng chứng, chưa hỗ trợ tự thực thi, dự báo ML hoặc kết luận vượt phạm vi dữ liệu. Mọi quyết định do cán bộ phê duyệt.</footer>
   </section>;

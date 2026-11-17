@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { shouldRefreshRoleShell } from "./role-mutation-filter";
+import AiPersonalProfileV44 from "./ai-personal-profile-v44";
 
 type LessonSnapshot = {
   index: number;
@@ -217,7 +218,7 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
       <section className="student-profile-card" id="student-profile">
         <div className="student-avatar">{snapshot.initial}</div>
         <div><span>HỒ SƠ HỌC VIÊN</span><h3>{snapshot.name}</h3><p>Hồ sơ học tập đã xác thực</p></div>
-        <dl><div><dt>Vai trò</dt><dd>Học viên</dd></div><div><dt>Quyền truy cập</dt><dd>{snapshot.access || "Đã xác thực"}</dd></div><div><dt>Trạng thái</dt><dd>{snapshot.network}</dd></div><div><dt>Thiết bị</dt><dd>{DEVICE_TYPE_LABELS[snapshot.deviceType]}{snapshot.platform ? ` · ${snapshot.platform}` : ""}{snapshot.browser ? ` · ${snapshot.browser}` : ""}</dd></div></dl>
+        <dl><div><dt>Vai trò</dt><dd>Học viên</dd></div><div><dt>Quyền truy cập</dt><dd>{snapshot.access || "Đã xác thực"}</dd></div><div><dt>Trạng thái</dt><dd>{snapshot.network}</dd></div><div><dt>Thiết bị</dt><dd>{DEVICE_TYPE_LABELS[snapshot.deviceType]}{snapshot.platform ? ` · ${snapshot.platform}` : ""}{snapshot.browser ? ` · ${snapshot.browser}` : ""}</dd></div></dl><AiPersonalProfileV44 role="learner"/>
       </section>
     </div>
   );

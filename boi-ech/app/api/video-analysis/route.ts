@@ -3,6 +3,7 @@ import {
   getCourseDatabase,
   verifyDeviceRequest,
 } from "../../device-auth.server";
+import { enqueueVideoForAssignedTeachers } from "../../teacher-video-inbox.server";
 
 export const dynamic = "force-dynamic";
 
@@ -175,20 +176,25 @@ export async function POST(request: Request) {
     const database = await getCourseDatabase();
     const clientEventId = `video-ai:${analysis.id}`.slice(0, 100);
 
-    await database.prepare(
-      `INSERT OR IGNORE INTO course_activity_events
-        (device_id, event_type, lesson_number, part, detail_json, client_event_id)
-       VALUES (?, 'video_ai_analysis', ?, 'phan-tich', ?, ?)`,
-    ).bind(device.deviceId, lessonNumber, JSON.stringify(analysis), clientEventId).run();
-
-    await database.prepare(
-      `UPDATE device_profiles
-          SET last_activity_at = CURRENT_TIMESTAMP,
-              last_lesson = ?,
-              last_part = 'phan-tich',
-              updated_at = CURRENT_TIMESTAMP
-        WHERE device_id = ?`,
-    ).bind(lessonNumber, device.deviceId).run();
+    // Event, media-free notification fanout and progress update are a single
+    // atomic D1 batch. If the inbox schema/notification fails, NO video event
+    // is acknowledged as saved (retry safely via unique clientEventId).
+    await database.batch([
+      database.prepare(
+        `INSERT OR IGNORE INTO course_activity_events
+          (device_id, event_type, lesson_number, part, detail_json, client_event_id)
+         VALUES (?, 'video_ai_analysis', ?, 'phan-tich', ?, ?)`,
+      ).bind(device.deviceId, lessonNumber, JSON.stringify(analysis), clientEventId),
+      enqueueVideoForAssignedTeachers(database,device.deviceId,clientEventId),
+      database.prepare(
+        `UPDATE device_profiles
+            SET last_activity_at = CURRENT_TIMESTAMP,
+                last_lesson = ?,
+                last_part = 'phan-tich',
+                updated_at = CURRENT_TIMESTAMP
+          WHERE device_id = ?`,
+      ).bind(lessonNumber, device.deviceId),
+    ]);
 
     return json({ saved: true, analysisId: analysis.id });
   } catch (error) {
