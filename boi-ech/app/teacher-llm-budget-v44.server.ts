@@ -24,7 +24,10 @@ export async function readModelPolicy():Promise<ModelPolicy>{
   const c=env as unknown as Record<string,unknown>;
   const requested=Number(c.BOI_ECH_AI_LLM_DAILY_TOKEN_LIMIT);
   const output=Number(c.BOI_ECH_AI_LLM_MAX_OUTPUT_TOKENS);
-  if(c.BOI_ECH_AI_LLM_ENABLED!=="enabled"||
+  // ZERO-SPEND is the default. Any paid provider requires an additional,
+  // independently explicit Owner-approved cost authorization.
+  if(c.BOI_ECH_AI_COST_MODE!=="OWNER_APPROVED_PAID_MODE"||
+   c.BOI_ECH_AI_LLM_ENABLED!=="enabled"||
    c.BOI_ECH_AI_LLM_REMOTE_TRANSFER!=="approved"||
    c.BOI_ECH_AI_LLM_PROVIDER!=="openai"||
    typeof c.BOI_ECH_AI_LLM_API_KEY!=="string"||c.BOI_ECH_AI_LLM_API_KEY.length<24||
