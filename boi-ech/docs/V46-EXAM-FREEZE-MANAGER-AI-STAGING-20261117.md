@@ -47,3 +47,11 @@ The existing deterministic Manager AI evidence analyzer is additionally hardened
 - Quality: accessible keyboard/mobile/dark-mode contrast, no fake compliance, rollback manifest and measured regression/reopen rates.
 
 **Status:** DEVELOPMENT ONLY / NO MERGE / NO PUBLISH / NO DATA OR SPEND TOGGLES.
+
+## ZERO-SPEND provider hardening (new V46 draft delta)
+
+The optional paid provider adapter now requires a **third, explicit server-only cost permission**: `BOI_ECH_AI_COST_MODE=OWNER_APPROVED_PAID_MODE`. With this unset (the default), even legacy `LLM_ENABLED` and `REMOTE_TRANSFER` toggles cannot cause paid egress. This turn does **not** set that variable, enable any paid provider, acquire API keys or make outbound requests.
+
+The original data-policy and model-provider gates remain required. An exact-source regression asserts the new gate is present. Paid model use remains OFF under the Owner's current ZERO-SPEND instruction.
+
+The Owner subsequently allowed only **selective safe release candidates** to be assessed. A separate main-targeted manager-only candidate is [PR #199](https://github.com/BlueDragon33/BOIECH_AI/pull/199), which is not part of this V46 branch. It passed exact-SHA source CI; authenticated role, Preview and independent A/B gates still BLOCK release. No broad release of V42–V46 is authorized.
