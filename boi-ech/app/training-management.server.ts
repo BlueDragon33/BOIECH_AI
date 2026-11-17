@@ -152,6 +152,21 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
  const authorityBindings=actor.accountId?[managerStorageDeviceId,accountSessionHash,...(scopedTarget?[scopedTarget]:[])]:[actor.deviceId];
  const db=await trainingDatabase();const commandId=id(payload.commandId);
  const action=payload.action;let command:Record<string,unknown>;let write:D1PreparedStatement;const followups:D1PreparedStatement[]=[];
+ // Optional manager-confirmed AI approval strengthens, never replaces, the
+ // canonical manager session, person/class membership and D1 CAS guards.
+ const approvedInput=payload.aiApproval;
+ let aiApproval:null|{proposalId:string;revision:number;fingerprint:string;classId:string}=null;
+ if(approvedInput!==undefined){
+  if(action!=="assign-person"||!approvedInput||typeof approvedInput!=="object"||Array.isArray(approvedInput))
+   fail("Xác nhận AI chỉ hợp lệ cho phân công người.", "AI_APPROVAL_INVALID",400);
+  const a=approvedInput as Record<string,unknown>;
+  if(typeof a.proposalId!=="string"||!/^(teacher|learner):[A-Za-z0-9_-]{1,96}:[A-Za-z0-9_-]{1,96}$/.test(a.proposalId)||
+    typeof a.revision!=="number"||!Number.isSafeInteger(a.revision)||a.revision<1||
+    typeof a.fingerprint!=="string"||!/^[a-f0-9]{64}$/.test(a.fingerprint)||
+    typeof a.classId!=="string"||!/^[A-Za-z0-9_-]{3,80}$/.test(a.classId))
+   fail("Xác minh đề xuất AI chưa hợp lệ.", "AI_APPROVAL_INVALID",400);
+  aiApproval={proposalId:a.proposalId,revision:a.revision,fingerprint:a.fingerprint,classId:a.classId};
+ }
  if(action==="save-resource") {
   const kind=payload.kind;if(kind!=="class"&&kind!=="room"&&kind!=="building")fail("Loại tài nguyên không hợp lệ.");
   const name=text(payload.name,50);if(/[;,]/.test(name))fail("Tên lớp/phòng không được chứa dấu phẩy hoặc chấm phẩy.");
@@ -328,7 +343,19 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
             END)=1
       )
     )`:"";
-  command={action,personId,classIds:ids,expectedClassName};
+  if(aiApproval&&(!ids.includes(aiApproval.classId)||ids.length===0||
+    !aiApproval.proposalId.endsWith(":"+personId)||
+    !aiApproval.proposalId.startsWith(target.role+":"+aiApproval.classId+":")))
+    fail("Đề xuất AI không trùng đối tượng hoặc lớp cần phân công.","AI_APPROVAL_MISMATCH",409);
+  const aiGuard=aiApproval?`AND EXISTS(
+    SELECT 1 FROM training_ai_proposals approved
+    WHERE approved.proposal_id=? AND approved.person_id=? AND approved.class_id=?
+      AND approved.kind=? AND approved.state='approved'
+      AND approved.revision=? AND approved.source_fingerprint=?
+  ) AND NOT EXISTS(
+    SELECT 1 FROM training_ai_proposal_applications used WHERE used.proposal_id=?
+  )`:"";
+  command={action,personId,classIds:ids,expectedClassName,...(aiApproval?{aiApproval}: {})};
   write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=?
     AND (?=0 OR (status='approved' AND (EXISTS(
       SELECT 1 FROM accounts ca JOIN account_onboarding o ON o.account_id=ca.account_id
@@ -339,8 +366,22 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
         WHERE ca.storage_device_id=device_access.device_id)
         AND NOT EXISTS(SELECT 1 FROM accounts ca JOIN account_onboarding o ON o.account_id=ca.account_id
           WHERE ca.storage_device_id=device_access.device_id AND o.first_review_by IS NOT NULL)
-        AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))))) AND ${authorityGuard} ${capacityGuard}`)
-    .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings,...(learnerNewClass?[learnerNewClass]:[]));
+        AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))))) AND ${authorityGuard} ${capacityGuard} ${aiGuard}`)
+    .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings,
+      ...(learnerNewClass?[learnerNewClass]:[]),
+      ...(aiApproval?[aiApproval.proposalId,personId,aiApproval.classId,target.role,aiApproval.revision,
+        aiApproval.fingerprint,aiApproval.proposalId]:[]));
+  if(aiApproval){
+   // D1 batch is atomic: class update, canonical command receipt/audit,
+   // teacher-term followups and proposal-application receipt must all commit.
+   followups.push(db.prepare(`INSERT INTO training_ai_proposal_applications
+     (command_id,proposal_id,actor_id,approved_revision,source_fingerprint)
+     SELECT ?,?,?,?,? WHERE EXISTS (
+       SELECT 1 FROM training_commands c WHERE c.command_id=? AND c.actor_id=?
+     )`)
+      .bind(commandId,aiApproval.proposalId,actor.deviceId,aiApproval.revision,
+        aiApproval.fingerprint,commandId,actor.deviceId));
+  }
  } else fail("Thao tác điều phối không hợp lệ.");
  const canonical=JSON.stringify(command);
  async function receipt(){return db.prepare("SELECT actor_id,payload_json FROM training_commands WHERE command_id=?").bind(commandId).first<{actor_id:string;payload_json:string}>();}
