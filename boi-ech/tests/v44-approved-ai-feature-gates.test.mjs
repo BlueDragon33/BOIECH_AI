@@ -155,4 +155,6 @@ test("V44: teacher and learner have an independent opt-in, withdrawal and manage
  assert.match(manager,/submit\("attest-class"\)/);
  assert.match(profile,/device_id IN \(SELECT value FROM json_each\(\?\)\)/);
  assert.match(profile,/sourcePossiblyTruncated/);
+ assert.match(client,/!response\.ok&&data\.code==="AI_PROFILE_ADMISSION_DISABLED"/);
+ assert.match(manager,/!response\.ok&&json\.code==="AI_PROFILE_ADMISSION_DISABLED"/);
 });

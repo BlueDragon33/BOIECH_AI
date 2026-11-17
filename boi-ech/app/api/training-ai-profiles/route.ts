@@ -29,7 +29,7 @@ export async function POST(request:Request){
   const device=await verifyDeviceRequest(payload,false);
   if(!await profileAdmissionEnabled())
    return respond({error:"Nguồn hồ sơ bổ sung chưa được chủ dữ liệu cho phép kích hoạt.",
-     code:"AI_PROFILE_ADMISSION_DISABLED"},409);
+     code:"AI_PROFILE_ADMISSION_DISABLED"},403);
   const action=payload.action;
   const db=await getCourseDatabase();
   if(action==="own-list"||action==="submit"||action==="withdraw"){
