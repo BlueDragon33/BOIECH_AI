@@ -347,6 +347,9 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
     !aiApproval.proposalId.endsWith(":"+personId)||
     !aiApproval.proposalId.startsWith(target.role+":"+aiApproval.classId+":")))
     fail("Đề xuất AI không trùng đối tượng hoặc lớp cần phân công.","AI_APPROVAL_MISMATCH",409);
+  // Check live consent and pool certification inside the final atomic UPDATE.
+  // A pre-transaction board/fingerprint read alone cannot close a withdrawal race.
+  // This strengthens only AI-assisted apply; normal signed manager allocation stays unchanged.
   const aiGuard=aiApproval?`AND EXISTS(
     SELECT 1 FROM training_ai_proposals approved
     WHERE approved.proposal_id=? AND approved.person_id=? AND approved.class_id=?
@@ -354,6 +357,17 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
       AND approved.revision=? AND approved.source_fingerprint=?
   ) AND NOT EXISTS(
     SELECT 1 FROM training_ai_proposal_applications used WHERE used.proposal_id=?
+  ) AND EXISTS(
+    SELECT 1 FROM training_ai_profile_submissions live_profile
+    WHERE live_profile.device_id=? AND live_profile.role=?
+      AND live_profile.state='verified' AND live_profile.consent_at IS NOT NULL
+      AND live_profile.verified_revision=live_profile.revision
+      AND datetime(live_profile.valid_until)>CURRENT_TIMESTAMP
+  ) AND EXISTS(
+    SELECT 1 FROM training_ai_class_safety_attestations live_pool
+    JOIN training_resources live_class ON live_class.id=live_pool.class_id
+    WHERE live_pool.class_id=? AND live_class.kind='class' AND live_class.status='active'
+      AND datetime(live_pool.valid_until)>CURRENT_TIMESTAMP
   )`:"";
   command={action,personId,classIds:ids,expectedClassName,...(aiApproval?{aiApproval}: {})};
   write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=?
@@ -370,7 +384,7 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
     .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings,
       ...(learnerNewClass?[learnerNewClass]:[]),
       ...(aiApproval?[aiApproval.proposalId,personId,aiApproval.classId,target.role,aiApproval.revision,
-        aiApproval.fingerprint,aiApproval.proposalId]:[]));
+        aiApproval.fingerprint,aiApproval.proposalId,personId,target.role,aiApproval.classId]:[]));
   if(aiApproval){
    // D1 batch is atomic: class update, canonical command receipt/audit,
    // teacher-term followups and proposal-application receipt must all commit.
