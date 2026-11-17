@@ -17,7 +17,9 @@ function moduleOf(path,dependencies={}){
  );
  return holder.exports;
 }
-const retrieval=moduleOf("app/teacher-knowledge-retrieval-v43.ts");
+const retrieval=moduleOf("app/teacher-knowledge-retrieval-v43.ts",{
+ "./ai-search-text":moduleOf("app/ai-search-text.ts")
+});
 const knowledge=moduleOf("app/teacher-approved-knowledge.server.ts",{
  "./course-content.server":{parseCourseDocument:v=>JSON.parse(v)}
 });

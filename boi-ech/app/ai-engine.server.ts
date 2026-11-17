@@ -2,6 +2,7 @@ import type { CourseDocument, CourseEditScope, CourseLessonNumber } from "./cour
 import { COURSE_LESSON_NUMBERS } from "./course-content.server";
 import { LESSON_PARTS, courseProgressKey, normalizeCompletedProgress } from "./course-logic";
 import type { PublicQuestion, ServerQuestion } from "./course-types";
+import { normalizeAiSearchText as normalized } from "./ai-search-text";
 
 export const AI_ENGINE_VERSION = "frog-ai-rules-1.0.0";
 export const AI_PROMPT_VERSION = "grounded-course-v1";
@@ -56,10 +57,6 @@ const domainTerms = [
 const blockedAnswerTerms = ["dap an", "cau so", "cau 1", "cau 2", "cau 3", "cau 4", "cau 5", "cau 6", "cau 7", "cau 8", "cau 9", "cau 10", "lam ho bai kiem tra"];
 const emergencyTerms = ["duoi nuoc", "duoi nuoc", "khong tho duoc", "kho tho", "dau nguc", "choang", "chong mat", "chuot rut", "bat tinh"];
 const stopWords = new Set(["va", "la", "cua", "cho", "toi", "minh", "em", "anh", "chi", "nen", "lam", "the", "nao", "mot", "nhung", "voi", "khi", "duoc", "can", "gi", "o", "co"]);
-
-function normalized(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/đ/g, "d").replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim();
-}
 
 function tokens(value: string) {
   return new Set(normalized(value).split(" ").filter((token) => token.length > 1 && !stopWords.has(token)));
