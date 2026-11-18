@@ -149,3 +149,22 @@ test("No generative model, unauthorized message/video pipeline or automatic admi
  assert.match(view,/không sửa lịch và không phê duyệt/);
  assert.ok(MANAGER_AI_FUTURE_CAPABILITIES.some(c=>c.name.includes("AI tạo sinh")&&c.status==="approval-required"));
 });
+
+test("Release V41: invalid scheduled times prevent a false conflict-free room assessment",()=>{
+ const b=board();
+ assert.equal(evaluateScheduleOption(b,"s1","r1","2030-06-06T13:00:00.000Z").state,"no-conflict-in-loaded-window");
+ b.sessions.push(session("bad-time","r1","teacher1","bad-timestamp","2030-06-06T14:00:00.000Z"));
+ const snapshot=JSON.stringify(b);
+ const scan=scanAllManagerConflicts(b);
+ assert.equal(scan.sourcePotentiallyTruncated,true);
+ assert.match(scan.coverageNote,/1 buổi có mốc giờ không hợp lệ/);
+ const result=evaluateScheduleOption(b,"s1","r1","2030-06-06T13:00:00.000Z");
+ assert.equal(result.state,"review-required");
+ assert.equal(result.overlappingSessions.length,0);
+ assert.match(result.warnings.join(" "),/chưa thể loại trừ xung đột/);
+ assert.equal(JSON.stringify(b),snapshot);
+ const cancelled=structuredClone(b);
+ cancelled.sessions.at(-1).status="cancelled";
+ assert.equal(scanAllManagerConflicts(cancelled).sourcePotentiallyTruncated,false);
+ assert.equal(evaluateScheduleOption(cancelled,"s1","r1","2030-06-06T13:00:00.000Z").state,"no-conflict-in-loaded-window");
+});
