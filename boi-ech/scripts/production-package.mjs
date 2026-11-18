@@ -55,13 +55,27 @@ export function roleAssetProbes(filenames){
   return 'assets/'+matches[0];
  });
 }
-export async function verifyPublicAssets(files,http=fetch){
- if(!files.some(f=>f.endsWith('.js'))||!files.some(f=>f.endsWith('.css')))throw new Error('Production JS/CSS probes missing');
+export async function verifyPublicAssets(files,http=fetch,{
+ retryDelays=[0,1000,2000,4000,7000,12000],
+ pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+}={}){
+ if(!Array.isArray(files)||!files.some(f=>f.endsWith('.js'))||!files.some(f=>f.endsWith('.css')))throw new Error('Production JS/CSS probes missing');
+ if(!Array.isArray(retryDelays)||retryDelays.length<1||retryDelays.length>10||retryDelays[0]!==0||
+    retryDelays.some(ms=>!Number.isSafeInteger(ms)||ms<0||ms>15000))throw new Error('Invalid bounded production asset retry policy');
  for(const file of files){
   if(!/^assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(file))throw new Error('Invalid public asset path');
-  const r=await http('https://boi-ech.boiech-ai.workers.dev/'+file,{redirect:'error',signal:AbortSignal.timeout(15000)});
-  const type=r.headers.get('content-type')??'';
-  if(r.status!==200||!(file.endsWith('.js')?/javascript|ecmascript/i.test(type):/text\/css/i.test(type)))throw new Error(`Production public asset failed: ${file} HTTP ${r.status}`);
+  for(let attempt=0;attempt<retryDelays.length;attempt++){
+   if(retryDelays[attempt])await pause(retryDelays[attempt]);
+   const r=await http('https://boi-ech.boiech-ai.workers.dev/'+file,{
+    redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000)});
+   const type=r.headers.get('content-type')??'';
+   if(r.status===200&&(file.endsWith('.js')?/javascript|ecmascript/i.test(type):/text\/css/i.test(type)))break;
+   // Cloudflare immutable asset manifests can propagate after the Worker revision.
+   // Retry only an exact 404, never HTML fallback, wrong MIME, WAF, redirects or
+   // 401/403/5xx. Exhaustion is a hard failure, not an implicit success.
+   if(r.status===404&&attempt<retryDelays.length-1)continue;
+   throw new Error(`Production public asset failed: ${file} HTTP ${r.status}`);
+  }
  }
 }
 /**
