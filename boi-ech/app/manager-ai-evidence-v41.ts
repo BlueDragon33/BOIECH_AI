@@ -214,9 +214,10 @@ export function answerManagerQuestion(question:string,report:ManagerAiReport):Ma
  const related=report.findings.filter(f=>matched[1].includes(f.area)).slice(0,5);
  if(!related.length&&(report.truncated||report.sourceMayBeTruncated))return {kind:"unsupported",
   title:"Chưa đủ dữ liệu đang hiển thị để kết luận",
-  answer:"Danh sách AI chỉ hiển thị "+report.findings.length+"/"+report.totalFindings+
-   " tín hiệu tổng hợp. "+(report.conflictExamplesLimited?"Mẫu trùng lịch bị giới hạn ở 30 trường hợp; ":"")+
-   "Cảnh báo của chủ đề này có thể nằm ngoài giới hạn hiển thị. Hãy thu hẹp khoảng xem và tải lại trước khi kết luận.",
+  answer:"Báo cáo có "+report.findings.length+"/"+report.totalFindings+
+   " tín hiệu tổng hợp đã hiển thị. "+(report.conflictExamplesLimited?"Mẫu trùng lịch bị giới hạn ở 30 trường hợp; ":"")+
+   (report.sourceMayBeTruncated?"Nguồn lịch đạt ngưỡng 1.000 buổi và có thể chưa được tải đủ; ":"")+
+   "Cảnh báo của chủ đề này có thể nằm ngoài giới hạn hiển thị hoặc dữ liệu đã tải. Hãy thu hẹp khoảng xem và tải lại trước khi kết luận.",
   references:[],disclaimer};
  const partialNote=report.truncated||report.sourceMayBeTruncated?
   "\nLưu ý: "+(report.truncated?"báo cáo đang giới hạn ở "+report.findings.length+"/"+report.totalFindings+
