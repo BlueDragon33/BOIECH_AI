@@ -23,3 +23,16 @@
 Previous 18 Nov exam freeze remains in effect for broad AI V42–V46 and student/teacher flows. The latest Owner instruction reopens ONLY selective safe-to-publish pieces; no automatic transfer to the official AI core. NEVER merge old stacked V42–V46 as a shortcut. ZERO-SPEND, Cloudflare-only, no Vercel.
 
 If any gate cannot be completed, preserve this candidate **Draft / BLOCKED** with evidence and leave Production unchanged. Absence of reviewer reports or signed runtime checks is not a PASS.
+
+## 18 Nov 2026 — new owner instruction and bounded V47 hardening
+
+Owner authorizes working toward merge/publish and conditionally waiving a stalled A/B reviewer **for the manager-only preview/release candidate**. This instruction does not turn absent A/B outcomes into PASS; it does not override protected environment approval, role isolation, D1 safety, signed UX or the currently adopted Constitution's empty `constitutionalWaivers` array.
+
+V47 read-only improvements were carefully ported into this main-targeted manager-only PR (without importing advanced V42–V47 API, D1 migrations, learner/teacher code or model providers):
+- Q&A cannot assert the absence of problems when the warning list is truncated.
+- UI indicates incomplete source coverage instead of reassuring falsely.
+- Malformed scheduled timestamps lead the full conflict scan/room simulation to withhold an all-clear.
+- P0 conflict **examples** capped at 30 are labeled sample coverage, not the total number of conflicts.
+- Focused negative tests verify cancellation exclusions and no source mutation.
+
+The Owner can personally assess usability on a protected Preview once the environment is authorized. Never claim Production has been published just because the GitHub PR was merged. The current manual Production workflow invokes remote D1 migration checks and must be inspected/approved for remote side effects before dispatch. Signed manager Preview E2E and runtime isolation remain mandatory unverified blockers until actually run. Pending reviewer waiver is recorded as a deliberate risk decision, **not** a constitutional PASS or independent review.
