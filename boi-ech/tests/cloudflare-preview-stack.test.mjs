@@ -113,3 +113,67 @@ test('live V2 summary probe rejects unexpected personal data without mutating D1
  };
  await assert.rejects(verifyV2SummaryLive('synthetic-test-secret',fetcher),/schema or aggregate/);
 });
+
+function v2ProbeFetcher(legacyReply){
+ const seen=[];
+ const fetcher=async(url,init)=>{
+  assert.equal(init.method,"GET","live V2 checks are read-only");
+  seen.push({url,headers:init.headers});
+  if(String(url).includes("/api/control/v2/account-summary")){
+   const token=init.headers.authorization;
+   if(!token)return Response.json({code:"CONTROL_AUTH_REQUIRED"},{status:401});
+   if(token==="Bearer invalid-preview-ticket")return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+   if(init.headers["x-control-role"]==="viewer")return Response.json({code:"ACCOUNT_SUMMARY_FORBIDDEN"},{status:403});
+   return Response.json({asOf:"2026-11-09T08:00:00.000Z",contract:"boi-account-summary.v2",
+    verified:true,counts:{totalAccounts:1,pending:0,active:1,suspended:0,expired:0,unverified:0}});
+  }
+  if(String(url).includes("/api/control/overview?")){
+   assert.equal(init.headers["x-control-role"],"owner");
+   assert.equal(init.headers.authorization,"Bearer test-only-bridge-credential");
+   return legacyReply();
+  }
+  throw new Error("Unexpected V2 control route");
+ };
+ return {fetcher,seen};
+}
+test("Preview legacy guard retries ONLY bounded app-coded credential propagation, then requires 409",async()=>{
+ const outcomes=[
+  Response.json({code:"CONTROL_SERVICE_FORBIDDEN"},{status:403}),
+  Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403}),
+  Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409})
+ ];
+ let calls=0;const delays=[];
+ const {fetcher,seen}=v2ProbeFetcher(()=>{calls++;return outcomes.shift();});
+ const result=await verifyV2SummaryLive("test-only-bridge-credential",fetcher,async ms=>delays.push(ms));
+ assert.deepEqual(delays,[1000,2000]);
+ assert.equal(calls,3);
+ assert.deepEqual(result.statusChecks,[200,200,403,401,403,409]);
+ assert.equal(seen.filter(x=>x.url.includes("overview?")).length,3);
+});
+test("Preview legacy guard refuses unexpected 403, HTML/WAF, wrong 409 code without retries",async()=>{
+ const cases=[
+  Response.json({code:"CONTROL_ORIGIN_FORBIDDEN"},{status:403}),
+  Response.json({code:"ACCOUNT_SUMMARY_FORBIDDEN"},{status:403}),
+  new Response("<html>Cloudflare security challenge</html>",{status:403,headers:{"content-type":"text/html"}}),
+  Response.json({code:"SOME_OTHER_DENIAL"},{status:403}),
+  Response.json({code:"UNRELATED_CONFLICT"},{status:409})
+ ];
+ for(const outcome of cases){
+  let calls=0;const delays=[];
+  const {fetcher}=v2ProbeFetcher(()=>{calls++;return outcome.clone();});
+  await assert.rejects(verifyV2SummaryLive("test-only-bridge-credential",fetcher,async ms=>delays.push(ms)),
+   error=>!error.message.includes("test-only-bridge-credential")&&
+    !error.message.includes("Cloudflare security challenge")&&
+    /readback mismatch|legacy control guard/.test(error.message));
+  assert.equal(calls,1);
+  assert.equal(delays.length,0);
+ }
+});
+test("Preview legacy guard exhausting transient 403 stays failed and never bypasses protection",async()=>{
+ let calls=0;const delays=[];
+ const {fetcher}=v2ProbeFetcher(()=>{calls++;return Response.json({code:"CONTROL_SERVICE_FORBIDDEN"},{status:403});});
+ await assert.rejects(verifyV2SummaryLive("test-only-bridge-credential",fetcher,async ms=>delays.push(ms)),
+  /HTTP 403; safe code CONTROL_SERVICE_FORBIDDEN/);
+ assert.equal(calls,5);
+ assert.deepEqual(delays,[1000,2000,4000,8000]);
+});
