@@ -1,0 +1,55 @@
+name: Boi Ech Production Read-only Reacceptance (manual)
+
+on:
+  # This incident-specific path filter allows one read-only reconciliation
+  # immediately after the verifier lands on main, without a second deploy.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-boi-ech-production-readonly.yml
+      - boi-ech/scripts/production-readonly-reaccept-20261118.mjs
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Gõ VERIFY_EXISTING_PRODUCTION để CHỈ ĐỌC trạng thái Production đã deploy, không ghi D1, không deploy."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boi-ech-production-readonly-reacceptance
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: boi-ech-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PRODUCTION_READONLY_CONFIRM: ${{ github.event_name == 'push' && 'VERIFY_EXISTING_PRODUCTION' || inputs.confirm }}
+    steps:
+      - name: Require read-only intent (never deploy or mutate remote D1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PRODUCTION_READONLY_CONFIRM" != "VERIFY_EXISTING_PRODUCTION" ]]; then
+            echo "::error::Enter VERIFY_EXISTING_PRODUCTION exactly."
+            exit 1
+          fi
+      - name: Checkout verifier source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+      - name: Inspect current deployed revision, D1 and existing Cloudflare public assets (GET only)
+        run: node boi-ech/scripts/production-readonly-reaccept-20261118.mjs
+      - name: Read-only acceptance summary
+        if: success()
+        run: |
+          echo "Production existing deployed revision and public CSS/JS passed read-only reacceptance."
+          echo "Owner authenticated manager/learner/teacher business UX remains a separate gate."

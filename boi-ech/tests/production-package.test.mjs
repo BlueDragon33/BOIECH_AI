@@ -46,7 +46,8 @@ test('actual rollback workflow records newest deployment when Wrangler returns o
 test('live public asset checks reject missing or HTML JavaScript responses',async()=>{
  const files=['assets/index-abc.js','assets/index-abc.css'];
  await assert.doesNotReject(verifyPublicAssets(files,async url=>new Response('',{headers:{'content-type':url.endsWith('.js')?'text/javascript':'text/css'}})));
- for(const r of [new Response('Not Found',{status:404}),new Response('<html>',{headers:{'content-type':'text/html'}})])await assert.rejects(verifyPublicAssets(files,async()=>r),/Production public asset failed/);
+ for(const r of [new Response('Not Found',{status:404}),new Response('<html>',{headers:{'content-type':'text/html'}})])
+  await assert.rejects(verifyPublicAssets(files,async()=>r,{retryDelays:[0,0],pause:async()=>{}}),/Production public asset failed/);
 });
 test('explicit Account-first activation sets both flags and the canonical CSRF origin without changing existing policy',()=>{
  const c=productionPackage(settings(),revision,true);
@@ -130,4 +131,48 @@ test('Single-review activation is verified from live settings, not merely the de
  live.result.bindings.find(b=>b.name==='BOI_ECH_SINGLE_REVIEW').text='true';
  const ok=await waitForLiveProductionRevision(async()=>live,revision,{activate:true,singleReview:true,attempts:1});
  assert.equal(ok.singleReview,true);
+});
+
+test('Production only retries edge-propagating 404 and verifies final CSS/JS type',async()=>{
+ const files=['assets/manager-workspace-BNv1YLk2.css','assets/index-CwI3PejO.js'];
+ const seen=[],delays=[];
+ const result=await verifyPublicAssets(files,async(url,opts)=>{
+  seen.push({url,opts});
+  if(url.endsWith('.css')&&seen.filter(x=>x.url.endsWith('.css')).length<=2)
+   return new Response('Not Found',{status:404});
+  return new Response('',{headers:{'content-type':url.endsWith('.css')?'text/css; charset=utf-8':'application/javascript'}});
+ },{retryDelays:[0,1000,2000,4000],pause:async ms=>delays.push(ms)});
+ assert.equal(result,undefined);
+ assert.deepEqual(delays,[1000,2000]);
+ assert.equal(seen.length,4);
+ assert.ok(seen.every(x=>x.opts.redirect==='error'&&x.opts.cache==='no-store'));
+});
+test('Production repeated 404 must fail after bounded attempts with no false PASS',async()=>{
+ let calls=0;const delays=[];
+ await assert.rejects(verifyPublicAssets(['assets/index-123.js','assets/index-123.css'],
+  async()=>{calls++;return new Response('Not Found',{status:404});},
+  {retryDelays:[0,1000,2000],pause:async ms=>delays.push(ms)}),
+  /Production public asset failed: assets\/index-123.js HTTP 404/);
+ assert.equal(calls,3);assert.deepEqual(delays,[1000,2000]);
+});
+test('Production never retries access denials, HTML fallback or invalid MIME',async()=>{
+ for(const r of [
+  new Response('forbidden',{status:403}),
+  new Response('<html>challenge</html>',{status:200,headers:{'content-type':'text/html'}}),
+  new Response('unavailable',{status:503})
+ ]){
+  let calls=0;
+  await assert.rejects(verifyPublicAssets(['assets/index-123.js','assets/index-123.css'],
+   async()=>{calls++;return r.clone();},{retryDelays:[0,1000,2000],pause:async()=>{throw Error('No sleep for non-404');}}),
+   /Production public asset failed: assets\/index-123.js/);
+  assert.equal(calls,1);
+ }
+});
+test('Production asset readback refuses empty or invalid retry inputs and unsafe paths',async()=>{
+ const ok=['assets/index-123.js','assets/index-123.css'];
+ for(const retryDelays of [[],[1000],[0,-1],[0,15001],[0,1.5],Array(11).fill(0)]){
+  await assert.rejects(verifyPublicAssets(ok,async()=>{throw Error('Should not fetch');},{retryDelays}),/retry policy/);
+ }
+ await assert.rejects(verifyPublicAssets([...ok,'../../api/private'],async()=>{throw Error('Should not fetch');}),
+  /Invalid public asset path/);
 });
