@@ -21,7 +21,7 @@ export type ManagerAiFinding={
 export type ManagerAiReport={
  engineVersion:typeof MANAGER_AI_ENGINE_VERSION;engineMode:"rules-only";generativeAiActive:false;
  observedAt:string;window:{from:string;to:string};coverage:{classes:number;teachers:number;rooms:number;sessions:number};
- findings:ManagerAiFinding[];totalFindings:number;truncated:boolean;
+ findings:ManagerAiFinding[];totalFindings:number;truncated:boolean;conflictExamplesLimited:boolean;
  counts:{critical:number;high:number;medium:number;info:number};
 };
 const weights:Record<ManagerAiPriority,number>={critical:0,high:1,medium:2,info:3};
@@ -150,7 +150,8 @@ export function analyzeManagerBoard(board:TrainingBoard,limit=40):ManagerAiRepor
      limitations:["Không tự kết luận buổi học bị hủy hoặc sai về mặt nghiệp vụ."]});
   }
  }
- for(const conflict of sessionConflicts(board).slice(0,30)){
+ const conflictExamples=sessionConflicts(board);
+ for(const conflict of conflictExamples.slice(0,30)){
   added(out,{id:"conflict:"+conflict.id,area:"schedule",priority:"critical",
    title:"Hai buổi học có dấu hiệu trùng lịch",
    details:"Các buổi “"+conflict.a.title+"” và “"+conflict.b.title+
@@ -182,7 +183,9 @@ export function analyzeManagerBoard(board:TrainingBoard,limit=40):ManagerAiRepor
  return {engineVersion:MANAGER_AI_ENGINE_VERSION,engineMode:"rules-only",generativeAiActive:false,
   observedAt:board.observedAt,window:{from:board.from,to:board.to},
   coverage:{classes:classes.length,teachers:teachers.length,rooms:rooms.length,sessions:sessions.length},
-  findings:sorted.slice(0,capped),totalFindings:sorted.length,truncated:sorted.length>capped,counts};
+  findings:sorted.slice(0,capped),totalFindings:sorted.length,
+  truncated:sorted.length>capped||conflictExamples.length>30,
+  conflictExamplesLimited:conflictExamples.length>30,counts};
 }
 function normalize(text:string){return text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").toLowerCase().replace(/\s+/g," ").trim();}
 export type ManagerAiAnswer={kind:"evidence-answer"|"unsupported";title:string;answer:string;references:ManagerAiEvidence[];disclaimer:string};
