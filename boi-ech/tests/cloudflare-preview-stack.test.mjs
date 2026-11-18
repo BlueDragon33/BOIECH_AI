@@ -173,7 +173,7 @@ test("Preview legacy guard exhausting transient 403 stays failed and never bypas
  let calls=0;const delays=[];
  const {fetcher}=v2ProbeFetcher(()=>{calls++;return Response.json({code:"CONTROL_SERVICE_FORBIDDEN"},{status:403});});
  await assert.rejects(verifyV2SummaryLive("test-only-bridge-credential",fetcher,async ms=>delays.push(ms)),
-  /HTTP 403; safe code CONTROL_SERVICE_FORBIDDEN/);
+  /got 403; safe code CONTROL_SERVICE_FORBIDDEN/);
  assert.equal(calls,5);
  assert.deepEqual(delays,[1000,2000,4000,8000]);
 });
