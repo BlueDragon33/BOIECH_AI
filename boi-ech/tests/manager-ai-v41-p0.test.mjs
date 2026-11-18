@@ -220,3 +220,38 @@ test("V41 isolated release: manager AI engine has no network, writes or provider
  assert.doesNotMatch(source,/\bfetch\s*\(|\.prepare\s*\(|\.batch\s*\(|\b(?:openai|anthropic)\.com\b|process\.env/);
  assert.match(source,/generativeAiActive:false/);
 });
+
+test("Release V41: capped findings never imply missing-category all clear",()=>{
+ const b=board(),before=JSON.stringify(b);
+ const limited=analyzeManagerBoard(b,1);
+ assert.equal(limited.truncated,true);
+ const hidden={...limited,findings:[]};
+ const response=answerManagerQuestion("Phòng nào cần xử lý?",hidden);
+ assert.equal(response.kind,"unsupported");
+ assert.match(response.title,/Chưa đủ dữ liệu/);
+ assert.deepEqual(response.references,[]);
+ const visible={...limited,findings:analyzeManagerBoard(b).findings.filter(f=>f.area==="class").slice(0,1)};
+ assert.match(answerManagerQuestion("Lớp nào quá tải?",visible).answer,/chưa bao phủ toàn bộ cảnh báo/);
+ assert.equal(JSON.stringify(b),before);
+});
+
+test("Release V41: dense collision examples are disclosed as sampled, not exhaustive",()=>{
+ const b=board();
+ b.sessions=Array.from({length:36},(_,i)=>session("dense-"+String(i).padStart(2,"0"),
+  "rm-1","t1","2030-04-15T09:00:00.000Z","2030-04-15T10:00:00.000Z"));
+ const before=JSON.stringify(b),report=analyzeManagerBoard(b,100);
+ assert.equal(report.conflictExamplesLimited,true);
+ assert.equal(report.truncated,true);
+ assert.equal(report.findings.filter(f=>f.id.startsWith("conflict:")).length,30);
+ assert.ok(report.totalFindings<100);
+ assert.match(answerManagerQuestion("Có lịch nào trùng nhau?",report).answer,/tối đa 30 mẫu trùng lịch/);
+ assert.equal(JSON.stringify(b),before);
+});
+
+test("Release V41: manager UI does not reassure on incomplete evidence",()=>{
+ const source=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
+ assert.match(source,/coverageIncomplete=report\.truncated\|\|board\.sessions\.length>=1000/g);
+ assert.match(source,/Dữ liệu chưa đầy đủ để xác nhận không có cảnh báo/);
+ assert.match(source,/Nguồn dữ liệu chưa đủ để kết luận không có cảnh báo/);
+ assert.match(source,/report\.conflictExamplesLimited/);
+});
