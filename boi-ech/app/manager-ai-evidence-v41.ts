@@ -217,11 +217,13 @@ export function answerManagerQuestion(question:string,report:ManagerAiReport):Ma
  if(!related.length&&report.truncated)return {kind:"unsupported",
   title:"Chưa đủ dữ liệu đang hiển thị để kết luận",
   answer:"Danh sách AI chỉ hiển thị "+report.findings.length+"/"+report.totalFindings+
-   " tín hiệu. Cảnh báo của chủ đề này có thể nằm ngoài giới hạn hiển thị. Hãy thu hẹp khoảng xem và tải lại trước khi kết luận.",
+   " tín hiệu tổng hợp. "+(report.conflictExamplesLimited?"Mẫu trùng lịch bị giới hạn ở 30 trường hợp; ":"")+
+   "Cảnh báo của chủ đề này có thể nằm ngoài giới hạn hiển thị. Hãy thu hẹp khoảng xem và tải lại trước khi kết luận.",
   references:[],disclaimer};
  const partialNote=report.truncated?
-  "\nLưu ý: chỉ "+report.findings.length+"/"+report.totalFindings+
-  " tín hiệu được hiển thị; câu trả lời chưa bao phủ toàn bộ cảnh báo.":"";
+  "\nLưu ý: báo cáo đang giới hạn ở "+report.findings.length+"/"+report.totalFindings+
+  " tín hiệu tổng hợp."+(report.conflictExamplesLimited?" Bộ phát hiện chỉ trình bày tối đa 30 mẫu trùng lịch.":"")+
+  " Câu trả lời chưa bao phủ toàn bộ cảnh báo.":"";
  return {kind:"evidence-answer",title:related.length?"Phân tích từ dữ liệu điều hành":"Chưa phát hiện vấn đề theo bộ quy tắc hiện tại",
   answer:(related.length?related.map((f,i)=>(i+1)+". "+f.title+". "+f.details+" Đề xuất: "+f.recommendedAction).join("\n"):
    "Không phát hiện cảnh báo thuộc chủ đề này trong khoảng dữ liệu đã tải. Điều đó không chứng minh không có rủi ro ngoài hệ thống.")+partialNote,
