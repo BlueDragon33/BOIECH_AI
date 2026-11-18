@@ -59,11 +59,14 @@ export async function verifyPublicAssets(files,http=fetch,{
  retryDelays=[0,1000,2000,4000,7000,12000],
  pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))
 }={}){
- if(!Array.isArray(files)||!files.some(f=>f.endsWith('.js'))||!files.some(f=>f.endsWith('.css')))throw new Error('Production JS/CSS probes missing');
+ if(!Array.isArray(files)||!files.some(f=>typeof f==='string'&&f.endsWith('.js'))||
+    !files.some(f=>typeof f==='string'&&f.endsWith('.css')))throw new Error('Production JS/CSS probes missing');
  if(!Array.isArray(retryDelays)||retryDelays.length<1||retryDelays.length>10||retryDelays[0]!==0||
     retryDelays.some(ms=>!Number.isSafeInteger(ms)||ms<0||ms>15000))throw new Error('Invalid bounded production asset retry policy');
  for(const file of files){
-  if(!/^assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(file))throw new Error('Invalid public asset path');
+  if(typeof file!=='string'||!/^assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(file))throw new Error('Invalid public asset path');
+ }
+ for(const file of files){
   for(let attempt=0;attempt<retryDelays.length;attempt++){
    if(retryDelays[attempt])await pause(retryDelays[attempt]);
    const r=await http('https://boi-ech.boiech-ai.workers.dev/'+file,{
