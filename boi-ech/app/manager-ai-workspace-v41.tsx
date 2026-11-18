@@ -39,6 +39,7 @@ function Glyph({name}:{name:"ai"|"users"|"calendar"|"alert"|"class"|"arrow"|"shi
 }
 export function ManagerAiContextNoticeV41({board,area,onOpen}:{board:TrainingBoard;area:"people"|"class"|"schedule"|"room";onOpen:()=>void}){
  const report=analyzeManagerBoard(board,60);
+ const coverageIncomplete=report.truncated||board.sessions.length>=1000;
  const wanted=area==="people"?["staff"]:area==="class"?["class","staff"]:area==="schedule"?["schedule"]:["schedule"];
  const selected=report.findings.filter(f=>wanted.includes(f.area));
  const urgent=selected.filter(f=>f.priority==="critical"||f.priority==="high");
@@ -48,18 +49,23 @@ export function ManagerAiContextNoticeV41({board,area,onOpen}:{board:TrainingBoa
  return <aside className={styles.contextNotice} aria-label="AI phát hiện theo ngữ cảnh, chỉ đọc">
   <span><Glyph name="ai"/></span>
   <div><strong>AI phân tích · {urgent.length} tín hiệu ưu tiên · {proposed} phương án phân bổ</strong>
-   <small>{urgent[0]?urgent[0].title:"Chưa phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại."} · Dữ liệu có bằng chứng, không tự thực thi.</small></div>
+   <small>{urgent[0]?urgent[0].title:coverageIncomplete?
+   "Dữ liệu chưa đầy đủ để xác nhận không có cảnh báo; cần xem bản phân tích chi tiết.":
+   "Chưa phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại."} · Dữ liệu có bằng chứng, không tự thực thi.</small></div>
   <button type="button" onClick={onOpen}>Xem phân tích <Glyph name="arrow"/></button>
  </aside>;
 }
 export function ManagerAiOverviewEntryV41({board,onOpen}:{board:TrainingBoard;onOpen:()=>void}){
  const report=analyzeManagerBoard(board,20);
+ const coverageIncomplete=report.truncated||board.sessions.length>=1000;
  const pending=report.counts.critical+report.counts.high;
  const allocation=buildAllocationReview(board);
  const toReview=allocation.teacherShortlist.length+allocation.learnerShortlist.length;
  return <button className={styles.overviewEntry} type="button" onClick={onOpen} aria-label="Mở Trung tâm AI Điều hành, xem cảnh báo có bằng chứng">
   <span className={styles.overviewEntryIcon}><Glyph name="ai"/></span>
-  <span><strong>AI Điều hành · V42</strong><small>{pending?"Có "+pending+" cảnh báo khẩn hoặc cần xử lý":"Không phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại"}</small>
+  <span><strong>AI Điều hành · V42</strong><small>{pending?"Có "+pending+" cảnh báo khẩn hoặc cần xử lý":
+  coverageIncomplete?"Nguồn dữ liệu chưa đủ để kết luận không có cảnh báo":
+  "Không phát hiện cảnh báo ưu tiên cao theo bộ quy tắc hiện tại"}</small>
    <small>{toReview} phương án phân bố học viên/giảng viên cần cán bộ chọn · Không tự thực thi</small></span>
   <Glyph name="arrow"/>
  </button>;
@@ -136,7 +142,7 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAll
        {!findings.length?<div className={styles.empty}><Glyph name="shield"/><strong>Chưa có cảnh báo thuộc bộ lọc này</strong>
           <p>Không phát hiện theo bộ quy tắc hiện tại; không có nghĩa mọi rủi ro đã được loại trừ.</p></div>:null}
       </div>
-      {report.truncated?<p className={styles.notice}>Đã giới hạn hiển thị {report.findings.length}/{report.totalFindings} tín hiệu. Thu hẹp khoảng xem và phân loại để đánh giá đầy đủ.</p>:null}
+      {report.truncated?<p className={styles.notice}>Đã tổng hợp {report.totalFindings} tín hiệu và hiển thị {report.findings.length}. {report.conflictExamplesLimited?"AI chỉ nêu tối đa 30 mẫu trùng lịch, không phải tổng số cặp trùng. ":""}Thu hẹp khoảng xem và kiểm tra dữ liệu gốc trước khi kết luận.</p>:null}
      </section>
     </div>
     <aside className={styles.sideColumn}>

@@ -21,7 +21,7 @@ export type ManagerAiFinding={
 export type ManagerAiReport={
  engineVersion:typeof MANAGER_AI_ENGINE_VERSION;engineMode:"rules-only";generativeAiActive:false;
  observedAt:string;window:{from:string;to:string};coverage:{classes:number;teachers:number;rooms:number;sessions:number};
- findings:ManagerAiFinding[];totalFindings:number;truncated:boolean;
+ findings:ManagerAiFinding[];totalFindings:number;truncated:boolean;conflictExamplesLimited:boolean;
  counts:{critical:number;high:number;medium:number;info:number};
 };
 const weights:Record<ManagerAiPriority,number>={critical:0,high:1,medium:2,info:3};
@@ -150,7 +150,8 @@ export function analyzeManagerBoard(board:TrainingBoard,limit=40):ManagerAiRepor
      limitations:["Không tự kết luận buổi học bị hủy hoặc sai về mặt nghiệp vụ."]});
   }
  }
- for(const conflict of sessionConflicts(board).slice(0,30)){
+ const conflictExamples=sessionConflicts(board);
+ for(const conflict of conflictExamples.slice(0,30)){
   added(out,{id:"conflict:"+conflict.id,area:"schedule",priority:"critical",
    title:"Hai buổi học có dấu hiệu trùng lịch",
    details:"Các buổi “"+conflict.a.title+"” và “"+conflict.b.title+
@@ -182,7 +183,9 @@ export function analyzeManagerBoard(board:TrainingBoard,limit=40):ManagerAiRepor
  return {engineVersion:MANAGER_AI_ENGINE_VERSION,engineMode:"rules-only",generativeAiActive:false,
   observedAt:board.observedAt,window:{from:board.from,to:board.to},
   coverage:{classes:classes.length,teachers:teachers.length,rooms:rooms.length,sessions:sessions.length},
-  findings:sorted.slice(0,capped),totalFindings:sorted.length,truncated:sorted.length>capped,counts};
+  findings:sorted.slice(0,capped),totalFindings:sorted.length,
+  truncated:sorted.length>capped||conflictExamples.length>30,
+  conflictExamplesLimited:conflictExamples.length>30,counts};
 }
 function normalize(text:string){return text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").toLowerCase().replace(/\s+/g," ").trim();}
 export type ManagerAiAnswer={kind:"evidence-answer"|"unsupported";title:string;answer:string;references:ManagerAiEvidence[];disclaimer:string};
@@ -209,9 +212,21 @@ export function answerManagerQuestion(question:string,report:ManagerAiReport):Ma
   answer:"V41.0 hỗ trợ câu hỏi về thiếu giảng viên, sĩ số, lịch trùng và công việc cần xử lý. Không tự suy đoán về dữ liệu khác; chọn câu gợi ý để xem bằng chứng.",
   references:[],disclaimer};
  const related=report.findings.filter(f=>matched[1].includes(f.area)).slice(0,5);
+ // The screen keeps only the top N findings. A missing category on a
+ // truncated report is NOT proof that the category is risk-free.
+ if(!related.length&&report.truncated)return {kind:"unsupported",
+  title:"Chưa đủ dữ liệu đang hiển thị để kết luận",
+  answer:"Danh sách AI chỉ hiển thị "+report.findings.length+"/"+report.totalFindings+
+   " tín hiệu tổng hợp. "+(report.conflictExamplesLimited?"Mẫu trùng lịch bị giới hạn ở 30 trường hợp; ":"")+
+   "Cảnh báo của chủ đề này có thể nằm ngoài giới hạn hiển thị. Hãy thu hẹp khoảng xem và tải lại trước khi kết luận.",
+  references:[],disclaimer};
+ const partialNote=report.truncated?
+  "\nLưu ý: báo cáo đang giới hạn ở "+report.findings.length+"/"+report.totalFindings+
+  " tín hiệu tổng hợp."+(report.conflictExamplesLimited?" Bộ phát hiện chỉ trình bày tối đa 30 mẫu trùng lịch.":"")+
+  " Câu trả lời chưa bao phủ toàn bộ cảnh báo.":"";
  return {kind:"evidence-answer",title:related.length?"Phân tích từ dữ liệu điều hành":"Chưa phát hiện vấn đề theo bộ quy tắc hiện tại",
-  answer:related.length?related.map((f,i)=>(i+1)+". "+f.title+". "+f.details+" Đề xuất: "+f.recommendedAction).join("\n"):
-   "Không phát hiện cảnh báo thuộc chủ đề này trong khoảng dữ liệu đã tải. Điều đó không chứng minh không có rủi ro ngoài hệ thống.",
+  answer:(related.length?related.map((f,i)=>(i+1)+". "+f.title+". "+f.details+" Đề xuất: "+f.recommendedAction).join("\n"):
+   "Không phát hiện cảnh báo thuộc chủ đề này trong khoảng dữ liệu đã tải. Điều đó không chứng minh không có rủi ro ngoài hệ thống.")+partialNote,
   references:related.flatMap(f=>f.evidence).slice(0,12),disclaimer};
 }
 export function simulateTeacherAllocation(board:TrainingBoard,classId:string,teacherId:string){

@@ -214,3 +214,50 @@ test("V46 warns about scheduled sessions held by blocked or expired teachers",()
  assert.equal(report.findings.some(f=>f.id==="broken-session:expired"),true);
  assert.equal(report.findings.some(f=>f.id.startsWith("conflict:")),false);
 });
+
+test("V47 manager Q&A never declares absence when relevant alerts are hidden by report cap",()=>{
+ const b=board(),source=JSON.stringify(b);
+ const raw=analyzeManagerBoard(b,1);
+ assert.equal(raw.truncated,true);
+ const noCategory={...raw,findings:raw.findings.filter(f=>f.area==="quality")};
+ const unknown=answerManagerQuestion("Phòng nào cần xử lý?",noCategory);
+ assert.equal(unknown.kind,"unsupported");
+ assert.match(unknown.title,/Chưa đủ dữ liệu/);
+ assert.match(unknown.answer,/giới hạn hiển thị/);
+ assert.deepEqual(unknown.references,[]);
+ const fullClean={...raw,findings:[],truncated:false,totalFindings:0};
+ const clean=answerManagerQuestion("Phòng nào cần xử lý?",fullClean);
+ assert.equal(clean.kind,"evidence-answer");
+ assert.match(clean.answer,/không chứng minh không có rủi ro/);
+ const partialWithFinding={...raw,findings:[{
+  ...analyzeManagerBoard(b).findings.find(f=>f.area==="class")
+ }]};
+ const answer=answerManagerQuestion("Lớp nào quá tải?",partialWithFinding);
+ assert.equal(answer.kind,"evidence-answer");
+ assert.match(answer.answer,/chưa bao phủ toàn bộ cảnh báo/);
+ assert.equal(JSON.stringify(b),source);
+});
+
+test("V47 manager entry points disclose incomplete data before reassuring staff",()=>{
+ const ui=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
+ assert.match(ui,/coverageIncomplete=report\.truncated\|\|board\.sessions\.length>=1000/g);
+ assert.match(ui,/Dữ liệu chưa đầy đủ để xác nhận không có cảnh báo/);
+ assert.match(ui,/Nguồn dữ liệu chưa đủ để kết luận không có cảnh báo/);
+});
+
+test("V47 dense overlaps report capped conflict examples rather than claiming exhaustive coverage",()=>{
+ const b=board();
+ b.sessions=Array.from({length:36},(_,i)=>session("dense-"+String(i).padStart(2,"0"),
+  "rm-1","t1","2030-04-15T09:00:00.000Z","2030-04-15T10:00:00.000Z"));
+ const before=JSON.stringify(b);
+ const report=analyzeManagerBoard(b,100);
+ assert.equal(report.conflictExamplesLimited,true);
+ assert.equal(report.truncated,true);
+ assert.equal(report.findings.filter(f=>f.id.startsWith("conflict:")).length,30);
+ assert.ok(report.totalFindings<100,"top-N should not be the source of truncation");
+ const answer=answerManagerQuestion("Có lịch nào trùng nhau?",report);
+ assert.match(answer.answer,/tối đa 30 mẫu trùng lịch/);
+ const ui=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
+ assert.match(ui,/report\.conflictExamplesLimited/);
+ assert.equal(JSON.stringify(b),before);
+});
