@@ -74,20 +74,53 @@ export async function checkPreviewStack(env = process.env, fetcher = fetch, depl
  * mutate D1. The same credential is installed on the two protected Preview
  * Workers only; no response bodies or secret values are logged on failure.
  */
-export async function verifyV2SummaryLive(secret, fetcher = fetch) {
+export async function verifyV2SummaryLive(
+  secret, fetcher = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms))
+) {
   const boiOrigin = `https://${BOI}.boiech-ai.workers.dev`;
   const appOrigin = `https://${APP}.boiech-ai.workers.dev`;
   const url = `${boiOrigin}/api/control/v2/account-summary`;
   const seen = [];
-  const request = async (path, role, bearer, expected) => {
+  const request = async (path, role, bearer, expected, {legacyGuard=false}={}) => {
     const headers = { origin: appOrigin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
       ...(role ? { "x-control-role": role } : {}) };
-    const response = await fetcher(path, {
-      method: "GET", headers, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000),
-    });
-    if (response.status !== expected) throw new Error(`Preview V2 control authorization/readback mismatch: expected HTTP ${expected}, got ${response.status}.`);
-    seen.push(expected);
-    return response;
+    // The just-rotated shared secret can briefly reach Cloudflare edge locations
+    // at different times. Retry ONLY app-coded credential propagation rejection,
+    // NEVER a WAF/HTML 403, scope/origin denial, role denial or unknown failure.
+    const delays = legacyGuard ? [0,1000,2000,4000,8000] : [0];
+    for(let attempt=0;attempt<delays.length;attempt++){
+      if(delays[attempt])await pause(delays[attempt]);
+      const response = await fetcher(path, {
+        method: "GET", headers, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000),
+      });
+      if(response.status===expected){
+        if(legacyGuard){
+          let code="UNKNOWN";
+          try {
+            if((response.headers.get("content-type")??"").includes("application/json"))
+              code=(await response.clone().json())?.code??"UNKNOWN";
+          } catch { /* Fail closed on unreadable response. */ }
+          if(code!=="ACCOUNT_CONTROL_REQUIRED")
+            throw new Error("Preview legacy control guard: expected ACCOUNT_CONTROL_REQUIRED on HTTP 409.");
+        }
+        seen.push(expected);
+        return response;
+      }
+      let code="UNKNOWN";
+      if(response.status===403){
+        try {
+          if((response.headers.get("content-type")??"").includes("application/json")){
+            const payload=await response.json();
+            if(typeof payload?.code==="string"&&/^CONTROL_[A-Z_]+$/.test(payload.code))code=payload.code;
+          }
+        }catch{ /* Cloudflare challenge/invalid response must never be retried. */ }
+      }
+      if(legacyGuard&&response.status===403&&
+         (code==="CONTROL_SERVICE_FORBIDDEN"||code==="CONTROL_TICKET_FORBIDDEN")&&
+         attempt<delays.length-1)continue;
+      throw new Error(`Preview V2 control authorization/readback mismatch: expected HTTP ${expected}, got ${response.status}; safe code ${code}.`);
+    }
+    throw new Error("Preview legacy control guard exhausted the bounded credential propagation check.");
   };
   const aggregate = await (await request(url, "owner", secret, 200)).json();
   const validKeys = ["asOf", "contract", "counts", "verified"];
@@ -106,7 +139,7 @@ export async function verifyV2SummaryLive(secret, fetcher = fetch) {
   await request(url, "owner", "invalid-preview-ticket", 403);
   // Explicit proof that V2 disables the legacy registry endpoint rather than
   // reopening private device/payment access through the central adapter.
-  await request(`${boiOrigin}/api/control/overview?activityDays=0`, "owner", secret, 409);
+  await request(`${boiOrigin}/api/control/overview?activityDays=0`, "owner", secret, 409, {legacyGuard:true});
   return { contract: "boi-account-summary.v2", verified: true, statusChecks: seen,
     totalAccountsVerified: true, personalRowsReturned: false };
 }
