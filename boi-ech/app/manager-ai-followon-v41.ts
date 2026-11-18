@@ -66,11 +66,15 @@ export function scanAllManagerConflicts(board:TrainingBoard,maxDisplayed=80):Ful
   }
  }
  const possiblyCapped=board.sessions.length>=1000;
+ const invalidCount=board.sessions.filter(s=>s.status!=="cancelled"&&
+  (!Number.isFinite(parsed(s.startsAt))||!Number.isFinite(parsed(s.endsAt))||
+   parsed(s.endsAt)<=parsed(s.startsAt))).length;
  return {observedAt:board.observedAt,from:board.from,to:board.to,scannedSessions:source.length,
   totalPairs:total,shownPairs:collisions,pairDisplayTruncated:total>collisions.length,
-  sourcePotentiallyTruncated:possiblyCapped,
-  coverageNote:possiblyCapped
-   ?"Nguồn phiên học có thể bị giới hạn theo trang dữ liệu: KHÔNG khẳng định đã kiểm tra hết hệ thống."
+  sourcePotentiallyTruncated:possiblyCapped||invalidCount>0,
+  coverageNote:possiblyCapped||invalidCount>0
+   ?"Chưa thể xác nhận lịch không trùng: "+(possiblyCapped?"nguồn có thể giới hạn 1.000 buổi; ":"")+
+    (invalidCount?invalidCount+" buổi có mốc giờ không hợp lệ. ":"")+"Cần rà soát trước khi quyết định."
    :"Đã đếm mọi cặp xung đột trong các buổi học hợp lệ của khoảng dữ liệu đang tải; không bao phủ dữ liệu ngoài khoảng này."};
 }
 export type TeacherCandidateReview={
@@ -163,6 +167,11 @@ export function evaluateScheduleOption(board:TrainingBoard,sessionId:string,room
   risks.push("Sĩ số lớp lớn hơn sức chứa cấu hình của phòng; không biết số người thực tế tham dự.");
  if(board.sessions.length>=1000)
   risks.push("Nguồn lịch có thể bị giới hạn ở 1.000 bản ghi; còn xung đột chưa kiểm tra.");
+ const invalidCount=board.sessions.filter(s=>s.status!=="cancelled"&&
+  (!Number.isFinite(parsed(s.startsAt))||!Number.isFinite(parsed(s.endsAt))||
+   parsed(s.endsAt)<=parsed(s.startsAt))).length;
+ if(invalidCount>0)risks.push("Có "+invalidCount+
+  " buổi thiếu mốc giờ hợp lệ, chưa thể loại trừ xung đột với phương án đang xét.");
  risks.push("Chưa xác minh khả năng sử dụng bể, thiết bị, sức khỏe, chuyên môn hoặc ngoại lệ vận hành.");
  const state=collisions.length?"conflict":risks.length>1?"review-required":"no-conflict-in-loaded-window";
  return {state,reason:collisions.length?"Có các buổi học trùng nguồn lực trong khoảng đề xuất.":
