@@ -1,0 +1,47 @@
+.root{display:grid;gap:0;min-width:0;overflow:hidden;background:#fff;color:#153b56;border:1px solid #cddfeb;border-radius:17px;box-shadow:0 9px 25px #174a7318}
+.root *{box-sizing:border-box;min-width:0}
+.root :is(h3,h4,p,dl){margin:0}
+.root :is(button,input,select,summary):focus-visible{outline:3px solid #e8a31c;outline-offset:3px}
+.heading{display:flex;align-items:center;gap:12px;padding:20px 18px;background:linear-gradient(115deg,#edf8ff,#f7fbff);border-bottom:1px solid #d0e3f1}
+.heading>span{display:grid;place-items:center;flex:none;width:43px;height:43px;border-radius:12px;color:#0d729f;background:#d8f0fa}
+.heading>div{display:grid;gap:5px}
+.heading small{color:#096a95;font-size:10px;letter-spacing:.1em;font-weight:850}
+.heading h3{color:#173d5c;font-size:20px;font-weight:850;line-height:1.35}
+.heading p{font-size:12px;line-height:1.55;color:#41667f}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:12px 14px;border-bottom:1px solid #d9e6ef}
+.tabs button{display:grid;gap:4px;align-content:center;min-height:58px;padding:10px 9px;text-align:center;color:#225478;background:#f2f7fc;border:1px solid #cedde9;border-radius:11px;font-size:12px;font-weight:800;cursor:pointer}
+.tabs button small{color:#456b85;font-size:10px}
+.tabs button[aria-pressed=true]{color:#fff;background:#0966ad;border-color:#0966ad}
+.tabs button[aria-pressed=true] small{color:#e7f5ff}
+.content{display:grid;gap:14px;padding:15px}
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.summary article{display:grid;align-content:center;gap:5px;min-height:88px;padding:13px;background:linear-gradient(125deg,#fff,#eaf6fe);border:1px solid #d2e4f1;border-radius:13px}
+.summary strong{color:#0d4167;font-size:27px;line-height:1.1;font-variant-numeric:tabular-nums}
+.summary span{color:#385b77;font-size:11px;line-height:1.5}
+.context{padding:11px 13px;background:#eaf6ff;color:#345a77;border:1px solid #c9e4f3;border-radius:11px;font-size:11px;line-height:1.65}
+.columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.card{padding:16px;display:grid;gap:12px;border:1px solid #d1e1ec;border-radius:13px;background:#fff;min-width:0}
+.card h4{color:#153e5c;font-size:15px;font-weight:850}
+.card>p{color:#4a6c85;font-size:12px;line-height:1.65}
+.scroll{display:grid;gap:9px;max-height:430px;overflow:auto;scrollbar-color:#b1cbe0 transparent}
+.record{display:grid;gap:6px;padding:11px 12px;border-radius:12px;border:1px solid #d5e5f1;background:#f8fbff}
+.record strong{font-size:12px;color:#124469;overflow-wrap:anywhere}
+.record span{font-size:11px;line-height:1.55;color:#406580;overflow-wrap:anywhere}
+.record[data-state=conflict]{border-color:#f0c3c8;background:#fff4f5}
+.record[data-state=review-required]{border-color:#eed5b2;background:#fffaf2}
+.record[data-state=no-conflict-in-loaded-window]{border-color:#badfcc;background:#f2fbf6}
+.empty{padding:16px;font-size:12px;line-height:1.6;color:#53738b;background:#f7fafc;border-radius:12px;text-align:center}
+.root .secondary{min-height:38px;padding:9px 13px;border:1px solid #a9cadf;background:#eaf6ff;color:#0c6190;border-radius:9px;font-size:11px;font-weight:820;cursor:pointer}
+.field{display:grid;gap:6px;color:#2b5570;font-size:11px;font-weight:780}
+.field :is(select,input){width:100%;min-height:42px;padding:8px 10px;color:#163d58;background:#fff;border:1px solid #adcadc;border-radius:10px;font-size:12px;color-scheme:light}
+.root .primary{min-height:43px;padding:10px 14px;background:#0874b2;color:#fff;border:1px solid #0874b2;border-radius:10px;font-size:12px;font-weight:830;cursor:pointer}
+.root button:disabled{opacity:.6;cursor:not-allowed}
+.facts{display:grid}
+.facts>div{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid #e3edf4}
+.facts dt{font-size:11px;color:#4b6b83;line-height:1.5}
+.facts dd{margin:0;font-size:12px;font-weight:800;color:#153e5b;text-align:right;line-height:1.5}
+.issue{color:#984454!important;font-size:10px!important;font-family:ui-monospace,monospace;overflow-wrap:anywhere}
+@media(max-width:1100px){.columns{grid-template-columns:1fr}}
+@media(max-width:770px){.tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:390px){.content{padding:10px}.heading{padding:14px}.heading h3{font-size:17px}.summary article{padding:10px}.summary strong{font-size:22px}.tabs button{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.root *{transition:none!important;animation:none!important}}
