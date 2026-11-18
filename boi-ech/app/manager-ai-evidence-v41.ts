@@ -209,9 +209,19 @@ export function answerManagerQuestion(question:string,report:ManagerAiReport):Ma
   answer:"V41.0 hỗ trợ câu hỏi về thiếu giảng viên, sĩ số, lịch trùng và công việc cần xử lý. Không tự suy đoán về dữ liệu khác; chọn câu gợi ý để xem bằng chứng.",
   references:[],disclaimer};
  const related=report.findings.filter(f=>matched[1].includes(f.area)).slice(0,5);
+ // The screen keeps only the top N findings. A missing category on a
+ // truncated report is NOT proof that the category is risk-free.
+ if(!related.length&&report.truncated)return {kind:"unsupported",
+  title:"Chưa đủ dữ liệu đang hiển thị để kết luận",
+  answer:"Danh sách AI chỉ hiển thị "+report.findings.length+"/"+report.totalFindings+
+   " tín hiệu. Cảnh báo của chủ đề này có thể nằm ngoài giới hạn hiển thị. Hãy thu hẹp khoảng xem và tải lại trước khi kết luận.",
+  references:[],disclaimer};
+ const partialNote=report.truncated?
+  "\nLưu ý: chỉ "+report.findings.length+"/"+report.totalFindings+
+  " tín hiệu được hiển thị; câu trả lời chưa bao phủ toàn bộ cảnh báo.":"";
  return {kind:"evidence-answer",title:related.length?"Phân tích từ dữ liệu điều hành":"Chưa phát hiện vấn đề theo bộ quy tắc hiện tại",
-  answer:related.length?related.map((f,i)=>(i+1)+". "+f.title+". "+f.details+" Đề xuất: "+f.recommendedAction).join("\n"):
-   "Không phát hiện cảnh báo thuộc chủ đề này trong khoảng dữ liệu đã tải. Điều đó không chứng minh không có rủi ro ngoài hệ thống.",
+  answer:(related.length?related.map((f,i)=>(i+1)+". "+f.title+". "+f.details+" Đề xuất: "+f.recommendedAction).join("\n"):
+   "Không phát hiện cảnh báo thuộc chủ đề này trong khoảng dữ liệu đã tải. Điều đó không chứng minh không có rủi ro ngoài hệ thống.")+partialNote,
   references:related.flatMap(f=>f.evidence).slice(0,12),disclaimer};
 }
 export function simulateTeacherAllocation(board:TrainingBoard,classId:string,teacherId:string){
