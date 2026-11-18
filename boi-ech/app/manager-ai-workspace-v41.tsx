@@ -132,7 +132,7 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
        {!findings.length?<div className={styles.empty}><Glyph name="shield"/><strong>Chưa có cảnh báo thuộc bộ lọc này</strong>
           <p>Không phát hiện theo bộ quy tắc hiện tại; không có nghĩa mọi rủi ro đã được loại trừ.</p></div>:null}
       </div>
-      {report.truncated?<p className={styles.notice}>Đã tổng hợp {report.totalFindings} tín hiệu và hiển thị {report.findings.length}. {report.conflictExamplesLimited?"AI chỉ nêu tối đa 30 mẫu trùng lịch, không phải tổng số cặp trùng. ":""}Thu hẹp khoảng xem và kiểm tra dữ liệu gốc trước khi kết luận.</p>:null}
+      {report.truncated||report.sourceMayBeTruncated?<p className={styles.notice}>{report.truncated?`Đã tổng hợp ${report.totalFindings} tín hiệu và hiển thị ${report.findings.length}. `:""}{report.conflictExamplesLimited?"AI chỉ nêu tối đa 30 mẫu trùng lịch, không phải tổng số cặp trùng. ":""}{report.sourceMayBeTruncated?"Nguồn lịch có thể bị cắt ở ngưỡng 1.000 buổi. ":""}Thu hẹp khoảng xem và kiểm tra dữ liệu gốc trước khi kết luận.</p>:null}
      </section>
     </div>
     <aside className={styles.sideColumn}>
