@@ -255,3 +255,19 @@ test("Release V41: manager UI does not reassure on incomplete evidence",()=>{
  assert.match(source,/Nguồn dữ liệu chưa đủ để kết luận không có cảnh báo/);
  assert.match(source,/report\.conflictExamplesLimited/);
 });
+
+test("Release V41: API 1000-session source cap blocks a falsely clean manager answer",()=>{
+ const b=board();
+ b.sessions=Array.from({length:1000},(_,i)=>session("cancel-"+i,"rm-1","t1",
+  "2030-04-15T09:00:00.000Z","2030-04-15T10:00:00.000Z",{status:"cancelled"}));
+ const before=JSON.stringify(b);
+ const report=analyzeManagerBoard(b,100);
+ assert.equal(report.sourceMayBeTruncated,true);
+ assert.equal(report.conflictExamplesLimited,false);
+ const result=answerManagerQuestion("Có lịch học trùng nhau không?",report);
+ assert.equal(result.kind,"unsupported");
+ assert.match(result.answer,/1.000 buổi/);
+ const managerUi=fs.readFileSync(path.join(root,"manager-ai-workspace-v41.tsx"),"utf8");
+ assert.match(managerUi,/report\.sourceMayBeTruncated/);
+ assert.equal(JSON.stringify(b),before);
+});
