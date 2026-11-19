@@ -6,16 +6,15 @@ import {fileURLToPath} from "node:url";
 import ts from "typescript";
 import {createRequire} from "node:module";
 
-const app=path.join(fileURLToPath(new URL("../",import.meta.url)),"app");
 const root=path.join(fileURLToPath(new URL("../",import.meta.url)));
 const read=p=>fs.readFileSync(path.join(root,p),"utf8");
 function load(name){
  const code=ts.transpileModule(read("app/"+name),{compilerOptions:{
   module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022
  }}).outputText;
- const module={exports:{}};
- new Function("require","module","exports",code)(createRequire(import.meta.url),module,module.exports);
- return module.exports;
+ const holder={exports:{}};
+ new Function("require","module","exports",code)(createRequire(import.meta.url),holder,holder.exports);
+ return holder.exports;
 }
 const {validateSubmittedTrainingProfile,validateClassSafetyProfile}=load("training-ai-profile-data.server.ts");
 const teacher={
