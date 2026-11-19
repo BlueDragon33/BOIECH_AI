@@ -468,3 +468,49 @@
     flex: 1;
   }
 }
+
+/* V48 · visible uncertainty, not an invented zero-mastery score. */
+.student-adaptive-score.unknown {
+  background: #f4f7fa;
+  border-color: #bacfdb;
+}
+.student-adaptive-score.unknown strong {
+  color: #405e75;
+}
+.student-adaptive-evidence-v48 {
+  display: grid;
+  gap: 5px;
+  margin: 12px 12px 0;
+  padding: 11px 14px;
+  border: 1px solid #b6d8e5;
+  border-radius: 12px;
+  background: #f1f9fc;
+  color: #22465e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.student-adaptive-evidence-v48 strong {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #164867;
+}
+.student-adaptive-evidence-v48 p {
+  margin: 0;
+}
+.student-adaptive-evidence-v48 small {
+  color: #45667b;
+  font-size: 11px;
+}
+.student-adaptive-evidence-v48[data-v48-learner-evidence="missing"] {
+  border-color: #e1ca8f;
+  background: #fffaf0;
+}
+.student-adaptive-evidence-v48[data-v48-learner-evidence="missing"] strong {
+  color: #79591e;
+}
+@media (max-width: 480px) {
+  .student-adaptive-evidence-v48 {
+    margin: 10px 10px 0;
+    padding: 10px;
+  }
+}
