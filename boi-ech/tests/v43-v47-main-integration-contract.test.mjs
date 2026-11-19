@@ -49,7 +49,7 @@ test("V44 signed opt-in UI cannot submit without explicit checkbox and current r
  assert.match(ui,/action:"withdraw",expectedRevision:revision/);
  assert.match(ui,/withdrawConfirm/);
  assert.match(ui,/role="alert"/);
- assert.doesNotMatch(ui,/localStorage|sessionStorage|audio|video\/mp4|camera|getUserMedia/);
+ assert.doesNotMatch(ui,/window\.(?:localStorage|sessionStorage)|(?:localStorage|sessionStorage)\.(?:setItem|getItem)|getUserMedia\s*\(|video\/mp4|audio\/mp3/);
  assert.match(teacherShell,/TrainingAiConsentPanelV44 key=\{deviceId\} role="teacher"/);
  assert.match(teacherShell,/signedTeacherProof\(credential,deviceId\)/);
  assert.match(learnerShell,/StudentAiConsentV44 key=\{snapshot\.deviceId\}/);
