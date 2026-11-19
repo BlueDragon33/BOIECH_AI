@@ -86,7 +86,7 @@ test("true teacher result expansion is reachable and no longer merely sets exist
  assert.match(shell,/function AnalysisQueue\(/);
  assert.match(shell,/aria-expanded=\{isOpen\}/);
  assert.match(shell,/setExpanded\(isOpen\?null:id\)/);
- assert.match(shell,/<TeacherVideoResultDetails analysis=\{analysis\} review=\{learner.latestTeacherAction\}/);
+ assert.match(shell,/<TeacherVideoResultDetails analysis=\{analysis\} review=\{learner.latestVideoReview \\?\\? learner.latestTeacherAction\}/);
  assert.match(shell,/data-server-review/);
  assert.match(shell,/data-server-feedback/);
  assert.doesNotMatch(shell,/<button type="button" onClick=\{\(\) => setTab\("analysis"\)\}>Mở tóm tắt<\/button>/);
