@@ -1,6 +1,6 @@
 "use client";
 
-import {useMemo,useState,type FormEvent} from "react";
+import {useEffect,useMemo,useState,type FormEvent} from "react";
 import {analyzeManagerBoard,answerManagerQuestion,simulateTeacherAllocation,type ManagerAiArea,type ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {classKey,classNames,type TrainingBoard} from "./training-types";
 import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
@@ -69,7 +69,12 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAll
  onReviewAllocation:(personId:string,classId:string)=>void;
 }){
  const report=useMemo(()=>analyzeManagerBoard(board,40),[board]);
- const brief=useMemo(()=>buildManagerDecisionBriefV48(report,Date.now()),[report]);
+ const [clock,setClock]=useState(()=>Date.now());
+ useEffect(()=>{
+  const tick=window.setInterval(()=>setClock(Date.now()),60_000);
+  return ()=>window.clearInterval(tick);
+ },[]);
+ const brief=useMemo(()=>buildManagerDecisionBriefV48(report,clock),[report,clock]);
  const [area,setArea]=useState<"all"|ManagerAiArea>("all");
  const [question,setQuestion]=useState("");
  const [submitted,setSubmitted]=useState("");
