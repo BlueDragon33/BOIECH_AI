@@ -11,7 +11,6 @@ const source=readFileSync(resolve("app/training-ai-profile-data.server.ts"),"utf
 const api=readFileSync(resolve("app/api/training-ai-profiles/route.ts"),"utf8");
 const schema=readFileSync(resolve("drizzle/0045_training_ai_consented_profiles.sql"),"utf8");
 const boardSource=readFileSync(resolve("app/training-management.server.ts"),"utf8");
-const mgrSource=readFileSync(resolve("app/manager-ai-allocation-v42.ts"),"utf8");
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const dataModule={exports:{}};
 new Function("require","module","exports",compiled)((name)=>require(name),dataModule,dataModule.exports);
@@ -147,7 +146,7 @@ test("V44 safe rollout: consent/profile source is OFF and does not implicitly mo
  assert.match(api,/if\(!await profileAdmissionEnabled\(\)\)/);
  assert.match(source,/BOI_ECH_AI_PROFILE_ADMISSION==="enabled"/);
  assert.doesNotMatch(boardSource,/training_ai_profile_submissions|training_ai_class_safety_attestations/);
- assert.doesNotMatch(mgrSource,/training_ai_profile_submissions|training_ai_class_safety_attestations/);
+ assert.doesNotMatch(boardSource,/BOI_ECH_AI_PROFILE_ADMISSION/);
  const schemaVersion=readFileSync(resolve("drizzle/0045_training_ai_consented_profiles.sql"),"utf8");
  assert.match(schemaVersion,/CHECK\(state!='verified' OR/);
  assert.doesNotMatch(schemaVersion,/INSERT INTO|UPDATE training_ai_profile_submissions/);
