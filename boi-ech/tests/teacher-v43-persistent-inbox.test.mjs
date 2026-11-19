@@ -28,6 +28,9 @@ function fixture(t){
  CREATE TABLE account_entitlements(account_id TEXT PRIMARY KEY,state TEXT,expires_at TEXT);
  `);
  sqlite.exec(migration.replace(/^--.*$/gm,"").replaceAll("--> statement-breakpoint",""));
+ // Production device_access and course_activity_events include these bounded
+ // metadata columns. Extend the minimal SQLite fixture without changing INSERT arity.
+ sqlite.exec("ALTER TABLE device_access ADD COLUMN person_code TEXT; ALTER TABLE course_activity_events ADD COLUMN lesson_number TEXT;");
  const add=sqlite.prepare("INSERT INTO device_access VALUES (?,?,?,?,?,?)");
  add.run("T1","teacher","approved","2030-01-01T00:00:00Z","A; C",null);
  add.run("T2","teacher","approved","2030-01-01T00:00:00Z","B",null);
