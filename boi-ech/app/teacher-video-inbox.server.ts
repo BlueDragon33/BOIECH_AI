@@ -72,7 +72,7 @@ export function syncTeacherVideoInbox(db:D1Database,teacherDeviceId:string,teach
  .bind(teacherDeviceId,...teacherClasses);
 }
 
-export type VideoReceipt={eventId:number;state:"unread"|"seen";revision:number;createdAt:string};
+export type VideoReceipt={eventId:number;state:"unread"|"seen";revision:number;createdAt:string;learnerCode:string|null;lessonNumber:string|null};
 export async function readTeacherVideoInbox(
  db:D1Database,teacherDeviceId:string,teacherClasses:string[],limit=80,
 ):Promise<{items:VideoReceipt[];possiblyTruncated:boolean}>{
