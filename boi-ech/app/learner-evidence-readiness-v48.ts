@@ -25,7 +25,9 @@ const validScore=(x:unknown):x is number=>typeof x==="number"&&Number.isFinite(x
 const lesson=(x:string)=>/^0[1-8]$/.test(x);
 const validTime=(value:unknown):value is string=>typeof value==="string"&&
  /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(value)&&
- Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value.slice(0,10);
+ Number.isFinite(Date.parse(value))&&
+ // Validate the calendar day as written, not the UTC day after applying its offset.
+ new Date(value.slice(0,10)+"T00:00:00Z").toISOString().slice(0,10)===value.slice(0,10);
 
 export function assessLearnerEvidenceV48(input:LearnerEvidenceInputV48,nowMs:number):LearnerDecisionV48{
  const invalid= !Number.isFinite(nowMs)||!validTime(input.generatedAt);

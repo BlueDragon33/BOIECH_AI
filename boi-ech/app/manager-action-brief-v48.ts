@@ -24,7 +24,9 @@ const label:Record<ManagerAiDestination,string>={
 const valid=(t:string)=>{
  if(typeof t!=="string"||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(t))return false;
  const ms=Date.parse(t);
- return Number.isFinite(ms);
+ // Reject impossible calendar days which Date.parse may silently normalize.
+ return Number.isFinite(ms)&&
+  new Date(t.slice(0,10)+"T00:00:00Z").toISOString().slice(0,10)===t.slice(0,10);
 };
 export function buildManagerDecisionBriefV48(report:ManagerAiReport,nowMs:number,max=4):ManagerDecisionBriefV48{
  const observed=report.observedAt,sourceValid=valid(observed)&&Number.isFinite(nowMs);

@@ -65,6 +65,16 @@ test("V48 learner: unsafe/missing times, unbounded minutes and invalid scores fa
  assert.equal(out.observedLessons,0);
  assert.equal(out.planStatus,"paused");
 });
+test("V48 learner: ISO timezone offsets crossing UTC midnight stay valid; impossible dates are rejected",()=>{
+ const offset=assessLearnerEvidenceV48(learning({
+  generatedAt:"2026-11-19T00:30:00+03:00"
+ }),Date.parse("2026-11-18T21:35:00Z"));
+ assert.equal(offset.sourceStatus,"fresh");
+ const invalid=assessLearnerEvidenceV48(learning({
+  generatedAt:"2026-02-30T10:00:00Z"
+ }),NOW);
+ assert.equal(invalid.sourceStatus,"invalid");
+});
 const suggestion=(mode,lessonNumber,id,priority="critical")=>({
  id,mode,lessonNumber,priority,title:"Cần xem",reason:"Theo chứng cứ",evidence:[]
 });
@@ -140,6 +150,16 @@ test("V48 manager: incomplete or stale source cannot assert all clear",()=>{
  assert.equal(future.status,"invalid");
  const none=buildManagerDecisionBriefV48(report({findings:[],totalFindings:0}),NOW);
  assert.ok(none.warnings.some(w=>w.includes("không chứng minh")));
+});
+test("V48 manager: offset timestamps are valid and normalized impossible dates are not",()=>{
+ const offset=buildManagerDecisionBriefV48(report({
+  observedAt:"2026-11-19T00:30:00+03:00"
+ }),Date.parse("2026-11-18T21:34:00Z"));
+ assert.equal(offset.status,"scoped");
+ const invalid=buildManagerDecisionBriefV48(report({
+  observedAt:"2026-02-30T10:00:00Z"
+ }),NOW);
+ assert.equal(invalid.status,"invalid");
 });
 test("V48 UI wiring uses only existing signed role snapshots and never calls remote model",()=>{
  const learner=src("student-adaptive-coach.tsx"),teacher=src("teacher-smart-interventions.tsx");
