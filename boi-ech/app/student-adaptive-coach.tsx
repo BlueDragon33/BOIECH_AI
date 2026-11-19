@@ -171,10 +171,15 @@ function AdaptiveCoach({
   loading: boolean;
   refreshError: string;
 }) {
+  const [clock,setClock]=useState(()=>Date.now());
+  useEffect(()=>{
+   const tick=window.setInterval(()=>setClock(Date.now()),60_000);
+   return ()=>window.clearInterval(tick);
+  },[]);
   const intelligence = data.intelligence;
   if (!data.settings?.enabled || !intelligence) return null;
 
-  const evidence=assessLearnerEvidenceV48(intelligence,Date.now());
+  const evidence=assessLearnerEvidenceV48(intelligence,clock);
   const priority = intelligence.competencies.find((item) => item.lessonNumber === intelligence.priorityLesson);
   const unlocked = intelligence.competencies.filter((item) => item.unlocked);
   const measured=unlocked.filter(item=>Number.isSafeInteger(item.attempts)&&item.attempts>0&&
