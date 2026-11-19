@@ -66,6 +66,9 @@ async function signedLearnerProof(credential: StoredDeviceCredential, deviceId: 
   return { deviceId, challenge: data.challenge, signature: base64Url(new Uint8Array(signature)) };
 }
 
+// Reuse the canonical learner's device-signed proof for optional profile consent.
+export {readCredential as readLearnerCredential,signedLearnerProof};
+
 async function loadInbox(deviceId: string) {
   const credential = await readCredential();
   if (!credential) return [] as TeacherInboxAction[];
