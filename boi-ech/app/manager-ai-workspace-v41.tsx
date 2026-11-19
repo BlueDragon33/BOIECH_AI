@@ -5,6 +5,7 @@ import {analyzeManagerBoard,answerManagerQuestion,simulateTeacherAllocation,type
 import {classKey,classNames,type TrainingBoard} from "./training-types";
 import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
 import ManagerAiAllocationPanelV42 from "./manager-ai-allocation-panel-v42";
+import {buildManagerDecisionBriefV48} from "./manager-action-brief-v48";
 import styles from "./manager-ai-workspace-v41.module.css";
 
 const categories:{key:"all"|ManagerAiArea;label:string}[]=[
@@ -68,6 +69,7 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAll
  onReviewAllocation:(personId:string,classId:string)=>void;
 }){
  const report=useMemo(()=>analyzeManagerBoard(board,40),[board]);
+ const brief=useMemo(()=>buildManagerDecisionBriefV48(report,Date.now()),[report]);
  const [area,setArea]=useState<"all"|ManagerAiArea>("all");
  const [question,setQuestion]=useState("");
  const [submitted,setSubmitted]=useState("");
@@ -107,6 +109,31 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAll
     <span>Khoảng xem: {date(report.window.from)} → {date(report.window.to)}</span>
     <span>{report.coverage.classes} lớp · {report.coverage.teachers} giảng viên · {report.coverage.sessions} buổi</span>
     <span>Phiên bản: {report.engineVersion}</span></div>
+   <section className={styles.section} aria-label="AI V48 kế hoạch kiểm tra ưu tiên" data-manager-action-brief-v48>
+    <div className={styles.sectionHeader}><div>
+     <small>V48 · DECISION BRIEF · CHỈ ĐỌC</small>
+     <h3>Việc cần kiểm tra tiếp theo</h3>
+     <p>Xếp nhóm theo mức cảnh báo và số tín hiệu trong phần dữ liệu đang hiển thị;
+      không tự phân công hoặc coi thứ tự này là tối ưu toàn hệ thống.</p>
+    </div><Glyph name="shield"/></div>
+    <p role="status">Nguồn: {brief.status==="scoped"?"Trong phạm vi đã tải":
+      brief.status==="partial"?"Chưa bao phủ đầy đủ":
+      brief.status==="stale"?"Đã cũ, cần cập nhật":"Mốc dữ liệu không hợp lệ"} ·
+      {brief.shown}/{brief.reportedTotal} cảnh báo đang hiển thị.</p>
+    {brief.warnings.map((warning,i)=><p key={i} role="note">{warning}</p>)}
+    <div className={styles.findings}>
+     {brief.groups.map(group=><article key={group.target} className={styles.finding} data-priority={group.priority}>
+      <div className={styles.findingTop}><span className={styles.priority} data-priority={group.priority}>
+       {labelPriority[group.priority]}</span><small>{group.reportedItems} tín hiệu đã tải</small></div>
+      <h4>{group.title}</h4>
+      <p>{group.proposedReview}</p>
+      <small>Tham chiếu nguồn: {group.referenceIds.length?
+       group.referenceIds.join(" · "):"Chưa đủ; phải kiểm chứng thủ công"}</small>
+      <div className={styles.cardActions}><button type="button" onClick={()=>navigate(group.target)}>
+       Mở phân hệ để kiểm tra <Glyph name="arrow"/></button></div>
+     </article>)}
+    </div>
+   </section>
    <div className={styles.twoColumns}>
     <div className={styles.mainColumn}>
      <section className={styles.section} aria-label="Hàng chờ phân tích AI">
