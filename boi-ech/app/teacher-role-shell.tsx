@@ -293,12 +293,12 @@ const [selectedLearner, setSelectedLearner] = useState<TeacherLearner | null>(nu
     onOpen={(personCode)=>{const person=workScopedLearners.find(item=>item.personCode===personCode);if(person)setSelectedLearner(person);}}/>
   </div>
   <aside id="teacher-task-ai-v39" className="icon-task-rail" tabIndex={-1}>
-   <TeacherSmartInterventions learners={workScopedLearners} sourcePossiblyTruncated={Boolean(overview?.coverage?.possiblyTruncated)} onUse={(personCode,suggestion)=>{
+   <TeacherSmartInterventions learners={workScopedLearners} onUse={(personCode,suggestion)=>{
     const learner=workScopedLearners.find(item=>item.personCode===personCode);
     if(!learner)return;
     openAction({mode:suggestion.mode,learner,analysisAt:suggestion.mode==="review"?learner.lastAnalysis?.analyzedAt:undefined,
      suggestedNote:suggestion.noteTemplate,suggestedTitle:suggestion.title,suggestedLessonNumber:suggestion.lessonNumber});
-   }}/>
+   }} sourcePossiblyTruncated={Boolean(overview?.coverage?.possiblyTruncated)}/>
   </aside>
  </div>
  <TeacherTaskToday assignments={workScopedAssignments} helpCount={workScopedSupport.length} onFilterChange={setTaskFilter}
