@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { checkPreviewStack, installPreviewBridge, verifyV2SummaryLive } from "../scripts/preview-stack-remote.mjs";
 
 const account="f88a42260814230aa4a151abbfe5659d";
@@ -34,7 +35,7 @@ function fixture(change=()=>{}) {
   if(String(url).includes('/api/control/v2/account-summary')){
     const token=init.headers?.authorization?.slice(7);
     if(!token)return Response.json({code:'CONTROL_AUTH_REQUIRED'},{status:401});
-    if(token==='invalid-preview-ticket')return Response.json({code:'CONTROL_TICKET_FORBIDDEN'},{status:403});
+    if(token==='invalid-preview-ticket-without-valid-signature-000000000000000')return Response.json({code:'CONTROL_TICKET_FORBIDDEN'},{status:403});
     if(init.headers?.['x-control-role']==='viewer')return Response.json({code:'ACCOUNT_SUMMARY_FORBIDDEN'},{status:403});
     return Response.json({asOf:'2026-11-09T08:00:00.000Z',contract:'boi-account-summary.v2',verified:true,
       counts:{totalAccounts:3,pending:1,active:1,suspended:0,expired:0,unverified:1}});
@@ -122,7 +123,7 @@ function v2ProbeFetcher(legacyReply){
   if(String(url).includes("/api/control/v2/account-summary")){
    const token=init.headers.authorization;
    if(!token)return Response.json({code:"CONTROL_AUTH_REQUIRED"},{status:401});
-   if(token==="Bearer invalid-preview-ticket")return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+   if(token==="Bearer invalid-preview-ticket-without-valid-signature-000000000000000")return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
    if(init.headers["x-control-role"]==="viewer")return Response.json({code:"ACCOUNT_SUMMARY_FORBIDDEN"},{status:403});
    return Response.json({asOf:"2026-11-09T08:00:00.000Z",contract:"boi-account-summary.v2",
     verified:true,counts:{totalAccounts:1,pending:0,active:1,suspended:0,expired:0,unverified:0}});
@@ -200,7 +201,7 @@ test("Preview V2 new Owner/Publisher credential may converge after transient app
 test("Preview V2 refuses incorrect negative-role codes even with matching HTTP status",async()=>{
  const cases=[
   {role:"viewer",code:"CONTROL_TICKET_FORBIDDEN",status:403},
-  {role:"owner",token:"invalid-preview-ticket",code:"ACCOUNT_SUMMARY_FORBIDDEN",status:403},
+  {role:"owner",token:"invalid-preview-ticket-without-valid-signature-000000000000000",code:"ACCOUNT_SUMMARY_FORBIDDEN",status:403},
   {role:"owner",missing:true,code:"ACCOUNT_SUMMARY_FORBIDDEN",status:401}
  ];
  for(const bad of cases){
@@ -233,4 +234,17 @@ test("Preview V2 persistent new-credential 403 always fails closed after bounded
     /expected HTTP 200, got 403; safe code CONTROL_TICKET_FORBIDDEN/);
  assert.equal(attempts,5);
  assert.deepEqual(delays,[1000,2000,4000,8000]);
+});
+
+test("Preview invalid-ticket contract uses a genuinely long malformed bearer, not a short service key",()=>{
+ const server=fs.readFileSync(new URL("../app/control-auth.server.ts",import.meta.url),"utf8");
+ const preview=fs.readFileSync(new URL("../scripts/preview-stack-remote.mjs",import.meta.url),"utf8");
+ const example="invalid-preview-ticket-without-valid-signature-000000000000000";
+ assert.ok(example.length>=32);
+ assert.match(server,/configured\.length < 32 \|\| supplied\.length < 32/);
+ assert.match(server,/CONTROL_SERVICE_FORBIDDEN/);
+ assert.match(server,/if \(!ticket \|\| ticket\.scope !== scope\)/);
+ assert.match(server,/CONTROL_TICKET_FORBIDDEN/);
+ assert.ok(preview.includes(`"owner", "${example}", 403`));
+ assert.ok(preview.includes(`bearer==="${example}"?"CONTROL_TICKET_FORBIDDEN"`));
 });
