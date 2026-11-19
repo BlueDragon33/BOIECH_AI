@@ -79,6 +79,10 @@ type GroundTruthSummary = {
   matches: number;
   corrections: number;
   accuracy: number;
+  macroF1: number | null;
+  abstained: number;
+  labelCoverage: number;
+  transitions: {expected: number; matched: number; missed: number; extra: number; meanAbsoluteSeconds: number | null};
   mistakes: Array<{ aiPhase: StrokePhase; truthPhase: ScoredPhase; count: number }>;
   phaseMetrics: Record<ScoredPhase, {
     annotated: number;
@@ -259,10 +263,11 @@ export default function PhaseCycleAnalyzer() {
   const [calibrationFrames, setCalibrationFrames] = useState<PhaseFrame[]>([]);
   const [showCalibration, setShowCalibration] = useState(false);
   const [groundTruthLabels, setGroundTruthLabels] = useState<Record<string, ScoredPhase>>({});
+  const [labelPurpose, setLabelPurpose] = useState<"evaluation" | "calibration">("evaluation");
+  const [calibrationPage, setCalibrationPage] = useState(0);
 
   const calibration = calibrationFrames.length ? summarizeCalibration(calibrationFrames) as CalibrationSummary : null;
-  const calibrationStep = Math.max(1, Math.ceil(calibrationFrames.length / 60));
-  const calibrationRows = calibrationFrames.filter((_, index) => index % calibrationStep === 0);
+  const calibrationRows = calibrationFrames.slice(calibrationPage * 60, (calibrationPage + 1) * 60);
   const groundTruth = summarizeGroundTruth(calibrationFrames, groundTruthLabels) as GroundTruthSummary;
 
   function setGroundTruth(time: number, phase: ScoredPhase | "") {
@@ -291,6 +296,8 @@ export default function PhaseCycleAnalyzer() {
     setReport(null);
     setCalibrationFrames([]);
     setGroundTruthLabels({});
+    setLabelPurpose("evaluation");
+    setCalibrationPage(0);
     setShowCalibration(false);
     setProgress(0);
     setStatus("Đang nhận dạng chu kỳ kéo tay → lấy hơi → thu chân → đạp → lướt…");
@@ -463,12 +470,29 @@ export default function PhaseCycleAnalyzer() {
                   <div style={{ background: "#f8fbfb", borderRadius: 9, padding: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c" }}>Cần sửa</span><b>{groundTruth.corrections}</b></div>
                   <div style={{ background: "#f8fbfb", borderRadius: 9, padding: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c" }}>Độ khớp</span><b>{groundTruth.annotated ? `${Math.round(groundTruth.accuracy * 100)}%` : "—"}</b></div>
                 </div>
+                <label style={{ display: "block", marginTop: 12, fontSize: 13 }}>Mục đích gắn nhãn
+                  <select value={labelPurpose} onChange={event => {setGroundTruthLabels({});setLabelPurpose(event.target.value as "evaluation" | "calibration");}} style={{ display: "block", marginTop: 5, minHeight: 44 }}>
+                    <option value="evaluation">Đối chiếu chất lượng nhận pha</option>
+                    <option value="calibration">Xem xét hiệu chỉnh ngưỡng</option>
+                  </select>
+                </label>
+                <p style={{ fontSize: 12, lineHeight: 1.5 }}>Dùng clip khác với clip đã hiệu chỉnh để kiểm định. Đổi mục đích sẽ xóa nhãn của lượt này.</p>
+                <p style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  F1 trung bình theo pha {groundTruth.macroF1 === null ? "—" : `${Math.round(groundTruth.macroF1 * 100)}%`} ·
+                  Nhãn phủ {Math.round(groundTruth.labelCoverage * 100)}% khung · Chưa nhận được pha {groundTruth.abstained} khung.
+                </p>
+                <p style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  Chuyển pha khớp {groundTruth.transitions.matched}/{groundTruth.transitions.expected} ·
+                  Bỏ sót {groundTruth.transitions.missed} · Phát hiện thêm {groundTruth.transitions.extra} ·
+                  Sai lệch mốc trung bình {groundTruth.transitions.meanAbsoluteSeconds === null ? "—" : `${groundTruth.transitions.meanAbsoluteSeconds.toFixed(2)} giây`}.
+                  Đối chiếu mốc chỉ dùng các khung liền kề đã gắn nhãn, sai lệch tối đa ghép cặp 0,6 giây, bước lấy mẫu 0,2 giây.
+                </p>
                 {groundTruth.mistakes.length ? <div style={{ marginTop: 9 }}><span style={{ display: "block", fontSize: 10, color: "#71858c", marginBottom: 5 }}>Nhầm nhiều nhất</span><div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>{groundTruth.mistakes.slice(0, 5).map((mistake) => <span key={`${mistake.aiPhase}-${mistake.truthPhase}`} style={{ borderRadius: 999, padding: "5px 8px", background: "#fff4e8", color: "#72502b", fontSize: 10, fontWeight: 800 }}>AI {PHASE_LABEL[mistake.aiPhase]} → chuẩn {PHASE_LABEL[mistake.truthPhase]} · {mistake.count}</span>)}</div></div> : null}
                 {groundTruth.annotated ? <div style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 6 }}>{SCORED_PHASES.map((phase) => {
                   const metric = groundTruth.phaseMetrics[phase];
                   return <div key={phase} style={{ border: "1px solid #e2ecee", borderRadius: 9, padding: 8 }}><span style={{ display: "block", fontSize: 10 }}>{PHASE_LABEL[phase]}</span><b style={{ fontSize: 12 }}>{metric.annotated ? `${Math.round(metric.recall * 100)}%` : "—"}</b><span style={{ marginLeft: 4, fontSize: 9, color: "#71858c" }}>{metric.correct}/{metric.annotated}</span></div>;
                 })}</div> : null}
-                <ThresholdAdvisorPanel frames={calibrationFrames} labelsByTime={groundTruthLabels} />
+                {labelPurpose === "calibration" ? <ThresholdAdvisorPanel frames={calibrationFrames} labelsByTime={groundTruthLabels} /> : null}
               </div>
 
               <div style={{ overflowX: "auto", maxHeight: 390, border: "1px solid #dce9ea", borderRadius: 12, background: "#fff" }}>
@@ -477,7 +501,12 @@ export default function PhaseCycleAnalyzer() {
                   <tbody>{calibrationRows.map((frame) => <tr key={`${frame.time}-${frame.phase}`} onClick={() => jumpToFrame(frame.time)} style={{ cursor: "pointer", background: groundTruthLabels[truthKey(frame.time)] && groundTruthLabels[truthKey(frame.time)] !== frame.phase ? "#fffaf2" : undefined }} title="Bấm hàng để nhảy video tới mốc này"><td style={cellStyle}>{frame.time.toFixed(1)}s</td><td style={cellStyle}><b>{PHASE_LABEL[frame.phase]}</b></td><td style={cellStyle}><select aria-label={`Nhãn chuẩn tại ${frame.time.toFixed(1)} giây`} value={groundTruthLabels[truthKey(frame.time)] ?? ""} onClick={(event) => event.stopPropagation()} onChange={(event) => setGroundTruth(frame.time, event.target.value as ScoredPhase | "")} style={{ maxWidth: 150, border: "1px solid #cadbdd", borderRadius: 7, padding: "5px 6px", background: "#fff", fontSize: 11 }}><option value="">Chưa gắn</option>{(GROUND_TRUTH_PHASES as ScoredPhase[]).map((phase) => <option key={phase} value={phase}>{PHASE_LABEL[phase]}</option>)}</select></td><td style={cellStyle}>{frame.armFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.kneeFlexion.toFixed(1)}</td><td style={cellStyle}>{frame.wristSpread.toFixed(2)}</td><td style={cellStyle}>{frame.ankleSpread.toFixed(2)}</td><td style={cellStyle}>{Math.round(frame.visibility * 100)}%</td></tr>)}</tbody>
                 </table>
               </div>
-              <p style={{ margin: 0, fontSize: 11, color: "#6b8189" }}>Bảng chỉ hiển thị tối đa khoảng 60 mốc để giữ giao diện nhẹ. Ground Truth chỉ tồn tại trong phiên trang và bị xóa khi chạy phân tích lại.</p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
+                <button type="button" disabled={calibrationPage === 0} onClick={() => setCalibrationPage(page => page - 1)} style={{ minHeight: 44 }}>Mốc trước</button>
+                <span>Mốc {calibrationPage * 60 + 1}–{Math.min((calibrationPage + 1) * 60, calibrationFrames.length)}/{calibrationFrames.length}</span>
+                <button type="button" disabled={(calibrationPage + 1) * 60 >= calibrationFrames.length} onClick={() => setCalibrationPage(page => page + 1)} style={{ minHeight: 44 }}>Mốc tiếp</button>
+              </div>
+              <p style={{ margin: 0, fontSize: 11, color: "#6b8189" }}>Mỗi trang hiển thị tối đa 60 mốc liên tiếp. Nhãn giữ trong phiên khi chuyển trang và bị xóa khi chạy phân tích lại.</p>
             </div> : null}
           </div> : null}
         </div> : null}
