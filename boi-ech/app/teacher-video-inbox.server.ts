@@ -80,7 +80,8 @@ export async function readTeacherVideoInbox(
  const scoped=teacherClasses.map(()=>"lower(trim(?))").join(",");
  const cap=Math.max(1,Math.min(80,Math.floor(limit)||80));
  const result=await db.prepare(`SELECT receipt.video_event_id AS eventId,receipt.state,
-  receipt.revision,source.created_at AS createdAt
+  receipt.revision,source.created_at AS createdAt,
+  learner.person_code AS learnerCode,source.lesson_number AS lessonNumber
  FROM teacher_video_inbox receipt
  JOIN course_activity_events source ON source.id=receipt.video_event_id AND source.event_type='video_ai_analysis'
  JOIN device_access learner ON learner.device_id=source.device_id
