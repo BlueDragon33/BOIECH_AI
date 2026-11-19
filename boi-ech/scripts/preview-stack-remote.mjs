@@ -100,7 +100,7 @@ export async function verifyV2SummaryLive(
       if(response.status===expected){
         const requiredCode=legacyGuard?"ACCOUNT_CONTROL_REQUIRED":
           expected===401?"CONTROL_AUTH_REQUIRED":
-          expected===403?(bearer==="invalid-preview-ticket"?"CONTROL_TICKET_FORBIDDEN":"ACCOUNT_SUMMARY_FORBIDDEN"):null;
+          expected===403?(bearer==="invalid-preview-ticket-without-valid-signature-000000000000000"?"CONTROL_TICKET_FORBIDDEN":"ACCOUNT_SUMMARY_FORBIDDEN"):null;
         if(requiredCode){
           let actualCode="UNKNOWN";
           try {
@@ -145,7 +145,7 @@ export async function verifyV2SummaryLive(
   await request(url, "publisher", secret, 200);
   await request(url, "viewer", secret, 403);
   await request(url, "owner", null, 401);
-  await request(url, "owner", "invalid-preview-ticket", 403);
+  await request(url, "owner", "invalid-preview-ticket-without-valid-signature-000000000000000", 403);
   // Explicit proof that V2 disables the legacy registry endpoint rather than
   // reopening private device/payment access through the central adapter.
   await request(`${boiOrigin}/api/control/overview?activityDays=0`, "owner", secret, 409, {legacyGuard:true});
