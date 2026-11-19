@@ -31,11 +31,11 @@ function fixture(t){
  // Production device_access and course_activity_events include these bounded
  // metadata columns. Extend the minimal SQLite fixture without changing INSERT arity.
  sqlite.exec("ALTER TABLE device_access ADD COLUMN person_code TEXT; ALTER TABLE course_activity_events ADD COLUMN lesson_number TEXT;");
- const add=sqlite.prepare("INSERT INTO device_access VALUES (?,?,?,?,?,?)");
+ const add=sqlite.prepare("INSERT INTO device_access (device_id,person_role,status,registration_submitted_at,class_name,access_expires_at) VALUES (?,?,?,?,?,?)");
  add.run("T1","teacher","approved","2030-01-01T00:00:00Z","A; C",null);
  add.run("T2","teacher","approved","2030-01-01T00:00:00Z","B",null);
  add.run("L1","learner","approved","2030-01-01T00:00:00Z","A",null);
- sqlite.prepare("INSERT INTO course_activity_events VALUES (?,?,?,?,?,?)")
+ sqlite.prepare("INSERT INTO course_activity_events (id,device_id,event_type,client_event_id,detail_json,created_at) VALUES (?,?,?,?,?,?)")
   .run(1,"L1","video_ai_analysis","video-ai:video1","{}", "2030-02-01T09:00:00Z");
  const db={
   prepare(sql){
