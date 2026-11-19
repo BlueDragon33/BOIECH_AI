@@ -3,7 +3,7 @@
 export type InterventionEvidenceClient = {
   kind: "quiz" | "video";
   lessonNumber: string | null;
-  score: number;
+  score: number | null;
   confidence: number | null;
   usable: boolean;
   at: string;
@@ -22,6 +22,7 @@ export type InterventionLearningAnalyticsClient = {
   afterVideo: InterventionEvidenceClient | null;
   quizDelta: number | null;
   videoDelta: number | null;
+  videoComparisonNote?: string;
   activeMinutesAfter: number;
   learningEventsAfter: number;
   observedChange: "positive" | "stable" | "mixed" | "negative" | "new-evidence" | "activity-only" | "pending";
@@ -92,9 +93,9 @@ function Evidence({
     <div className="teacher-loop-evidence">
       <span>{label}</span>
       <div>
-        <strong>{before ? `${before.score}${suffix ?? ""}` : "—"}</strong>
+        <strong>{before?.score != null ? `${before.score}${suffix ?? ""}` : "—"}</strong>
         <i>→</i>
-        <strong>{after ? `${after.score}${suffix ?? ""}` : "—"}</strong>
+        <strong>{after?.score != null ? `${after.score}${suffix ?? ""}` : "—"}</strong>
       </div>
       <small>{delta(change, suffix)}{lowTrust ? " · có mốc AI chưa đủ tin cậy" : ""}</small>
     </div>
@@ -161,6 +162,7 @@ export default function TeacherLearningAnalyticsPanel({
             </div>
 
             <p className="teacher-loop-note">{item.evidenceNote}</p>
+            {item.videoComparisonNote ? <p className="teacher-loop-note">{item.videoComparisonNote}</p> : null}
             {item.note ? <blockquote>{item.note}</blockquote> : null}
             <footer>
               <span>Bằng chứng được lấy từ tiến độ, kiểm tra và tóm tắt AI media-free.</span>

@@ -1,4 +1,6 @@
 type LearningEventRow = {
+  /** D1 event identity is populated by scoped overview queries; legacy rows may omit it. */
+  id?: number;
   device_id: string;
   event_type: string;
   lesson_number: string | null;
@@ -10,10 +12,12 @@ type LearningEventRow = {
 export type InterventionEvidence = {
   kind: "quiz" | "video";
   lessonNumber: string | null;
-  score: number;
+  score: number | null;
   confidence: number | null;
   usable: boolean;
   at: string;
+  engineVersion?: string | null;
+  cameraView?: string | null;
 };
 
 export type InterventionLearningAnalytics = {
@@ -29,6 +33,7 @@ export type InterventionLearningAnalytics = {
   afterVideo: InterventionEvidence | null;
   quizDelta: number | null;
   videoDelta: number | null;
+  videoComparisonNote: string;
   activeMinutesAfter: number;
   learningEventsAfter: number;
   observedChange: "positive" | "stable" | "mixed" | "negative" | "new-evidence" | "activity-only" | "pending";
@@ -48,7 +53,10 @@ export type LearnerLearningAnalytics = {
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
-  try { return JSON.parse(value) as T; }
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as T : fallback;
+  }
   catch { return fallback; }
 }
 
@@ -58,8 +66,9 @@ function time(value: string | null | undefined) {
 }
 
 function boundedScore(value: unknown, maximum: number) {
+  if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return null;
   const score = Number(value);
-  return Number.isFinite(score) ? Math.max(0, Math.min(maximum, score)) : null;
+  return Number.isFinite(score) && score >= 0 && score <= maximum ? score : null;
 }
 
 function actionType(eventType: string) {
@@ -79,20 +88,18 @@ function evidenceFor(event: LearningEventRow): InterventionEvidence | null {
   const detail = parseJson<Record<string, unknown>>(event.detail_json, {});
   if (event.event_type === "quiz_submit") {
     const score = boundedScore(detail.score, 10);
-    if (score === null) return null;
     return {
       kind: "quiz",
       lessonNumber: event.lesson_number,
       score,
       confidence: null,
-      usable: true,
+      usable: score !== null,
       at: event.created_at,
     };
   }
   if (event.event_type === "video_ai_analysis") {
     const score = boundedScore(detail.score, 100);
-    if (score === null) return null;
-    const confidence = boundedScore(detail.confidence, 100) ?? 0;
+    const confidence = boundedScore(detail.confidence, 100);
     const quality = detail.captureQuality && typeof detail.captureQuality === "object"
       ? detail.captureQuality as Record<string, unknown>
       : {};
@@ -101,8 +108,10 @@ function evidenceFor(event: LearningEventRow): InterventionEvidence | null {
       lessonNumber: event.lesson_number,
       score,
       confidence,
-      usable: confidence >= 70 && quality.level === "good",
+      usable: score !== null && confidence !== null && confidence >= 70 && quality.level === "good",
       at: typeof detail.analyzedAt === "string" && detail.analyzedAt ? detail.analyzedAt : event.created_at,
+      engineVersion: typeof detail.engineVersion === "string" && detail.engineVersion.trim() ? detail.engineVersion.trim() : null,
+      cameraView: ["front", "side", "rear"].includes(String(detail.cameraView)) ? String(detail.cameraView) : null,
     };
   }
   return null;
@@ -138,7 +147,23 @@ function nearestEvidence(
 
 function roundedDelta(after: InterventionEvidence | null, before: InterventionEvidence | null) {
   if (!after || !before || !after.usable || !before.usable) return null;
+  if (after.score === null || before.score === null || after.lessonNumber !== before.lessonNumber) return null;
   return Math.round((after.score - before.score) * 10) / 10;
+}
+
+function compareVideoEvidence(before: InterventionEvidence | null, after: InterventionEvidence | null) {
+  if (!before || !after) return {delta: null, note: "Cần video trước và sau cùng bài để đo lại."};
+  if (before.score === null || after.score === null)
+    return {delta: null, note: "Có lượt video chưa có điểm để so sánh."};
+  if (!before.usable || !after.usable)
+    return {delta: null, note: "Cần hai video đủ rõ và đủ độ tin cậy để đo lại."};
+  if (!before.lessonNumber || before.lessonNumber !== after.lessonNumber)
+    return {delta: null, note: "Cần hai video cùng bài học để so sánh."};
+  if (!before.engineVersion || !after.engineVersion || !before.cameraView || !after.cameraView)
+    return {delta: null, note: "Thiếu phiên bản chấm hoặc góc quay của video cũ; cần quay lại làm mốc."};
+  if (before.engineVersion !== after.engineVersion || before.cameraView !== after.cameraView)
+    return {delta: null, note: "Phiên bản chấm hoặc góc quay khác nhau; cần quay lại cùng điều kiện."};
+  return {delta: roundedDelta(after, before), note: "Đối chiếu hai video cùng bài, góc quay và phiên bản chấm."};
 }
 
 function activityAfter(events: LearningEventRow[], interventionTime: number, followUpCutoff = Number.POSITIVE_INFINITY) {
@@ -215,7 +240,8 @@ export function buildLearningAnalytics(events: LearningEventRow[]): LearnerLearn
       const beforeVideo = nearestEvidence(ordered, "video", lessonNumber, interventionTime, "before");
       const afterVideo = nearestEvidence(ordered, "video", lessonNumber, interventionTime, "after", followUpCutoff);
       const quizDelta = roundedDelta(afterQuiz, beforeQuiz);
-      const videoDelta = roundedDelta(afterVideo, beforeVideo);
+      const videoComparison = compareVideoEvidence(beforeVideo, afterVideo);
+      const videoDelta = videoComparison.delta;
       const activity = activityAfter(ordered, interventionTime, followUpCutoff);
       const hasAfterEvidence = Boolean(afterQuiz || afterVideo);
       const change = observedChange(quizDelta, videoDelta, hasAfterEvidence, activity.count);
@@ -232,6 +258,7 @@ export function buildLearningAnalytics(events: LearningEventRow[]): LearnerLearn
         afterVideo,
         quizDelta,
         videoDelta,
+        videoComparisonNote: videoComparison.note,
         activeMinutesAfter: activity.activeMinutes,
         learningEventsAfter: activity.count,
         observedChange: change,
