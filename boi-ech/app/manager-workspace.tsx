@@ -8,6 +8,7 @@ import styles from "./manager-workspace.module.css";
 import ManagerRenewalPanel from "./manager-renewal-panel";
 import ManagerCommandCenter from "./manager-command-center";
 import ManagerAiWorkspaceV41,{ManagerAiOverviewEntryV41,ManagerAiContextNoticeV41} from "./manager-ai-workspace-v41";
+import {assessManagerAiSnapshot} from "./manager-ai-snapshot-v46";
 import ManagerRosterCleanup from "./manager-roster-cleanup";
 import ManagerConsoleV12 from "./manager-console-v12";
 import ManagerBuildingStudio from "./manager-building-studio";
@@ -86,7 +87,30 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
   return true;
  }
 
- function assignPerson(p:TrainingPerson,targetClassId?:string){const previous=(p.role==="teacher"?classNames(p.className):[p.className]).map(name=>name.trim()).filter(Boolean);setDetail(null);setAssignment({person:p,ids:targetClassId&&p.role==="learner"?[targetClassId]:classes.filter(c=>previous.some(n=>classKey(n)===classKey(c.name))).map(c=>c.id),omittedNames:previous.filter(name=>!classes.some(c=>classKey(c.name)===classKey(name))),replaceConfirmed:false});setFormError("");}
+ function assignPerson(p:TrainingPerson,targetClassId?:string){
+  const previous=(p.role==="teacher"?classNames(p.className):[p.className]).map(n=>n.trim()).filter(Boolean);
+  const existing=classes.filter(c=>previous.some(n=>classKey(n)===classKey(c.name))).map(c=>c.id);
+  const target=targetClassId&&classes.some(c=>c.id===targetClassId)?targetClassId:"";
+  const ids=target?(p.role==="learner"?[target]:[...new Set([...existing,target])]):existing;
+  if(p.role==="teacher"&&ids.length>12){setFormError("Giảng viên đã đạt giới hạn 12 lớp, cần điều chỉnh thủ công.");return;}
+  setDetail(null);setAssignment({person:p,ids,
+   omittedNames:previous.filter(n=>!classes.some(c=>classKey(c.name)===classKey(n))),replaceConfirmed:false});
+  setFormError("");
+ }
+ function reviewAllocation(personId:string,classId:string){
+  const person=board.people.find(p=>p.id===personId),klass=classes.find(c=>c.id===classId);
+  const sourcePartial=board.people.length>=1000||board.sessions.length>=1000||board.resources.length>=1000||
+   board.sessions.some(s=>s.status!=="cancelled"&&
+     (!Number.isFinite(Date.parse(s.startsAt))||!Number.isFinite(Date.parse(s.endsAt))||
+      Date.parse(s.endsAt)<=Date.parse(s.startsAt)));
+  const review=assessManagerAiSnapshot({observedAt:board.observedAt,sourceMayBeTruncated:sourcePartial},Date.now());
+  if(!review.canDecide){setFormError(review.message);return;}
+  if(!person||!klass||klass.status!=="active"||person.status!=="approved"||person.expired||!person.registered){
+   setFormError("Tài khoản hoặc lớp không còn hợp lệ; hãy làm mới bảng quản lý.");return;
+  }
+  // Form opening remains non-mutating; any save uses existing signed, atomic API checks.
+  assignPerson(person,classId);
+ }
  function editSession(s?:TrainingSession,preferredRoomId="",preferredClassId=""){setDetail(null);setSession(s?{...s,
  assistantTeacherId:s.assistantTeacherId??"",periodStart:s.periodStart??null,periodEnd:s.periodEnd??null,
  startsAt:localDate(s.startsAt),endsAt:localDate(s.endsAt),expectedVersion:s.version}:
@@ -159,7 +183,7 @@ export function TrainingDashboard({board,tab,setTab,busy,notice,noticeError=fals
   </>:null}
   {(["people","class","schedule","room"] as Tab[]).includes(tab)?
     <ManagerAiContextNoticeV41 board={board} area={tab as "people"|"class"|"schedule"|"room"} onOpen={()=>selectTab("ai")}/>:null}
-  {tab==="ai"?<ManagerAiWorkspaceV41 board={board} busy={busy} onNavigate={selectTab}/>:null}
+  {tab==="ai"?<ManagerAiWorkspaceV41 board={board} busy={busy} onNavigate={selectTab} onReviewAllocation={reviewAllocation}/>:null}
   {tab!=="overview"?<div className={styles.sectionHeading}><div><button type="button" className={styles.backButton} onClick={()=>selectTab("overview")}>← Trang chủ</button><h2>{title}</h2></div>{tab==="schedule"?<button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>editSession()}>+ Xếp buổi học</button>:(["class","room","building"] as Tab[]).includes(tab)?<button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>newResource(tab as ResourceKind)}>+ Thêm {tab==="class"?"lớp":tab==="room"?"phòng":"tòa"}</button>:tab==="people"&&getProof?<button type="button" className={styles.primaryButton}
     onClick={()=>setCleanupTarget("all")}>♻ Thanh lọc hồ sơ cũ</button>:null}</div>:null}
   {tab!=="overview"&&tab!=="ai"&&tab!=="settings"&&tab!=="approval"&&tab!=="building"&&!(v12Enabled&&["class","room","people"].includes(tab))?<div className={styles.toolbar}><label>Tìm kiếm<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Tên hoặc lớp…"/></label><label>Lọc trạng thái<select value={filter} onChange={event=>setFilter(event.target.value)}><option value="all">Tất cả</option>{tab==="people"?<><option value="legacy">Hồ sơ cũ / chưa liên kết</option><option value="account-first">Có tài khoản Account-first</option><option value="available">Còn trống trong khung giờ</option><option value="unassigned">Chưa có lớp hoạt động</option><option value="inactive">Chờ duyệt / khóa / hết hạn</option><option value="review">Hồ sơ cần xem · chỉ đọc</option></>:tab==="schedule"?<><option value="scheduled">Đã xếp</option><option value="completed">Hoàn thành</option><option value="cancelled">Đã hủy</option></>:Object.entries(stateText).map(([key,value])=><option key={key} value={key}>{value}</option>)}</select></label><span className={styles.resultCount}>{tab==="people"?people.length:tab==="schedule"?sessions.length:resources.length} kết quả</span></div>:null}

@@ -4,6 +4,7 @@ import {useMemo,useState,type FormEvent} from "react";
 import {analyzeManagerBoard,answerManagerQuestion,simulateTeacherAllocation,type ManagerAiArea,type ManagerAiDestination} from "./manager-ai-evidence-v41";
 import {classKey,classNames,type TrainingBoard} from "./training-types";
 import ManagerAiFollowonV41 from "./manager-ai-followon-panel-v41";
+import ManagerAiAllocationPanelV42 from "./manager-ai-allocation-panel-v42";
 import styles from "./manager-ai-workspace-v41.module.css";
 
 const categories:{key:"all"|ManagerAiArea;label:string}[]=[
@@ -62,8 +63,9 @@ export function ManagerAiOverviewEntryV41({board,onOpen}:{board:TrainingBoard;on
   <Glyph name="arrow"/>
  </button>;
 }
-export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
+export default function ManagerAiWorkspaceV41({board,busy,onNavigate,onReviewAllocation}:{
  board:TrainingBoard;busy:boolean;onNavigate:(id:ManagerAiDestination)=>void;
+ onReviewAllocation:(personId:string,classId:string)=>void;
 }){
  const report=useMemo(()=>analyzeManagerBoard(board,40),[board]);
  const [area,setArea]=useState<"all"|ManagerAiArea>("all");
@@ -173,7 +175,8 @@ export default function ManagerAiWorkspaceV41({board,busy,onNavigate}:{
      </section>
     </aside>
    </div>
+   <ManagerAiAllocationPanelV42 board={board} onNavigate={onNavigate} onReviewProposal={onReviewAllocation}/>
    <ManagerAiFollowonV41 board={board} report={report}/>
-   <footer className={styles.footer}>V41.0–V41.3 · Các năng lực đã bật vẫn là phân tích có bằng chứng, chưa hỗ trợ tự thực thi, dự báo ML hoặc kết luận vượt phạm vi dữ liệu. Mọi quyết định do cán bộ phê duyệt.</footer>
+   <footer className={styles.footer}>V41–V42 · Phân lớp/giảng viên chỉ gợi ý có bằng chứng và đối chiếu snapshot. Không tự ghi dữ liệu, dự báo ML hoặc dùng LLM. Mọi quyết định do cán bộ phê duyệt.</footer>
   </section>;
 }

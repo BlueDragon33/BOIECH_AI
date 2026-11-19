@@ -87,21 +87,30 @@ export async function verifyV2SummaryLive(
     // The just-rotated shared secret can briefly reach Cloudflare edge locations
     // at different times. Retry ONLY app-coded credential propagation rejection,
     // NEVER a WAF/HTML 403, scope/origin denial, role denial or unknown failure.
-    const delays = legacyGuard ? [0,1000,2000,4000,8000] : [0];
+    // Only a request with the freshly installed exact shared credential may
+    // retry transient, app-coded key propagation. A viewer denial, invalid
+    // ticket, missing bearer, origin denial or WAF challenge never gets retried.
+    const retryNewCredential = bearer===secret && (expected===200 || legacyGuard);
+    const delays = retryNewCredential ? [0,1000,2000,4000,8000] : [0];
     for(let attempt=0;attempt<delays.length;attempt++){
       if(delays[attempt])await pause(delays[attempt]);
       const response = await fetcher(path, {
         method: "GET", headers, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20_000),
       });
       if(response.status===expected){
-        if(legacyGuard){
-          let code="UNKNOWN";
+        const requiredCode=legacyGuard?"ACCOUNT_CONTROL_REQUIRED":
+          expected===401?"CONTROL_AUTH_REQUIRED":
+          expected===403?(bearer==="invalid-preview-ticket-without-valid-signature-000000000000000"?"CONTROL_TICKET_FORBIDDEN":"ACCOUNT_SUMMARY_FORBIDDEN"):null;
+        if(requiredCode){
+          let actualCode="UNKNOWN";
           try {
             if((response.headers.get("content-type")??"").includes("application/json"))
-              code=(await response.clone().json())?.code??"UNKNOWN";
-          } catch { /* Fail closed on unreadable response. */ }
-          if(code!=="ACCOUNT_CONTROL_REQUIRED")
-            throw new Error("Preview legacy control guard: expected ACCOUNT_CONTROL_REQUIRED on HTTP 409.");
+              actualCode=(await response.clone().json())?.code??"UNKNOWN";
+          } catch { /* Do not accept invalid JSON or an HTML challenge. */ }
+          if(actualCode!==requiredCode)
+            throw new Error(legacyGuard?
+              "Preview legacy control guard: expected ACCOUNT_CONTROL_REQUIRED on HTTP 409.":
+              `Preview negative-role contract mismatch: expected safe code ${requiredCode} on HTTP ${expected}.`);
         }
         seen.push(expected);
         return response;
@@ -115,12 +124,12 @@ export async function verifyV2SummaryLive(
           }
         }catch{ /* Cloudflare challenge/invalid response must never be retried. */ }
       }
-      if(legacyGuard&&response.status===403&&
+      if(retryNewCredential&&response.status===403&&
          (code==="CONTROL_SERVICE_FORBIDDEN"||code==="CONTROL_TICKET_FORBIDDEN")&&
          attempt<delays.length-1)continue;
       throw new Error(`Preview V2 control authorization/readback mismatch: expected HTTP ${expected}, got ${response.status}; safe code ${code}.`);
     }
-    throw new Error("Preview legacy control guard exhausted the bounded credential propagation check.");
+    throw new Error("Preview V2 credential-propagation check exhausted without valid authorization.");
   };
   const aggregate = await (await request(url, "owner", secret, 200)).json();
   const validKeys = ["asOf", "contract", "counts", "verified"];
@@ -136,7 +145,7 @@ export async function verifyV2SummaryLive(
   await request(url, "publisher", secret, 200);
   await request(url, "viewer", secret, 403);
   await request(url, "owner", null, 401);
-  await request(url, "owner", "invalid-preview-ticket", 403);
+  await request(url, "owner", "invalid-preview-ticket-without-valid-signature-000000000000000", 403);
   // Explicit proof that V2 disables the legacy registry endpoint rather than
   // reopening private device/payment access through the central adapter.
   await request(`${boiOrigin}/api/control/overview?activityDays=0`, "owner", secret, 409, {legacyGuard:true});

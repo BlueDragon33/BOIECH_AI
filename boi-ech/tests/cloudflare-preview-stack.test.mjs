@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { checkPreviewStack, installPreviewBridge, verifyV2SummaryLive } from "../scripts/preview-stack-remote.mjs";
 
 const account="f88a42260814230aa4a151abbfe5659d";
@@ -34,7 +35,7 @@ function fixture(change=()=>{}) {
   if(String(url).includes('/api/control/v2/account-summary')){
     const token=init.headers?.authorization?.slice(7);
     if(!token)return Response.json({code:'CONTROL_AUTH_REQUIRED'},{status:401});
-    if(token==='invalid-preview-ticket')return Response.json({code:'CONTROL_TICKET_FORBIDDEN'},{status:403});
+    if(token==='invalid-preview-ticket-without-valid-signature-000000000000000')return Response.json({code:'CONTROL_TICKET_FORBIDDEN'},{status:403});
     if(init.headers?.['x-control-role']==='viewer')return Response.json({code:'ACCOUNT_SUMMARY_FORBIDDEN'},{status:403});
     return Response.json({asOf:'2026-11-09T08:00:00.000Z',contract:'boi-account-summary.v2',verified:true,
       counts:{totalAccounts:3,pending:1,active:1,suspended:0,expired:0,unverified:1}});
@@ -122,7 +123,7 @@ function v2ProbeFetcher(legacyReply){
   if(String(url).includes("/api/control/v2/account-summary")){
    const token=init.headers.authorization;
    if(!token)return Response.json({code:"CONTROL_AUTH_REQUIRED"},{status:401});
-   if(token==="Bearer invalid-preview-ticket")return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+   if(token==="Bearer invalid-preview-ticket-without-valid-signature-000000000000000")return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
    if(init.headers["x-control-role"]==="viewer")return Response.json({code:"ACCOUNT_SUMMARY_FORBIDDEN"},{status:403});
    return Response.json({asOf:"2026-11-09T08:00:00.000Z",contract:"boi-account-summary.v2",
     verified:true,counts:{totalAccounts:1,pending:0,active:1,suspended:0,expired:0,unverified:0}});
@@ -176,4 +177,74 @@ test("Preview legacy guard exhausting transient 403 stays failed and never bypas
   /got 403; safe code CONTROL_SERVICE_FORBIDDEN/);
  assert.equal(calls,5);
  assert.deepEqual(delays,[1000,2000,4000,8000]);
+});
+
+test("Preview V2 new Owner/Publisher credential may converge after transient app-coded 403 only",async()=>{
+ const baseline=v2ProbeFetcher(()=>Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409}));
+ const calls={owner:0,publisher:0};const delays=[];
+ const secret="test-only-bridge-credential";
+ const fetcher=async(url,init)=>{
+  if(String(url).includes("/api/control/v2/account-summary")&&
+     init.headers.authorization===`Bearer ${secret}`&&
+     ["owner","publisher"].includes(init.headers["x-control-role"])){
+   const role=init.headers["x-control-role"];
+   if(calls[role]++===0)return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+  }
+  return baseline.fetcher(url,init);
+ };
+ const result=await verifyV2SummaryLive(secret,fetcher,async ms=>delays.push(ms));
+ assert.deepEqual(delays,[1000,1000],"only valid Owner and Publisher calls may retry");
+ assert.equal(calls.owner,2);assert.equal(calls.publisher,2);
+ assert.deepEqual(result.statusChecks,[200,200,403,401,403,409]);
+ assert.ok(baseline.seen.every(x=>x.headers?.authorization!=="Bearer undefined"));
+});
+test("Preview V2 refuses incorrect negative-role codes even with matching HTTP status",async()=>{
+ const cases=[
+  {role:"viewer",code:"CONTROL_TICKET_FORBIDDEN",status:403},
+  {role:"owner",token:"invalid-preview-ticket-without-valid-signature-000000000000000",code:"ACCOUNT_SUMMARY_FORBIDDEN",status:403},
+  {role:"owner",missing:true,code:"ACCOUNT_SUMMARY_FORBIDDEN",status:401}
+ ];
+ for(const bad of cases){
+  const baseline=v2ProbeFetcher(()=>Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409}));
+  const waits=[];
+  const fetcher=async(url,init)=>{
+   if(String(url).includes("/api/control/v2/account-summary")&&
+     init.headers["x-control-role"]===bad.role&&
+     (bad.missing?!init.headers.authorization:
+      bad.token?init.headers.authorization===`Bearer ${bad.token}`:Boolean(init.headers.authorization)))
+    return Response.json({code:bad.code},{status:bad.status});
+   return baseline.fetcher(url,init);
+  };
+  await assert.rejects(verifyV2SummaryLive("test-only-bridge-credential",fetcher,async ms=>waits.push(ms)),
+    /negative-role contract mismatch/);
+  assert.deepEqual(waits,[],"never retry negative-role failure");
+ }
+});
+test("Preview V2 persistent new-credential 403 always fails closed after bounded five attempts",async()=>{
+ const baseline=v2ProbeFetcher(()=>Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409}));
+ let attempts=0;const delays=[];const secret="test-only-bridge-credential";
+ const fetcher=async(url,init)=>{
+  if(String(url).includes("/api/control/v2/account-summary")&&
+     init.headers["x-control-role"]==="owner"&&init.headers.authorization===`Bearer ${secret}`){
+    attempts++;return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+  }
+  return baseline.fetcher(url,init);
+ };
+ await assert.rejects(verifyV2SummaryLive(secret,fetcher,async ms=>delays.push(ms)),
+    /expected HTTP 200, got 403; safe code CONTROL_TICKET_FORBIDDEN/);
+ assert.equal(attempts,5);
+ assert.deepEqual(delays,[1000,2000,4000,8000]);
+});
+
+test("Preview invalid-ticket contract uses a genuinely long malformed bearer, not a short service key",()=>{
+ const server=fs.readFileSync(new URL("../app/control-auth.server.ts",import.meta.url),"utf8");
+ const preview=fs.readFileSync(new URL("../scripts/preview-stack-remote.mjs",import.meta.url),"utf8");
+ const example="invalid-preview-ticket-without-valid-signature-000000000000000";
+ assert.ok(example.length>=32);
+ assert.match(server,/configured\.length < 32 \|\| supplied\.length < 32/);
+ assert.match(server,/CONTROL_SERVICE_FORBIDDEN/);
+ assert.match(server,/if \(!ticket \|\| ticket\.scope !== scope\)/);
+ assert.match(server,/CONTROL_TICKET_FORBIDDEN/);
+ assert.ok(preview.includes(`"owner", "${example}", 403`));
+ assert.ok(preview.includes(`bearer==="${example}"?"CONTROL_TICKET_FORBIDDEN"`));
 });
