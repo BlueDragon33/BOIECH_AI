@@ -1,6 +1,7 @@
 "use client";
 import {useState} from "react";
-import type {TrainingBoard} from "./training-types";
+import {classNames,type TrainingBoard} from "./training-types";
+import {assessInstructorForClass,type InstructorAdmissionProfile,type ClassAdmissionProfile} from "./manager-ai-profile-admission-v43";
 import type {TrainingProof} from "./training-client";
 
 type PendingV44={
@@ -11,6 +12,7 @@ type ManagerReplyV44={
  ok?:boolean;state?:string;revision?:number;
  pending?:PendingV44[];
  safetyRevisions?:{class_id:string;revision:number}[];
+ verified?:{teacher:InstructorAdmissionProfile[];safety:ClassAdmissionProfile[];sourceMayBeTruncated:boolean};
  sourcePossiblyTruncated?:boolean;
  error?:string;code?:string;
 };
@@ -23,6 +25,7 @@ export default function ManagerAiProfileReviewV44({board,getProof}:{
  const [loaded,setLoaded]=useState(false),[pending,setPending]=useState<PendingV44[]>([]);
  const [safety,setSafety]=useState<{class_id:string;revision:number}[]>([]);
  const [partial,setPartial]=useState(false),[busy,setBusy]=useState(false);
+ const [verified,setVerified]=useState<ManagerReplyV44["verified"]>(undefined);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [reference,setReference]=useState(""),[validUntil,setValidUntil]=useState("");
  const [classId,setClassId]=useState(""),[cert,setCert]=useState("");
@@ -50,6 +53,7 @@ export default function ManagerAiProfileReviewV44({board,getProof}:{
    setPending(Array.isArray(data.pending)?data.pending:[]);
    setSafety(Array.isArray(data.safetyRevisions)?data.safetyRevisions:[]);
    setPartial(Boolean(data.sourcePossiblyTruncated));
+   setVerified(data.verified);
    setLoaded(true);
    setNotice("Chỉ hồ sơ của đúng danh sách quản lý hiện tại. Không có dữ liệu nào tự động được duyệt.");
   }catch(e){setError(e instanceof Error?e.message:"Không thể tải hồ sơ.");}
@@ -68,6 +72,20 @@ export default function ManagerAiProfileReviewV44({board,getProof}:{
   }catch(e){setError(e instanceof Error?e.message:"Không xác minh được hồ sơ.");}
   finally{setBusy(false);}
  };
+ const comparisons=board.resources.filter(r=>r.kind==="class"&&r.status==="active"&&r.missingTeachers>0)
+  .slice(0,4).flatMap(klass=>
+   board.people.filter(p=>p.role==="teacher"&&p.registered&&p.status==="approved"&&!p.expired)
+    .slice(0,12).map(p=>{
+     const teacher=verified?.teacher.find(x=>x.teacherId===p.id);
+     const safety=verified?.safety.find(x=>x.classId===klass.id);
+     const result=assessInstructorForClass({
+      teacherId:p.id,classId:klass.id,now:new Date().toISOString(),
+      teacher,klass:safety,
+      existingTeacherClasses:classNames(p.className).length,
+      registeredLearners:klass.learnerCount
+     });
+     return {key:klass.id+":"+p.id,klassName:klass.name,teacherName:p.name,result};
+    }));
  const attest=async()=>{
   if(busy)return;
   try{
@@ -104,6 +122,16 @@ export default function ManagerAiProfileReviewV44({board,getProof}:{
     onChange={e=>setReference(e.target.value)} disabled={busy} placeholder="Mã nghiệp vụ đã kiểm tra ngoài hệ thống"/></label>
    <label>Hiệu lực xác minh (không quá 90 ngày)<input type="datetime-local"
     value={validUntil} onChange={e=>setValidUntil(e.target.value)} disabled={busy}/></label>
+   <div><h4>Đối chiếu nguồn chuyên môn vào AI phân bổ · V44</h4>
+    <p>Chỉ so sánh tối đa 4 lớp và 12 giảng viên từ dữ liệu có quyền. Không tự quyết định; kết quả thiếu hồ sơ là chưa đủ căn cứ.</p>
+    {partial?<p role="status">Nguồn có thể bị giới hạn; không được kết luận danh sách đầy đủ.</p>:null}
+    <ul>{comparisons.map(item=><li key={item.key}>
+      <strong>{item.klassName} · {item.teacherName}</strong>
+      <span> · {item.result.status==="eligible"?"Đủ điều kiện trong nguồn đã xét":
+       item.result.status==="hard-veto"?"Không đạt điều kiện bắt buộc":"Thiếu nguồn đã xác minh"}</span>
+      <small>{item.result.reasons.join(" ")}</small>
+    </li>)}</ul>
+   </div>
    <ul>{pending.map(record=><li key={record.deviceId}>
     <strong>{board.people.find(p=>p.id===record.deviceId)?.name??"Hồ sơ không rõ tên"}</strong>
     <small> · {record.role} · phiên bản {record.revision} · {record.submittedAt}</small>
