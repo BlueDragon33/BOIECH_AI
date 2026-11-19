@@ -296,6 +296,30 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
       .bind(personId,...ids,commandId,actor.deviceId));
   }
   const className=names.join("; ")||(target.role==="learner"?"Chưa phân lớp":"Chưa phân công");
+  // Two managers may see the same last free seat. UI previews are not
+  // reservations: keep the live seat-capacity condition inside the existing
+  // signed, atomic D1 UPDATE, not merely in the browser recommendation.
+  const learnerNewClass=target.role==="learner"&&names.length===1&&classKey(names[0])!==classKey(expectedClassName)
+    ? names[0]:"";
+  const capacityGuard=learnerNewClass?` AND EXISTS (
+      SELECT 1 FROM training_resources seat
+      WHERE seat.kind='class' AND seat.status='active' AND seat.name=?
+      AND seat.capacity > (
+        SELECT COUNT(*) FROM device_access member
+        LEFT JOIN accounts acc ON acc.storage_device_id=member.device_id
+        LEFT JOIN account_onboarding onboard ON onboard.account_id=acc.account_id
+        LEFT JOIN account_entitlements entitlement ON entitlement.account_id=acc.account_id
+        WHERE member.person_role='learner' AND member.status='approved'
+          AND member.registration_submitted_at IS NOT NULL
+          AND lower(trim(COALESCE(member.class_name,'')))=lower(trim(seat.name))
+          AND (CASE WHEN entitlement.account_id IS NOT NULL OR onboard.first_review_by IS NOT NULL
+              THEN CASE WHEN onboard.stage='active' AND entitlement.state='active'
+                  AND datetime(entitlement.expires_at)>CURRENT_TIMESTAMP THEN 1 ELSE 0 END
+              ELSE CASE WHEN member.access_expires_at IS NOT NULL
+                  AND datetime(member.access_expires_at)<=CURRENT_TIMESTAMP THEN 0 ELSE 1 END
+            END)=1
+      )
+    )`:"";
   command={action,personId,classIds:ids,expectedClassName};
   write=db.prepare(`UPDATE device_access SET class_name=?,updated_at=CURRENT_TIMESTAMP WHERE device_id=? AND COALESCE(class_name,'')=? AND person_role=?
     AND (?=0 OR (status='approved' AND (EXISTS(
@@ -307,8 +331,8 @@ export async function trainingCommand(actor:PublicDeviceState,payload:Record<str
         WHERE ca.storage_device_id=device_access.device_id)
         AND NOT EXISTS(SELECT 1 FROM accounts ca JOIN account_onboarding o ON o.account_id=ca.account_id
           WHERE ca.storage_device_id=device_access.device_id AND o.first_review_by IS NOT NULL)
-        AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))))) AND ${authorityGuard}`)
-    .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings);
+        AND (access_expires_at IS NULL OR datetime(access_expires_at)>CURRENT_TIMESTAMP))))) AND ${authorityGuard} ${capacityGuard}`)
+    .bind(className,personId,expectedClassName,target.role,ids.length,...authorityBindings,...(learnerNewClass?[learnerNewClass]:[]));
  } else fail("Thao tác điều phối không hợp lệ.");
  const canonical=JSON.stringify(command);
  async function receipt(){return db.prepare("SELECT actor_id,payload_json FROM training_commands WHERE command_id=?").bind(commandId).first<{actor_id:string;payload_json:string}>();}
