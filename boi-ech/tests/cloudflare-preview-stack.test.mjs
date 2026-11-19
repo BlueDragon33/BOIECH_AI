@@ -177,3 +177,60 @@ test("Preview legacy guard exhausting transient 403 stays failed and never bypas
  assert.equal(calls,5);
  assert.deepEqual(delays,[1000,2000,4000,8000]);
 });
+
+test("Preview V2 new Owner/Publisher credential may converge after transient app-coded 403 only",async()=>{
+ const baseline=v2ProbeFetcher(()=>Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409}));
+ const calls={owner:0,publisher:0};const delays=[];
+ const secret="test-only-bridge-credential";
+ const fetcher=async(url,init)=>{
+  if(String(url).includes("/api/control/v2/account-summary")&&
+     init.headers.authorization===`Bearer ${secret}`&&
+     ["owner","publisher"].includes(init.headers["x-control-role"])){
+   const role=init.headers["x-control-role"];
+   if(calls[role]++===0)return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+  }
+  return baseline.fetcher(url,init);
+ };
+ const result=await verifyV2SummaryLive(secret,fetcher,async ms=>delays.push(ms));
+ assert.deepEqual(delays,[1000,1000],"only valid Owner and Publisher calls may retry");
+ assert.equal(calls.owner,2);assert.equal(calls.publisher,2);
+ assert.deepEqual(result.statusChecks,[200,200,403,401,403,409]);
+ assert.ok(baseline.seen.every(x=>x.headers?.authorization!=="Bearer undefined"));
+});
+test("Preview V2 refuses incorrect negative-role codes even with matching HTTP status",async()=>{
+ const cases=[
+  {role:"viewer",code:"CONTROL_TICKET_FORBIDDEN",status:403},
+  {role:"owner",token:"invalid-preview-ticket",code:"ACCOUNT_SUMMARY_FORBIDDEN",status:403},
+  {role:"owner",missing:true,code:"ACCOUNT_SUMMARY_FORBIDDEN",status:401}
+ ];
+ for(const bad of cases){
+  const baseline=v2ProbeFetcher(()=>Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409}));
+  const waits=[];
+  const fetcher=async(url,init)=>{
+   if(String(url).includes("/api/control/v2/account-summary")&&
+     init.headers["x-control-role"]===bad.role&&
+     (bad.missing?!init.headers.authorization:
+      bad.token?init.headers.authorization===`Bearer ${bad.token}`:Boolean(init.headers.authorization)))
+    return Response.json({code:bad.code},{status:bad.status});
+   return baseline.fetcher(url,init);
+  };
+  await assert.rejects(verifyV2SummaryLive("test-only-bridge-credential",fetcher,async ms=>waits.push(ms)),
+    /negative-role contract mismatch/);
+  assert.deepEqual(waits,[],"never retry negative-role failure");
+ }
+});
+test("Preview V2 persistent new-credential 403 always fails closed after bounded five attempts",async()=>{
+ const baseline=v2ProbeFetcher(()=>Response.json({code:"ACCOUNT_CONTROL_REQUIRED"},{status:409}));
+ let attempts=0;const delays=[];const secret="test-only-bridge-credential";
+ const fetcher=async(url,init)=>{
+  if(String(url).includes("/api/control/v2/account-summary")&&
+     init.headers["x-control-role"]==="owner"&&init.headers.authorization===`Bearer ${secret}`){
+    attempts++;return Response.json({code:"CONTROL_TICKET_FORBIDDEN"},{status:403});
+  }
+  return baseline.fetcher(url,init);
+ };
+ await assert.rejects(verifyV2SummaryLive(secret,fetcher,async ms=>delays.push(ms)),
+    /expected HTTP 200, got 403; safe code CONTROL_TICKET_FORBIDDEN/);
+ assert.equal(attempts,5);
+ assert.deepEqual(delays,[1000,2000,4000,8000]);
+});
