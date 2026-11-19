@@ -45,6 +45,7 @@ function fixture(t){
  (11,'L1','video:11','video_ai_analysis','2030-01-01T00:00:00Z'),
  (12,'L1','video:12','heartbeat','2030-01-01T00:00:00Z');
  `);
+ sqlite.exec("ALTER TABLE device_access ADD COLUMN person_code TEXT; ALTER TABLE course_activity_events ADD COLUMN lesson_number TEXT;");
  const db={prepare(sql){return {bind(...values){
   const stmt=sqlite.prepare(sql);
   return {
