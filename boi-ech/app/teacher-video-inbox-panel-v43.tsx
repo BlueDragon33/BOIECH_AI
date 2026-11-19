@@ -4,6 +4,7 @@ import {useState} from "react";
 
 export type TeacherInboxReceiptV43={
  eventId:number;state:"unread"|"seen";revision:number;createdAt:string;
+ learnerCode?:string|null;lessonNumber?:string|null;
 };
 export type TeacherInboxReplyV43={
  items:TeacherInboxReceiptV43[];unreadCount:number;
