@@ -90,6 +90,12 @@ test("V48 teacher: poor capture promotes human review, not skill diagnosis; show
  assert.equal(out.hidden,1);assert.equal(out.possiblyIncomplete,true);
  assert.equal(buildTeacherEvidenceQueueV48(rows,{limit:3}).items
   .find(x=>x.learner.personCode==="A").evidenceCaution,true);
+ const impossible=buildTeacherEvidenceQueueV48([
+  teacher("C",[suggestion("review","01","C1","high")],{
+   lastAnalysis:{confidence:140,captureQuality:"good"}
+  })
+ ]);
+ assert.equal(impossible.items[0].urgency,4,"Impossible confidence >100 must trigger source review");
 });
 test("V48 teacher: rejects unauthorized empty learner identifiers, caps output, immutable input",()=>{
  const source=Object.freeze([Object.freeze(teacher("A",[suggestion("feedback","01","a")])),
