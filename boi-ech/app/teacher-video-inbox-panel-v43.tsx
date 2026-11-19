@@ -69,7 +69,7 @@ export default function TeacherVideoInboxPanelV43({onRequest}:{
     {incomplete?" Danh sách bị giới hạn, chưa phải toàn bộ thông báo.":""}</p>
    {items.length?<ul>
     {items.map(item=><li key={item.eventId}>
-      <span>Sự kiện video #{item.eventId} · {item.createdAt} ·
+      <span>{item.learnerCode?"Mã học viên "+item.learnerCode+" · ":""}{item.lessonNumber?"Bài "+item.lessonNumber+" · ":""}Sự kiện video #{item.eventId} · {item.createdAt} ·
        {item.state==="seen"?" Đã xem thông báo":" Chưa xem"}</span>
       {item.state==="unread"?<button type="button" disabled={busy}
        onClick={()=>void markSeen(item)}>Đánh dấu đã xem</button>:null}
