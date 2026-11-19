@@ -132,16 +132,24 @@ export async function POST(request: Request) {
       return json({ error: "Không xác định được lần phân tích cần review." }, 400);
     }
 
-    if (clientEventId) {
-      const duplicate = await database.prepare(
-        "SELECT id FROM course_activity_events WHERE device_id = ? AND client_event_id = ? LIMIT 1",
-      ).bind(learner.device_id, clientEventId).first<{ id: number }>();
-      if (duplicate) return json({ ok: true, duplicate: true, id: duplicate.id });
+    if(analysisAt){
+      // Video timestamp must resolve to THIS learner's saved summary.
+      const source=await database.prepare(
+        `SELECT id FROM course_activity_events
+         WHERE device_id=? AND event_type='video_ai_analysis'
+         AND COALESCE(NULLIF(json_extract(detail_json,'$.analyzedAt'),''),created_at)=?
+         LIMIT 1`
+      ).bind(learner.device_id,analysisAt).first<{id:number}>();
+      if(!source)return json({
+       error:"Không tìm thấy video hợp lệ thuộc học viên này.",
+       code:"TEACHER_ANALYSIS_EVIDENCE_REQUIRED"
+      },409);
     }
 
     const eventType = ACTION_TYPES[action];
     const detail = {
       source: "teacher-dashboard",
+      teacherDeviceId: teacher.deviceId,
       teacherName: teacher.learnerName?.slice(0, 120) || "Giảng viên",
       teacherClassName: learner.class_name || teacherClasses[0],
       action,
@@ -152,6 +160,19 @@ export async function POST(request: Request) {
       ...(analysisAt ? { analysisAt } : {}),
       ...(action === "review" ? { reviewStatus } : {}),
     };
+
+    // Duplicate client IDs can only replay the original actor/action/payload.
+    if(clientEventId){
+      const duplicate=await database.prepare(
+        "SELECT id,event_type,detail_json FROM course_activity_events WHERE device_id=? AND client_event_id=? LIMIT 1"
+      ).bind(learner.device_id,clientEventId).first<{id:number;event_type:string;detail_json:string}>();
+      if(duplicate){
+        if(duplicate.event_type!==eventType||duplicate.detail_json!==JSON.stringify(detail))
+          return json({error:"Mã thao tác thuộc một quyết định khác.",
+            code:"TEACHER_ACTION_REPLAY_CONFLICT"},409);
+        return json({ok:true,duplicate:true,id:duplicate.id});
+      }
+    }
 
     const result = await database.prepare(
       `INSERT INTO course_activity_events
