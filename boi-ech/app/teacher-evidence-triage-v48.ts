@@ -26,7 +26,7 @@ export type TeacherQueueV48<T extends TriageLearnerV48>={
 const priority=(key:TriageSuggestionV48["priority"])=>
  key==="critical"?3:key==="high"?2:1;
 const hasPoorVideo=(x:TriageLearnerV48)=>Boolean(x.lastAnalysis&&
- (!Number.isFinite(x.lastAnalysis.confidence)||x.lastAnalysis.confidence<70||
+ (!Number.isFinite(x.lastAnalysis.confidence)||x.lastAnalysis.confidence<70||x.lastAnalysis.confidence>100||
  x.lastAnalysis.captureQuality!=="good"));
 export function buildTeacherEvidenceQueueV48<T extends TriageLearnerV48>(
  learners:readonly T[],opts:{limit?:number;sourcePossiblyTruncated?:boolean}={}
