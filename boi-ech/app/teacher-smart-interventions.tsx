@@ -29,7 +29,7 @@ export default function TeacherSmartInterventions({learners,onUse,sourcePossibly
     <div><small>SMART INTERVENTION ENGINE</small><h2>Gợi ý can thiệp</h2></div>
    </div>
    <p>Đối chiếu độ tin cậy AI, ưu tiên theo lớp đã xác thực và luân phiên học viên ngang mức ưu tiên.
-    Giảng viên phải duyệt trước khi gửi.</p>
+    Giảng viên phải duyệt nội dung trước khi gửi.</p>
    <strong className="icon-task-ai-count">{items.length}/{queue.totalEligible} đề xuất đang hiển thị</strong>
   </header>
   {queue.possiblyIncomplete?<p role="status" className="teacher-video-list-note">
