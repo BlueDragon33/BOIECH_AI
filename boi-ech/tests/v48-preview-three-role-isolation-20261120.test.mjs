@@ -70,8 +70,12 @@ test("V48 teacher HTTP: wrong-role denied, current class only, unrelated class e
   assert.equal(teacherResponse.status,200,await teacherResponse.clone().text());
   const body=await teacherResponse.json();
   assert.equal(body.summary.learnerCount,1);
-  assert.ok(body.learners.some(x=>x.personCode==="PERSON48322"));
-  assert.ok(!body.learners.some(x=>x.personCode==="PERSON48323"));
+  const codeA=f.sqlite.prepare("SELECT person_code FROM device_access WHERE device_id=?").get(learnerA.account.storageDeviceId).person_code;
+  const codeB=f.sqlite.prepare("SELECT person_code FROM device_access WHERE device_id=?").get(learnerB.account.storageDeviceId).person_code;
+  assert.match(codeA,/^HV_[A-F0-9]{20}$/);
+  assert.match(codeB,/^HV_[A-F0-9]{20}$/);
+  assert.ok(body.learners.some(x=>x.personCode===codeA));
+  assert.ok(!body.learners.some(x=>x.personCode===codeB));
   assert.ok(body.learners.every(x=>x.className==="QA CLASS A"));
   for(const who of [manager,learnerA,learnerB]){
    const response=await http(f,who.token,"api/teacher/overview/route.ts",{});
