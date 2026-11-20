@@ -15,14 +15,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      EXPECTED_APP_SHA: 720521a905ddb71ebd54ac8c80c94be705438928
+      EXPECTED_APP_SHA: a9f650a864a01103a8032aff6fc775fa24480703
     steps:
       - uses: actions/checkout@v4
       - name: Checkout Owner-approved Application-Management Preview source
         uses: actions/checkout@v4
         with:
           repository: BlueDragon33/Application-Management
-          ref: 720521a905ddb71ebd54ac8c80c94be705438928
+          ref: a9f650a864a01103a8032aff6fc775fa24480703
           path: paired-application-management
           persist-credentials: false
       - uses: actions/setup-node@v4
