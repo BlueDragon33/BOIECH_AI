@@ -47,7 +47,7 @@ test("V48 three roles: distinct human review, per-role entitlement, no two-revie
    assert.ok(entries.every(x=>x.stage==="active"));
    assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM account_audit WHERE action='account.review.first'").get().n,3);
    for(const person of [teacher,learner]){
-     await assert.rejects(()=>f.service.capability(await f.service.session(person.token),"manager.approve.registration"),
+     await assert.rejects(async()=>f.service.capability(await f.service.session(person.token),"manager.approve.registration"),
        e=>e.code==="ACCOUNT_PERMISSION_REQUIRED");
      await assert.rejects(()=>f.service.reviewBoard(person.token),e=>e.code==="ACCOUNT_PERMISSION_REQUIRED");
    }
