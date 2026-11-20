@@ -12,6 +12,7 @@ test("protected paired Preview candidate uses the exact tested App SHA everywher
   assert.match(workflow, /environment: boi-ech-preview/);
   assert.match(workflow, /DEPLOY_PREVIEW/);
   assert.match(workflow, /INSTALL_PREVIEW_BRIDGE/);
+  assert.match(workflow, /NEXT_PUBLIC_BOI_ECH_SINGLE_REVIEW: "true"/);
 });
 
 test("G3 source/read-only D1 gates precede ANY remote Preview SQL or Worker deployment", () => {

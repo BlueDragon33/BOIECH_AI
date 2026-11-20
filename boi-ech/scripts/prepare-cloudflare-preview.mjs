@@ -73,7 +73,7 @@ const rendered = fs.readFileSync(TEMPLATE, "utf8")
   .replace("__BOI_ECH_BUILD_REVISION__", revision);
 
 if (/__[A-Z0-9_]+__/.test(rendered)) throw new Error("Cloudflare preview config vẫn còn placeholder.");
-if (!rendered.includes('"BOI_ECH_ACCOUNT_FIRST": "true"') || !rendered.includes('"BOI_ECH_ACCOUNT_V2": "true"')) {
+if (!rendered.includes('"BOI_ECH_ACCOUNT_FIRST": "true"') || !rendered.includes('"BOI_ECH_ACCOUNT_V2": "true"') || !rendered.includes('"BOI_ECH_SINGLE_REVIEW": "true"')) {
   throw new Error("Bản Preview phải bật đủ Account-first V2 để có thể nghiệm thu.");
 }
 const previewConfig = JSON.parse(rendered);

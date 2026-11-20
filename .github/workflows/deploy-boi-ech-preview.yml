@@ -73,6 +73,8 @@ jobs:
           const boi = fs.readFileSync("boi-ech/app/api/control/v2/account-summary/route.ts", "utf8");
           const app = fs.readFileSync("application-management-preview-source/app/api/apps/boi-ech/access/route.ts", "utf8");
           const view = fs.readFileSync("application-management-preview-source/app/boi-access-view.tsx", "utf8");
+          const boiPreviewConfig = JSON.parse(fs.readFileSync("boi-ech/wrangler.cloudflare.preview.example.jsonc", "utf8"));
+          const appManagerUi = fs.readFileSync("application-management-preview-source/app/apps/boi-ech/account-expiry-panel.tsx", "utf8");
           const contract = 'boi-account-summary.v2';
           if (!boi.includes('contract: "' + contract + '"') ||
               !boi.includes('export async function GET(') ||
@@ -81,7 +83,10 @@ jobs:
               !app.includes('/api/control/v2/account-summary') ||
               !app.includes('result.payload.contract !== "' + contract + '"') ||
               !view.includes('data.contract === "' + contract + '"') ||
-              !view.includes('data.verified !== true')) {
+              !view.includes('data.verified !== true') ||
+              boiPreviewConfig.name !== "boi-ech-preview" ||
+              boiPreviewConfig.vars?.BOI_ECH_SINGLE_REVIEW !== "true" ||
+              !appManagerUi.includes('process.env.NEXT_PUBLIC_BOI_ECH_SINGLE_REVIEW === "true"')) {
             throw new Error("Paired V2 source contract mismatch. STOP before D1 migration or Preview deployment.");
           }
           console.log("Paired BOIECH_AI x Application-Management V2 Preview source contract PASS (no remote writes).");
@@ -141,6 +146,8 @@ jobs:
       - name: Build App Preview before any remote D1 mutation
         working-directory: application-management-preview-source
         env:
+          # Compile-time UI-only flag; Boi Preview's BOI_ECH_SINGLE_REVIEW is pinned separately.
+          NEXT_PUBLIC_BOI_ECH_SINGLE_REVIEW: "true"
           # Critical: the Vite/Cloudflare build generates the deployed revision
           # from GITHUB_SHA. This secondary checkout has its own pinned commit.
           # Do not publish the BOIECH_AI commit as the App Management revision.

@@ -42,3 +42,9 @@
 5. Keep independent [PR #210](https://github.com/BlueDragon33/BOIECH_AI/pull/210) D1 0043/0045 and consent profile feature gated; V48 must not auto-promote its migrations.
 
 **No Production or Preview D1 writes, no paid API and no Vercel** are performed by this PR. All results are advisory and cannot replace trained swimming-instructor evaluation or pool safety protocols.
+
+## Preview-only QA environment activation (Owner request · 2026-11-20)
+- The isolated Boi Preview template explicitly enables `BOI_ECH_SINGLE_REVIEW=true` alongside Account-first V2. The paired App Preview build sets `NEXT_PUBLIC_BOI_ECH_SINGLE_REVIEW=true` in its build step only. Both MUST agree, and source preflight verifies both BEFORE any remote migration or write.
+- This only **enables** the reviewed Owner → Cán bộ → Giảng viên/Học viên human onboarding flow; it never creates/approves users or provisions passwords. Credentials and D1 rows are not cloned from Production. Exact Preview Worker/D1 identities and existing bridge gates remain.
+- The synthetic three-role fixture suite `v48-preview-three-role-isolation-20261120.test.mjs` runs against ephemeral in-memory SQLite with all existing D1 SQL migrations, real account service and HTTP routes. **Do not label it signed live Cloudflare Preview E2E.**
+- The live-release acceptance still requires real consented Preview test accounts, authorized manual approval, signed role/session requests, mobile viewport/keyboard testing, and explicit reviewer/Owner gate. No Production flag changes.
