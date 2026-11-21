@@ -48,6 +48,20 @@ export async function getEditorUser(): Promise<ChatGPTUser | null> {
   return getChatGPTUser();
 }
 
+/**
+ * The Account-first editor inherits the same strict origin boundary as the
+ * canonical /api/accounts POST path. Legacy ChatGPT-only editor sessions keep
+ * their existing proof/permission contract.
+ */
+export async function assertEditorPostOrigin(request: Request): Promise<void> {
+  const config = await accountConfiguration();
+  if (!config.v2 || !(await accountCookieToken())) return;
+  if (request.headers.get("origin") !== config.origin ||
+      !request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+    throw new EditorAccessError("Nguồn yêu cầu biên tập không khớp ứng dụng.", 403, "EDITOR_CSRF_REJECTED");
+  }
+}
+
 export class EditorAccessError extends Error {
   status: number;
   code: string;
