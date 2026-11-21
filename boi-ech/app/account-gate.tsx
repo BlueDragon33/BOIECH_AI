@@ -224,7 +224,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const readbackId=++readbackGeneration.current;
-    const {response,data} = await accountReadWithinDeadline<{ account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string }>("/api/accounts", { credentials: "same-origin", cache: "no-store" });
+    const {response,data} = await accountReadWithinDeadline<{ account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string; code?:string }>("/api/accounts", { credentials: "same-origin", cache: "no-store" });
     // A polling GET can finish after a successful profile submit/readback.
     // Never allow that stale reply to roll the UI back to a pending state.
     if (!mounted.current || readbackId !== readbackGeneration.current) return;
