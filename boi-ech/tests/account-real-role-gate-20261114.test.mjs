@@ -12,7 +12,7 @@ const runtime=src("account-runtime.server.ts");
 const verify=src("device-auth.server.ts");
 
 test("a successful login changes immediately to CHECKING instead of standing in the old form",()=>{
- assert.match(gate,/if\(showGate\)setAuthSubmitting\(true\)/);
+ assert.match(gate,/if\(showGate\)\{resumeVerifiedSessionOnLoad\.current=false;setAuthSubmitting\(true\);\}/);
  assert.match(gate,/if \(authSubmitting && !active\) return <AccountVerificationShowcase phase="checking"/);
  assert.match(gate,/finally \{ if\(showGate\)setAuthSubmitting\(false\); \}/);
  assert.match(gate,/setFieldErrors\(previous=>/);
