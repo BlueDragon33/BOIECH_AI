@@ -3,6 +3,7 @@ import {
   createEditorChallenge,
   EditorAccessError,
   editorErrorResponse,
+  assertEditorPostOrigin,
   registerEditorDevice,
 } from "../../../editor-device-auth.server";
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    await assertEditorPostOrigin(request);
     const user = await getEditorUser();
     if (!user) throw new EditorAccessError("Cần phiên Giảng viên hợp lệ để tiếp tục.", 401, "EDITOR_SIGN_IN_REQUIRED");
     const payload = (await request.json()) as Record<string, unknown>;
