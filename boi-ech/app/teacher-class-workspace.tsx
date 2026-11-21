@@ -162,8 +162,10 @@ export default function TeacherClassWorkspace({
         <span>LỚP HỌC CỦA TÔI</span>
         <h1>Lớp học của tôi</h1>
         <p>Theo dõi các lớp được Cán bộ quản lý phân công và tiến độ học tập trong phạm vi chuyên môn.</p>
-        <small>{summaries.length} lớp · {totalLearners} học viên · {totalSupport} cần hỗ trợ</small>
-        <span data-teacher-sync-mount="class"/>
+        <div className="teacher-class-header-meta">
+          <small>{summaries.length} lớp · {totalLearners} học viên · {totalSupport} cần hỗ trợ</small>
+          <span data-teacher-sync-mount="class"/>
+        </div>
       </div>
       <div className="teacher-class-header-actions">
         <button type="button" onClick={() => onOpenEditor(selected?.name ?? "")}>Biên tập bài giảng</button>
