@@ -41,6 +41,7 @@ import "./teacher-contrast-content-first.css";
 import "./teacher-video-results-transparency.css";
 import "./teacher-task-icon-v39.css";
 import "./teacher-class-grid-list-v49.css";
+import "./teacher-roster-v52.css";
 import MultiAccountSwitcher from "./multi-account-switcher";
 
 const geistSans = Geist({

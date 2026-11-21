@@ -11,9 +11,15 @@ function panel(){
   const source=fs.readFileSync(new URL("../app/teacher-roster-manager.tsx",import.meta.url),"utf8")+
     "\nexport {RosterPanel};";
   const loaded={exports:{}};
+  const helper={exports:{}};
+  const helperSource=fs.readFileSync(new URL("../app/teacher-roster-activity.ts",import.meta.url),"utf8");
+  new Function("require","module","exports",ts.transpileModule(helperSource,{
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}
+  }).outputText)(require,helper,helper.exports);
+  const localRequire=(name)=>name==="./teacher-roster-activity"?helper.exports:require(name);
   new Function("require","module","exports",ts.transpileModule(source,{
     compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}
-  }).outputText)(require,loaded,loaded.exports);
+  }).outputText)(localRequire,loaded,loaded.exports);
   return loaded.exports.RosterPanel;
 }
 const item={status:"approved",name:"Học viên được duyệt",personCode:"HV_PRIVATE_ONLY",
