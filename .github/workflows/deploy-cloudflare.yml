@@ -163,6 +163,10 @@ jobs:
         working-directory: boi-ech
         run: node scripts/production-package.mjs assets
 
+      - name: Verify live Editor route and fail-closed anonymous session
+        working-directory: boi-ech
+        run: node scripts/verify-editor-route-live.mjs
+
       - name: Verify Universal Management Contract on live Production
         shell: bash
         run: |
