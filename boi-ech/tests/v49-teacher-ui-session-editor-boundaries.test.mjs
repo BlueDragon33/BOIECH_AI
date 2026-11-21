@@ -59,7 +59,7 @@ test("teacher editor uses same authenticated account and retains independent P-2
   assert.match(auth,/accountCookieToken\(\)/);
   assert.match(auth,/\.authorize\(token\)/);
   assert.match(auth,/if \(actor\.role !== "teacher"\) return null/);
-  assert.match(auth,/if \(error instanceof AccountError\) return null/);
+  assert.match(auth,/if \(error instanceof AccountError \|\| error instanceof AccountEntitlementError\) return null/);
   assert.match(auth,/export async function getEditorUser/);
   assert.match(auth,/export async function assertEditorPostOrigin/);
   assert.match(auth,/EDITOR_CSRF_REJECTED/);
