@@ -28,6 +28,7 @@
     "BOI_ECH_ACCOUNT_ORIGIN": "__BOI_ECH_PREVIEW_ORIGIN__",
     "BOI_ECH_ACCOUNT_FIRST": "true",
     "BOI_ECH_ACCOUNT_V2": "true",
+    "BOI_ECH_SINGLE_REVIEW": "true",
     "BOI_ECH_DEPLOYMENT_CHANNEL": "cloudflare-preview",
     "BOI_ECH_BUILD_REVISION": "__BOI_ECH_BUILD_REVISION__",
     "BOI_ECH_BUILD_SOURCE": "BlueDragon33/BOIECH_AI/boi-ech"

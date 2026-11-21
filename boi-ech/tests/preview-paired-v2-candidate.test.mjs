@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const workflow = fs.readFileSync(new URL("../../.github/workflows/deploy-boi-ech-preview.yml", import.meta.url), "utf8");
-const appSha = "64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd";
+const appSha = "a9f650a864a01103a8032aff6fc775fa24480703";
 
 test("protected paired Preview candidate uses the exact tested App SHA everywhere", () => {
   const pins = workflow.match(/[a-f0-9]{40}/g) ?? [];
@@ -12,6 +12,7 @@ test("protected paired Preview candidate uses the exact tested App SHA everywher
   assert.match(workflow, /environment: boi-ech-preview/);
   assert.match(workflow, /DEPLOY_PREVIEW/);
   assert.match(workflow, /INSTALL_PREVIEW_BRIDGE/);
+  assert.match(workflow, /NEXT_PUBLIC_BOI_ECH_SINGLE_REVIEW: "true"/);
 });
 
 test("G3 source/read-only D1 gates precede ANY remote Preview SQL or Worker deployment", () => {

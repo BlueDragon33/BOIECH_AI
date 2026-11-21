@@ -65,7 +65,7 @@ test("Application-Management Vite build pins its own app revision instead of inh
 });
 
 test("the reviewed App checkout and job-wide revision are both pinned independently of Bơi Ếch",()=>{
- const pinned = "64fe5a939937c1116cd3d3faf1c6d6e8b73d19dd";
+ const pinned = "a9f650a864a01103a8032aff6fc775fa24480703";
  assert.ok(workflow.includes("APPLICATION_MANAGEMENT_BUILD_REVISION: "+pinned));
  assert.ok(workflow.includes("ref: "+pinned));
  assert.notEqual(pinned,boiRev);

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {assessLearnerEvidenceV48} from "./learner-evidence-readiness-v48";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type AdaptiveAlert = { level: "info" | "warning" | "critical"; code: string; text: string };
@@ -170,14 +171,22 @@ function AdaptiveCoach({
   loading: boolean;
   refreshError: string;
 }) {
+  const [clock,setClock]=useState(()=>Date.now());
+  useEffect(()=>{
+   const tick=window.setInterval(()=>setClock(Date.now()),60_000);
+   return ()=>window.clearInterval(tick);
+  },[]);
   const intelligence = data.intelligence;
   if (!data.settings?.enabled || !intelligence) return null;
 
+  const evidence=assessLearnerEvidenceV48(intelligence,clock);
   const priority = intelligence.competencies.find((item) => item.lessonNumber === intelligence.priorityLesson);
   const unlocked = intelligence.competencies.filter((item) => item.unlocked);
-  const averageMastery = unlocked.length
-    ? Math.round(unlocked.reduce((sum, item) => sum + item.mastery, 0) / unlocked.length)
-    : 0;
+  const measured=unlocked.filter(item=>Number.isSafeInteger(item.attempts)&&item.attempts>0&&
+    typeof item.score==="number"&&Number.isFinite(item.score)&&item.score>=0&&item.score<=100&&
+    Number.isFinite(item.mastery)&&item.mastery>=0&&item.mastery<=100);
+  const averageMastery=measured.length?
+    Math.round(measured.reduce((sum,item)=>sum+item.mastery,0)/measured.length):null;
   const alerts = intelligence.alerts.filter((item) => item.level !== "info").slice(0, 2);
 
   return (
@@ -186,11 +195,11 @@ function AdaptiveCoach({
         <div>
           <span>LEARNER MODEL · LỘ TRÌNH THÍCH ỨNG</span>
           <h2>AI đang ưu tiên Bài {intelligence.priorityLesson}</h2>
-          <p>{priority?.label ?? "Bài đang cần củng cố"} · dữ liệu được suy ra từ tiến độ, điểm, lượt làm và tự đánh giá.</p>
+          <p>{priority?.label ?? "Bài đang cần củng cố"} · chỉ số gợi ý từ hoạt động học; không chứng nhận kỹ thuật bơi.</p>
         </div>
-        <div className={`student-adaptive-score ${masteryTone(priority?.mastery ?? 0)}`}>
-          <strong>{priority?.mastery ?? 0}%</strong>
-          <span>Nắm vững bài ưu tiên</span>
+        <div className={`student-adaptive-score ${evidence.priorityMastery===null?"unknown":masteryTone(evidence.priorityMastery)}`}>
+          <strong>{evidence.priorityMastery===null?"—":evidence.priorityMastery+"%"}</strong>
+          <span>{evidence.priorityMastery===null?"Chưa đủ dữ liệu xác thực":"Chỉ số gợi ý bài ưu tiên"}</span>
         </div>
       </header>
 
@@ -201,6 +210,14 @@ function AdaptiveCoach({
         </div>
       ) : null}
 
+      <div className="student-adaptive-evidence-v48" role="status" data-v48-learner-evidence={evidence.evidenceStatus}>
+        <strong>{evidence.sourceStatus==="fresh"?
+          evidence.evidenceStatus==="observed"?"Nguồn học tập đã ghi nhận — vẫn cần đối chiếu":"Chưa đủ bằng chứng để kết luận thành thạo":
+          "Dữ liệu học tập không còn đủ mới hoặc sai mốc thời gian"}</strong>
+        <p>{evidence.checkpoint}</p>
+        <small>{evidence.observedLessons}/{evidence.unlockedLessons} bài đã mở có lượt kiểm tra và điểm hợp lệ.
+          AI không chấm khả năng bơi thực tế.</small>
+      </div>
       <div className="student-adaptive-body">
         <div className="student-adaptive-plan">
           <div className="student-adaptive-heading">
@@ -208,7 +225,7 @@ function AdaptiveCoach({
             <button type="button" onClick={reload} disabled={loading}>{loading ? "Đang cập nhật…" : "Cập nhật"}</button>
           </div>
           <div className="student-adaptive-plan-grid">
-            {intelligence.todayPlan.slice(0, 3).map((item, index) => (
+            {evidence.usablePlan.map((item, index) => (
               <button key={item.id} type="button" onClick={() => openPlanItem(item)}>
                 <span>{String(index + 1).padStart(2, "0")} · {item.minutes} phút</span>
                 <strong>{item.title}</strong>
@@ -217,20 +234,25 @@ function AdaptiveCoach({
               </button>
             ))}
           </div>
+          {evidence.planStatus==="paused"?<p role="status">Kế hoạch tạm dừng vì thiếu nguồn mới,
+           bài học được mở hoặc dữ liệu kế hoạch hợp lệ. Cập nhật Learner Model để xem lại.</p>:null}
+          {evidence.planStatus==="exploratory"?<small>Đây là lộ trình thăm dò;
+           kết quả chỉ được đối chiếu sau lượt học và kiểm tra tiếp theo.</small>:null}
         </div>
 
         <aside className="student-adaptive-insight">
           <div className="student-adaptive-average">
             <span>NĂNG LỰC CÁC BÀI ĐÃ MỞ</span>
-            <strong>{averageMastery}%</strong>
-            <div><i style={{ width: `${averageMastery}%` }} /></div>
+            <strong>{averageMastery===null?"—":averageMastery+"%"}</strong>
+            <div><i style={{ width: `${averageMastery??0}%` }} /></div>
+            <small>{measured.length}/{unlocked.length} bài có số liệu hợp lệ; không suy số 0 cho bài chưa kiểm tra.</small>
           </div>
           <div className="student-adaptive-competencies">
             {unlocked.slice(0, 4).map((item) => (
               <div key={item.lessonNumber}>
                 <span>Bài {item.lessonNumber}</span>
-                <strong>{item.mastery}%</strong>
-                <i><b style={{ width: `${item.mastery}%` }} /></i>
+                <strong>{measured.includes(item)?item.mastery+"%":"Chưa đủ dữ liệu"}</strong>
+                <i><b style={{ width: `${measured.includes(item)?item.mastery:0}%` }} /></i>
               </div>
             ))}
           </div>

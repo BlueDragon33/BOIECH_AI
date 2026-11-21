@@ -298,7 +298,7 @@ const [selectedLearner, setSelectedLearner] = useState<TeacherLearner | null>(nu
     if(!learner)return;
     openAction({mode:suggestion.mode,learner,analysisAt:suggestion.mode==="review"?learner.lastAnalysis?.analyzedAt:undefined,
      suggestedNote:suggestion.noteTemplate,suggestedTitle:suggestion.title,suggestedLessonNumber:suggestion.lessonNumber});
-   }}/>
+   }} sourcePossiblyTruncated={Boolean(overview?.coverage?.possiblyTruncated)}/>
   </aside>
  </div>
  <TeacherTaskToday assignments={workScopedAssignments} helpCount={workScopedSupport.length} onFilterChange={setTaskFilter}
