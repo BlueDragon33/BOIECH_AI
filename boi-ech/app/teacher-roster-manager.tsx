@@ -106,16 +106,16 @@ function RosterPanel({data,loading,error,onSync}:{data:RosterResponse;loading:bo
   return <section className="teacher-roster-manager teacher-roster-v52" data-teacher-roster-ui aria-label="Học viên lớp phụ trách">
     <header className="teacher-roster-heading">
       <div>
-        <span className="teacher-roster-eyebrow">HỌC VIÊN · LỚP PHỤ TRÁCH</span>
+        <span className="teacher-roster-eyebrow">DANH SÁCH HỌC VIÊN ĐÃ DUYỆT</span>
         <h2>Danh sách học viên đã duyệt</h2>
-        <p>Tài khoản được duyệt không có nghĩa đang trực tuyến. Giảng viên chỉ được xem học viên thuộc lớp đã phân công.</p>
+        <p>Chỉ xem học viên đã được Cán bộ quản lý duyệt và phân công đúng lớp. Giảng viên không thể duyệt, loại, khóa hay khôi phục tài khoản học viên. Tài khoản được duyệt không đồng nghĩa đang trực tuyến.</p>
       </div>
       <div className="teacher-roster-heading-actions">
         <span className={snapshotFresh?"teacher-roster-snapshot fresh":"teacher-roster-snapshot stale"} role="status">
           {snapshotFresh?"Dữ liệu vừa đồng bộ":"Chưa có dữ liệu đồng bộ mới"}
         </span>
         <button type="button" disabled={loading} onClick={onSync}>
-          {loading?"Đang đồng bộ…":"Làm mới dữ liệu"}
+          {loading?"Đang đồng bộ…":"Đồng bộ dữ liệu"}
         </button>
       </div>
     </header>
@@ -154,7 +154,7 @@ function RosterPanel({data,loading,error,onSync}:{data:RosterResponse;loading:bo
     {display==="list"?
       <div className="teacher-roster-table-wrap">
         <table className="teacher-roster-table">
-          <thead><tr><th>Học viên</th><th>Lớp</th><th>Tài khoản</th><th>Hoạt động ghi nhận</th><th>Lần ghi nhận cuối</th></tr></thead>
+          <thead><tr><th>Học viên</th><th>Lớp phụ trách</th><th>Tài khoản</th><th>Hoạt động ghi nhận</th><th>Lần ghi nhận cuối</th></tr></thead>
           <tbody>{listed.map(({person,activity})=>
             <tr key={person.personCode||person.name}>
               <td><div className="teacher-roster-person">
