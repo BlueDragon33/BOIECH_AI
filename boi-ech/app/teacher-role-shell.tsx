@@ -390,8 +390,9 @@ export default function TeacherRoleShell() {
       timer = 0;
       if (disposed) return;
       const shell = document.querySelector<HTMLElement>(".app-shell");
-      const role = shell?.dataset.personRole || text(document.querySelector(".learner-chip small"));
-      const isTeacher = Boolean(shell && (role === "teacher" || role === "Giảng viên"));
+      // The signed, server-verified workspace is authoritative; UI copy must never grant roles.
+      const isTeacher = Boolean(shell && workspace?.role === "teacher" &&
+        (!shell.dataset.personRole || shell.dataset.personRole === "teacher"));
       setActive(isTeacher);
       if (!isTeacher || !shell) {
         const request = requestRef.current;
@@ -405,6 +406,9 @@ export default function TeacherRoleShell() {
         setOverview(null);
         setLoading(false);
         delete document.body.dataset.teacherRoleUi;
+        dashboardNode?.remove(); dashboardNode = null; setDashboardMount(null);
+        navNode?.remove(); navNode = null; setNavMount(null);
+        searchNode?.remove(); searchNode = null; setSearchMount(null);
         return;
       }
       document.body.dataset.teacherRoleUi = "active";
@@ -484,6 +488,6 @@ export default function TeacherRoleShell() {
       searchNode?.remove();
       delete document.body.dataset.teacherRoleUi;
     };
-  }, [refresh]);
+  }, [refresh, workspace?.role, workspace?.accountId]);
   if (!active) return null; const teacherName = overview?.teacher.name || text(document.querySelector(".learner-chip strong")).replace(/^Chào\s+/i, "") || "Giảng viên"; const className = overview?.teacher.className || "Lớp phụ trách"; const nav = navMount ? createPortal(<div data-teacher-role-ui><TeacherNavigation tab={tab} setTab={setTab} teacherName={teacherName} className={className} unread={unread}/><div className="teacher-hidden-nav-targets"><button data-teacher-nav-target="learners" onClick={() => setTab("learners")}/></div></div>, navMount) : null; const search = searchMount ? createPortal(<TeacherSearch query={query} setQuery={setQuery} setTab={setTab}/>, searchMount) : null; const dashboard = dashboardMount ? createPortal(<TeacherDashboard key={workspaceDeviceId} deviceId={workspaceDeviceId} overview={overview} loading={loading} error={error} tab={tab} setTab={setTab} selectedClass={selectedClass} setSelectedClass={setSelectedClass} refresh={refresh} query={query} submitAction={submitAction}/>, dashboardMount) : null; return <>{nav}{search}{dashboard}</>;
 }
