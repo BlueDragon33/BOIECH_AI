@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { shouldRefreshRoleShell } from "./role-mutation-filter";
+import { useAccountWorkspace } from "./account-workspace-bootstrap";
 
 type LessonSnapshot = {
   index: number;
@@ -224,6 +225,7 @@ function StudentDashboard({ snapshot, openLesson }: { snapshot: StudentSnapshot;
 }
 
 export default function StudentRoleShell() {
+  const workspace = useAccountWorkspace();
   const [snapshot, setSnapshot] = useState<StudentSnapshot>(EMPTY);
   const [active, setActive] = useState(false);
   const [dashboardMount, setDashboardMount] = useState<HTMLElement | null>(null);
@@ -240,12 +242,15 @@ export default function StudentRoleShell() {
     const sync = () => {
       timer = 0;
       const shell = document.querySelector<HTMLElement>(".app-shell");
-      const role = text(document.querySelector(".learner-chip small"));
-      const isLearner = Boolean(shell && role === "Học viên");
+      // Role comes from the signed, server-validated workspace; never from a visual label.
+      const isLearner = Boolean(shell && workspace?.role === "learner" &&
+        (!shell.dataset.personRole || shell.dataset.personRole === "learner"));
       setActive(isLearner);
       if (!isLearner || !shell) {
         delete document.body.dataset.studentRoleUi;
         delete document.body.dataset.studentSection;
+        dashboardNode?.remove(); dashboardNode = null; setDashboardMount(null);
+        navNode?.remove(); navNode = null; setNavMount(null);
         return;
       }
 
