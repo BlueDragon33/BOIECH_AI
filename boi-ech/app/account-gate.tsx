@@ -81,7 +81,7 @@ function accountNetworkError(error: unknown) {
 }
 // Cloudflare or an upstream outage may return HTML (or no body). Never display
 // raw infrastructure errors or leave account onboarding waiting for JSON.
-// A 401 still means "no active session", even if its response has no JSON.
+// An unstructured 401 must NOT be treated as a session verdict; only the canonical API can end it.
 async function readAccountPayload(response: Response): Promise<Record<string, unknown>> {
   let parsed: unknown;
   try { parsed=await response.json(); } catch { /* Non-JSON body, handled below. */ }
