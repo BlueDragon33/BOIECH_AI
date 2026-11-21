@@ -66,7 +66,9 @@ test("teacher editor uses same authenticated account and retains independent P-2
   assert.match(auth,/crypto\.subtle\.verify/);
   assert.match(api,/getEditorUser\(\)/);
   assert.match(api,/assertEditorPostOrigin\(request\)/);
-  assert.match(page,/getEditorUser\(\)/);
+  assert.match(page,/EditorSessionGate/);
+  assert.doesNotMatch(page,/getEditorUser\(\)/);
+  assert.match(source("app/api/editor/session/route.ts"),/getEditorUser\(\)/);
   assert.match(page,/if \(!user\) redirect/);
   assert.match(content,/verifyEditorProof\(payload\)/);
   assert.match(content,/assertEditorPostOrigin\(request\)/);
