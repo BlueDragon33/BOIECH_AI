@@ -9,7 +9,9 @@ const enhancements = fs.readFileSync(new URL("../app/learner-enhancements.tsx", 
 const css = fs.readFileSync(new URL("../app/student-role-shell.css", import.meta.url), "utf8");
 
 test("learner dashboard activates only for the registered learner role", () => {
-  assert.match(shell, /role === "Học viên"/);
+  assert.match(shell, /workspace\?\.role === "learner"/);
+  assert.match(enhancements, /workspace\?\.role!=="learner"/);
+  assert.doesNotMatch(shell, /role === "Học viên"/);
   assert.doesNotMatch(shell, /role === "Giảng viên"/);
   assert.match(shell, /document\.body\.dataset\.studentRoleUi = "active"/);
   assert.match(css, /body\[data-student-role-ui="active"\]/);
