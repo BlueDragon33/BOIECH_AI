@@ -467,9 +467,10 @@ export default function EditorWorkspace({ user, initialLesson, returnHref }: { u
     if (saved && submit) await run({ action: "submit-review", versionId: openRequest.id }, "Chỉnh sửa xong. Bản mới đã được gửi về Trung tâm để kiểm tra.");
   }
 
+  const accountFirstEditor = user.email.endsWith("@account.boi-ech.invalid");
   return (
     <main className="edit-workspace">
-      <header className="edit-topbar"><Link href={returnHref}>← Trở lại Bơi ếch AI</Link><div><span>Biên tập tại Site nội dung</span><strong>Bơi ếch</strong></div><div className="edit-user"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{user.email}</small></div><a href={`/signout-with-chatgpt?return_to=${encodeURIComponent(returnHref)}`}>Đăng xuất</a></div></header>
+      <header className="edit-topbar"><Link href={returnHref}>← Trở lại Bơi ếch AI</Link><div><span>Biên tập tại Site nội dung</span><strong>Bơi ếch</strong></div><div className="edit-user"><span>{user.displayName.slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{accountFirstEditor ? "Giảng viên · phiên Bơi Ếch đã xác thực" : user.email}</small></div>{accountFirstEditor ? <Link href={returnHref}>Về ứng dụng</Link> : <a href={`/signout-with-chatgpt?return_to=${encodeURIComponent(returnHref)}`}>Đăng xuất</a>}</div></header>
       <section className="edit-shell">
         <aside className="edit-rail">
           <div className="edit-device"><span>Laptop biên tập</span><strong>{device?.deviceCode || "Đang đăng ký…"}</strong><small>Yêu cầu chỉ có hiệu lực trên đúng laptop và tài khoản này.</small></div>
