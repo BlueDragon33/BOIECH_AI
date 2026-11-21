@@ -1,8 +1,9 @@
-import { getChatGPTUser } from "../../../chatgpt-auth";
+import { getEditorUser } from "../../../editor-device-auth.server";
 import {
   createEditorChallenge,
   EditorAccessError,
   editorErrorResponse,
+  assertEditorPostOrigin,
   registerEditorDevice,
 } from "../../../editor-device-auth.server";
 
@@ -10,8 +11,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const user = await getChatGPTUser();
-    if (!user) throw new EditorAccessError("Cần đăng nhập ChatGPT để tiếp tục.", 401, "EDITOR_SIGN_IN_REQUIRED");
+    await assertEditorPostOrigin(request);
+    const user = await getEditorUser();
+    if (!user) throw new EditorAccessError("Cần phiên Giảng viên hợp lệ để tiếp tục.", 401, "EDITOR_SIGN_IN_REQUIRED");
     const payload = (await request.json()) as Record<string, unknown>;
     const action = typeof payload.action === "string" ? payload.action : "";
     if (action === "register") return Response.json({ device: await registerEditorDevice(payload.publicKey, user) }, { headers: { "cache-control": "no-store, private" } });

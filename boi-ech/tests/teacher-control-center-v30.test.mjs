@@ -80,8 +80,9 @@ test("teacher return context survives video and editor flows", () => {
   assert.match(videoPage, /useSearchParams/);
   assert.match(videoPage, /returnMode === "teacher"/);
   assert.match(videoPage, /workspace=teacher&tab=/);
-  assert.match(editorPage, /requireChatGPTUser\(editorHref\)/);
-  assert.match(editorPage, /return=teacher&tab=/);
+  assert.match(editorPage, /getEditorUser\(\)/);
+  assert.match(editorPage, /const teacherReturn = params\.return === "teacher"/);
+  assert.match(editorPage, /\?workspace=teacher&tab=/);
   assert.match(editorPage, /returnHref=\{returnHref\}/);
   assert.match(editor, /Link href=\{returnHref\}/);
   assert.doesNotMatch(editor, /<Link href="\/">← Trở lại khóa học<\/Link>/);
@@ -89,7 +90,8 @@ test("teacher return context survives video and editor flows", () => {
 
 test("teacher role is structural and legacy learner content is suppressed before adapter styling", () => {
   assert.match(page, /data-person-role=\{deviceAccess\.personRole \?\? ""\}/);
-  assert.match(shell, /shell\?\.dataset\.personRole/);
+  assert.match(shell, /workspace\?\.role === "teacher"/);
+  assert.match(shell, /shell\.dataset\.personRole/);
   assert.match(css, /\.app-shell\[data-person-role="teacher"\] \.main-area > \.page/);
   assert.match(css, /display:\s*none !important/);
 });

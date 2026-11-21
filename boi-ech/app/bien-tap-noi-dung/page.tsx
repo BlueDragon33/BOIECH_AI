@@ -1,4 +1,5 @@
-import { requireChatGPTUser } from "../chatgpt-auth";
+import { getEditorUser } from "../editor-device-auth.server";
+import { redirect } from "next/navigation";
 import EditorWorkspace from "./editor-workspace";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,8 @@ export default async function ContentEditorPage({ searchParams }: { searchParams
   const returnClass = (params.class ?? "").trim().slice(0, 100);
   const classQuery = returnClass ? `&class=${encodeURIComponent(returnClass)}` : "";
   const returnHref = teacherReturn ? `/?workspace=teacher&tab=${encodeURIComponent(returnTab)}${classQuery}` : "/";
-  const editorHref = `/bien-tap-noi-dung?lesson=${encodeURIComponent(initialLesson)}${teacherReturn ? `&return=teacher&tab=${encodeURIComponent(returnTab)}${classQuery}` : ""}`;
-  const user = await requireChatGPTUser(editorHref);
+  // Server-side authorization; the editor API repeats the check for every operation.
+  const user = await getEditorUser();
+  if (!user) redirect("/?workspace=teacher&tab=class");
   return <EditorWorkspace user={{ displayName: user.displayName, email: user.email }} initialLesson={initialLesson} returnHref={returnHref} />;
 }

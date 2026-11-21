@@ -29,6 +29,8 @@ type TeacherClassAssignment = {
 
 type TeacherClassFilter = "all" | "attention" | "active" | "empty";
 type TeacherClassSort = "attention" | "progress" | "recent" | "name";
+type TeacherClassView = "grid" | "list";
+const CLASS_VIEW_STORAGE = "boi-ech-teacher-class-view-v49";
 
 type TeacherClassWorkspaceProps = {
   classes: string[];
@@ -100,6 +102,17 @@ export default function TeacherClassWorkspace({
   const [classQuery, setClassQuery] = useState("");
   const [classFilter, setClassFilter] = useState<TeacherClassFilter>("all");
   const [classSort, setClassSort] = useState<TeacherClassSort>("attention");
+  const [classView, setClassView] = useState<TeacherClassView>(() => {
+    try {
+      return typeof window !== "undefined" && window.localStorage.getItem(CLASS_VIEW_STORAGE) === "list"
+        ? "list" : "grid";
+    } catch { return "grid"; /* A view preference must not block the workspace. */ }
+  });
+  const chooseClassView = (view: TeacherClassView) => {
+    setClassView(view);
+    try { window.localStorage.setItem(CLASS_VIEW_STORAGE, view); }
+    catch { /* Storage might be disabled in a private browser. */ }
+  };
 
   const attentionCount = summaries.filter((item) => item.support > 0).length;
   const activeCount = summaries.filter((item) => item.learners.length > 0).length;
@@ -149,8 +162,10 @@ export default function TeacherClassWorkspace({
         <span>LỚP HỌC CỦA TÔI</span>
         <h1>Lớp học của tôi</h1>
         <p>Theo dõi các lớp được Cán bộ quản lý phân công và tiến độ học tập trong phạm vi chuyên môn.</p>
-        <small>{summaries.length} lớp · {totalLearners} học viên · {totalSupport} cần hỗ trợ</small>
-        <span data-teacher-sync-mount="class"/>
+        <div className="teacher-class-header-meta">
+          <small>{summaries.length} lớp · {totalLearners} học viên · {totalSupport} cần hỗ trợ</small>
+          <span data-teacher-sync-mount="class"/>
+        </div>
       </div>
       <div className="teacher-class-header-actions">
         <button type="button" onClick={() => onOpenEditor(selected?.name ?? "")}>Biên tập bài giảng</button>
@@ -168,6 +183,10 @@ export default function TeacherClassWorkspace({
       <div className="teacher-class-tools">
         <label className="teacher-class-search"><span aria-hidden="true">⌕</span><input value={classQuery} onChange={(event) => setClassQuery(event.target.value.slice(0, 80))} placeholder="Tìm lớp học…" aria-label="Tìm lớp học"/></label>
         <label className="teacher-class-sort"><span>Sắp xếp</span><select value={classSort} onChange={(event) => setClassSort(event.target.value as TeacherClassSort)} aria-label="Sắp xếp lớp học"><option value="attention">Ưu tiên can thiệp</option><option value="progress">Tiến độ thấp trước</option><option value="recent">Hoạt động gần nhất</option><option value="name">Tên A–Z</option></select></label>
+        <div className="teacher-class-view-switch" role="group" aria-label="Kiểu hiển thị danh sách lớp">
+          <button type="button" aria-pressed={classView === "grid"} className={classView === "grid" ? "active" : ""} onClick={() => chooseClassView("grid")}>▦ Grid</button>
+          <button type="button" aria-pressed={classView === "list"} className={classView === "list" ? "active" : ""} onClick={() => chooseClassView("list")}>☷ List</button>
+        </div>
       </div>
     </section>
 
@@ -177,7 +196,7 @@ export default function TeacherClassWorkspace({
           <span>Hiển thị {visibleSummaries.length}/{summaries.length} lớp</span>
           <small>Chọn một lớp để giữ đúng ngữ cảnh khi mở học viên, bài tập, báo cáo hoặc video AI.</small>
         </div>
-        <div className="teacher-class-card-grid" role="list" aria-label="Các lớp được phân công">
+        <div className="teacher-class-card-grid" data-view={classView} role="list" aria-label={classView === "grid" ? "Các lớp dạng thẻ" : "Các lớp dạng danh sách"}>
           {visibleSummaries.map((item) => {
             const active = item.name === selected?.name;
             const status = item.support > 0 ? "Cần chú ý" : item.learners.length === 0 ? "Chưa có học viên" : "Đang theo dõi";

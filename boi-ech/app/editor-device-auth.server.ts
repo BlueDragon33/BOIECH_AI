@@ -1,4 +1,7 @@
 import { getChatGPTUser, type ChatGPTUser } from "./chatgpt-auth";
+import { AccountError } from "./account-core.server";
+import { AccountEntitlementError } from "./account-entitlement.server";
+import { accountConfiguration, accountCookieToken, accountService } from "./account-runtime.server";
 import { getCourseDatabase } from "./device-auth.server";
 
 type EditorDeviceRow = {
@@ -16,6 +19,49 @@ export type EditorDeviceState = {
   email: string;
   displayName: string;
 };
+
+/**
+ * Existing ChatGPT editorial identities remain supported, but a fully
+ * authorized Account-first teacher must not be sent into another login flow.
+ * The editor's independent P-256 device and human permission approval remain.
+ * Never accept a role or email declared by the browser.
+ */
+export async function getEditorUser(): Promise<ChatGPTUser | null> {
+  const cfg = await accountConfiguration();
+  if (cfg.v2) {
+    const token = await accountCookieToken();
+    if (token) {
+      try {
+        const actor = await (await accountService()).authorize(token);
+        if (actor.role !== "teacher") return null;
+        return {
+          displayName: actor.name || "Giảng viên",
+          fullName: actor.name || null,
+          // Stable internal editor owner key, not an email address to contact.
+          email: `teacher-${actor.accountId}@account.boi-ech.invalid`,
+        };
+      } catch (error) {
+        if (error instanceof AccountError || error instanceof AccountEntitlementError) return null;
+        throw error;
+      }
+    }
+  }
+  return getChatGPTUser();
+}
+
+/**
+ * The Account-first editor inherits the same strict origin boundary as the
+ * canonical /api/accounts POST path. Legacy ChatGPT-only editor sessions keep
+ * their existing proof/permission contract.
+ */
+export async function assertEditorPostOrigin(request: Request): Promise<void> {
+  const config = await accountConfiguration();
+  if (!config.v2 || !(await accountCookieToken())) return;
+  if (request.headers.get("origin") !== config.origin ||
+      !request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+    throw new EditorAccessError("Nguồn yêu cầu biên tập không khớp ứng dụng.", 403, "EDITOR_CSRF_REJECTED");
+  }
+}
 
 export class EditorAccessError extends Error {
   status: number;
@@ -122,8 +168,8 @@ export async function createEditorChallenge(deviceId: unknown, user: ChatGPTUser
 }
 
 export async function verifyEditorProof(payload: Record<string, unknown>) {
-  const user = await getChatGPTUser();
-  if (!user) throw new EditorAccessError("Cần đăng nhập ChatGPT để chỉnh sửa.", 401, "EDITOR_SIGN_IN_REQUIRED");
+  const user = await getEditorUser();
+  if (!user) throw new EditorAccessError("Cần phiên Giảng viên đang hoạt động hoặc phiên biên tập hợp lệ.", 401, "EDITOR_SIGN_IN_REQUIRED");
   const deviceId = typeof payload.deviceId === "string" ? payload.deviceId : "";
   const challenge = typeof payload.challenge === "string" ? payload.challenge : "";
   const signature = typeof payload.signature === "string" ? payload.signature : "";
