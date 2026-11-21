@@ -1,6 +1,4 @@
-import { getEditorUser } from "../editor-device-auth.server";
-import { redirect } from "next/navigation";
-import EditorWorkspace from "./editor-workspace";
+import EditorSessionGate from "./editor-session-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +14,8 @@ export default async function ContentEditorPage({ searchParams }: { searchParams
   const returnClass = (params.class ?? "").trim().slice(0, 100);
   const classQuery = returnClass ? `&class=${encodeURIComponent(returnClass)}` : "";
   const returnHref = teacherReturn ? `/?workspace=teacher&tab=${encodeURIComponent(returnTab)}${classQuery}` : "/";
-  // Server-side authorization; the editor API repeats the check for every operation.
-  const user = await getEditorUser();
-  if (!user) redirect("/?workspace=teacher&tab=class");
-  return <EditorWorkspace user={{ displayName: user.displayName, email: user.email }} initialLesson={initialLesson} returnHref={returnHref} />;
+  // Render safely even when the D1/identity readback is temporarily unavailable.
+  // The editor and each mutation remain blocked until a signed teacher session
+  // is confirmed independently on /api/editor/session and POST proof routes.
+  return <EditorSessionGate initialLesson={initialLesson} returnHref={returnHref} />;
 }
