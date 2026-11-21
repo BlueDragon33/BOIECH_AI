@@ -267,6 +267,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   },[enabled,bypass]);
   const waitingForApproval = Boolean(account && (account.status !== "approved" ||
     account.onboardingStage !== "active" || account.deviceApproved === false || account.entitlementActive === false));
+  // A change to onboarding/status must not tear down and recreate focus,
+  // pageshow and online listeners while an authorization readback is running.
+  // Keep the current value for the stable event subscription instead.
+  const waitingForApprovalRef = useRef(waitingForApproval);
+  useEffect(() => { waitingForApprovalRef.current = waitingForApproval; }, [waitingForApproval]);
   useEffect(() => {
     if (!enabled || bypass) return;
     mounted.current = true;
@@ -283,7 +288,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       // Users awaiting the one-time review must stay signed in while the page
       // receives a real refresh signal. Approved users renew while actively interacting or
       // watching a lesson, not after abandoning a background tab.
-      if(!waitingForApproval && !mediaPlaying &&
+      if(!waitingForApprovalRef.current && !mediaPlaying &&
         now-lastUserEngagementAt.current>15*60_000)return;
       lastLeaseRenewalAttemptAt.current=now;
       try{await send({action:"keepalive"});}
@@ -348,7 +353,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       navigator.serviceWorker?.removeEventListener("message",onRemoteNotification);
       channel?.close();
     };
-  }, [enabled, bypass, reload, waitingForApproval]);
+  }, [enabled, bypass, reload]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
       account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
@@ -577,7 +582,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
      roleAssetFailure,managerPreload,managerPreloadError]);
   if (!enabled || bypass) return children;
   const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
-    && account.storageDeviceId && pathname==="/");
+    && account.storageDeviceId && pathname==="/" &&
+    // Never mount privileged manager UI while its first signed board readback
+    // or the one-time session-resume verification is still pending.
+    enteredAccountId===account.accountId &&
+    managerPreload?.accountId===account.accountId && Boolean(managerPreload.board));
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{
