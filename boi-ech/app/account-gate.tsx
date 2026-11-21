@@ -216,6 +216,8 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const lastUserEngagementAt=useRef(0);
   const lastLeaseRenewalAttemptAt=useRef(0);
   const readbackGeneration=useRef(0);
+  // Only resume on initial load after the server confirms the same session.
+  const resumeVerifiedSessionOnLoad=useRef(true);
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const readbackId=++readbackGeneration.current;
@@ -226,11 +228,12 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true);
     setTrialEnabled(data.accountUiTrial === true);
     if (!response.ok) {
-      if (response.status === 401) { setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
+      if (response.status === 401) { resumeVerifiedSessionOnLoad.current=false; setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
       throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
     }
     // Keep a document's namespace immutable: old async completions can only write its old account store.
     if (accountTransitionNeedsReload(current.current,data.account?.accountId ?? "")) {
+      resumeVerifiedSessionOnLoad.current=false;
       setReady(false); setRecovery(""); recoveryOwner.current=""; reloadPreservingPendingManagerInvite(managerInviteRef.current); return;
     }
     if ((current.current && data.account?.accountId !== current.current) ||
@@ -238,6 +241,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       setRecovery(""); recoveryOwner.current = "";
       if(mounted.current) setReady(false);
     }
+    if(!data.account) resumeVerifiedSessionOnLoad.current=false;
     await preparePortableAccount(data.account?.accountId ?? null, claim);
     if (!mounted.current || readbackId !== readbackGeneration.current) return;
     current.current = data.account?.accountId ?? "";
@@ -430,7 +434,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // Present real CHECKING immediately after a valid form submission,
     // instead of leaving the old card stuck at "Đang xử lý…".
     const showGate=mode==="login"||mode==="claim"||mode==="register";
-    if(showGate)setAuthSubmitting(true);
+    if(showGate){resumeVerifiedSessionOnLoad.current=false;setAuthSubmitting(true);}
     try {
     await run(async () => {
       if(mode==="recover"&&v2&&recoveryMethod==="question"){
@@ -550,6 +554,27 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
     return()=>controller.abort();
   },[managerNeedsBootstrap,account?.accountId,getManagerProof,managerPreloadAttempt]);
+  // F5 / browser reload: do not require a second GO for an approved session.
+  // Real server session, trusted device and role bootstrap must all succeed.
+  useEffect(()=>{
+    if(!resumeVerifiedSessionOnLoad.current || !enabled || bypass || !v2 ||
+      !ready || !active || !account?.accountId || enteredAccountId) return;
+    const id=account.accountId;
+    const signedRole=account.role==="learner" || account.role==="teacher";
+    const roleReady=signedRole && roleDeviceVerified?.accountId===id &&
+      roleDeviceVerified.device.status==="approved" &&
+      roleBootstrap?.accountId===id && roleBootstrap.role===account.role &&
+      !roleBootstrapError && !roleAssetFailure;
+    const managerReady=account.role==="manager" &&
+      managerPreload?.accountId===id && Boolean(managerPreload.board) &&
+      !managerPreloadError;
+    if(roleReady || managerReady){
+      resumeVerifiedSessionOnLoad.current=false;
+      setEnteredAccountId(id);
+    }
+  },[enabled,bypass,v2,ready,active,account?.accountId,account?.role,
+     enteredAccountId,roleDeviceVerified,roleBootstrap,roleBootstrapError,
+     roleAssetFailure,managerPreload,managerPreloadError]);
   if (!enabled || bypass) return children;
   const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
     && account.storageDeviceId && pathname==="/");
@@ -623,6 +648,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     });
   }
   async function logoutAccount(){
+    resumeVerifiedSessionOnLoad.current=false;
     await run(async()=>{
       // Keep the current validated UI usable if network logout fails.
       await send({action:"logout"});
