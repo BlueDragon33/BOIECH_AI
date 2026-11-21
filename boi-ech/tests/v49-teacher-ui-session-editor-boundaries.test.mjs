@@ -61,11 +61,15 @@ test("teacher editor uses same authenticated account and retains independent P-2
   assert.match(auth,/if \(actor\.role !== "teacher"\) return null/);
   assert.match(auth,/if \(error instanceof AccountError\) return null/);
   assert.match(auth,/export async function getEditorUser/);
+  assert.match(auth,/export async function assertEditorPostOrigin/);
+  assert.match(auth,/EDITOR_CSRF_REJECTED/);
   assert.match(auth,/crypto\.subtle\.verify/);
   assert.match(api,/getEditorUser\(\)/);
+  assert.match(api,/assertEditorPostOrigin\(request\)/);
   assert.match(page,/getEditorUser\(\)/);
   assert.match(page,/if \(!user\) redirect/);
   assert.match(content,/verifyEditorProof\(payload\)/);
+  assert.match(content,/assertEditorPostOrigin\(request\)/);
   assert.match(content,/action === "request-edit"/);
   assert.match(content,/status IN \('permission_requested','draft','changes_requested','review'\)/);
 });
