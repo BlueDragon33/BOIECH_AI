@@ -1,3 +1,12 @@
+/* Hide the legacy learner surfaces immediately from the verified role
+   carried by the canonical app-shell, before the teacher portal mounts. */
+.app-shell[data-person-role="teacher"] .main-area > .page,
+.app-shell[data-person-role="teacher"] .main-area > .ai-page,
+.app-shell[data-person-role="teacher"] .sidebar > nav,
+.app-shell[data-person-role="teacher"] .sidebar > .sidebar-progress {
+  display: none !important;
+}
+
 /* V49: grid/list control and compact class review. Display preferences only.
    Do not hide server warnings or authorization states. */
 .teacher-reference-v36 .teacher-class-view-switch {
