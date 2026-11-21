@@ -346,7 +346,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     window.addEventListener("keydown",engagement);
     window.addEventListener("wheel",engagement,{passive:true});
     window.addEventListener("touchstart",engagement,{passive:true});
-    window.addEventListener("scroll",engagement,{passive:true,capture:true});
     // Non-bubbling timeupdate is observed in capture phase; the renewal still
     // checks visibility + actual playing state and is throttle-limited.
     document.addEventListener("timeupdate",engagement,true);
@@ -370,7 +369,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       window.removeEventListener("keydown",engagement);
       window.removeEventListener("wheel",engagement);
       window.removeEventListener("touchstart",engagement);
-      window.removeEventListener("scroll",engagement,true);
       document.removeEventListener("timeupdate",engagement,true);
       window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh);
       window.removeEventListener("online",refresh);
