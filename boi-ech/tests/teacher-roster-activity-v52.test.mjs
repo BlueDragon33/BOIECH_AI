@@ -57,7 +57,7 @@ test("P-256 and teacher class access remain server-only, read-only and scoped",(
   assert.match(route,/verifyDeviceRequest\(payload,false\)/);
   assert.match(route,/teacher\.personRole!=="teacher"/);
   assert.match(route,/person_role='learner' AND status='approved'/);
-  assert.match(route,/class_name\) IN/);
+  assert.match(route,/lower\(trim\(class_name\)\) IN/);
   assert.match(route,/last_seen_at/);
   assert.doesNotMatch(route,/UPDATE device_access|DELETE FROM device_access|INSERT INTO/);
   assert.doesNotMatch(route,/online:true|status:"online"|isOnline/);
