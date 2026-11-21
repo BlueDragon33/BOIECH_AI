@@ -13,6 +13,7 @@ import {
   EditorAccessError,
   editorErrorResponse,
   verifyEditorProof,
+  assertEditorPostOrigin,
 } from "../../../editor-device-auth.server";
 import { getCourseDatabase } from "../../../device-auth.server";
 
@@ -48,6 +49,7 @@ async function versionFor(id: string) {
 
 export async function POST(request: Request) {
   try {
+    await assertEditorPostOrigin(request);
     const payload = (await request.json()) as Record<string, unknown>;
     const editor = await verifyEditorProof(payload);
     const action = typeof payload.action === "string" ? payload.action : "bootstrap";
