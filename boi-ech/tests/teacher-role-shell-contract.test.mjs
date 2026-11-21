@@ -10,7 +10,9 @@ const enhancements = fs.readFileSync(new URL("../app/teacher-enhancements.tsx", 
 const css = fs.readFileSync(new URL("../app/teacher-role-shell.css", import.meta.url), "utf8");
 
 test("teacher shell activates only for the registered teacher role", () => {
-  assert.match(shell, /role === "Giảng viên"/);
+  assert.match(shell, /workspace\?\.role === "teacher"/);
+  assert.match(enhancements, /workspace\?\.role!=="teacher"/);
+  assert.doesNotMatch(shell, /role === "Giảng viên"/);
   assert.doesNotMatch(shell, /role === "Học viên"/);
   assert.match(shell, /document\.body\.dataset\.teacherRoleUi = "active"/);
   assert.match(css, /body\[data-teacher-role-ui="active"\]/);
