@@ -78,6 +78,27 @@ test("no unverifiable session can resume, but transient errors do not delete coo
   assert.equal(accountTransitionNeedsReload("account-A",""),true);
 });
 
+test("foreground study/edit/video activity renews bounded session without periodic background polling",()=>{
+  const body=gate.slice(gate.indexOf("const keepAliveIfEngaged=async"),gate.indexOf("// Conditional sync:"));
+  assert.match(body,/now-lastLeaseRenewalAttemptAt\.current<4\*60_000/);
+  assert.match(body,/now-lastUserEngagementAt\.current>15\*60_000/);
+  assert.match(body,/await send\(\{action:"keepalive"\}\)/);
+  assert.match(body,/const engagement=\(\)=>\{/);
+  assert.match(body,/if\(document\.hidden \|\| lock\.current\)return/);
+  assert.match(body,/lastUserEngagementAt\.current=Date\.now\(\)/);
+  assert.match(body,/void keepAliveIfEngaged\(\)/);
+  assert.match(gate,/document\.addEventListener\("timeupdate",engagement,true\)/);
+  assert.match(gate,/document\.removeEventListener\("timeupdate",engagement,true\)/);
+  assert.match(gate,/window\.addEventListener\("pointerdown",engagement/);
+  assert.match(gate,/window\.addEventListener\("keydown",engagement\)/);
+  assert.doesNotMatch(gate,/setInterval\(\(\) => .*keepalive/);
+  // The server alone enforces expiration/revocation and a 7-day hard cap.
+  const core=read("app/account-core.server.ts");
+  assert.match(core,/async keepAlive\(token: string\)/);
+  assert.match(core,/issued_at_ms\+\?>\?/);
+  assert.match(core,/revoked=0/);
+});
+
 test("all touched runtime modules remain parseable TypeScript/TSX",()=>{
   for(const [name,body,kind] of [
     ["account-scope.ts",scope,ts.ScriptKind.TS],
