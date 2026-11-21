@@ -2,6 +2,7 @@
 
 import {useCallback,useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
+import {classifyRosterActivity,formatRosterMoment} from "./teacher-roster-activity";
 
 type Credential={version:2;privateKey:CryptoKey|null;publicKey:JsonWebKey};
 type RosterItem={name:string;personCode:string;className:string;status:"approved";lastSeenAt:string};
@@ -63,34 +64,130 @@ function CompactSync({loading,syncedAt,onSync}:{loading:boolean;syncedAt:string;
     <button type="button" disabled={loading} onClick={onSync}>{loading?"Đang đồng bộ…":"Đồng bộ dữ liệu"}</button>
   </div>;
 }
+type RosterFilter = "all" | "recent" | "older" | "unknown";
+type RosterDisplay = "list" | "grid";
+const ROSTER_DISPLAY_PREFERENCE = "boi-ech:teacher-roster:view:v52";
+
 function RosterPanel({data,loading,error,onSync}:{data:RosterResponse;loading:boolean;error:string;onSync:()=>void}){
   const [query,setQuery]=useState("");
+  const [activityFilter,setActivityFilter]=useState<RosterFilter>("all");
+  const [display,setDisplay]=useState<RosterDisplay>(()=>{
+    try{return typeof window!=="undefined" &&
+      window.localStorage.getItem(ROSTER_DISPLAY_PREFERENCE)==="grid"?"grid":"list";}
+    catch{return "list";}
+  });
+  const [nowMs,setNowMs]=useState(()=>Date.now());
+  useEffect(()=>{
+    // Display-only clock: must never trigger account authorization/network calls.
+    const timer=window.setInterval(()=>setNowMs(Date.now()),60_000);
+    return()=>window.clearInterval(timer);
+  },[]);
+
   const term=query.trim().toLocaleLowerCase("vi");
-  const listed=data.roster.filter(person=>!term||
-    [person.name,person.className].join(" ").toLocaleLowerCase("vi").includes(term));
-  return <section className="teacher-roster-manager" data-teacher-roster-ui>
-    <header><div><span>DANH SÁCH HỌC VIÊN ĐÃ DUYỆT</span><h2>Theo dõi lớp phụ trách</h2>
-      <p>Chỉ xem học viên đã được Cán bộ quản lý duyệt và phân công đúng lớp.
-        Giảng viên không thể duyệt, loại, khóa hay khôi phục tài khoản học viên.</p></div>
-      <button type="button" disabled={loading} onClick={onSync}>{loading?"Đang đồng bộ…":"Đồng bộ dữ liệu"}</button>
+  const classified=data.roster.map(person=>({
+    person,activity:classifyRosterActivity(person.lastSeenAt,data.syncedAt,nowMs,!error)
+  }));
+  const counts={
+    recent:classified.filter(item=>item.activity.kind==="recent").length,
+    older:classified.filter(item=>item.activity.kind==="older").length,
+    unknown:classified.filter(item=>item.activity.kind==="unknown").length,
+  };
+  const listed=classified.filter(({person,activity})=>
+    (!term||[person.name,person.className].join(" ").toLocaleLowerCase("vi").includes(term)) &&
+    (activityFilter==="all"||activity.kind===activityFilter));
+  const changeDisplay=(next:RosterDisplay)=>{
+    setDisplay(next);
+    try{window.localStorage.setItem(ROSTER_DISPLAY_PREFERENCE,next);}
+    catch{/* Display preference is optional; never blocks a signed roster. */}
+  };
+  const snapshotFresh=Boolean(data.syncedAt) && !error &&
+    Math.abs(nowMs-Date.parse(data.syncedAt))<=180_000;
+
+  return <section className="teacher-roster-manager teacher-roster-v52" data-teacher-roster-ui aria-label="Học viên lớp phụ trách">
+    <header className="teacher-roster-heading">
+      <div>
+        <span className="teacher-roster-eyebrow">HỌC VIÊN · LỚP PHỤ TRÁCH</span>
+        <h2>Danh sách học viên đã duyệt</h2>
+        <p>Tài khoản được duyệt không có nghĩa đang trực tuyến. Giảng viên chỉ được xem học viên thuộc lớp đã phân công.</p>
+      </div>
+      <div className="teacher-roster-heading-actions">
+        <span className={snapshotFresh?"teacher-roster-snapshot fresh":"teacher-roster-snapshot stale"} role="status">
+          {snapshotFresh?"Dữ liệu vừa đồng bộ":"Chưa có dữ liệu đồng bộ mới"}
+        </span>
+        <button type="button" disabled={loading} onClick={onSync}>
+          {loading?"Đang đồng bộ…":"Làm mới dữ liệu"}
+        </button>
+      </div>
     </header>
     <div className="teacher-roster-summary">
       <div><strong>{data.counts.approved}</strong><span>Học viên đã duyệt</span></div>
-      <div className="synced"><strong>{clock(data.syncedAt)}</strong><span>Lần đồng bộ cuối</span></div>
+      <div><strong>{counts.recent}</strong><span>Tương tác gần đây*</span></div>
+      <div><strong>{counts.older+counts.unknown}</strong><span>Không có tín hiệu mới / chưa rõ</span></div>
+      <div className="synced"><strong>{formatRosterMoment(data.syncedAt)}</strong><span>Lần đồng bộ cuối</span></div>
     </div>
-    <div className="teacher-roster-toolbar"><input value={query} onChange={e=>setQuery(e.target.value)}
-      placeholder="Tìm theo tên hoặc lớp" aria-label="Tìm học viên đã duyệt"/></div>
-    {error?<p className="teacher-roster-error" role="alert">{error}</p>:null}
-    <div className="teacher-roster-table-wrap"><table className="teacher-roster-table">
-      <thead><tr><th>Học viên</th><th>Lớp phụ trách</th><th>Trạng thái</th><th>Hoạt động gần nhất</th></tr></thead>
-      <tbody>{listed.map(person=><tr key={person.personCode||person.name}>
-        <td><strong>{person.name}</strong></td><td>{person.className||"Chưa có lớp"}</td>
-        <td><span className="teacher-roster-status approved">Đang học</span></td>
-        <td>{clock(person.lastSeenAt)}</td>
-      </tr>)}</tbody>
-    </table>
-    {!listed.length?<div className="teacher-roster-empty">Không có học viên đã duyệt phù hợp trong phạm vi lớp.</div>:null}
+    <div className="teacher-roster-toolbar">
+      <label className="teacher-roster-search">
+        <span className="sr-only">Tìm học viên hoặc lớp</span>
+        <input value={query} onChange={event=>setQuery(event.target.value)}
+          placeholder="Tìm học viên hoặc lớp…" aria-label="Tìm học viên đã duyệt"/>
+      </label>
+      <label className="teacher-roster-select-label">
+        <span className="sr-only">Lọc theo hoạt động</span>
+        <select aria-label="Lọc theo hoạt động" value={activityFilter}
+          onChange={event=>setActivityFilter(event.target.value as RosterFilter)}>
+          <option value="all">Mọi hoạt động</option>
+          <option value="recent">Có tương tác gần đây</option>
+          <option value="older">Chưa có tín hiệu mới</option>
+          <option value="unknown">Chưa xác định</option>
+        </select>
+      </label>
+      <div className="teacher-roster-display" role="group" aria-label="Kiểu xem danh sách">
+        <button type="button" aria-pressed={display==="list"}
+          className={display==="list"?"selected":""} onClick={()=>changeDisplay("list")}>☷ Danh sách</button>
+        <button type="button" aria-pressed={display==="grid"}
+          className={display==="grid"?"selected":""} onClick={()=>changeDisplay("grid")}>▦ Thẻ</button>
+      </div>
     </div>
+    {error?<p className="teacher-roster-error" role="alert">
+      {error} · Đang hiển thị dữ liệu lần cuối, không xác nhận trạng thái trực tuyến.
+    </p>:null}
+    {display==="list"?
+      <div className="teacher-roster-table-wrap">
+        <table className="teacher-roster-table">
+          <thead><tr><th>Học viên</th><th>Lớp</th><th>Tài khoản</th><th>Hoạt động ghi nhận</th><th>Lần ghi nhận cuối</th></tr></thead>
+          <tbody>{listed.map(({person,activity})=>
+            <tr key={person.personCode||person.name}>
+              <td><div className="teacher-roster-person">
+                <span className="teacher-roster-avatar" aria-hidden="true">{person.name.trim().slice(0,1).toLocaleUpperCase("vi")||"H"}</span>
+                <strong>{person.name}</strong>
+              </div></td>
+              <td>{person.className||"Chưa có lớp"}</td>
+              <td><span className="teacher-roster-status approved">Đã duyệt</span></td>
+              <td><span className={`teacher-roster-activity ${activity.kind}`} title={activity.explanation}>{activity.label}</span></td>
+              <td><span className="teacher-roster-lastseen">
+                {activity.recordedAt!==null?<time dateTime={new Date(activity.recordedAt).toISOString()}>{formatRosterMoment(person.lastSeenAt)}</time>:"Chưa ghi nhận"}
+                <small>Ghi nhận thiết bị, không phải giờ học</small>
+              </span></td>
+            </tr>
+          )}</tbody>
+        </table>
+      </div>:
+      <div className="teacher-roster-grid" role="list" aria-label="Thẻ học viên đã duyệt">
+        {listed.map(({person,activity})=><article key={person.personCode||person.name} role="listitem">
+          <header><span className="teacher-roster-avatar" aria-hidden="true">{person.name.trim().slice(0,1).toLocaleUpperCase("vi")||"H"}</span>
+            <div><strong>{person.name}</strong><small>{person.className||"Chưa có lớp"}</small></div></header>
+          <div className="teacher-roster-grid-badges">
+            <span className="teacher-roster-status approved">Đã duyệt</span>
+            <span className={`teacher-roster-activity ${activity.kind}`} title={activity.explanation}>{activity.label}</span>
+          </div>
+          <p>Lần ghi nhận: {formatRosterMoment(person.lastSeenAt)}</p>
+        </article>)}
+      </div>}
+    {!listed.length?<div className="teacher-roster-empty">Không có học viên phù hợp với bộ lọc trong phạm vi lớp.</div>:null}
+    <footer className="teacher-roster-disclaimer">
+      * “Tương tác gần đây” chỉ có nghĩa thiết bị được xác minh trong 5 phút gần nhất và dữ liệu vừa đồng bộ.
+      Không khẳng định học viên đang online, đang xem bài hay đang học. Trạng thái trực tuyến thực cần heartbeat có thời hạn và quyền hợp lệ.
+    </footer>
   </section>;
 }
 export default function TeacherRosterManager(){
