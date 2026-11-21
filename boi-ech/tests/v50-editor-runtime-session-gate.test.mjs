@@ -56,3 +56,13 @@ test("editor mutation contract retains signed role and independently signed lapt
   assert.match(content, /verifyEditorProof\(payload\)/);
   assert.match(content, /assertEditorPostOrigin\(request\)/);
 });
+
+test("Production deployment verifies editor route without signed test bypass", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/deploy-cloudflare.yml", import.meta.url), "utf8");
+  const smoke = source("scripts/verify-editor-route-live.mjs");
+  assert.match(workflow, /run: node scripts\/verify-editor-route-live\.mjs/);
+  assert.match(smoke, /bien-tap-noi-dung\?lesson=01/);
+  assert.match(smoke, /session\.status!==401/);
+  assert.match(smoke, /EDITOR_SESSION_REQUIRED/);
+  assert.doesNotMatch(smoke, /POST|\.run\(/);
+});
