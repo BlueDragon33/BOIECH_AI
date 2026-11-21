@@ -1,3 +1,36 @@
+.teacher-reference-v36 .teacher-class-header-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  max-width: 100%;
+}
+.teacher-reference-v36 .teacher-class-header-meta > small {
+  display: inline-flex;
+  margin-top: 0;
+  line-height: 1.4;
+}
+.teacher-reference-v36 .teacher-class-header-meta [data-teacher-sync-mount="class"] {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.teacher-reference-v36 .teacher-class-header-meta .teacher-roster-sync-compact {
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: 6px;
+}
+.teacher-reference-v36 .teacher-class-header-meta .teacher-roster-sync-compact :is(small,span) {
+  color: #b0d1df;
+  font-size: 11px;
+}
+.teacher-reference-v36 .teacher-class-header-meta .teacher-roster-sync-compact > button {
+  min-height: 31px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
 /* Hide the legacy learner surfaces immediately from the verified role
    carried by the canonical app-shell, before the teacher portal mounts. */
 .app-shell[data-person-role="teacher"] .main-area > .page,
