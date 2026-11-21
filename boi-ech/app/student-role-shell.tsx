@@ -345,7 +345,7 @@ export default function StudentRoleShell() {
       delete document.body.dataset.studentRoleUi;
       delete document.body.dataset.studentSection;
     };
-  }, []);
+  }, [workspace?.role, workspace?.accountId]);
 
   const originalLessonButtons = useMemo(() => () => Array.from(document.querySelectorAll<HTMLButtonElement>(".page-overview .lesson-card")), []);
   const openLesson = (index: number) => originalLessonButtons()[index]?.click();
