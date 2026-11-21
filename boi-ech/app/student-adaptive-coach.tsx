@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {assessLearnerEvidenceV48} from "./learner-evidence-readiness-v48";
+import {useAccountWorkspace} from "./account-workspace-bootstrap";
 
 type StoredDeviceCredential = { version: 2; privateKey: CryptoKey | null; publicKey: JsonWebKey };
 type AdaptiveAlert = { level: "info" | "warning" | "critical"; code: string; text: string };
@@ -279,6 +280,7 @@ function AdaptiveCoach({
 }
 
 export default function StudentAdaptiveCoach() {
+  const workspace=useAccountWorkspace();
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const [data, setData] = useState<AdaptiveBootstrap | null>(null);
   const [loading, setLoading] = useState(false);
@@ -322,8 +324,7 @@ export default function StudentAdaptiveCoach() {
 
     const sync = () => {
       timer = 0;
-      const role = text(document.querySelector(".learner-chip small"));
-      const nextMount = role === "Học viên"
+      const nextMount = workspace?.role === "learner"
         ? document.querySelector<HTMLElement>("[data-student-adaptive-mount]")
         : null;
       setMount(nextMount);
@@ -385,7 +386,7 @@ export default function StudentAdaptiveCoach() {
       setData(null);
       setError("");
     };
-  }, [refresh]);
+  }, [refresh, workspace?.role, workspace?.accountId]);
 
   if (!mount) return null;
   if (loading && !data) {
