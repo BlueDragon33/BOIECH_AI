@@ -43,6 +43,24 @@ test("Active authenticated use extends idle lease and rolling 8h horizon without
   // Staying signed in does not manufacture an approval or an entitlement.
  }finally{f.close();}
 });
+test("a real foreground event every four minutes keeps one signed session alive across forty minutes",async()=>{
+ const f=leaseFixture();try{
+  const a=await f.register(41011);
+  const before=row(f,a.token);
+  for(let minuteElapsed=4;minuteElapsed<=44;minuteElapsed+=4){
+    f.advance(4*minute);
+    const result=await f.serviceAt.keepAlive(a.token);
+    assert.equal(result.ok,true);
+    assert.ok(row(f,a.token).idle_expires_at>f.time());
+  }
+  assert.equal((await f.serviceAt.session(a.token)).accountId,a.account.accountId);
+  assert.equal(row(f,a.token).issued_at_ms,before.issued_at_ms,
+    "foreground renewals never reset the seven-day hard cap");
+  f.advance(31*minute);
+  await assert.rejects(()=>f.serviceAt.session(a.token),e=>e.code==="SESSION_INVALID");
+ }finally{f.close();}
+});
+
 test("An expired, forged or revoked session can never be revived by the keepalive endpoint",async()=>{
  const f=leaseFixture();try{
   const a=await f.register(41002);
