@@ -81,7 +81,8 @@ test("teacher return context survives video and editor flows", () => {
   assert.match(videoPage, /returnMode === "teacher"/);
   assert.match(videoPage, /workspace=teacher&tab=/);
   assert.match(editorPage, /getEditorUser\(\)/);
-  assert.match(editorPage, /return=teacher&tab=/);
+  assert.match(editorPage, /const teacherReturn = params\.return === "teacher"/);
+  assert.match(editorPage, /\?workspace=teacher&tab=/);
   assert.match(editorPage, /returnHref=\{returnHref\}/);
   assert.match(editor, /Link href=\{returnHref\}/);
   assert.doesNotMatch(editor, /<Link href="\/">← Trở lại khóa học<\/Link>/);
