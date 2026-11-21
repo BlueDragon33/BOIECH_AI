@@ -17,12 +17,16 @@ const html=(status)=>new Response("<html><body>Cloudflare gateway error</body></
   status,headers:{"content-type":"text/html"},
 });
 
-test("existing login session read accepts valid JSON and safely treats an unformatted 401 as logout",async()=>{
+test("session read accepts canonical JSON and never treats upstream HTML 401 as logout",async()=>{
   const {readAccountPayload}=harness(async()=>null);
   assert.deepEqual(await readAccountPayload(Response.json({account:{accountId:"acc_fixture"}})),
     {account:{accountId:"acc_fixture"}});
-  assert.deepEqual(await readAccountPayload(html(401)),{});
-  assert.deepEqual(await readAccountPayload(new Response(null,{status:401})),{});
+  assert.deepEqual(await readAccountPayload(Response.json({code:"SESSION_INVALID"},{status:401})),
+    {code:"SESSION_INVALID"});
+  await assert.rejects(()=>readAccountPayload(html(401)),
+    error=>/Giữ nguyên phiên/.test(error.message));
+  await assert.rejects(()=>readAccountPayload(new Response(null,{status:401})),
+    error=>/Giữ nguyên phiên/.test(error.message));
 });
 
 test("failed or empty Cloudflare responses become actionable Vietnamese errors, never raw HTML",async()=>{

@@ -81,13 +81,16 @@ function accountNetworkError(error: unknown) {
 }
 // Cloudflare or an upstream outage may return HTML (or no body). Never display
 // raw infrastructure errors or leave account onboarding waiting for JSON.
-// A 401 still means "no active session", even if its response has no JSON.
+// An unstructured 401 must NOT be treated as a session verdict; only the canonical API can end it.
 async function readAccountPayload(response: Response): Promise<Record<string, unknown>> {
   let parsed: unknown;
   try { parsed=await response.json(); } catch { /* Non-JSON body, handled below. */ }
   if(parsed && typeof parsed==="object" && !Array.isArray(parsed))
     return parsed as Record<string, unknown>;
-  if(response.status===401) return {};
+  // An HTML 401 may come from an upstream edge challenge, not the
+  // canonical Bơi Ếch session API. Never invalidate a cookie on that alone.
+  if(response.status===401)
+    throw new Error("Cổng mạng trả 401 nhưng không có kết quả xác thực hợp lệ từ Bơi Ếch. Giữ nguyên phiên, chọn Thử đọc lại phiên.");
   if(response.status===429)
     throw new Error("Hệ thống đang giới hạn lượt thử. Không gửi liên tiếp; hãy thử lại sau 15 phút.");
   if(response.status>=500)
@@ -221,15 +224,25 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   const attemptedAutoActivation=useRef(new Set<string>());
   const reload = useCallback(async (claim = false) => {
     const readbackId=++readbackGeneration.current;
-    const {response,data} = await accountReadWithinDeadline<{ account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string }>("/api/accounts", { credentials: "same-origin", cache: "no-store" });
+    const {response,data} = await accountReadWithinDeadline<{ account?: Account | null; devices?: Device[]; accountV2?:boolean; accountSingleReview?:boolean; accountUiTrial?:boolean; error?: string; code?:string }>("/api/accounts", { credentials: "same-origin", cache: "no-store" });
     // A polling GET can finish after a successful profile submit/readback.
     // Never allow that stale reply to roll the UI back to a pending state.
     if (!mounted.current || readbackId !== readbackGeneration.current) return;
     setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true);
     setTrialEnabled(data.accountUiTrial === true);
     if (!response.ok) {
-      if (response.status === 401) { resumeVerifiedSessionOnLoad.current=false; setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
-      throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
+      if (response.status === 401 &&
+        (data.code === "SESSION_INVALID" || data.code === "SESSION_REQUIRED")) {
+        resumeVerifiedSessionOnLoad.current=false; setRecovery(""); recoveryOwner.current = "";
+        if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;}
+        await preparePortableAccount(null); current.current = "";
+        if (mounted.current) { setAccount(null); setReady(true); }
+        return;
+      }
+      // Gateway faults are not proof of invalid credentials; retain the
+      // existing namespace, in-memory session and P-256 keys until definitive
+      // logout/revocation is returned by the canonical account API.
+      throw new Error(data.error ?? "Chưa thể xác minh phiên từ máy chủ. Vui lòng thử đọc lại, không cần đăng nhập lại.");
     }
     // Keep a document's namespace immutable: old async completions can only write its old account store.
     if (accountTransitionNeedsReload(current.current,data.account?.accountId ?? "")) {
@@ -267,6 +280,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
   },[enabled,bypass]);
   const waitingForApproval = Boolean(account && (account.status !== "approved" ||
     account.onboardingStage !== "active" || account.deviceApproved === false || account.entitlementActive === false));
+  // A change to onboarding/status must not tear down and recreate focus,
+  // pageshow and online listeners while an authorization readback is running.
+  // Keep the current value for the stable event subscription instead.
+  const waitingForApprovalRef = useRef(waitingForApproval);
+  useEffect(() => { waitingForApprovalRef.current = waitingForApproval; }, [waitingForApproval]);
   useEffect(() => {
     if (!enabled || bypass) return;
     mounted.current = true;
@@ -274,7 +292,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // Activity signals are UX hints, not authentication. Only a valid,
     // non-revoked server cookie can refresh its bounded lease. A hidden or
     // abandoned tab must not keep the session alive indefinitely.
-    const engagement=()=>{if(!document.hidden)lastUserEngagementAt.current=Date.now();};
     const keepAliveIfEngaged=async()=>{
       const now=Date.now();
       if(!current.current || now-lastLeaseRenewalAttemptAt.current<4*60_000)return;
@@ -283,7 +300,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       // Users awaiting the one-time review must stay signed in while the page
       // receives a real refresh signal. Approved users renew while actively interacting or
       // watching a lesson, not after abandoning a background tab.
-      if(!waitingForApproval && !mediaPlaying &&
+      if(!waitingForApprovalRef.current && !mediaPlaying &&
         now-lastUserEngagementAt.current>15*60_000)return;
       lastLeaseRenewalAttemptAt.current=now;
       try{await send({action:"keepalive"});}
@@ -291,6 +308,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         // Never treat an uncertain keepalive transport as logout. The
         // authoritative readback below distinguishes expired from unavailable.
       }
+    };
+    // A person may stay on the same tab for longer than the server's 30-minute
+    // idle window. Refreshing the browser must not log them out merely because
+    // focus/pageshow did not fire while they studied, edited, or watched video.
+    // Only foreground real interactions/media progress trigger this bounded
+    // (at most once per four minutes) server-authorized lease renewal.
+    const engagement=()=>{
+      if(document.hidden || lock.current)return;
+      lastUserEngagementAt.current=Date.now();
+      void keepAliveIfEngaged();
     };
     // Conditional sync: no recurring server polling. Only real external
     // notifications, cross-tab changes, manual refresh, reconnect or resume.
@@ -319,7 +346,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     window.addEventListener("keydown",engagement);
     window.addEventListener("wheel",engagement,{passive:true});
     window.addEventListener("touchstart",engagement,{passive:true});
-    window.addEventListener("scroll",engagement,{passive:true,capture:true});
+    // Non-bubbling timeupdate is observed in capture phase; the renewal still
+    // checks visibility + actual playing state and is throttle-limited.
+    document.addEventListener("timeupdate",engagement,true);
     refresh(); window.addEventListener("focus", refresh); window.addEventListener("pageshow",refresh);
     window.addEventListener("online",refresh);
     document.addEventListener("visibilitychange",onVisibility);
@@ -340,7 +369,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       window.removeEventListener("keydown",engagement);
       window.removeEventListener("wheel",engagement);
       window.removeEventListener("touchstart",engagement);
-      window.removeEventListener("scroll",engagement,true);
+      document.removeEventListener("timeupdate",engagement,true);
       window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh);
       window.removeEventListener("online",refresh);
       document.removeEventListener("visibilitychange",onVisibility);
@@ -348,7 +377,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       navigator.serviceWorker?.removeEventListener("message",onRemoteNotification);
       channel?.close();
     };
-  }, [enabled, bypass, reload, waitingForApproval]);
+  }, [enabled, bypass, reload]);
   useEffect(()=>{
     if(!ready||!v2||!singleReview||!account?.accountId||
       account.onboardingStage!=="profile_required"||account.profileDraftReady!==true||
@@ -577,7 +606,11 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
      roleAssetFailure,managerPreload,managerPreloadError]);
   if (!enabled || bypass) return children;
   const managerDashboard=Boolean(ready && active && v2 && account?.role==="manager"
-    && account.storageDeviceId && pathname==="/");
+    && account.storageDeviceId && pathname==="/" &&
+    // Never mount privileged manager UI while its first signed board readback
+    // or the one-time session-resume verification is still pending.
+    enteredAccountId===account.accountId &&
+    managerPreload?.accountId===account.accountId && Boolean(managerPreload.board));
   async function submitProfile(form:HTMLFormElement) {
     const fields=Object.fromEntries(new FormData(form));
     await run(async()=>{

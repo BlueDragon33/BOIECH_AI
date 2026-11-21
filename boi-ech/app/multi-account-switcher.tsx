@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { mayReusePreparedAccountScope } from "./account-scope";
 
 const DB_NAME = "boi-ech-doc-lap";
 const DB_VERSION = 4;
@@ -76,7 +77,11 @@ function openAccountDb(databaseName = DB_NAME) {
     };
     request.onsuccess = () => {
       if (settled) { request.result.close(); return; }
-      settled = true; window.clearTimeout(deadline); resolve(request.result);
+      settled = true; window.clearTimeout(deadline);
+      // Another tab may need an IndexedDB schema upgrade. Never indefinitely
+      // pin an old version with a dangling connection in this tab.
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
     };
     request.onerror = () => {
       if (settled) return;
@@ -102,15 +107,25 @@ function transactionDone(transaction: IDBTransaction) {
 
 async function readActiveCredential() {
   const db = await openAccountDb();
-  const value = await requestValue(db.transaction(DEVICE_STORE, "readonly").objectStore(DEVICE_STORE).get(ACTIVE_KEY));
-  return value as StoredDeviceCredential | undefined;
+  try {
+    const value = await requestValue(db.transaction(DEVICE_STORE, "readonly").objectStore(DEVICE_STORE).get(ACTIVE_KEY));
+    return value as StoredDeviceCredential | undefined;
+  } finally {
+    // Releasing the IndexedDB connection avoids blocking upgrades in other tabs
+    // when users reload or change accounts.
+    db.close();
+  }
 }
 
 async function writeActiveCredential(credential: StoredDeviceCredential) {
   const db = await openAccountDb();
-  const transaction = db.transaction(DEVICE_STORE, "readwrite");
-  transaction.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
-  await transactionDone(transaction);
+  try {
+    const transaction = db.transaction(DEVICE_STORE, "readwrite");
+    transaction.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
 }
 
 async function canonicalDeviceId(credential: StoredDeviceCredential) {
@@ -133,31 +148,39 @@ async function readKeyedValues(storeName: string, databaseName = DB_NAME) {
       cursor.continue();
     };
     request.onerror = () => reject(request.error);
-  });
+  }).finally(() => db.close());
 }
 
 async function snapshotLocalState(databaseName = DB_NAME): Promise<LocalAccountState> {
   const db = await openAccountDb(databaseName);
-  const progress = await requestValue(db.transaction("tien-do", "readonly").objectStore("tien-do").get("bai-03"));
-  const offlineActions = await requestValue(db.transaction("dong-bo", "readonly").objectStore("dong-bo").getAll());
-  const studyStats = await requestValue(db.transaction("thong-ke-hoc", "readonly").objectStore("thong-ke-hoc").get("current"));
-  const personalContent = await readKeyedValues("ban-rieng", databaseName);
-  return { progress, offlineActions, personalContent, studyStats };
+  try {
+    const progress = await requestValue(db.transaction("tien-do", "readonly").objectStore("tien-do").get("bai-03"));
+    const offlineActions = await requestValue(db.transaction("dong-bo", "readonly").objectStore("dong-bo").getAll());
+    const studyStats = await requestValue(db.transaction("thong-ke-hoc", "readonly").objectStore("thong-ke-hoc").get("current"));
+    const personalContent = await readKeyedValues("ban-rieng", databaseName);
+    return { progress, offlineActions, personalContent, studyStats };
+  } finally {
+    db.close();
+  }
 }
 
 async function restoreLocalState(state: LocalAccountState, databaseName = DB_NAME) {
   const db = await openAccountDb(databaseName);
-  const transaction = db.transaction(["tien-do", "dong-bo", "ban-rieng", "thong-ke-hoc"], "readwrite");
-  const progress = transaction.objectStore("tien-do");
-  const offline = transaction.objectStore("dong-bo");
-  const personal = transaction.objectStore("ban-rieng");
-  const study = transaction.objectStore("thong-ke-hoc");
-  progress.clear(); offline.clear(); personal.clear(); study.clear();
-  if (state.progress !== undefined) progress.put(state.progress, "bai-03");
-  state.offlineActions.forEach((value) => offline.put(value));
-  state.personalContent.forEach(({ key, value }) => personal.put(value, key));
-  if (state.studyStats !== undefined) study.put(state.studyStats, "current");
-  await transactionDone(transaction);
+  try {
+    const transaction = db.transaction(["tien-do", "dong-bo", "ban-rieng", "thong-ke-hoc"], "readwrite");
+    const progress = transaction.objectStore("tien-do");
+    const offline = transaction.objectStore("dong-bo");
+    const personal = transaction.objectStore("ban-rieng");
+    const study = transaction.objectStore("thong-ke-hoc");
+    progress.clear(); offline.clear(); personal.clear(); study.clear();
+    if (state.progress !== undefined) progress.put(state.progress, "bai-03");
+    state.offlineActions.forEach((value) => offline.put(value));
+    state.personalContent.forEach(({ key, value }) => personal.put(value, key));
+    if (state.studyStats !== undefined) study.put(state.studyStats, "current");
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
 }
 
 async function clearAccountLocalState() {
@@ -166,9 +189,13 @@ async function clearAccountLocalState() {
 
 async function storeVaultRecord(record: AccountVaultRecord) {
   const db = await openAccountDb();
-  const transaction = db.transaction(DEVICE_STORE, "readwrite");
-  transaction.objectStore(DEVICE_STORE).put(record, `${ACCOUNT_PREFIX}${record.deviceId}`);
-  await transactionDone(transaction);
+  try {
+    const transaction = db.transaction(DEVICE_STORE, "readwrite");
+    transaction.objectStore(DEVICE_STORE).put(record, `${ACCOUNT_PREFIX}${record.deviceId}`);
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
 }
 
 async function listVaultRecords() {
@@ -191,7 +218,7 @@ async function listVaultRecords() {
       cursor.continue();
     };
     request.onerror = () => reject(request.error);
-  });
+  }).finally(() => db.close());
 }
 
 async function archiveActiveAccount(meta: AccountMeta) {
@@ -418,6 +445,11 @@ export async function preparePortableAccount(accountId: string | null, claim = f
   if (accountId !== null && !/^acc_[a-f0-9]{64}$/.test(accountId)) throw new Error("Mã tài khoản không hợp lệ.");
   const existingScope = document.documentElement.dataset.accountLocalDatabase;
   const requestedScope = accountId ? DB_NAME + ":" + accountId : DB_NAME + ":signed-out";
+  // A trusted account may be read back on focus/pageshow/online multiple
+  // times. Its credential and local namespace were already verified in this
+  // document. Avoid redundant IndexedDB writes and open handles.
+  // A claim must still run its one-time legacy migration.
+  if (mayReusePreparedAccountScope(existingScope, requestedScope, claim)) return;
   if (existingScope && existingScope !== DB_NAME + ":signed-out" && existingScope !== requestedScope)
     throw new Error("ACCOUNT_DOCUMENT_RELOAD_REQUIRED");
   // Each tab keeps its own namespace. Concurrent tabs never swap a shared progress/queue store.
@@ -441,9 +473,11 @@ export async function preparePortableAccount(accountId: string | null, claim = f
     let credential = await readActiveCredential();
     if (!credential?.privateKey) { credential = await generateCredential(); await writeActiveCredential(credential); }
     const profileDb = await openAccountDb(databaseName);
-    const tx = profileDb.transaction(DEVICE_STORE, "readwrite");
-    tx.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
-    await transactionDone(tx); profileDb.close();
+    try {
+      const tx = profileDb.transaction(DEVICE_STORE, "readwrite");
+      tx.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
+      await transactionDone(tx);
+    } finally { profileDb.close(); }
   }
   const videoScope = accountId ? await portableValue("portable:video:" + accountId) : null;
   document.documentElement.dataset.accountLocalDatabase = databaseName;
