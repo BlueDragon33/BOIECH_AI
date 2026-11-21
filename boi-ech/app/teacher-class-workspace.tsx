@@ -102,12 +102,12 @@ export default function TeacherClassWorkspace({
   const [classQuery, setClassQuery] = useState("");
   const [classFilter, setClassFilter] = useState<TeacherClassFilter>("all");
   const [classSort, setClassSort] = useState<TeacherClassSort>("attention");
-  const [classView, setClassView] = useState<TeacherClassView>("grid");
-  useEffect(() => {
+  const [classView, setClassView] = useState<TeacherClassView>(() => {
     try {
-      if (window.localStorage.getItem(CLASS_VIEW_STORAGE) === "list") setClassView("list");
-    } catch { /* A display preference must never block the class workspace. */ }
-  }, []);
+      return typeof window !== "undefined" && window.localStorage.getItem(CLASS_VIEW_STORAGE) === "list"
+        ? "list" : "grid";
+    } catch { return "grid"; /* A view preference must not block the workspace. */ }
+  });
   const chooseClassView = (view: TeacherClassView) => {
     setClassView(view);
     try { window.localStorage.setItem(CLASS_VIEW_STORAGE, view); }
