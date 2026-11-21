@@ -15,7 +15,7 @@ Thư mục `quan-ly-hoc-tap/` chỉ còn phục vụ đối chiếu/migration l�
 
 Bơi ếch sở hữu runtime, D1 `boi-ech-db`, registry thiết bị `BE-`, tiến độ học, thanh toán, nội dung và audit của chính nó. Application Management chỉ quản trị từ xa qua Control API; không sở hữu database Bơi ếch.
 
-Production Cloudflare hiện tại được giữ nhưng deployment đã chuyển sang **manual-only** trong giai đoạn migration. Một đường preview riêng dùng Worker `boi-ech-preview`, D1 `boi-ech-preview-db` và R2 `boi-ech-preview-payments` được dùng để kiểm chứng trước khi thay đổi production.
+Production Cloudflare hiện tại được giữ ở chế độ **manual-only / Production-first** theo quyết định Owner ngày 21/11/2026. Preview riêng (`boi-ech-preview`, D1/R2 riêng) là tùy chọn, không bắt buộc trong quy trình phát hành thường lệ. CI, bảo vệ dữ liệu, kiểm tra migration, rollback, readback và nghiệm thu sau Production vẫn bắt buộc; chi tiết tại `docs/DEVELOPMENT_RELEASE_POLICY.md`.
 
 GitHub là source of truth. Không commit `.env`, token, khóa bí mật, D1 ID preview hoặc credential Cloudflare vào repository.
 
@@ -57,7 +57,7 @@ Yêu cầu Node.js `>=22.13.0`.
 
 ## Operational sovereignty
 
-BOIECH_AI adopts **Universal Constitution 1.2.0** at **B3**.
+BOIECH_AI adopts **Universal Constitution 1.3.0** at **B3**.
 
 Bơi ếch is currently in a truthful sovereignty migration:
 - lessons and teaching truth must remain provider-independent;
