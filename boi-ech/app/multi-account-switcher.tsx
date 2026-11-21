@@ -102,15 +102,25 @@ function transactionDone(transaction: IDBTransaction) {
 
 async function readActiveCredential() {
   const db = await openAccountDb();
-  const value = await requestValue(db.transaction(DEVICE_STORE, "readonly").objectStore(DEVICE_STORE).get(ACTIVE_KEY));
-  return value as StoredDeviceCredential | undefined;
+  try {
+    const value = await requestValue(db.transaction(DEVICE_STORE, "readonly").objectStore(DEVICE_STORE).get(ACTIVE_KEY));
+    return value as StoredDeviceCredential | undefined;
+  } finally {
+    // Releasing the IndexedDB connection avoids blocking upgrades in other tabs
+    // when users reload or change accounts.
+    db.close();
+  }
 }
 
 async function writeActiveCredential(credential: StoredDeviceCredential) {
   const db = await openAccountDb();
-  const transaction = db.transaction(DEVICE_STORE, "readwrite");
-  transaction.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
-  await transactionDone(transaction);
+  try {
+    const transaction = db.transaction(DEVICE_STORE, "readwrite");
+    transaction.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
 }
 
 async function canonicalDeviceId(credential: StoredDeviceCredential) {
@@ -418,6 +428,11 @@ export async function preparePortableAccount(accountId: string | null, claim = f
   if (accountId !== null && !/^acc_[a-f0-9]{64}$/.test(accountId)) throw new Error("Mã tài khoản không hợp lệ.");
   const existingScope = document.documentElement.dataset.accountLocalDatabase;
   const requestedScope = accountId ? DB_NAME + ":" + accountId : DB_NAME + ":signed-out";
+  // A trusted account may be read back on focus/pageshow/online multiple
+  // times. Its credential and local namespace were already verified in this
+  // document. Avoid redundant IndexedDB writes and open handles.
+  // A claim must still run its one-time legacy migration.
+  if (!claim && existingScope === requestedScope) return;
   if (existingScope && existingScope !== DB_NAME + ":signed-out" && existingScope !== requestedScope)
     throw new Error("ACCOUNT_DOCUMENT_RELOAD_REQUIRED");
   // Each tab keeps its own namespace. Concurrent tabs never swap a shared progress/queue store.
@@ -443,7 +458,8 @@ export async function preparePortableAccount(accountId: string | null, claim = f
     const profileDb = await openAccountDb(databaseName);
     const tx = profileDb.transaction(DEVICE_STORE, "readwrite");
     tx.objectStore(DEVICE_STORE).put(credential, ACTIVE_KEY);
-    await transactionDone(tx); profileDb.close();
+    try { await transactionDone(tx); }
+    finally { profileDb.close(); }
   }
   const videoScope = accountId ? await portableValue("portable:video:" + accountId) : null;
   document.documentElement.dataset.accountLocalDatabase = databaseName;
