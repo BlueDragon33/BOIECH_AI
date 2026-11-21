@@ -1,5 +1,6 @@
 import { getChatGPTUser, type ChatGPTUser } from "./chatgpt-auth";
 import { AccountError } from "./account-core.server";
+import { AccountEntitlementError } from "./account-entitlement.server";
 import { accountConfiguration, accountCookieToken, accountService } from "./account-runtime.server";
 import { getCourseDatabase } from "./device-auth.server";
 
@@ -40,7 +41,7 @@ export async function getEditorUser(): Promise<ChatGPTUser | null> {
           email: `teacher-${actor.accountId}@account.boi-ech.invalid`,
         };
       } catch (error) {
-        if (error instanceof AccountError) return null;
+        if (error instanceof AccountError || error instanceof AccountEntitlementError) return null;
         throw error;
       }
     }
