@@ -87,7 +87,10 @@ async function readAccountPayload(response: Response): Promise<Record<string, un
   try { parsed=await response.json(); } catch { /* Non-JSON body, handled below. */ }
   if(parsed && typeof parsed==="object" && !Array.isArray(parsed))
     return parsed as Record<string, unknown>;
-  if(response.status===401) return {};
+  // An HTML 401 may come from an upstream edge challenge, not the
+  // canonical Bơi Ếch session API. Never invalidate a cookie on that alone.
+  if(response.status===401)
+    throw new Error("Cổng mạng trả 401 nhưng không có kết quả xác thực hợp lệ từ Bơi Ếch. Giữ nguyên phiên, chọn Thử đọc lại phiên.");
   if(response.status===429)
     throw new Error("Hệ thống đang giới hạn lượt thử. Không gửi liên tiếp; hãy thử lại sau 15 phút.");
   if(response.status>=500)
@@ -228,8 +231,18 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     setV2(data.accountV2 === true); setSingleReview(data.accountSingleReview === true);
     setTrialEnabled(data.accountUiTrial === true);
     if (!response.ok) {
-      if (response.status === 401) { resumeVerifiedSessionOnLoad.current=false; setRecovery(""); recoveryOwner.current = ""; if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;} await preparePortableAccount(null); current.current = ""; if (mounted.current) { setAccount(null); setReady(true); } return; }
-      throw new Error(data.error ?? "Không đọc được phiên đăng nhập.");
+      if (response.status === 401 &&
+        (data.code === "SESSION_INVALID" || data.code === "SESSION_REQUIRED")) {
+        resumeVerifiedSessionOnLoad.current=false; setRecovery(""); recoveryOwner.current = "";
+        if(current.current){setReady(false);reloadPreservingPendingManagerInvite(managerInviteRef.current);return;}
+        await preparePortableAccount(null); current.current = "";
+        if (mounted.current) { setAccount(null); setReady(true); }
+        return;
+      }
+      // Gateway faults are not proof of invalid credentials; retain the
+      // existing namespace, in-memory session and P-256 keys until definitive
+      // logout/revocation is returned by the canonical account API.
+      throw new Error(data.error ?? "Chưa thể xác minh phiên từ máy chủ. Vui lòng thử đọc lại, không cần đăng nhập lại.");
     }
     // Keep a document's namespace immutable: old async completions can only write its old account store.
     if (accountTransitionNeedsReload(current.current,data.account?.accountId ?? "")) {
