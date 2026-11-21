@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import EditorWorkspace from "./editor-workspace";
 
@@ -24,6 +24,39 @@ function verifiedUser(value: unknown): value is EditorUser {
  * when the editor's database/identity bootstrap is temporarily unavailable.
  * POST mutation routes independently revalidate role + P-256 proof.
  */
+async function loadEditorSession(signal: AbortSignal): Promise<GateState> {
+  try {
+    const response = await fetch("/api/editor/session", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+      headers: { accept: "application/json" },
+    });
+    const payload = await response.json() as SessionReply;
+    if (response.ok && verifiedUser(payload.user)) {
+      return { kind: "ready", user: payload.user };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return {
+        kind: "denied",
+        message: typeof payload.error === "string" ? payload.error : "Tài khoản hiện tại chưa có quyền Biên tập nội dung.",
+      };
+    }
+    return {
+      kind: "unavailable",
+      message: typeof payload.error === "string" ? payload.error : "Không thể kiểm tra phiên biên tập trên máy chủ.",
+      code: typeof payload.code === "string" ? payload.code : "EDITOR_SESSION_INVALID_REPLY",
+    };
+  } catch {
+    return {
+      kind: "unavailable",
+      message: "Không kết nối được dịch vụ biên tập. Không cần xóa dữ liệu hoặc đăng nhập lại.",
+      code: "EDITOR_SESSION_NETWORK",
+    };
+  }
+}
+
 export default function EditorSessionGate({
   initialLesson,
   returnHref,
@@ -32,49 +65,14 @@ export default function EditorSessionGate({
   returnHref: string;
 }) {
   const [state, setState] = useState<GateState>({ kind: "loading" });
-
-  const checkSession = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const response = await fetch("/api/editor/session", {
-        method: "GET",
-        credentials: "same-origin",
-        cache: "no-store",
-        signal,
-        headers: { accept: "application/json" },
-      });
-      const payload = await response.json() as SessionReply;
-      if (signal?.aborted) return;
-      if (response.ok && verifiedUser(payload.user)) {
-        setState({ kind: "ready", user: payload.user });
-        return;
-      }
-      if (response.status === 401 || response.status === 403) {
-        setState({
-          kind: "denied",
-          message: typeof payload.error === "string" ? payload.error : "Tài khoản hiện tại chưa có quyền Biên tập nội dung.",
-        });
-        return;
-      }
-      setState({
-        kind: "unavailable",
-        message: typeof payload.error === "string" ? payload.error : "Không thể kiểm tra phiên biên tập trên máy chủ.",
-        code: typeof payload.code === "string" ? payload.code : "EDITOR_SESSION_INVALID_REPLY",
-      });
-    } catch {
-      if (signal?.aborted) return;
-      setState({
-        kind: "unavailable",
-        message: "Không kết nối được dịch vụ biên tập. Không cần xóa dữ liệu hoặc đăng nhập lại.",
-        code: "EDITOR_SESSION_NETWORK",
-      });
-    }
-  }, []);
-
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    void checkSession(controller.signal);
+    void loadEditorSession(controller.signal).then((next) => {
+      if (!controller.signal.aborted) setState(next);
+    });
     return () => controller.abort();
-  }, [checkSession]);
+  }, [attempt]);
 
   if (state.kind === "ready") {
     return <EditorWorkspace user={state.user} initialLesson={initialLesson} returnHref={returnHref} />;
@@ -102,7 +100,7 @@ export default function EditorSessionGate({
         ) : null}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "1.2rem" }}>
           {state.kind === "unavailable" || state.kind === "denied" ? (
-            <button type="button" onClick={() => { setState({ kind: "loading" }); void checkSession(); }}
+            <button type="button" onClick={() => { setState({ kind: "loading" }); setAttempt(value => value + 1); }}
               style={{ borderRadius: "0.7rem", padding: "0.8rem 1.2rem",
                 background: "#10b9bd", color: "#05212d", fontWeight: 800 }}>
               Kiểm tra lại
