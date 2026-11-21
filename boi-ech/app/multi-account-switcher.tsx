@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { mayReusePreparedAccountScope } from "./account-scope";
 
 const DB_NAME = "boi-ech-doc-lap";
 const DB_VERSION = 4;
@@ -432,7 +433,7 @@ export async function preparePortableAccount(accountId: string | null, claim = f
   // times. Its credential and local namespace were already verified in this
   // document. Avoid redundant IndexedDB writes and open handles.
   // A claim must still run its one-time legacy migration.
-  if (!claim && existingScope === requestedScope) return;
+  if (mayReusePreparedAccountScope(existingScope, requestedScope, claim)) return;
   if (existingScope && existingScope !== DB_NAME + ":signed-out" && existingScope !== requestedScope)
     throw new Error("ACCOUNT_DOCUMENT_RELOAD_REQUIRED");
   // Each tab keeps its own namespace. Concurrent tabs never swap a shared progress/queue store.
