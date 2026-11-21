@@ -56,7 +56,12 @@ test("disabled, hover and focus visuals have sufficient contrast and visible sta
 test("actual learner names and headers in roster and watchlist are targeted as foreground-background PAIRS",()=>{
  assert.match(roster,/className="teacher-roster-table"/);
  assert.match(roster,/<th>Học viên<\/th><th>Lớp phụ trách<\/th>/);
- assert.match(roster,/<td><strong>\{person.name\}<\/strong><\/td>/);
+ assert.match(roster,/className="teacher-roster-person"/);
+ assert.match(roster,/<strong>\{person.name\}<\/strong>/);
+ const v52=readFileSync(new URL("../app/teacher-roster-v52.css",import.meta.url),"utf8");
+ assert.match(v52,/\.teacher-roster-v52 \.teacher-roster-person/);
+ assert.match(v52,/\.teacher-roster-v52 \.teacher-roster-table td strong/);
+ assert.match(v52,/\.teacher-roster-v52 \.teacher-roster-activity\.older/);
  assert.match(shell,/className="teacher-table"/);
  assert.match(shell,/>Xem hồ sơ<\/button>/);
  for(const name of [".teacher-roster-manager",".teacher-roster-table tbody tr td",
