@@ -1,0 +1,145 @@
+/* V49: grid/list control and compact class review. Display preferences only.
+   Do not hide server warnings or authorization states. */
+.teacher-reference-v36 .teacher-class-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(98,191,221,.35);
+  border-radius: 12px;
+  background: rgba(4,27,44,.76);
+  white-space: nowrap;
+}
+.teacher-reference-v36 .teacher-class-view-switch button {
+  min-height: 34px;
+  min-width: 60px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 10px;
+  background: transparent;
+  color: #c6dfeb;
+  font-weight: 750;
+  cursor: pointer;
+}
+.teacher-reference-v36 .teacher-class-view-switch button.active,
+.teacher-reference-v36 .teacher-class-view-switch button[aria-pressed="true"] {
+  background: #36c7ed;
+  color: #042a3c;
+}
+.teacher-reference-v36 .teacher-class-view-switch button:focus-visible {
+  outline: 3px solid #ffc75e;
+  outline-offset: 2px;
+}
+.teacher-reference-v36 .teacher-class-stage {
+  min-width: 0;
+  align-items: start;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="grid"] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] > article {
+  display: grid;
+  grid-template-columns: minmax(160px, .7fr) minmax(260px, 1.3fr);
+  align-items: center;
+  gap: 12px 18px;
+  min-height: 0;
+  padding: 14px 16px;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] > article > header {
+  grid-column: 1 / -1;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-title {
+  min-width: 0;
+  margin: 0;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] dl {
+  min-width: 0;
+  margin: 0;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-progress,
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-actions,
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-editor {
+  grid-column: 1 / -1;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-actions button {
+  flex: 1 1 110px;
+}
+.teacher-reference-v36 .teacher-class-control-header > div:first-child {
+  min-width: 0;
+}
+.teacher-reference-v36 .teacher-class-control-header [data-teacher-sync-mount="class"] {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 6px;
+  vertical-align: middle;
+}
+.teacher-reference-v36 .teacher-class-stage-heading {
+  min-height: 26px;
+}
+@media (max-width: 1380px) {
+  .teacher-reference-v36 .teacher-class-control-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .teacher-reference-v36 .teacher-class-tools {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 1060px) {
+  .teacher-reference-v36 .teacher-class-stage {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .teacher-reference-v36 .teacher-class-reference-rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(min(100%,245px),1fr));
+    gap: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .teacher-reference-v36 .teacher-class-tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+  .teacher-reference-v36 .teacher-class-search {
+    grid-column: 1 / -1;
+  }
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] > article {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] > article > header,
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-title,
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] dl,
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-progress,
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-actions,
+  .teacher-reference-v36 .teacher-class-card-grid[data-view="list"] .teacher-class-card-editor {
+    grid-column: 1;
+  }
+  .teacher-reference-v36 .teacher-class-view-switch {
+    justify-self: end;
+  }
+}
+@media (max-width: 420px) {
+  .teacher-reference-v36 .teacher-class-tools {
+    grid-template-columns: 1fr;
+  }
+  .teacher-reference-v36 .teacher-class-view-switch {
+    justify-self: stretch;
+  }
+  .teacher-reference-v36 .teacher-class-view-switch button {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .teacher-reference-v36 .teacher-class-view-switch button { transition: none; }
+}
