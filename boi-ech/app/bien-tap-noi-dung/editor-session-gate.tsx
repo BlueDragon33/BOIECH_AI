@@ -34,7 +34,6 @@ export default function EditorSessionGate({
   const [state, setState] = useState<GateState>({ kind: "loading" });
 
   const checkSession = useCallback(async (signal?: AbortSignal) => {
-    setState({ kind: "loading" });
     try {
       const response = await fetch("/api/editor/session", {
         method: "GET",
@@ -103,7 +102,7 @@ export default function EditorSessionGate({
         ) : null}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "1.2rem" }}>
           {state.kind === "unavailable" || state.kind === "denied" ? (
-            <button type="button" onClick={() => void checkSession()}
+            <button type="button" onClick={() => { setState({ kind: "loading" }); void checkSession(); }}
               style={{ borderRadius: "0.7rem", padding: "0.8rem 1.2rem",
                 background: "#10b9bd", color: "#05212d", fontWeight: 800 }}>
               Kiểm tra lại
