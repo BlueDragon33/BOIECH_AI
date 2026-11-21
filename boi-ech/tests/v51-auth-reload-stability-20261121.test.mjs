@@ -69,6 +69,10 @@ test("no unverifiable session can resume, but transient errors do not delete coo
   assert.match(gate,/roleBootstrap\?\.accountId===id && roleBootstrap\.role===account\.role/);
   assert.match(gate,/roleDeviceVerified\.device\.status==="approved"/);
   assert.match(gate,/readAccountPayload\(response\)/);
+  assert.match(gate,/response\.status === 401 &&[\s\S]*?data\.code === "SESSION_INVALID"/);
+  assert.match(gate,/data\.code === "SESSION_REQUIRED"/);
+  assert.doesNotMatch(gate,/if\(response\.status===401\) return \{\}/);
+
   assert.match(editor,/credentials: "same-origin"/);
   assert.match(editor,/EDITOR_SESSION_NETWORK/);
   const reload=gate.slice(gate.indexOf("const reload = useCallback"),gate.indexOf("useEffect(()=>{",gate.indexOf("const reload = useCallback")));
