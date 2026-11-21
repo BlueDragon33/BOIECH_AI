@@ -37,6 +37,19 @@ test("P-256 credential databases are closed after reads/writes and never deleted
     assert.match(match[0],/finally \{[\s\S]*?db\.close\(\)/);
   }
   assert.match(portable,/finally \{ profileDb\.close\(\); \}/);
+  assert.match(portable,/request\.result\.onversionchange = \(\) => request\.result\.close\(\)/);
+  for(const func of ["snapshotLocalState","restoreLocalState","storeVaultRecord"]){
+    const start=portable.indexOf("async function "+func+"(");
+    assert.ok(start>0,func+" must exist");
+    const end=portable.indexOf("\nasync function ",start+15);
+    const body=portable.slice(start,end>0?end:undefined);
+    assert.match(body,/finally \{[\s\S]*?db\.close\(\)/,func+" should close IDB");
+  }
+  for(const func of ["readKeyedValues","listVaultRecords"]){
+    const start=portable.indexOf("async function "+func+"(");
+    const end=portable.indexOf("\nasync function ",start+15);
+    assert.match(portable.slice(start,end>0?end:undefined),/\.finally\(\(\) => db\.close\(\)\)/);
+  }
   const prepare=portable.slice(portable.indexOf("export async function preparePortableAccount"),portable.indexOf("export async function portableWorkspaceCredential"));
   assert.doesNotMatch(prepare,/deleteDatabase|clearAccountLocalState\(/);
 });
