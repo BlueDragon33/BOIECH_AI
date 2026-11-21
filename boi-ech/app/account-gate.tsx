@@ -279,7 +279,6 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     // Activity signals are UX hints, not authentication. Only a valid,
     // non-revoked server cookie can refresh its bounded lease. A hidden or
     // abandoned tab must not keep the session alive indefinitely.
-    const engagement=()=>{if(!document.hidden)lastUserEngagementAt.current=Date.now();};
     const keepAliveIfEngaged=async()=>{
       const now=Date.now();
       if(!current.current || now-lastLeaseRenewalAttemptAt.current<4*60_000)return;
@@ -296,6 +295,16 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
         // Never treat an uncertain keepalive transport as logout. The
         // authoritative readback below distinguishes expired from unavailable.
       }
+    };
+    // A person may stay on the same tab for longer than the server's 30-minute
+    // idle window. Refreshing the browser must not log them out merely because
+    // focus/pageshow did not fire while they studied, edited, or watched video.
+    // Only foreground real interactions/media progress trigger this bounded
+    // (at most once per four minutes) server-authorized lease renewal.
+    const engagement=()=>{
+      if(document.hidden || lock.current)return;
+      lastUserEngagementAt.current=Date.now();
+      void keepAliveIfEngaged();
     };
     // Conditional sync: no recurring server polling. Only real external
     // notifications, cross-tab changes, manual refresh, reconnect or resume.
@@ -325,6 +334,9 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
     window.addEventListener("wheel",engagement,{passive:true});
     window.addEventListener("touchstart",engagement,{passive:true});
     window.addEventListener("scroll",engagement,{passive:true,capture:true});
+    // Non-bubbling timeupdate is observed in capture phase; the renewal still
+    // checks visibility + actual playing state and is throttle-limited.
+    document.addEventListener("timeupdate",engagement,true);
     refresh(); window.addEventListener("focus", refresh); window.addEventListener("pageshow",refresh);
     window.addEventListener("online",refresh);
     document.addEventListener("visibilitychange",onVisibility);
@@ -346,6 +358,7 @@ export default function AccountGate({ enabled, children }: { enabled: boolean; c
       window.removeEventListener("wheel",engagement);
       window.removeEventListener("touchstart",engagement);
       window.removeEventListener("scroll",engagement,true);
+      document.removeEventListener("timeupdate",engagement,true);
       window.removeEventListener("focus", refresh); window.removeEventListener("pageshow",refresh);
       window.removeEventListener("online",refresh);
       document.removeEventListener("visibilitychange",onVisibility);
